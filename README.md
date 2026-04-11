@@ -1,5 +1,7 @@
 <p align="center">
-  <a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="200" alt="Laravel" /></a>
+  <a href="https://laravel.com" target="_blank">
+    <img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="200" alt="Laravel" />
+  </a>
 </p>
 
 # Vanep API
@@ -12,21 +14,34 @@ API for the Vanep application (Laravel, Passport, Sail).
 
 - PHP **8.3+** (Composer); Sail runtime in this repo uses **PHP 8.5**
 - Composer
-- Docker (or [Colima](https://github.com/abiosoft/colima) on macOS)
+- Docker e Docker Compose
 - Node.js **20+** and npm (for Vite assets; can also run via Sail)
 
 ---
 
 ## How to install
 
-### Install Colima (macOS, optional)
+### Install Docker
+
+#### Linux
 
 ```bash
-brew install colima
-colima start
+# Ubuntu/Debian
+sudo apt update
+sudo apt install -y docker.io docker-compose-plugin
+
+# Adicionar seu usuário ao grupo docker (evita usar sudo)
+sudo usermod -aG docker $USER
+newgrp docker
 ```
 
-Stop with `colima stop`.
+> Para outras distros, siga a [documentação oficial](https://docs.docker.com/engine/install/).
+
+#### Windows
+
+1. Instale o [Docker Desktop para Windows](https://docs.docker.com/desktop/install/windows-install/)
+2. Certifique-se de que o **WSL 2** está habilitado (recomendado)
+3. Após instalar, o comando `docker compose` já estará disponível no terminal
 
 ---
 
@@ -127,7 +142,8 @@ MAIL_USERNAME=null
 MAIL_PASSWORD=null
 ```
 
-App: [http://localhost](http://localhost) (port **80**, or `APP_PORT`). Mailpit UI: [http://localhost:8025](http://localhost:8025).
+- App: [http://localhost](http://localhost) (port **80**, or `APP_PORT`)
+- Mailpit UI: [http://localhost:8025](http://localhost:8025)
 
 Mailpit is **already** in `compose.yaml`; you do not need `sail:add mailpit`.
 
@@ -136,7 +152,7 @@ Mailpit is **already** in `compose.yaml`; you do not need `sail:add mailpit`.
 ## Makefile (development)
 
 | Command | Description |
-|---------|-------------|
+|---|---|
 | `make up` | Start containers (detached) |
 | `make down` | Stop containers |
 | `make nuke` | Stop containers and remove volumes |
@@ -150,7 +166,7 @@ Mailpit is **already** in `compose.yaml`; you do not need `sail:add mailpit`.
 | `make lint` | Check code style (Laravel Pint, read-only) |
 | `make lint-fix` | Auto-fix code style (Pint) |
 | `make test` | Run tests |
-| `make test-coverage` | Run tests with coverage (needs PCOV or Xdebug coverage in PHP) |
+| `make test-coverage` | Run tests with coverage (needs PCOV or Xdebug) |
 | `make worker-up` | Start queue worker in the background |
 | `make worker-down` | Stop queue worker processes in the container |
 | `make worker-restart` | Restart queue worker |
@@ -182,7 +198,7 @@ Mailpit receives SMTP mail from the app in development.
 
 ### Configure `.env`
 
-```
+```env
 MAIL_MAILER=smtp
 MAIL_HOST=mailpit
 MAIL_PORT=1025
@@ -201,18 +217,6 @@ make test
 make artisan args="route:list"
 make down
 ```
-
----
-
-## Sail alias (optional)
-
-In `~/.zshrc`:
-
-```bash
-alias sail='[ -f sail ] && bash sail || bash vendor/bin/sail'
-```
-
-Then `source ~/.zshrc` and use `sail` instead of `./vendor/bin/sail` if you prefer.
 
 ---
 
