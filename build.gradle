@@ -1,0 +1,85 @@
+plugins {
+	id 'java'
+	id 'org.springframework.boot' version '4.0.6'
+	id 'io.spring.dependency-management' version '1.1.7'
+	id 'jacoco'
+	id 'com.diffplug.spotless' version '8.0.0'
+}
+
+group = 'br.com'
+version = '0.0.1-SNAPSHOT'
+
+java {
+	toolchain {
+		languageVersion = JavaLanguageVersion.of(25)
+	}
+}
+
+repositories {
+	mavenCentral()
+}
+
+dependencies {
+	implementation 'org.springframework.boot:spring-boot-starter'
+	implementation 'org.springframework.boot:spring-boot-starter-web'
+	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.named('test') {
+	useJUnitPlatform()
+	finalizedBy jacocoTestReport
+}
+
+spotless {
+	java {
+		target 'src/**/*.java'
+		// GJF ≥ 1.27.x trata JDK 25; Spotless 8.x alinha versões do formatador.
+		googleJavaFormat('1.27.0')
+		removeUnusedImports()
+		trimTrailingWhitespace()
+	}
+}
+
+tasks.named('check') {
+	dependsOn jacocoTestCoverageVerification
+	dependsOn 'spotlessCheck'
+}
+
+jacoco {
+	toolVersion = '0.8.14'
+}
+
+// `main` não é executado nos testes; excluir a classe de entrada do relatório e da verificação.
+def jacocoExcludedClasses = ['**/VanepApplication.class']
+
+jacocoTestReport {
+	dependsOn test
+	afterEvaluate {
+		classDirectories.setFrom(files(sourceSets.main.output.classesDirs.collect {
+			fileTree(dir: it, exclude: jacocoExcludedClasses)
+		}))
+	}
+	reports {
+		xml.required = true
+		html.required = true
+	}
+}
+
+jacocoTestCoverageVerification {
+	dependsOn test
+	afterEvaluate {
+		classDirectories.setFrom(files(sourceSets.main.output.classesDirs.collect {
+			fileTree(dir: it, exclude: jacocoExcludedClasses)
+		}))
+	}
+	violationRules {
+		rule {
+			limit {
+				counter = 'LINE'
+				value = 'COVEREDRATIO'
+				minimum = 0.75
+			}
+		}
+	}
+}
