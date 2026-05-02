@@ -1,163 +1,49 @@
-SAIL ?= ./vendor/bin/sail
-COMPOSE ?= docker compose
-args ?=
+GRADLEW = ./gradlew
+COMPOSE = docker compose
+SERVICE = vanep
 
-.DEFAULT_GOAL := help
+.PHONY: up down nuke restart logs shell test test-coverage check boot-run build clean docker-build lint lint-fix
 
-.PHONY: help
-help:
-	@echo "Vanep API ($(SAIL))"
-	@grep -E '^[a-zA-Z][a-zA-Z0-9_.-]*:' $(MAKEFILE_LIST) | sed 's/:.*//' | sort -u
-
-.PHONY: install
-install:
-	composer install
-
-.PHONY: env
-env:
-	@test -f .env || cp .env.example .env
-
-.PHONY: up
 up:
-	$(SAIL) up -d
+	$(COMPOSE) up -d
 
-.PHONY: down
 down:
-	$(SAIL) down
+	$(COMPOSE) down
 
-.PHONY: nuke
 nuke:
-	$(SAIL) down -v --remove-orphans
+	$(COMPOSE) down -v
 
-.PHONY: restart
-restart:
-	$(SAIL) restart
+restart: down up
 
-.PHONY: logs
 logs:
-	$(SAIL) logs -f
+	$(COMPOSE) logs -f $(SERVICE)
 
-.PHONY: build-sail
-build-sail:
-	$(SAIL) build --no-cache
-
-.PHONY: shell
 shell:
-	$(SAIL) shell
+	$(COMPOSE) exec $(SERVICE) sh
 
-.PHONY: root-shell
-root-shell:
-	$(SAIL) root-shell
+docker-build:
+	$(COMPOSE) build
 
-.PHONY: psql
-psql:
-	$(SAIL) psql
-
-.PHONY: artisan
-artisan:
-	$(SAIL) php artisan $(args)
-
-.PHONY: composer
-composer:
-	$(SAIL) composer $(args)
-
-.PHONY: npm
-npm:
-	$(SAIL) npm $(args)
-
-.PHONY: npm-install
-npm-install:
-	$(SAIL) npm install
-
-.PHONY: vite-dev
-vite-dev:
-	$(SAIL) npm run dev
-
-.PHONY: vite-build
-vite-build:
-	$(SAIL) npm run build
-
-.PHONY: migrate
-migrate:
-	$(SAIL) php artisan migrate
-
-.PHONY: migrate-fresh
-migrate-fresh:
-	$(SAIL) php artisan migrate:fresh
-
-.PHONY: seed
-seed:
-	$(SAIL) php artisan db:seed
-
-.PHONY: migrate-fresh-seed
-migrate-fresh-seed:
-	$(SAIL) php artisan migrate:fresh --seed
-
-.PHONY: passport-install
-passport-install:
-	$(SAIL) php artisan passport:install
-
-.PHONY: passport-keys
-passport-keys:
-	$(SAIL) php artisan passport:keys
-
-.PHONY: optimize-clear
-optimize-clear:
-	$(SAIL) php artisan optimize:clear
-
-.PHONY: key
-key:
-	$(SAIL) php artisan key:generate --ansi
-
-.PHONY: test
 test:
-	$(SAIL) php artisan test
+	$(GRADLEW) test --no-daemon
 
-.PHONY: test-coverage
 test-coverage:
-	$(SAIL) php artisan test --coverage
+	$(GRADLEW) check --no-daemon
 
-.PHONY: test-host
-test-host:
-	composer run test
+check: test-coverage
 
-.PHONY: lint
+boot-run:
+	$(GRADLEW) bootRun --no-daemon
+
+build:
+	$(GRADLEW) bootJar --no-daemon
+
+clean:
+	$(GRADLEW) clean --no-daemon
+
+# Estilo de código (Spotless + Google Java Format); equivalente ao Pint no Laravel
 lint:
-	$(SAIL) pint --test $(PINT_ARGS)
+	$(GRADLEW) spotlessCheck --no-daemon
 
-.PHONY: lint-fix
 lint-fix:
-	$(SAIL) pint $(PINT_ARGS)
-
-.PHONY: pail
-pail:
-	$(SAIL) php artisan pail
-
-.PHONY: dev-host
-dev-host:
-	composer run dev
-
-.PHONY: queue-work
-queue-work:
-	$(SAIL) php artisan queue:work
-
-.PHONY: worker-up
-worker-up:
-	$(COMPOSE) exec -d laravel.test php artisan queue:work
-
-.PHONY: worker-down
-worker-down:
-	$(COMPOSE) exec -T laravel.test sh -c 'pkill -TERM -f "queue:work" 2>/dev/null || true'
-
-.PHONY: worker-restart
-worker-restart: worker-down worker-up
-
-.PHONY: install-api
-install-api:
-	$(SAIL) php artisan install:api
-
-.PHONY: setup
-setup: install env up key migrate
-	$(SAIL) php artisan passport:install -n
-	$(SAIL) npm install
-	$(SAIL) npm run build
+	$(GRADLEW) spotlessApply --no-daemon

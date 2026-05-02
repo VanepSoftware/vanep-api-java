@@ -1,225 +1,135 @@
-<p align="center">
-  <a href="https://laravel.com" target="_blank">
-    <img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="200" alt="Laravel" />
-  </a>
-</p>
-
 # Vanep API
 
-API for the Vanep application (Laravel, Passport, Sail).
+API Spring Boot do projeto Vanep. Este repositório usa **Gradle (DSL Groovy)** para desenvolvimento local e **Docker** para imagem de execução em CI/CD e deploy.
 
 ---
 
-## Requirements
+## Versões principais
 
-- PHP **8.3+** (Composer); Sail runtime in this repo uses **PHP 8.5**
-- Composer
-- Docker e Docker Compose
-- Node.js **20+** and npm (for Vite assets; can also run via Sail)
+| Componente | Versão |
+| --- | --- |
+| Java | **25** |
+| Spring Boot | **4.0.6** |
+| Gradle (wrapper) | **9.4.1** (`gradle/wrapper/gradle-wrapper.properties`) |
+| Build script | **Groovy** (`build.gradle`, `settings.gradle`) |
 
----
+Outras dependências transitivas seguem o BOM do Spring Boot via `io.spring.dependency-management`.
 
-## How to install
-
-### Install Docker
-
-#### Linux
-
-```bash
-# Ubuntu/Debian
-sudo apt update
-sudo apt install -y docker.io docker-compose-plugin
-
-# Adicionar seu usuário ao grupo docker (evita usar sudo)
-sudo usermod -aG docker $USER
-newgrp docker
-```
-
-> Para outras distros, siga a [documentação oficial](https://docs.docker.com/engine/install/).
-
-#### Windows
-
-1. Instale o [Docker Desktop para Windows](https://docs.docker.com/desktop/install/windows-install/)
-2. Certifique-se de que o **WSL 2** está habilitado (recomendado)
-3. Após instalar, o comando `docker compose` já estará disponível no terminal
+**Estilo de código:** [Spotless](https://github.com/diffplug/spotless) com **Google Java Format** (via Gradle). O `./gradlew check` inclui **`spotlessCheck`** — o CI falha se o código não estiver formatado.
 
 ---
 
-### Set up the application
+## Requisitos
 
-#### 1. Copy environment file
+### Desenvolvimento (Gradle na máquina)
 
-```bash
-cp .env.example .env
-```
+- **JDK 25** (alinhado ao `java.toolchain` no `build.gradle`)
+- Nada mais obrigatório: o **Gradle Wrapper** (`./gradlew`) baixa o Gradle correto
 
-Configure database and Redis for Sail (see **Environment for Sail** below) before running migrations.
+### Docker (CI, deploy, ambiente containerizado)
 
-#### 2. Install dependencies
+- **Docker** e **Docker Compose** v2 (`docker compose`)
 
-```bash
-composer install
-```
+### Opcional
 
-#### 3. Start containers
-
-```bash
-make up
-```
-
-#### 4. Generate application key
-
-```bash
-make artisan args="key:generate"
-```
-
-#### 5. Run migrations
-
-```bash
-make migrate
-```
-
-#### 6. Generate Passport encryption keys
-
-```bash
-make artisan args="passport:keys"
-```
-
-#### 7. Create OAuth clients
-
-Create Passport clients with Artisan, for example a public client (PKCE, no secret):
-
-```bash
-make artisan args="passport:client --public"
-```
-
-When prompted for the redirect URI, use the callback URL of your SPA (example: `http://localhost:3000/api/auth/callback/your-app`).
-
-Alternatively, `make passport-install` runs `passport:install` (non-interactive shortcut: `make artisan args="passport:install -n"`).
-
-#### 8. Seed the database (optional)
-
-```bash
-make artisan args="db:seed"
-```
-
-The default `DatabaseSeeder` creates a single demo user (`test@example.com`). There is **no** roles package or role seeder in this repo yet.
-
-#### 9. Front-end assets (optional)
-
-```bash
-make npm-install
-make vite-build
-```
+- **GNU Make** — para usar os atalhos do `Makefile` na raiz do projeto
 
 ---
 
-## Environment for Sail
+## Makefile (atalhos)
 
-`compose.yaml` includes **PostgreSQL**, **Redis**, and **Mailpit**. Example `.env` values:
+Na raiz do repositório (com `make` instalado):
 
-```env
-APP_URL=http://localhost
-
-DB_CONNECTION=pgsql
-DB_HOST=pgsql
-DB_PORT=5432
-DB_DATABASE=laravel
-DB_USERNAME=sail
-DB_PASSWORD=password
-
-REDIS_HOST=redis
-
-CACHE_STORE=redis
-SESSION_DRIVER=database
-QUEUE_CONNECTION=database
-
-MAIL_MAILER=smtp
-MAIL_HOST=mailpit
-MAIL_PORT=1025
-MAIL_SCHEME=null
-MAIL_USERNAME=null
-MAIL_PASSWORD=null
-```
-
-- App: [http://localhost](http://localhost) (port **80**, or `APP_PORT`)
-- Mailpit UI: [http://localhost:8025](http://localhost:8025)
-
-Mailpit is **already** in `compose.yaml`; you do not need `sail:add mailpit`.
+| Alvo | O que faz |
+| --- | --- |
+| `make up` | `docker compose up -d` — sobe os containers em segundo plano |
+| `make down` | `docker compose down` |
+| `make nuke` | `docker compose down -v` — para e remove volumes |
+| `make restart` | `down` + `up` |
+| `make logs` | Acompanha logs do serviço `vanep` (`docker compose logs -f`) |
+| `make shell` | Shell no container (`docker compose exec vanep sh`) |
+| `make docker-build` | `docker compose build` |
+| `make lint` | Verifica formatação Spotless (`./gradlew spotlessCheck`), igual ideia do Pint `--test` |
+| `make lint-fix` | Aplica formatação (`./gradlew spotlessApply`), igual ideia do Pint sem `--test` |
+| `make test` | Só testes (`./gradlew test`) |
+| `make test-coverage` | Lint Spotless + testes + JaCoCo + cobertura ≥ 75 % (`./gradlew check`) |
+| `make check` | Igual a `make test-coverage` |
+| `make boot-run` | Sobe a API localmente (`./gradlew bootRun`, porta **8080**) |
+| `make build` | Gera o JAR (`./gradlew bootJar`) |
+| `make clean` | `./gradlew clean` |
 
 ---
 
-## Makefile (development)
+## Desenvolvimento local com Gradle
 
-| Command | Description |
-|---|---|
-| `make up` | Start containers (detached) |
-| `make down` | Stop containers |
-| `make nuke` | Stop containers and remove volumes |
-| `make restart` | Restart containers |
-| `make shell` | Shell in the app container |
-| `make migrate` | Run migrations |
-| `make migrate-fresh` | Drop all tables and re-run migrations |
-| `make artisan args="..."` | Run Artisan (e.g. `make artisan args="migrate:status"`) |
-| `make composer args="..."` | Run Composer in the container |
-| `make npm args="..."` | Run npm in the container |
-| `make lint` | Check code style (Laravel Pint, read-only) |
-| `make lint-fix` | Auto-fix code style (Pint) |
-| `make test` | Run tests |
-| `make test-coverage` | Run tests with coverage (needs PCOV or Xdebug) |
-| `make worker-up` | Start queue worker in the background |
-| `make worker-down` | Stop queue worker processes in the container |
-| `make worker-restart` | Restart queue worker |
-
-### Linter (Laravel Pint)
-
-[Pint](https://laravel.com/docs/pint) keeps PHP style consistent.
+Clone o repositório e, na raiz:
 
 ```bash
-make lint
-make lint-fix
+chmod +x gradlew   # apenas se o arquivo não estiver executável
 ```
 
-### Queue worker
+### Como rodar os testes
 
-With `QUEUE_CONNECTION=database`, jobs use the `jobs` table; run a worker to process them.
+| Objetivo | Com Make | Com Gradle direto |
+| --- | --- | --- |
+| Rodar **só** a suíte de testes | `make test` | `./gradlew test` |
+| Rodar **lint**, testes **e** validar cobertura (**≥ 75 %** em linhas) + relatório JaCoCo | `make test-coverage` ou `make check` | `./gradlew check` |
 
-```bash
-make worker-up
-make worker-down
-make worker-restart
-```
+Relatório HTML do JaCoCo (gerado após `check` ou `test`; o HTML completo costuma aparecer após `check` por causa da ordem das tarefas):
+
+- **`build/reports/jacoco/test/html/index.html`** — abra no navegador para ver linhas cobertas por arquivo.
+
+Outros comandos úteis:
+
+| Comando | Descrição |
+| --- | --- |
+| `./gradlew bootRun` | Sobe a aplicação em modo desenvolvimento (porta padrão **8080**) |
+| `./gradlew bootJar` | Gera o JAR executável em `build/libs/` |
+| `./gradlew jacocoTestReport` | Regenera só o relatório JaCoCo (normalmente já roda após `test`) |
+| `./gradlew spotlessCheck` | Só verifica formatação (também entra no `check`) |
+| `./gradlew spotlessApply` | Aplica a formatação em `src/**/*.java` |
+
+### Cobertura de testes (JaCoCo)
+
+- O gate de CI e o alvo **`make test-coverage`** usam **`./gradlew check`**, que inclui **`spotlessCheck`** (formatação) e **`jacocoTestCoverageVerification`**: cobertura mínima de **75 %** em **linhas** no conjunto de classes analisadas.
+- A classe **`VanepApplication`** (ponto de entrada com `main`) está **excluída** do relatório e da verificação JaCoCo, pois o `main` não é executado pela suíte de testes — prática comum em apps Spring Boot.
 
 ---
 
-## Mail in development (Mailpit)
+## Docker e Compose (deploy / paridade com CI)
 
-Mailpit receives SMTP mail from the app in development.
-
-### Configure `.env`
-
-```env
-MAIL_MAILER=smtp
-MAIL_HOST=mailpit
-MAIL_PORT=1025
-```
-
-### Open the Mailpit UI
-
-[http://localhost:8025](http://localhost:8025)
-
-**Examples**
+A imagem é construída com **multi-stage Dockerfile** (JDK 25 para build, JRE 25 para execução).
 
 ```bash
-make up
-make migrate
-make test
-make artisan args="route:list"
-make down
+docker compose build
+docker compose up
 ```
+
+A API fica em **`http://localhost:8080`** (ajuste com a variável **`APP_PORT`** se precisar). O endpoint raiz **`GET /`** retorna o texto `vanep`.
+
+Para gerar só a imagem:
+
+```bash
+docker build -t vanep-api:local .
+docker run --rm -p 8080:8080 vanep-api:local
+```
+
+**Nota:** alterações no código exigem **rebuild** da imagem (`docker compose build` ou `docker compose up --build`) para entrarem no container; no dia a dia o fluxo típico é desenvolver com **`./gradlew`** e usar Docker quando for validar/deployar.
 
 ---
 
-## License
+## CI no GitHub Actions
 
-MIT (Laravel framework and default application structure).
+O workflow **`.github/workflows/ci.yml`** roda em `push` e `pull_request` para `main` e `master`:
+
+1. **`./gradlew check`** — **Spotless** (estilo Google Java Format), testes e falha se a cobertura JaCoCo ficar abaixo de **75 %** (linhas).
+2. **`docker build`** — garante que a imagem Docker continua buildando.
+3. **Smoke test** — sobe um container e valida **`GET http://127.0.0.1:8080/`** (corpo `vanep`).
+
+Artefato opcional: relatório HTML do JaCoCo é publicado como artifact **`jacoco-html`**.
+
+---
+
+## Licença
+
+MIT.
