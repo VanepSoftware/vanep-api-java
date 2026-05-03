@@ -40,10 +40,29 @@ jobs:
       - name: Smoke test — app no Docker responde em GET /
         run: |
           set -euo pipefail
-          cid=$(docker run -d -p 8080:8080 vanep-api:ci)
-          cleanup() { docker rm -f "$cid" >/dev/null 2>&1 || true; }
+          net=vanep-ci
+          docker network create "$net"
+          docker run -d --name postgres --network "$net" \
+            -e POSTGRES_DB=vanep -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres \
+            postgres:17-alpine
+          cleanup() {
+            docker rm -f app-ci postgres >/dev/null 2>&1 || true
+            docker network rm "$net" >/dev/null 2>&1 || true
+          }
           trap cleanup EXIT
-          for _ in $(seq 1 30); do
+          for _ in $(seq 1 60); do
+            if docker exec postgres pg_isready -U postgres -d vanep >/dev/null 2>&1; then
+              break
+            fi
+            sleep 1
+          done
+          docker exec postgres pg_isready -U postgres -d vanep
+          cid=$(docker run -d --name app-ci --network "$net" -p 8080:8080 \
+            -e SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/vanep \
+            -e SPRING_DATASOURCE_USERNAME=postgres \
+            -e SPRING_DATASOURCE_PASSWORD=postgres \
+            vanep-api:ci)
+          for _ in $(seq 1 60); do
             if curl -fsS --max-time 3 "http://127.0.0.1:8080/" | grep -qx 'vanep'; then
               echo "Smoke OK: GET / retorna vanep"
               exit 0
