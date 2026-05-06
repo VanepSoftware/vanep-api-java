@@ -19,6 +19,10 @@ repositories {
 	mavenCentral()
 }
 
+bootRun {
+	systemProperty 'spring.profiles.active', 'local'
+}
+
 dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter'
 	implementation 'org.springframework.boot:spring-boot-starter-web'
