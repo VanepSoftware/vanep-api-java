@@ -60,10 +60,9 @@ No serviço **`vanep`**, o Compose ainda define **`POSTGRES_HOST=postgres`** (no
 Para correr a app **fora** do container com `./gradlew bootRun` ou `make dev` / `make boot-run`, o Gradle activa o perfil **`local`** (`spring.profiles.active=local` no `bootRun`).
 
 - **`application.properties`** — configuração comum (nome da app, JPA, Flyway), **sem** datasource.
-- **`application-local.properties`** — JDBC e credenciais para o Postgres no host (ex.: `127.0.0.1` e a mesma porta que mapeaste no Compose). Este ficheiro **não** é versionado; existe **`application-local.properties.example`** como modelo.
-- Na primeira vez, o **Makefile** pode criar `application-local.properties` a partir do example (`setup-local`).
+- **`application-local.properties`** — JDBC no host (`127.0.0.1`) com placeholders **`${POSTGRES_*}`** (sem senhas no Git). O **`./gradlew bootRun`** lê **`.env`** na raiz (via `build.gradle`) e injeta essas variáveis no processo; sem `.env`, exporta **`POSTGRES_*`** manualmente ou define-as na IDE.
 
-Alinha o URL/porta em **`application-local.properties`** com o **`POSTGRES_PORT`** do `.env` (se expuseres o Postgres em `5432` no host, o JDBC típico é `jdbc:postgresql://127.0.0.1:5432/<POSTGRES_DB>`).
+Alinha **`POSTGRES_PORT`** no `.env` com o mapeamento do Compose (por defeito `jdbc:postgresql://127.0.0.1:<POSTGRES_PORT>/<POSTGRES_DB>`).
 
 ### Cursor / VS Code
 
@@ -76,7 +75,7 @@ O **`.vscode/launch.json`** passa **`-Dspring.profiles.active=local`** para alin
 - **Flyway** aplica migrações em `src/main/resources/db/migration` na subida da aplicação. O projeto inclui **`flyway-database-postgresql`** no Gradle (PostgreSQL 17.x com Flyway 10+).
 - **Perfis Spring:**
   - **`local`** — datasource em **`application-local.properties`** (Gradle na máquina, Postgres normalmente em `127.0.0.1`).
-  - **`docker`** — datasource em **`application-docker.properties`**; variáveis `POSTGRES_*` vêm do ambiente do contentor (via `.env` no Compose).
+  - **`docker`** — datasource em **`application-docker.properties`** (porta **5432** na rede entre contentores; não uses `POSTGRES_PORT` do host no JDBC). Variáveis `POSTGRES_*` vêm do ambiente (`.env` no Compose / CI).
   - **`test`** — H2 em memória; Flyway desligado nos testes.
 
 Evita usar **`localhost`** no JDBC no host se o Postgres do Docker só estiver a ouvir em **IPv4** no mapeamento da porta — **`127.0.0.1`** costuma ser mais previsível que **`localhost`** (IPv6).
@@ -108,9 +107,8 @@ Na raiz do repositório (com `make` instalado):
 
 | Alvo | O que faz |
 | --- | --- |
-| `make setup-env` | Falha com mensagem útil se **`.env`** não existir (obrigatório para Compose) |
-| `make setup-local` | Cria **`application-local.properties`** a partir do **example** se ainda não existir |
-| `make dev` | `setup-env` → sobe Postgres (`db-up`) → `setup-local` → espera porta → **`./gradlew bootRun`** (perfil **local**) |
+| `make setup-env` | Falha com mensagem útil se **`.env`** não existir (obrigatório para Compose e recomendado para `bootRun`) |
+| `make dev` | `setup-env` → sobe Postgres (`db-up`) → espera porta → **`./gradlew bootRun`** (perfil **local**, `.env` carregado pelo Gradle) |
 | `make db-up` | Exige **`.env`**; `docker compose up -d postgres` |
 | `make db-down` | `docker compose stop postgres` |
 | `make db-logs` | Logs do Postgres (`docker compose logs -f postgres`) |
@@ -127,7 +125,7 @@ Na raiz do repositório (com `make` instalado):
 | `make lint-fix` | `./gradlew spotlessApply` |
 | `make test` | `./gradlew test` |
 | `make test-coverage` / `make check` | `./gradlew check` (Spotless + testes + JaCoCo ≥ 75 % linhas) |
-| `make boot-run` | `setup-local` → `./gradlew bootRun` (perfil **local**) — Postgres precisa de estar acessível (ex.: `make db-up`) |
+| `make boot-run` | `setup-env` → `./gradlew bootRun` (perfil **local**) — Postgres precisa de estar acessível (ex.: `make db-up`) |
 | `make build` | `./gradlew bootJar` |
 | `make clean` | `./gradlew clean` |
 
@@ -140,7 +138,7 @@ Clone o repositório e, na raiz:
 ```bash
 chmod +x gradlew   # apenas se o arquivo não estiver executável
 cp .env.example .env
-# Edite .env e copie application-local.properties.example → application-local.properties se necessário.
+# Edite .env (POSTGRES_* , POSTGRES_PORT e APP_PORT).
 ```
 
 ### Como rodar os testes
@@ -160,7 +158,7 @@ Outros comandos úteis:
 
 | Comando | Descrição |
 | --- | --- |
-| `./gradlew bootRun` | Perfil **local** por defeito (ver `build.gradle`); precisa de **`application-local.properties`** e Postgres alinhado |
+| `./gradlew bootRun` | Perfil **local** por defeito (ver `build.gradle`); precisa de **`.env`** na raiz (ou variáveis **`POSTGRES_*`** no ambiente) e Postgres alinhado |
 | `./gradlew bootJar` | Gera o JAR em `build/libs/` |
 | `./gradlew spotlessCheck` / `spotlessApply` | Formatação |
 
@@ -173,9 +171,9 @@ Outros comandos úteis:
 
 ## Docker e Compose
 
-A imagem usa **multi-stage Dockerfile** (JDK 25 build, JRE 25 runtime).
+A imagem usa **multi-stage Dockerfile** (JDK 25 build, JRE 25 runtime). O **`Dockerfile`** define **`SPRING_PROFILES_ACTIVE=docker`** por defeito; o Compose pode reforçar o mesmo valor.
 
-O **`docker-compose.yml`** define **postgres** e **vanep**, com **`env_file: .env`** para credenciais e portas no host. O serviço **vanep** usa **`SPRING_PROFILES_ACTIVE=docker`** e **`POSTGRES_HOST=postgres`** na rede interna.
+O **`docker-compose.yml`** define **postgres** e **vanep**, com **`env_file: .env`** para credenciais e portas no host. O serviço **vanep** usa **`POSTGRES_HOST=postgres`** na rede interna.
 
 ```bash
 cp .env.example .env   # preencher
@@ -199,6 +197,15 @@ O workflow **`.github/workflows/ci.yml`** corre em `push` e `pull_request` para 
 1. **`./gradlew check`** — Spotless, testes e cobertura JaCoCo ≥ **75 %** (linhas).
 2. **`docker build`** — imagem continua a construir.
 3. **Smoke test** — rede Docker, Postgres com **`POSTGRES_*`**, API com perfil **`docker`** e variáveis **`POSTGRES_*`** / **`POSTGRES_HOST`**, validação de **`GET http://127.0.0.1:8080/`** (corpo `vanep`).
+
+Valores do Postgres de CI **não estão fixos no YAML**: o workflow lê **variáveis** e **secret** do repositório (Settings → Secrets and variables → Actions), com **fallback** (`vanep` / `postgres` / `5432`) quando não estão definidos — necessário para **PRs a partir de forks**, onde secrets customizados não são expostos ao runner.
+
+| Onde definir | Nome | Uso |
+| --- | --- | --- |
+| Variables | `CI_POSTGRES_DB` | Nome da base (fallback: `vanep`) |
+| Variables | `CI_POSTGRES_USER` | Utilizador (fallback: `postgres`) |
+| Variables | `CI_POSTGRES_PORT` | Porta no smoke (fallback: `5432`) |
+| Secrets | `CI_POSTGRES_PASSWORD` | Senha (fallback: `postgres`) |
 
 Artefacto opcional: **`jacoco-html`**.
 

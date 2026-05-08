@@ -21,6 +21,24 @@ repositories {
 
 bootRun {
 	systemProperty 'spring.profiles.active', 'local'
+	def envFile = rootProject.file('.env')
+	if (envFile.exists()) {
+		envFile.eachLine { line ->
+			def trimmed = line.trim()
+			if (trimmed.isEmpty() || trimmed.startsWith('#')) {
+				return
+			}
+			def eq = trimmed.indexOf('=')
+			if (eq > 0) {
+				def key = trimmed.substring(0, eq).trim()
+				def value = trimmed.substring(eq + 1).trim()
+				if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+					value = value.substring(1, value.length() - 1)
+				}
+				environment key, value
+			}
+		}
+	}
 }
 
 dependencies {

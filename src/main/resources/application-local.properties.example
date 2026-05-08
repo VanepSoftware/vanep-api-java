@@ -1,6 +1,0 @@
-# Copie para application-local.properties na mesma pasta e ajuste (o ficheiro real está no .gitignore).
-
-spring.datasource.url=jdbc:postgresql://127.0.0.1:5432/vanep
-spring.datasource.username=postgres
-spring.datasource.password=postgres
-spring.datasource.driver-class-name=org.postgresql.Driver

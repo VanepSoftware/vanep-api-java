@@ -3,17 +3,11 @@ COMPOSE = docker compose
 SERVICE = vanep
 POSTGRES_SERVICE = postgres
 
-LOCAL_PROPS = src/main/resources/application-local.properties
-LOCAL_EXAMPLE = src/main/resources/application-local.properties.example
 ENV_FILE = .env
 ENV_EXAMPLE = .env.example
 
 .PHONY: up down nuke restart logs shell test test-coverage check boot-run build clean \
-	docker-build lint lint-fix db-up db-down db-logs db-psql up-build dev setup-local setup-env
-
-# Copia o example na primeira vez (perfil local + bootRun / Make).
-setup-local:
-	@test -f $(LOCAL_PROPS) || (echo "=> Criando $(LOCAL_PROPS) a partir do example." && cp $(LOCAL_EXAMPLE) $(LOCAL_PROPS))
+	docker-build lint lint-fix db-up db-down db-logs db-psql up-build dev setup-env
 
 # Docker Compose exige `.env` na raiz (sem defaults sensíveis no compose).
 setup-env:
@@ -54,7 +48,7 @@ db-psql:
 up-build: setup-env
 	$(COMPOSE) up -d --build
 
-dev: db-up setup-local
+dev: db-up setup-env
 	@bash -euo pipefail -c '\
 		port="$$(grep -E "^POSTGRES_PORT=" "$(ENV_FILE)" | cut -d= -f2-)"; \
 		port="$${port:-5432}"; \
@@ -76,7 +70,7 @@ test-coverage:
 
 check: test-coverage
 
-boot-run: setup-local
+boot-run: setup-env
 	$(GRADLEW) bootRun --no-daemon
 
 build:
