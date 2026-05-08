@@ -11,6 +11,12 @@ permissions:
 jobs:
   ci:
     runs-on: ubuntu-latest
+    env:
+      SPRING_APPLICATION_NAME: vanep
+      POSTGRES_DB: vanep
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_PORT: "5432"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -40,10 +46,35 @@ jobs:
       - name: Smoke test — app no Docker responde em GET /
         run: |
           set -euo pipefail
-          cid=$(docker run -d -p 8080:8080 vanep-api:ci)
-          cleanup() { docker rm -f "$cid" >/dev/null 2>&1 || true; }
+          net=vanep-ci
+          docker network create "$net"
+          docker run -d --name postgres --network "$net" \
+            -e POSTGRES_DB="$POSTGRES_DB" \
+            -e POSTGRES_USER="$POSTGRES_USER" \
+            -e POSTGRES_PASSWORD="$POSTGRES_PASSWORD" \
+            postgres:17-alpine
+          cleanup() {
+            docker rm -f app-ci postgres >/dev/null 2>&1 || true
+            docker network rm "$net" >/dev/null 2>&1 || true
+          }
           trap cleanup EXIT
-          for _ in $(seq 1 30); do
+          for _ in $(seq 1 60); do
+            if docker exec postgres pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB" >/dev/null 2>&1; then
+              break
+            fi
+            sleep 1
+          done
+          docker exec postgres pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"
+          cid=$(docker run -d --name app-ci --network "$net" -p 8080:8080 \
+            -e SPRING_PROFILES_ACTIVE=docker \
+            -e SPRING_APPLICATION_NAME="$SPRING_APPLICATION_NAME" \
+            -e POSTGRES_HOST=postgres \
+            -e POSTGRES_PORT="$POSTGRES_PORT" \
+            -e POSTGRES_DB="$POSTGRES_DB" \
+            -e POSTGRES_USER="$POSTGRES_USER" \
+            -e POSTGRES_PASSWORD="$POSTGRES_PASSWORD" \
+            vanep-api:ci)
+          for _ in $(seq 1 60); do
             if curl -fsS --max-time 3 "http://127.0.0.1:8080/" | grep -qx 'vanep'; then
               echo "Smoke OK: GET / retorna vanep"
               exit 0

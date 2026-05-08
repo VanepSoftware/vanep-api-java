@@ -19,11 +19,39 @@ repositories {
 	mavenCentral()
 }
 
+bootRun {
+	systemProperty 'spring.profiles.active', 'local'
+	def envFile = rootProject.file('.env')
+	if (envFile.exists()) {
+		envFile.eachLine { line ->
+			def trimmed = line.trim()
+			if (trimmed.isEmpty() || trimmed.startsWith('#')) {
+				return
+			}
+			def eq = trimmed.indexOf('=')
+			if (eq > 0) {
+				def key = trimmed.substring(0, eq).trim()
+				def value = trimmed.substring(eq + 1).trim()
+				if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+					value = value.substring(1, value.length() - 1)
+				}
+				environment key, value
+			}
+		}
+	}
+}
+
 dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter'
 	implementation 'org.springframework.boot:spring-boot-starter-web'
+	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+	implementation 'org.springframework.boot:spring-boot-starter-flyway'
+	runtimeOnly 'org.flywaydb:flyway-database-postgresql'
+	runtimeOnly 'org.postgresql:postgresql'
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+	testRuntimeOnly 'com.h2database:h2'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
 }
 
 tasks.named('test') {
@@ -34,7 +62,6 @@ tasks.named('test') {
 spotless {
 	java {
 		target 'src/**/*.java'
-		// GJF ≥ 1.27.x trata JDK 25; Spotless 8.x alinha versões do formatador.
 		googleJavaFormat('1.27.0')
 		removeUnusedImports()
 		trimTrailingWhitespace()
@@ -50,7 +77,6 @@ jacoco {
 	toolVersion = '0.8.14'
 }
 
-// `main` não é executado nos testes; excluir a classe de entrada do relatório e da verificação.
 def jacocoExcludedClasses = ['**/VanepApplication.class']
 
 jacocoTestReport {
