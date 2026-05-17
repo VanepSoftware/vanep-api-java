@@ -37,6 +37,91 @@ Outras dependências transitivas seguem o BOM do Spring Boot via `io.spring.depe
 
 ---
 
+## Passo a passo: rodar o projeto
+
+Objetivo: ter **PostgreSQL acessível em `127.0.0.1`** na porta definida em **`POSTGRES_PORT`** no `.env`, com as mesmas credenciais que o Spring usa no perfil **`local`**.
+
+### 1. Clonar e ir à raiz do repositório
+
+```bash
+cd vanep-api-java
+```
+
+### 2. Criar o `.env` na raiz
+
+```bash
+cp .env.example .env
+```
+
+Edite **`.env`** e preencha **`POSTGRES_DB`**, **`POSTGRES_USER`**, **`POSTGRES_PASSWORD`**, **`POSTGRES_PORT`** e **`APP_PORT`**.
+
+Use o formato **`CHAVE=valor`** sem espaços à volta do **`=`** (evita surpresas no Docker Compose e no carregamento do `.env` pelo Gradle).
+
+### 3. Porta **5432** no host (conflito com PostgreSQL do sistema)
+
+O Compose mapeia **`${POSTGRES_PORT}:5432`** (porta do **host** → porta **interna** do container). Se algo já estiver a ouvir em **`0.0.0.0:5432`** ou **`127.0.0.1:5432`**, o `docker compose up` falha com **address already in use**.
+
+Em Debian/Ubuntu costuma existir um serviço **`postgresql@…-main`** (ex.: `postgresql@18-main`). Para listar e parar **só esse cluster** (liberta a 5432 no host):
+
+```bash
+sudo systemctl list-units 'postgresql@*'
+sudo systemctl stop postgresql@18-main
+```
+
+Substitua **`18-main`** pelo nome que aparecer na lista (pode ser `17-main`, etc.). O unit genérico **`postgresql.service`** muitas vezes só dispara o arranque e **não** mostra o processo que segura a porta.
+
+**Alternativa sem parar o Postgres do sistema:** no `.env`, use outra porta livre no host, por exemplo **`POSTGRES_PORT=5433`**. O perfil **`local`** já usa **`127.0.0.1:${POSTGRES_PORT}`** em `application-local.properties`.
+
+### 4. Caminho recomendado: Postgres no Docker + API com Gradle
+
+Sobe o Postgres, espera a porta TCP em **`127.0.0.1`** e inicia **`bootRun`** com perfil **`local`** (o Gradle lê o `.env` na raiz):
+
+```bash
+make dev
+```
+
+Equivalente em dois passos:
+
+```bash
+make db-up
+make boot-run
+```
+
+Confirme que o mapeamento existe no host (troque o nome do container se o Compose usar outro sufixo):
+
+```bash
+docker port vanep-api-java-postgres-1 5432
+```
+
+Deve aparecer algo como **`0.0.0.0:5432->5432/tcp`** (ou a porta que escolheu em **`POSTGRES_PORT`**). Se aparecer **“no public port … published”**, o Compose não publicou a porta — reveja o `.env` e volte a criar o serviço (`make down` e `make db-up`, ou `make nuke` se aceitar apagar o volume local).
+
+### 5. Tudo no Docker (API + Postgres)
+
+```bash
+make up-build
+```
+
+A API fica exposta em **`http://127.0.0.1:${APP_PORT}/`** (por defeito **8080**). Não rode **`make boot-run`** em simultâneo na mesma porta HTTP sem mudar **`APP_PORT`** ou a porta do servidor Spring — os dois serviços disputariam a **8080**.
+
+### 6. Testar sem subir o Postgres
+
+Os testes Gradle usam **H2**; não precisam de Docker:
+
+```bash
+make test
+```
+
+### Resolução rápida de erros
+
+| Sintoma | Causa provável | O que fazer |
+| --- | --- | --- |
+| **address already in use** na **5432** | Postgres do sistema ou outro processo na porta | Parar **`postgresql@…-main`** ou mudar **`POSTGRES_PORT`** no `.env` |
+| **password authentication failed** para **`postgres`** | A app está a ligar ao **Postgres errado** (ex.: sistema em vez do container) ou credenciais diferentes | Garantir **`docker port … 5432`** com mapeamento; alinhar **`.env`** com o container; testar com **`make db-psql`** |
+| **Connection refused** a **`127.0.0.1:5432`** | Nada a ouvir nessa porta no host | Subir **`make db-up`** e confirmar **`docker port`**; se parou o Postgres do sistema, o Docker **tem** de publicar a porta |
+| **`killall 5432`** não faz nada | `killall` usa **nome do executável**, não o número da porta | Usar **`systemctl`** / **`ss`** como acima |
+
+---
+
 ## Configuração: `.env`, perfil `local` e arquivos Spring
 
 ### `.env` na raiz (Docker Compose)
@@ -132,6 +217,8 @@ Na raiz do repositório (com `make` instalado):
 ---
 
 ## Desenvolvimento local com Gradle
+
+Fluxo completo (`.env`, porta **5432**, Docker vs Postgres do sistema, erros comuns): ver a secção **Passo a passo: rodar o projeto** acima.
 
 Clone o repositório e, na raiz:
 
