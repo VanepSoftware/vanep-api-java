@@ -1,5 +1,5 @@
 package br.com.vanep.users;
 
-public record SignUpDataUsers(String name, String email, String username, String password, String cpf, String phone, Integer address_id,  Type type) {
+public record SignUpDataUsers(String names, String email, String username, String passwords, String cpf, String phone, Integer address_id,  Type_user types) {
 
 }

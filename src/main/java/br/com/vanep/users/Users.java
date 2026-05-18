@@ -21,14 +21,14 @@ import lombok.NoArgsConstructor;
 public class Users {
     
     public Users(SignUpDataUsers dados) {
-        this.name = dados.name();
+        this.names = dados.names();
         this.email = dados.email();
         this.username = dados.username();
-        this.password = dados.password();
+        this.passwords = dados.passwords();
         this.cpf = dados.cpf();
         this.phone = dados.phone();
         this.address_id = dados.address_id();
-        this.type = dados.type();
+        this.types = dados.types();
 
     }
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -36,12 +36,12 @@ public class Users {
     private String token;
 
     @Enumerated(EnumType.STRING)
-    private Type type;
+    private Type_user types;
 
-    private String name;
+    private String names;
     private String email;
     private String username;
-    private String password;
+    private String passwords;
     private String cpf;
     private String phone;
     private Integer address_id;

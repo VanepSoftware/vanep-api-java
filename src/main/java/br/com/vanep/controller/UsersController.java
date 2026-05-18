@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.RestController;
 import br.com.vanep.repository.UsersRepository;
 import br.com.vanep.users.SignUpDataUsers;
 import br.com.vanep.users.Users;
+import jakarta.transaction.Transactional;
 
 @RestController
 @RequestMapping("SignUpUsers")
@@ -18,6 +19,7 @@ public class UsersController {
     private UsersRepository repository; 
 
     @PostMapping
+    @Transactional
     public void SignUp(@RequestBody SignUpDataUsers dados){
         repository.save(new Users(dados));
     }
