@@ -22,4 +22,9 @@ class RootControllerTest {
   void rootReturnsVanep() throws Exception {
     mockMvc.perform(get("/")).andExpect(status().isOk()).andExpect(content().string("vanep"));
   }
+
+  @Test
+  void oiReturnsOi() throws Exception {
+    mockMvc.perform(get("/oi")).andExpect(status().isOk()).andExpect(content().string("oi"));
+  }
 }
