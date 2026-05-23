@@ -26,19 +26,17 @@ jobs:
         with:
           distribution: temurin
           java-version: "25"
-
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
+          cache: maven
 
       - name: Lint + testes + JaCoCo (Spotless + cobertura ≥ 75% linhas)
-        run: chmod +x gradlew && ./gradlew check --no-daemon
+        run: chmod +x mvnw && ./mvnw verify -B
 
       - name: Upload relatório JaCoCo (HTML)
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: jacoco-html
-          path: build/reports/jacoco/test/html/
+          path: target/site/jacoco/
 
       - name: Build imagem Docker
         run: docker build -t vanep-api:ci .

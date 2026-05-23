@@ -2,16 +2,15 @@ FROM eclipse-temurin:25-jdk-jammy AS builder
 
 WORKDIR /app
 
-COPY gradlew gradlew.bat ./
-COPY gradle/wrapper gradle/wrapper
-COPY build.gradle settings.gradle ./
+COPY .mvn .mvn
+COPY mvnw pom.xml ./
 COPY src src
 
-RUN chmod +x gradlew \
-	&& ./gradlew bootJar --no-daemon -x test
+RUN chmod +x mvnw \
+	&& ./mvnw -B package -DskipTests
 
 RUN mkdir /out \
-	&& cp "$(ls build/libs/*.jar | grep -v -- '-plain\.jar' | head -n1)" /out/app.jar
+	&& cp "$(ls target/*.jar | grep -v '\.original$' | head -n1)" /out/app.jar
 
 FROM eclipse-temurin:25-jre-jammy
 

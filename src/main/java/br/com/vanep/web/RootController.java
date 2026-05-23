@@ -10,4 +10,9 @@ public class RootController {
   public String root() {
     return "vanep";
   }
+
+  @GetMapping("/oi")
+  public String oi() {
+    return "oi";
+  }
 }
