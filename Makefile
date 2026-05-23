@@ -1,4 +1,4 @@
-GRADLEW = ./gradlew
+MVNW = ./mvnw
 COMPOSE = docker compose
 SERVICE = vanep
 POSTGRES_SERVICE = postgres
@@ -60,27 +60,27 @@ dev: db-up setup-env
 		done; \
 		echo "Timeout: Postgres não respondeu em 127.0.0.1:$$port (mapeamento da porta no host?)." >&2; \
 		exit 1'
-	$(GRADLEW) bootRun --no-daemon
+	@bash -euo pipefail -c 'set -a && . ./$(ENV_FILE) && set +a && $(MVNW) spring-boot:run'
 
 test:
-	$(GRADLEW) test --no-daemon
+	$(MVNW) test
 
 test-coverage:
-	$(GRADLEW) check --no-daemon
+	$(MVNW) verify
 
 check: test-coverage
 
 boot-run: setup-env
-	$(GRADLEW) bootRun --no-daemon
+	@bash -euo pipefail -c 'set -a && . ./$(ENV_FILE) && set +a && $(MVNW) spring-boot:run'
 
 build:
-	$(GRADLEW) bootJar --no-daemon
+	$(MVNW) package -DskipTests
 
 clean:
-	$(GRADLEW) clean --no-daemon
+	$(MVNW) clean
 
 lint:
-	$(GRADLEW) spotlessCheck --no-daemon
+	$(MVNW) spotless:check
 
 lint-fix:
-	$(GRADLEW) spotlessApply --no-daemon
+	$(MVNW) spotless:apply
