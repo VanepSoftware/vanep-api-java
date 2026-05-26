@@ -2,6 +2,8 @@
 
 API Spring Boot do projeto Vanep. Este repositório usa **Maven** para desenvolvimento local e **Docker** para imagem de execução em CI/CD e deploy.
 
+**Visão geral e convenções do código:** [docs/project-overview.md](docs/project-overview.md).
+
 ---
 
 ## Versões principais
