@@ -4,8 +4,8 @@ import java.util.Arrays;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
-import org.springframework.http.HttpMethod;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -22,10 +22,10 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 /**
- * Proteção HTTP: {@code /api/**} com Basic auth (stateless, sem CSRF), exceto {@code POST /api/users}
- * (cadastro público). Documentação OpenAPI pública
- * ou bloqueada conforme {@code vanep.security.swagger-enabled}. Sobrescreva user/senha por
- * propriedades {@code vanep.security.http-basic.*} ou variáveis de ambiente equivalentes.
+ * Proteção HTTP: {@code /api/**} com Basic auth (stateless, sem CSRF), exceto {@code POST
+ * /api/users} (cadastro público). Documentação OpenAPI pública ou bloqueada conforme {@code
+ * vanep.security.swagger-enabled}. Sobrescreva user/senha por propriedades {@code
+ * vanep.security.http-basic.*} ou variáveis de ambiente equivalentes.
  */
 @Configuration
 @EnableWebSecurity

@@ -162,7 +162,7 @@ O **`.vscode/launch.json`** passa **`-Dspring.profiles.active=local`** para alin
 - Rotas **`/api/**`** exigem **HTTP Basic** até existir outro mecanismo (JWT, OAuth2, etc.). Utilizador e palavra-passe por defeito estão em **`SecurityConfig`** (`@Value` com fallback); altere com **`vanep.security.http-basic.username`** / **`vanep.security.http-basic.password`** em `application.properties`, perfil ou variáveis de ambiente.
 - **`vanep.security.swagger-enabled`:** se `false`, pedidos a `/swagger-ui*` e `/v3/api-docs*` passam a ser **403** (útil em produção).
 - **`vanep.security.cors-allowed-origins`:** opcional, lista separada por vírgulas (ex.: `http://localhost:5173`) para permitir browsers noutro origin a chamarem **`/api/**`**.
-- No perfil **`test`**, **`vanep.security.permit-all=true`** evita autenticação nos testes Maven; a documentação SpringDoc fica desligada nesse perfil para reduzir ruído nos logs.
+- No perfil **`test`**, os testes que precisam de rotas abertas usam `@TestPropertySource(properties = "vanep.security.permit-all=true")`; a documentação SpringDoc fica desligada nesse perfil (`springdoc.*.enabled=false`) para reduzir ruído nos logs.
 
 ---
 
