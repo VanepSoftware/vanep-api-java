@@ -23,9 +23,9 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 /**
  * Proteção HTTP: {@code /api/**} com Basic auth (stateless, sem CSRF), exceto {@code POST
- * /api/users} (cadastro público). Documentação OpenAPI pública ou bloqueada conforme {@code
- * vanep.security.swagger-enabled}. Sobrescreva user/senha por propriedades {@code
- * vanep.security.http-basic.*} ou variáveis de ambiente equivalentes.
+ * /api/users} (cadastro público) e {@code GET /} (identificação / smoke). Documentação OpenAPI
+ * pública ou bloqueada conforme {@code vanep.security.swagger-enabled}. Sobrescreva user/senha por
+ * propriedades {@code vanep.security.http-basic.*} ou variáveis de ambiente equivalentes.
  */
 @Configuration
 @EnableWebSecurity
@@ -72,6 +72,7 @@ public class SecurityConfig {
           }
 
           auth.requestMatchers("/error").permitAll();
+          auth.requestMatchers(HttpMethod.GET, "/").permitAll();
 
           if (swaggerEnabled) {
             auth.requestMatchers(
