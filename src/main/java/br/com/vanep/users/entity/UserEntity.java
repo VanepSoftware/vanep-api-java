@@ -1,7 +1,8 @@
-package br.com.vanep.entity;
+package br.com.vanep.users.entity;
 
 import br.com.vanep.config.TokenGenerator;
-import br.com.vanep.enums.UserTypeEnum;
+import br.com.vanep.entity.GenericTimeStampsEntity;
+import br.com.vanep.users.enums.UserTypeEnum;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;

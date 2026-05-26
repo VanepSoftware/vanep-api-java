@@ -15,7 +15,7 @@ public final class TokenGenerator {
     String input =
         System.nanoTime() + ThreadLocalRandom.current().nextLong() + UUID.randomUUID().toString();
     try {
-      MessageDigest digest = MessageDigest.getInstance("SHA-1"); 
+      MessageDigest digest = MessageDigest.getInstance("SHA-1");
       byte[] hash = digest.digest(input.getBytes(StandardCharsets.UTF_8));
       return HexFormat.of().formatHex(hash).substring(0, 25);
     } catch (NoSuchAlgorithmException e) {

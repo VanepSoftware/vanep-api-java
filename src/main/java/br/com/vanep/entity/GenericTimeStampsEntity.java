@@ -8,19 +8,20 @@ import java.time.LocalDateTime;
 import lombok.Getter;
 import lombok.Setter;
 
+/** {@code created_at} / {@code updated_at}; callbacks cobrem insert mesmo sem trigger no banco. */
 @Getter
 @Setter
 @MappedSuperclass
 public abstract class GenericTimeStampsEntity {
 
-  @Column(name = "created_at")
+  @Column(name = "created_at", updatable = false)
   private LocalDateTime createdAt;
 
   @Column(name = "updated_at")
   private LocalDateTime updatedAt;
 
   @PrePersist
-  protected void onPrePersist() {
+  protected void onCreate() {
     LocalDateTime now = LocalDateTime.now();
     if (createdAt == null) {
       createdAt = now;
@@ -29,7 +30,7 @@ public abstract class GenericTimeStampsEntity {
   }
 
   @PreUpdate
-  protected void onPreUpdate() {
+  protected void onUpdate() {
     updatedAt = LocalDateTime.now();
   }
 }

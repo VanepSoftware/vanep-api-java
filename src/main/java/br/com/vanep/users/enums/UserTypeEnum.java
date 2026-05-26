@@ -1,4 +1,4 @@
-package br.com.vanep.enums;
+package br.com.vanep.users.enums;
 
 public enum UserTypeEnum {
   CLIENT,

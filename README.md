@@ -144,7 +144,7 @@ No serviço **`vanep`**, o Compose ainda define **`POSTGRES_HOST=postgres`** (no
 
 Para rodar a app **fora** do container com `./mvnw spring-boot:run` ou `make dev` / `make boot-run`, o plugin Spring Boot ativa o perfil **`local`** (configurado no `pom.xml`).
 
-- **`application.properties`** — configuração comum (nome da app, JPA, Flyway), **sem** datasource.
+- **`application.properties`** — configuração comum (nome da app, JPA, Flyway), **sem** datasource. Propriedades opcionais **`vanep.security.*`** são lidas por **`SecurityConfig`** (Basic, CORS, Swagger público ou não).
 - **`application-local.properties`** — JDBC no host (`127.0.0.1`) com placeholders **`${POSTGRES_*}`** (sem senhas no Git). O **`make boot-run`** / **`make dev`** fazem `source` do **`.env`** na raiz antes de iniciar a JVM; sem `.env`, exporte **`POSTGRES_*`** manualmente ou defina-as na IDE.
 
 Alinhe **`POSTGRES_PORT`** no `.env` com o mapeamento do Compose (por padrão `jdbc:postgresql://127.0.0.1:<POSTGRES_PORT>/<POSTGRES_DB>`).
@@ -152,6 +152,17 @@ Alinhe **`POSTGRES_PORT`** no `.env` com o mapeamento do Compose (por padrão `j
 ### Cursor / VS Code
 
 O **`.vscode/launch.json`** passa **`-Dspring.profiles.active=local`** para alinhar com o Maven.
+
+---
+
+## OpenAPI (Swagger) e segurança HTTP
+
+- **Swagger UI:** `http://127.0.0.1:<porta>/swagger-ui.html`
+- **Especificação OpenAPI (JSON):** `http://127.0.0.1:<porta>/v3/api-docs`
+- Rotas **`/api/**`** exigem **HTTP Basic** até existir outro mecanismo (JWT, OAuth2, etc.). Utilizador e palavra-passe por defeito estão em **`SecurityConfig`** (`@Value` com fallback); altere com **`vanep.security.http-basic.username`** / **`vanep.security.http-basic.password`** em `application.properties`, perfil ou variáveis de ambiente.
+- **`vanep.security.swagger-enabled`:** se `false`, pedidos a `/swagger-ui*` e `/v3/api-docs*` passam a ser **403** (útil em produção).
+- **`vanep.security.cors-allowed-origins`:** opcional, lista separada por vírgulas (ex.: `http://localhost:5173`) para permitir browsers noutro origin a chamarem **`/api/**`**.
+- No perfil **`test`**, **`vanep.security.permit-all=true`** evita autenticação nos testes Maven; a documentação SpringDoc fica desligada nesse perfil para reduzir ruído nos logs.
 
 ---
 

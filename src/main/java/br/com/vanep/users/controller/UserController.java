@@ -1,8 +1,9 @@
-package br.com.vanep.controller;
+package br.com.vanep.users.controller;
 
-import br.com.vanep.dto.user.UserPayloadDto;
-import br.com.vanep.dto.user.UserResponseDto;
-import br.com.vanep.service.UserService;
+import br.com.vanep.users.dto.UserPayloadDto;
+import br.com.vanep.users.dto.UserResponseDto;
+import br.com.vanep.users.service.UserService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -17,6 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/users")
+@Tag(name = "Users", description = "Cadastro e consulta de usuários")
 public class UserController {
 
   private final UserService userService;

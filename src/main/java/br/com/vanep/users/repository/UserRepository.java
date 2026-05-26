@@ -1,6 +1,6 @@
-package br.com.vanep.repository;
+package br.com.vanep.users.repository;
 
-import br.com.vanep.entity.UserEntity;
+import br.com.vanep.users.entity.UserEntity;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 

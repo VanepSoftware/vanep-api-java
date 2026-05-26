@@ -1,7 +1,7 @@
-package br.com.vanep.mapper;
+package br.com.vanep.users.mapper;
 
-import br.com.vanep.dto.user.UserResponseDto;
-import br.com.vanep.entity.UserEntity;
+import br.com.vanep.users.dto.UserResponseDto;
+import br.com.vanep.users.entity.UserEntity;
 import org.springframework.stereotype.Component;
 
 @Component

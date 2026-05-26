@@ -1,6 +1,6 @@
-package br.com.vanep.dto.user;
+package br.com.vanep.users.dto;
 
-import br.com.vanep.enums.UserTypeEnum;
+import br.com.vanep.users.enums.UserTypeEnum;
 
 public record UserResponseDto(
     String token,

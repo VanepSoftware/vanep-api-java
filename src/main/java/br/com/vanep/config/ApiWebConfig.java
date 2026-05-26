@@ -14,6 +14,7 @@ public class ApiWebConfig implements WebMvcConfigurer {
         "/api",
         clazz ->
             clazz.isAnnotationPresent(RestController.class)
-                && clazz.getPackageName().startsWith("br.com.vanep.controller"));
+                && clazz.getPackageName().startsWith("br.com.vanep")
+                && clazz.getPackageName().endsWith(".controller"));
   }
 }

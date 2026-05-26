@@ -1,11 +1,11 @@
-package br.com.vanep.service;
+package br.com.vanep.users.service;
 
 import br.com.vanep.config.PasswordHasher;
-import br.com.vanep.dto.user.UserPayloadDto;
-import br.com.vanep.dto.user.UserResponseDto;
-import br.com.vanep.entity.UserEntity;
-import br.com.vanep.mapper.UserMapper;
-import br.com.vanep.repository.UserRepository;
+import br.com.vanep.users.dto.UserPayloadDto;
+import br.com.vanep.users.dto.UserResponseDto;
+import br.com.vanep.users.entity.UserEntity;
+import br.com.vanep.users.mapper.UserMapper;
+import br.com.vanep.users.repository.UserRepository;
 import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;

@@ -1,9 +1,9 @@
-package br.com.vanep.seed;
+package br.com.vanep.users.seed;
 
 import br.com.vanep.config.PasswordHasher;
-import br.com.vanep.entity.UserEntity;
-import br.com.vanep.enums.UserTypeEnum;
-import br.com.vanep.repository.UserRepository;
+import br.com.vanep.users.entity.UserEntity;
+import br.com.vanep.users.enums.UserTypeEnum;
+import br.com.vanep.users.repository.UserRepository;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
