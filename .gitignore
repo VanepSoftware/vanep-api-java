@@ -1,5 +1,6 @@
 HELP.md
 .env
+config/application-local.properties
 .gradle/
 .m2/
 build/
