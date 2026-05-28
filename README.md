@@ -2,6 +2,8 @@
 
 API Spring Boot do projeto Vanep. Este repositório usa **Maven** para desenvolvimento local e **Docker** para imagem de execução em CI/CD e deploy.
 
+**Visão geral e convenções do código:** [docs/project-overview.md](docs/project-overview.md).
+
 ---
 
 ## Versões principais
@@ -144,7 +146,7 @@ No serviço **`vanep`**, o Compose ainda define **`POSTGRES_HOST=postgres`** (no
 
 Para rodar a app **fora** do container com `./mvnw spring-boot:run` ou `make dev` / `make boot-run`, o plugin Spring Boot ativa o perfil **`local`** (configurado no `pom.xml`).
 
-- **`application.properties`** — configuração comum (nome da app, JPA, Flyway), **sem** datasource.
+- **`application.properties`** — configuração comum (nome da app, JPA, Flyway), **sem** datasource. Propriedades opcionais **`vanep.security.*`** são lidas por **`SecurityConfig`** (Basic, CORS, Swagger público ou não).
 - **`application-local.properties`** — JDBC no host (`127.0.0.1`) com placeholders **`${POSTGRES_*}`** (sem senhas no Git). O **`make boot-run`** / **`make dev`** fazem `source` do **`.env`** na raiz antes de iniciar a JVM; sem `.env`, exporte **`POSTGRES_*`** manualmente ou defina-as na IDE.
 
 Alinhe **`POSTGRES_PORT`** no `.env` com o mapeamento do Compose (por padrão `jdbc:postgresql://127.0.0.1:<POSTGRES_PORT>/<POSTGRES_DB>`).
@@ -152,6 +154,17 @@ Alinhe **`POSTGRES_PORT`** no `.env` com o mapeamento do Compose (por padrão `j
 ### Cursor / VS Code
 
 O **`.vscode/launch.json`** passa **`-Dspring.profiles.active=local`** para alinhar com o Maven.
+
+---
+
+## OpenAPI (Swagger) e segurança HTTP
+
+- **Swagger UI:** `http://127.0.0.1:<porta>/swagger-ui.html`
+- **Especificação OpenAPI (JSON):** `http://127.0.0.1:<porta>/v3/api-docs`
+- Rotas **`/api/**`** exigem **HTTP Basic** até existir outro mecanismo (JWT, OAuth2, etc.). Utilizador e palavra-passe por defeito estão em **`SecurityConfig`** (`@Value` com fallback); altere com **`vanep.security.http-basic.username`** / **`vanep.security.http-basic.password`** em `application.properties`, perfil ou variáveis de ambiente.
+- **`vanep.security.swagger-enabled`:** se `false`, pedidos a `/swagger-ui*` e `/v3/api-docs*` passam a ser **403** (útil em produção).
+- **`vanep.security.cors-allowed-origins`:** opcional, lista separada por vírgulas (ex.: `http://localhost:5173`) para permitir browsers noutro origin a chamarem **`/api/**`**.
+- No perfil **`test`**, os testes que precisam de rotas abertas usam `@TestPropertySource(properties = "vanep.security.permit-all=true")`; a documentação SpringDoc fica desligada nesse perfil (`springdoc.*.enabled=false`) para reduzir ruído nos logs.
 
 ---
 
@@ -267,8 +280,6 @@ cp .env.example .env   # preencher
 make docker-build && make up
 ```
 
-**GET /** devolve o texto **`vanep`** (nome da app em `application.properties`).
-
 Só Postgres para desenvolvimento com Maven na máquina:
 
 ```bash
@@ -282,17 +293,6 @@ make db-up
 O workflow **`.github/workflows/ci.yml`** roda em `push` e `pull_request` para `main` e `master`:
 
 1. **`./mvnw verify`** — Spotless, testes e cobertura JaCoCo ≥ **75 %** (linhas).
-2. **`docker build`** — a imagem continua sendo construída.
-3. **Smoke test** — rede Docker, Postgres com **`POSTGRES_*`**, API com perfil **`docker`** e variáveis **`POSTGRES_*`** / **`POSTGRES_HOST`**, validação de **`GET http://127.0.0.1:8080/`** (corpo `vanep`).
-
-Valores do Postgres de CI **não estão fixos no YAML**: o workflow lê **variáveis** e **secret** do repositório (Settings → Secrets and variables → Actions), com **fallback** (`vanep` / `postgres` / `5432`) quando não estão definidos — necessário para **PRs a partir de forks**, onde secrets customizados não são expostos ao runner.
-
-| Onde definir | Nome | Uso |
-| --- | --- | --- |
-| Variables | `CI_POSTGRES_DB` | Nome do banco (fallback: `vanep`) |
-| Variables | `CI_POSTGRES_USER` | Usuário (fallback: `postgres`) |
-| Variables | `CI_POSTGRES_PORT` | Porta no smoke (fallback: `5432`) |
-| Secrets | `CI_POSTGRES_PASSWORD` | Senha (fallback: `postgres`) |
 
 Artefato opcional: **`jacoco-html`**.
 

@@ -7,7 +7,7 @@ ENV_FILE = .env
 ENV_EXAMPLE = .env.example
 
 .PHONY: up down nuke restart logs shell test test-coverage check boot-run build clean \
-	docker-build lint lint-fix db-up db-down db-logs db-psql up-build dev setup-env
+	docker-build lint lint-fix db-up db-down db-logs db-psql db-migrate db-seed up-build dev setup-env
 
 # Docker Compose exige `.env` na raiz (sem defaults sensíveis no compose).
 setup-env:
@@ -44,6 +44,27 @@ db-logs:
 
 db-psql:
 	$(COMPOSE) exec $(POSTGRES_SERVICE) sh -c 'psql -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"'
+
+db-migrate: setup-env
+	@bash -euo pipefail -c 'set -a && . ./$(ENV_FILE) && set +a && export POSTGRES_PORT="$${POSTGRES_PORT:-5432}" && $(MVNW) flyway:migrate'
+
+db-seed: db-up db-migrate setup-env
+	@bash -euo pipefail -c '\
+		port="$$(grep -E "^POSTGRES_PORT=" "$(ENV_FILE)" | cut -d= -f2-)"; \
+		port="$${port:-5432}"; \
+		for _ in $$(seq 1 60); do \
+			if (echo >/dev/tcp/127.0.0.1/$$port) 2>/dev/null; then \
+				break; \
+			fi; \
+			sleep 1; \
+		done; \
+		if ! (echo >/dev/tcp/127.0.0.1/$$port) 2>/dev/null; then \
+			echo "Timeout: Postgres não respondeu em 127.0.0.1:$$port." >&2; \
+			exit 1; \
+		fi; \
+		set -a && . ./$(ENV_FILE) && set +a && \
+		$(MVNW) -Dspring-boot.run.jvmArguments="-Dspring.main.web-application-type=none" \
+			spring-boot:run -Dspring-boot.run.arguments="--vanep.seed.only=true"'
 
 up-build: setup-env
 	$(COMPOSE) up -d --build
