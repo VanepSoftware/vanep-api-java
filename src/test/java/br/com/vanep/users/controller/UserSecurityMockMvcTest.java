@@ -7,7 +7,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import br.com.vanep.users.dto.UserPayloadDto;
+import br.com.vanep.users.dto.UserRequestDto;
 import br.com.vanep.users.dto.UserResponseDto;
 import br.com.vanep.users.enums.UserTypeEnum;
 import br.com.vanep.users.service.UserService;
@@ -59,7 +59,7 @@ class UserSecurityMockMvcTest {
 
   @Test
   void postUsers_withoutBasic_returns201() throws Exception {
-    when(userService.create(any(UserPayloadDto.class)))
+    when(userService.create(any(UserRequestDto.class)))
         .thenReturn(
             new UserResponseDto("t", UserTypeEnum.CLIENT, "N", "a@b.com", "u", "1", false, null));
 

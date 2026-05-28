@@ -12,7 +12,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import br.com.vanep.users.dto.UserPayloadDto;
+import br.com.vanep.users.dto.UserRequestDto;
 import br.com.vanep.users.dto.UserResponseDto;
 import br.com.vanep.users.enums.UserTypeEnum;
 import br.com.vanep.users.service.UserService;
@@ -53,7 +53,7 @@ class UserControllerMockMvcTest {
   void postUsers_returns201AndBody() throws Exception {
     UserResponseDto response =
         new UserResponseDto("abc", UserTypeEnum.CLIENT, "N", "a@b.com", "u", "123", false, null);
-    when(userService.create(any(UserPayloadDto.class))).thenReturn(response);
+    when(userService.create(any(UserRequestDto.class))).thenReturn(response);
 
     mockMvc
         .perform(
@@ -74,7 +74,7 @@ class UserControllerMockMvcTest {
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.token").value("abc"));
 
-    verify(userService).create(any(UserPayloadDto.class));
+    verify(userService).create(any(UserRequestDto.class));
   }
 
   @Test
@@ -108,13 +108,13 @@ class UserControllerMockMvcTest {
   void putUser_returns200() throws Exception {
     UserResponseDto response =
         new UserResponseDto("tok", UserTypeEnum.CLIENT, "N2", "b@b.com", "u2", "222", false, "9");
-    when(userService.update(eq("tok"), any(UserPayloadDto.class))).thenReturn(response);
+    when(userService.update(eq("tok"), any(UserRequestDto.class))).thenReturn(response);
 
     mockMvc
         .perform(
             put("/api/users/tok")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(samplePayload())))
+                .content(objectMapper.writeValueAsString(sampleRequest())))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.name").value("N2"));
   }
@@ -126,7 +126,7 @@ class UserControllerMockMvcTest {
     verify(userService).delete("tok");
   }
 
-  private static UserPayloadDto samplePayload() {
-    return new UserPayloadDto("N2", UserTypeEnum.CLIENT, "b@b.com", "u2", null, "22222222222", "9");
+  private static UserRequestDto sampleRequest() {
+    return new UserRequestDto("N2", UserTypeEnum.CLIENT, "b@b.com", "u2", null, "22222222222", "9");
   }
 }

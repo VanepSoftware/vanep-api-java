@@ -7,11 +7,17 @@ import jakarta.persistence.PreUpdate;
 import java.time.LocalDateTime;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.SoftDelete;
+import org.hibernate.annotations.SoftDeleteType;
 
-/** {@code created_at} / {@code updated_at}; callbacks cobrem insert mesmo sem trigger no banco. */
+/**
+ * {@code created_at} / {@code updated_at}; callbacks cobrem insert mesmo sem trigger no banco.
+ * {@code deleted_at} com soft delete Hibernate para entidades que usam essa coluna.
+ */
 @Getter
 @Setter
 @MappedSuperclass
+@SoftDelete(columnName = "deleted_at", strategy = SoftDeleteType.TIMESTAMP)
 public abstract class GenericTimeStampsEntity {
 
   @Column(name = "created_at", updatable = false)

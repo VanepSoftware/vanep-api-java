@@ -1,6 +1,6 @@
 package br.com.vanep.users.controller;
 
-import br.com.vanep.users.dto.UserPayloadDto;
+import br.com.vanep.users.dto.UserRequestDto;
 import br.com.vanep.users.dto.UserResponseDto;
 import br.com.vanep.users.service.UserService;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -29,8 +29,8 @@ public class UserController {
 
   @PostMapping
   @ResponseStatus(HttpStatus.CREATED)
-  public UserResponseDto create(@RequestBody UserPayloadDto payload) {
-    return userService.create(payload);
+  public UserResponseDto create(@RequestBody UserRequestDto request) {
+    return userService.create(request);
   }
 
   @GetMapping
@@ -44,8 +44,8 @@ public class UserController {
   }
 
   @PutMapping("/{token}")
-  public UserResponseDto update(@PathVariable String token, @RequestBody UserPayloadDto payload) {
-    return userService.update(token, payload);
+  public UserResponseDto update(@PathVariable String token, @RequestBody UserRequestDto request) {
+    return userService.update(token, request);
   }
 
   @DeleteMapping("/{token}")

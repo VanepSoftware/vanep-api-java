@@ -8,7 +8,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import br.com.vanep.config.PasswordHasher;
-import br.com.vanep.users.dto.UserPayloadDto;
+import br.com.vanep.users.dto.UserRequestDto;
 import br.com.vanep.users.dto.UserResponseDto;
 import br.com.vanep.users.entity.UserEntity;
 import br.com.vanep.users.enums.UserTypeEnum;
@@ -34,12 +34,12 @@ class UserServiceTest {
 
   @InjectMocks private UserService userService;
 
-  private UserPayloadDto payload;
+  private UserRequestDto request;
 
   @BeforeEach
   void setUp() {
-    payload =
-        new UserPayloadDto(
+    request =
+        new UserRequestDto(
             "Nome",
             UserTypeEnum.CLIENT,
             "a@b.com",
@@ -67,7 +67,7 @@ class UserServiceTest {
                 false,
                 "11999990000"));
 
-    UserResponseDto result = userService.create(payload);
+    UserResponseDto result = userService.create(request);
 
     assertThat(result.token()).isEqualTo("t1");
     verify(passwordHasher).encode("raw-secret");
@@ -108,8 +108,8 @@ class UserServiceTest {
     existing.setPassword("OLD");
     when(userRepository.findByToken("tok")).thenReturn(Optional.of(existing));
     when(userRepository.save(existing)).thenReturn(existing);
-    UserPayloadDto noPwd =
-        new UserPayloadDto("N2", UserTypeEnum.DRIVER, "b@b.com", "u2", null, "98765432100", null);
+    UserRequestDto noPwd =
+        new UserRequestDto("N2", UserTypeEnum.DRIVER, "b@b.com", "u2", null, "98765432100", null);
     when(userMapper.toResponse(existing)).thenReturn(sampleResponse("tok"));
 
     userService.update("tok", noPwd);
@@ -124,8 +124,8 @@ class UserServiceTest {
     existing.setPassword("OLD");
     when(userRepository.findByToken("tok")).thenReturn(Optional.of(existing));
     when(userRepository.save(existing)).thenReturn(existing);
-    UserPayloadDto blankPwd =
-        new UserPayloadDto("N2", UserTypeEnum.DRIVER, "b@b.com", "u2", "   ", "98765432100", null);
+    UserRequestDto blankPwd =
+        new UserRequestDto("N2", UserTypeEnum.DRIVER, "b@b.com", "u2", "   ", "98765432100", null);
     when(userMapper.toResponse(existing)).thenReturn(sampleResponse("tok"));
 
     userService.update("tok", blankPwd);
@@ -140,8 +140,8 @@ class UserServiceTest {
     when(userRepository.findByToken("tok")).thenReturn(Optional.of(existing));
     when(userRepository.save(existing)).thenReturn(existing);
     when(passwordHasher.encode("newpass")).thenReturn("ENC2");
-    UserPayloadDto withPwd =
-        new UserPayloadDto(
+    UserRequestDto withPwd =
+        new UserRequestDto(
             "N2", UserTypeEnum.ADMIN, "b@b.com", "u2", "newpass", "98765432100", null);
     when(userMapper.toResponse(existing)).thenReturn(sampleResponse("tok"));
 

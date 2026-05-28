@@ -1,7 +1,7 @@
 package br.com.vanep.users.service;
 
 import br.com.vanep.config.PasswordHasher;
-import br.com.vanep.users.dto.UserPayloadDto;
+import br.com.vanep.users.dto.UserRequestDto;
 import br.com.vanep.users.dto.UserResponseDto;
 import br.com.vanep.users.entity.UserEntity;
 import br.com.vanep.users.mapper.UserMapper;
@@ -27,9 +27,9 @@ public class UserService {
   }
 
   @Transactional
-  public UserResponseDto create(UserPayloadDto payload) {
+  public UserResponseDto create(UserRequestDto request) {
     UserEntity user = new UserEntity();
-    applyPayload(user, payload, true);
+    applyRequest(user, request, true);
     return userMapper.toResponse(userRepository.save(user));
   }
 
@@ -44,9 +44,9 @@ public class UserService {
   }
 
   @Transactional
-  public UserResponseDto update(String token, UserPayloadDto payload) {
+  public UserResponseDto update(String token, UserRequestDto request) {
     UserEntity user = getByToken(token);
-    applyPayload(user, payload, false);
+    applyRequest(user, request, false);
     return userMapper.toResponse(userRepository.save(user));
   }
 
@@ -61,22 +61,22 @@ public class UserService {
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
   }
 
-  private void applyPayload(UserEntity user, UserPayloadDto payload, boolean isCreate) {
-    user.setType(payload.type());
-    user.setName(payload.name());
-    user.setEmail(payload.email());
-    user.setUsername(payload.username());
-    user.setCpf(payload.cpf());
-    user.setPhone(payload.phone());
+  private void applyRequest(UserEntity user, UserRequestDto request, boolean isCreate) {
+    user.setType(request.type());
+    user.setName(request.name());
+    user.setEmail(request.email());
+    user.setUsername(request.username());
+    user.setCpf(request.cpf());
+    user.setPhone(request.phone());
 
     if (isCreate) {
       user.setVerified(false);
-      user.setPassword(passwordHasher.encode(payload.password()));
+      user.setPassword(passwordHasher.encode(request.password()));
       return;
     }
 
-    if (payload.password() != null && !payload.password().isBlank()) {
-      user.setPassword(passwordHasher.encode(payload.password()));
+    if (request.password() != null && !request.password().isBlank()) {
+      user.setPassword(passwordHasher.encode(request.password()));
     }
   }
 }
