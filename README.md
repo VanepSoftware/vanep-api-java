@@ -280,8 +280,6 @@ cp .env.example .env   # preencher
 make docker-build && make up
 ```
 
-**GET /** devolve o texto **`vanep`** (nome da app em `application.properties`).
-
 Só Postgres para desenvolvimento com Maven na máquina:
 
 ```bash
@@ -295,17 +293,6 @@ make db-up
 O workflow **`.github/workflows/ci.yml`** roda em `push` e `pull_request` para `main` e `master`:
 
 1. **`./mvnw verify`** — Spotless, testes e cobertura JaCoCo ≥ **75 %** (linhas).
-2. **`docker build`** — a imagem continua sendo construída.
-3. **Smoke test** — rede Docker, Postgres com **`POSTGRES_*`**, API com perfil **`docker`** e variáveis **`POSTGRES_*`** / **`POSTGRES_HOST`**, validação de **`GET http://127.0.0.1:8080/`** (corpo `vanep`).
-
-Valores do Postgres de CI **não estão fixos no YAML**: o workflow lê **variáveis** e **secret** do repositório (Settings → Secrets and variables → Actions), com **fallback** (`vanep` / `postgres` / `5432`) quando não estão definidos — necessário para **PRs a partir de forks**, onde secrets customizados não são expostos ao runner.
-
-| Onde definir | Nome | Uso |
-| --- | --- | --- |
-| Variables | `CI_POSTGRES_DB` | Nome do banco (fallback: `vanep`) |
-| Variables | `CI_POSTGRES_USER` | Usuário (fallback: `postgres`) |
-| Variables | `CI_POSTGRES_PORT` | Porta no smoke (fallback: `5432`) |
-| Secrets | `CI_POSTGRES_PASSWORD` | Senha (fallback: `postgres`) |
 
 Artefato opcional: **`jacoco-html`**.
 
