@@ -157,14 +157,46 @@ O **`.vscode/launch.json`** passa **`-Dspring.profiles.active=local`** para alin
 
 ---
 
-## OpenAPI (Swagger) e segurança HTTP
+## OpenAPI (Swagger)
 
 - **Swagger UI:** `http://127.0.0.1:<porta>/swagger-ui.html`
 - **Especificação OpenAPI (JSON):** `http://127.0.0.1:<porta>/v3/api-docs`
-- Rotas **`/api/**`** exigem **HTTP Basic** até existir outro mecanismo (JWT, OAuth2, etc.). Utilizador e palavra-passe por defeito estão em **`SecurityConfig`** (`@Value` com fallback); altere com **`vanep.security.http-basic.username`** / **`vanep.security.http-basic.password`** em `application.properties`, perfil ou variáveis de ambiente.
-- **`vanep.security.swagger-enabled`:** se `false`, pedidos a `/swagger-ui*` e `/v3/api-docs*` passam a ser **403** (útil em produção).
-- **`vanep.security.cors-allowed-origins`:** opcional, lista separada por vírgulas (ex.: `http://localhost:5173`) para permitir browsers noutro origin a chamarem **`/api/**`**.
-- No perfil **`test`**, os testes que precisam de rotas abertas usam `@TestPropertySource(properties = "vanep.security.permit-all=true")`; a documentação SpringDoc fica desligada nesse perfil (`springdoc.*.enabled=false`) para reduzir ruído nos logs.
+- No perfil **`test`** a documentação SpringDoc fica desligada (`springdoc.*.enabled=false`) para reduzir ruído nos logs.
+
+---
+
+## Autenticação (OAuth2 + Spring Authorization Server)
+
+A Vanep replica o esquema de OAuth2 dos checklists (lá feito com Laravel Passport). Aqui o
+equivalente é o **Spring Authorization Server**: a própria API é o **Authorization Server** e
+também o **Resource Server**.
+
+| Papel | Como |
+|---|---|
+| **Authorization Server** | Endpoints OAuth2 padrão: `/oauth2/authorize`, `/oauth2/token`, `/oauth2/jwks`. Fluxo **authorization code + PKCE** (cliente público, sem secret — igual ao `token_endpoint_auth_method: none` do checklists-frontend). |
+| **Tela de login** | Servida pela própria API (Thymeleaf) em **`/login`** — fundo preto, marca Vanep, e-mail + senha. É a tela mostrada durante o fluxo de autorização. |
+| **Resource Server** | Rotas **`/api/**`** são protegidas por **JWT** (Bearer). Sem token → **401**. Ex.: `GET /api/user/profile` devolve o perfil da conta autenticada (consumido pelo front como "userinfo"). |
+| **Senhas** | **Argon2id + pepper** (HMAC-SHA256 com `VANEP_PASSWORD_PEPPER` antes do hash). |
+
+### Variáveis de ambiente (ver `.env.example`)
+
+- **`VANEP_PASSWORD_PEPPER`** — segredo do servidor para o hash de senhas. **Obrigatório em runtime.**
+- **`VANEP_OAUTH_CLIENT_ID`** — id do cliente público dos frontends (default `vanep-frontend`).
+- **`VANEP_OAUTH_REDIRECT_URIS`** — callbacks permitidas (separadas por vírgula).
+- **`VANEP_OAUTH_POST_LOGOUT_REDIRECT_URIS`**, **`VANEP_OAUTH_ACCESS_TOKEN_TTL_MINUTES`** (default 15), **`VANEP_OAUTH_REFRESH_TOKEN_TTL_DAYS`** (default 90).
+- **`VANEP_REMEMBER_ME_KEY`** — chave do cookie "lembrar-me".
+- **`VANEP_SEED_ENABLED`** — `true` semeia um admin de teste no boot.
+
+> **Chave JWT:** nesta fase a chave RSA de assinatura é gerada em memória no boot (tokens deixam de
+> ser válidos ao reiniciar). Persistir a chave por env/keystore é um próximo passo para produção.
+
+### Usuário de teste (dev)
+
+No perfil **`local`** o seed vem habilitado. Também dá para semear sob demanda:
+
+```bash
+make db-seed   # cria admin@vanep.com.br / password
+```
 
 ---
 
@@ -174,7 +206,7 @@ O **`.vscode/launch.json`** passa **`-Dspring.profiles.active=local`** para alin
 - **Perfis Spring:**
   - **`local`** — datasource em **`application-local.properties`** (Maven na máquina, Postgres normalmente em `127.0.0.1`).
   - **`docker`** — datasource em **`application-docker.properties`** (porta **5432** na rede entre containers; não use `POSTGRES_PORT` do host no JDBC). Variáveis `POSTGRES_*` vêm do ambiente (`.env` no Compose / CI).
-  - **`test`** — H2 em memória; Flyway desligado nos testes.
+  - **`test`** — H2 em memória; Flyway desligado e schema gerado pelas entidades JPA (`ddl-auto=create-drop`), já que o SQL das migrações é específico de PostgreSQL.
 
 Evite usar **`localhost`** no JDBC no host se o Postgres do Docker só estiver escutando em **IPv4** no mapeamento da porta — **`127.0.0.1`** costuma ser mais previsível que **`localhost`** (IPv6).
 
