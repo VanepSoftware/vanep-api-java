@@ -167,8 +167,7 @@ O **`.vscode/launch.json`** passa **`-Dspring.profiles.active=local`** para alin
 
 ## Autenticação (OAuth2 + Spring Authorization Server)
 
-A Vanep replica o esquema de OAuth2 dos checklists (lá feito com Laravel Passport). Aqui o
-equivalente é o **Spring Authorization Server**: a própria API é o **Authorization Server** e
+A Vanep replica o esquema de OAuth2 a própria API é o **Authorization Server** e
 também o **Resource Server**.
 
 | Papel | Como |
