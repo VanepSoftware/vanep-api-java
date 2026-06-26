@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Entrar — Vanep</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" th:href="@{/css/auth.css}" />
+  </head>
+  <body>
+    <main class="login-shell">
+      <div class="login-card">
+        <h1 class="brand">Vanep</h1>
+        <p class="subtitle">Acesse sua conta</p>
+
+        <div class="alert alert-error" th:if="${param.error}">
+          E-mail ou senha inválidos.
+        </div>
+        <div class="alert alert-success" th:if="${param.logout}">
+          Sessão encerrada com sucesso.
+        </div>
+        <div class="alert alert-success" th:if="${param.registered}">
+          Conta criada! Faça login para continuar.
+        </div>
+
+        <form method="post" th:action="@{/login}">
+          <div class="field">
+            <label for="email">E-mail</label>
+            <input
+              id="email"
+              type="email"
+              name="email"
+              required
+              autofocus
+              autocomplete="email"
+              placeholder="seu@email.com"
+            />
+          </div>
+
+          <div class="field">
+            <label for="password">Senha</label>
+            <input
+              id="password"
+              type="password"
+              name="password"
+              required
+              autocomplete="current-password"
+              placeholder="••••••••"
+            />
+          </div>
+
+          <label class="remember">
+            <input type="checkbox" name="remember-me" />
+            <span>Lembrar-me</span>
+          </label>
+
+          <button type="submit" class="btn-submit">Entrar</button>
+
+          <!-- Recuperação de senha chega em fase posterior. -->
+          <a class="forgot" href="#">Esqueci minha senha</a>
+        </form>
+
+        <div th:if="${googleEnabled}">
+          <div class="divider"><span>ou</span></div>
+          <a class="btn-google" th:href="@{/oauth2/authorization/google}">
+            Entrar com Google
+          </a>
+        </div>
+
+        <a class="forgot" th:href="@{/signup}">Criar conta</a>
+      </div>
+    </main>
+  </body>
+</html>
