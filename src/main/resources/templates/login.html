@@ -24,6 +24,9 @@
         <div class="alert alert-success" th:if="${param.logout}">
           Sessão encerrada com sucesso.
         </div>
+        <div class="alert alert-success" th:if="${param.registered}">
+          Conta criada! Faça login para continuar.
+        </div>
 
         <form method="post" th:action="@{/login}">
           <div class="field">
@@ -68,6 +71,8 @@
             Entrar com Google
           </a>
         </div>
+
+        <a class="forgot" th:href="@{/signup}">Criar conta</a>
       </div>
     </main>
   </body>

@@ -2,16 +2,15 @@ package br.com.vanep.user;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 import lombok.Getter;
@@ -19,12 +18,12 @@ import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
-/** Vínculo de um provedor OAuth (Google/Apple) a uma {@link User conta}. */
+/** Perfil de cliente (responsável). 1:1 com {@link User}. */
 @Entity
-@Table(name = "oauth_account")
+@Table(name = "client")
 @Getter
 @Setter
-public class OAuthAccount {
+public class Client {
 
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -33,18 +32,20 @@ public class OAuthAccount {
   @Column(nullable = false, unique = true, length = 32)
   private String token;
 
-  @ManyToOne(fetch = FetchType.EAGER, optional = false)
-  @JoinColumn(name = "user_id", nullable = false)
+  @OneToOne(fetch = FetchType.LAZY, optional = false)
+  @JoinColumn(name = "user_id", nullable = false, unique = true)
   private User user;
 
-  @Enumerated(EnumType.STRING)
-  @Column(nullable = false, length = 16)
-  private AuthProvider provider;
+  @Column private String photo;
 
-  @Column(name = "provider_uid", nullable = false)
-  private String providerUid;
+  @Column(precision = 3, scale = 2)
+  private BigDecimal rating;
 
-  @Column private String email;
+  @Column(name = "address_id")
+  private Long addressId;
+
+  @Column(name = "is_active", nullable = false)
+  private boolean active = true;
 
   @CreationTimestamp
   @Column(name = "created_at", nullable = false, updatable = false)
@@ -53,6 +54,9 @@ public class OAuthAccount {
   @UpdateTimestamp
   @Column(name = "updated_at", nullable = false)
   private Instant updatedAt;
+
+  @Column(name = "deleted_at")
+  private Instant deletedAt;
 
   @PrePersist
   void onCreate() {

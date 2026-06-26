@@ -83,6 +83,10 @@ public class SecurityConfig {
                 authorize
                     .requestMatchers("/login", "/error", "/css/**", "/images/**", "/webjars/**")
                     .permitAll()
+                    // Cadastro público por e-mail/senha (não inclui /signup/complete, que é do
+                    // fluxo social e exige autenticação).
+                    .requestMatchers("/signup", "/signup/client", "/signup/driver")
+                    .permitAll()
                     .requestMatchers("/actuator/health", "/actuator/info")
                     .permitAll()
                     .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html")
