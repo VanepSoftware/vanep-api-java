@@ -192,6 +192,16 @@ Como o Google não fornece CPF (e `user.document` é obrigatório), o login soci
 > Config no Google Cloud Console: OAuth Client tipo *Web application*, redirect URI
 > **`http://localhost:8080/login/oauth2/code/google`**. Defina `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` no `.env`.
 
+### Cadastro por e-mail/senha (cliente e motorista)
+
+Telas públicas servidas pela API (Thymeleaf):
+
+- **`/signup`** — escolha entre **cliente** ou **motorista**.
+- **`/signup/client`** — cria `users` (tipo `CLIENT`) + perfil `client`.
+- **`/signup/driver`** — cria `users` (tipo `DRIVER`) + perfil `driver` (entra como `PENDING`, só recebe propostas após aprovação).
+
+Ao concluir, o usuário é levado a `/login?registered`. E-mail e documento (CPF) são únicos.
+
 ### Variáveis de ambiente (ver `.env.example`)
 
 - **`VANEP_PASSWORD_PEPPER`** — segredo do servidor para o hash de senhas. **Obrigatório em runtime.**
