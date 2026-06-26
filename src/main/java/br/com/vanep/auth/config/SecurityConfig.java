@@ -1,5 +1,8 @@
 package br.com.vanep.auth.config;
 
+import br.com.vanep.auth.oauth.OAuthLoginSuccessHandler;
+import br.com.vanep.auth.oauth.VanepOidcUserService;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -10,6 +13,7 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.oauth2.server.authorization.OAuth2AuthorizationServerConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
 import org.springframework.security.web.util.matcher.MediaTypeRequestMatcher;
@@ -68,7 +72,12 @@ public class SecurityConfig {
   @Bean
   @Order(3)
   public SecurityFilterChain defaultSecurityFilterChain(
-      HttpSecurity http, @Value("${vanep.remember-me.key}") String rememberMeKey) throws Exception {
+      HttpSecurity http,
+      @Value("${vanep.remember-me.key}") String rememberMeKey,
+      ObjectProvider<ClientRegistrationRepository> clientRegistrationRepository,
+      VanepOidcUserService oidcUserService,
+      OAuthLoginSuccessHandler oauthLoginSuccessHandler)
+      throws Exception {
     http.authorizeHttpRequests(
             authorize ->
                 authorize
@@ -83,6 +92,16 @@ public class SecurityConfig {
         .formLogin(form -> form.loginPage("/login").usernameParameter("email").permitAll())
         .rememberMe(remember -> remember.key(rememberMeKey).rememberMeParameter("remember-me"))
         .logout(logout -> logout.logoutSuccessUrl("/login?logout").permitAll());
+
+    // Login social só é ativado quando há um provedor configurado (ex.: Google via env).
+    if (clientRegistrationRepository.getIfAvailable() != null) {
+      http.oauth2Login(
+          oauth ->
+              oauth
+                  .loginPage("/login")
+                  .userInfoEndpoint(userInfo -> userInfo.oidcUserService(oidcUserService))
+                  .successHandler(oauthLoginSuccessHandler));
+    }
 
     return http.build();
   }

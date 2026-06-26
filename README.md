@@ -175,8 +175,22 @@ também o **Resource Server**.
 |---|---|
 | **Authorization Server** | Endpoints OAuth2 padrão: `/oauth2/authorize`, `/oauth2/token`, `/oauth2/jwks`. Fluxo **authorization code + PKCE** (cliente público, sem secret — igual ao `token_endpoint_auth_method: none` do checklists-frontend). |
 | **Tela de login** | Servida pela própria API (Thymeleaf) em **`/login`** — fundo preto, marca Vanep, e-mail + senha. É a tela mostrada durante o fluxo de autorização. |
+| **Login social (Google)** | Botão **"Entrar com Google"** (OAuth2 Client / OIDC). Aparece só quando há `GOOGLE_CLIENT_ID` configurado. |
 | **Resource Server** | Rotas **`/api/**`** são protegidas por **JWT** (Bearer). Sem token → **401**. Ex.: `GET /api/user/profile` devolve o perfil da conta autenticada (consumido pelo front como "userinfo"). |
 | **Senhas** | **Argon2id + pepper** (HMAC-SHA256 com `VANEP_PASSWORD_PEPPER` antes do hash). |
+
+### Login com Google (cadastro em 2 passos)
+
+Como o Google não fornece CPF (e `user.document` é obrigatório), o login social usa **cadastro em
+2 passos**:
+
+1. Usuário entra com o Google. Se já existe conta (vínculo em `oauth_account`, ou conta local com o
+   mesmo e-mail verificado → vincula automaticamente), entra direto.
+2. Se é a primeira vez, vai para **`/signup/complete`** — escolhe **cliente/motorista** e preenche
+   CPF, telefone, etc. Só então a conta (`users` + `oauth_account`) é criada e o fluxo OAuth segue.
+
+> Config no Google Cloud Console: OAuth Client tipo *Web application*, redirect URI
+> **`http://localhost:8080/login/oauth2/code/google`**. Defina `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` no `.env`.
 
 ### Variáveis de ambiente (ver `.env.example`)
 
