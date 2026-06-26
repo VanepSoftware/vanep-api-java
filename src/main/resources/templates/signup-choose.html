@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Criar conta — Vanep</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" th:href="@{/css/auth.css}" />
+  </head>
+  <body>
+    <main class="login-shell">
+      <div class="login-card">
+        <h1 class="brand">Vanep</h1>
+        <p class="subtitle">Como você quer usar a Vanep?</p>
+
+        <a class="btn-submit" th:href="@{/signup/client}">Sou cliente (responsável)</a>
+        <div style="height: 0.75rem"></div>
+        <a class="btn-google" th:href="@{/signup/driver}">Sou motorista</a>
+
+        <a class="forgot" th:href="@{/login}">Já tenho conta — entrar</a>
+      </div>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Completar cadastro — Vanep</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" th:href="@{/css/auth.css}" />
+  </head>
+  <body>
+    <main class="login-shell">
+      <div class="login-card">
+        <h1 class="brand">Vanep</h1>
+        <p class="subtitle">Complete seu cadastro</p>
+
+        <p class="subtitle" th:if="${email}" th:text="${email}">seu@email.com</p>
+
+        <form method="post" th:action="@{/signup/complete}" th:object="${signupForm}">
+          <div class="field">
+            <label>Você é</label>
+            <label class="remember">
+              <input type="radio" th:field="*{type}" value="CLIENT" />
+              <span>Cliente (responsável)</span>
+            </label>
+            <label class="remember">
+              <input type="radio" th:field="*{type}" value="DRIVER" />
+              <span>Motorista</span>
+            </label>
+            <div class="form-error" th:if="${#fields.hasErrors('type')}" th:errors="*{type}"></div>
+          </div>
+
+          <div class="field">
+            <label for="document">CPF</label>
+            <input id="document" type="text" th:field="*{document}" placeholder="000.000.000-00" />
+            <div
+              class="form-error"
+              th:if="${#fields.hasErrors('document')}"
+              th:errors="*{document}"
+            ></div>
+          </div>
+
+          <div class="field">
+            <label for="phone">Telefone</label>
+            <input id="phone" type="text" th:field="*{phone}" placeholder="(00) 00000-0000" />
+          </div>
+
+          <div class="field">
+            <label for="birthDate">Data de nascimento</label>
+            <input id="birthDate" type="date" th:field="*{birthDate}" />
+          </div>
+
+          <div class="field">
+            <label for="gender">Sexo</label>
+            <select id="gender" th:field="*{gender}">
+              <option value="">Prefiro não informar</option>
+              <option value="MALE">Masculino</option>
+              <option value="FEMALE">Feminino</option>
+              <option value="OTHER">Outro</option>
+            </select>
+          </div>
+
+          <label class="remember">
+            <input type="checkbox" th:field="*{acceptTerms}" />
+            <span>Aceito os termos de uso</span>
+          </label>
+          <div
+            class="form-error"
+            th:if="${#fields.hasErrors('acceptTerms')}"
+            th:errors="*{acceptTerms}"
+          ></div>
+
+          <button type="submit" class="btn-submit">Concluir cadastro</button>
+        </form>
+      </div>
+    </main>
+  </body>
+</html>

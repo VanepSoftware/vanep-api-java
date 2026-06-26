@@ -24,6 +24,9 @@
         <div class="alert alert-success" th:if="${param.logout}">
           Sessão encerrada com sucesso.
         </div>
+        <div class="alert alert-success" th:if="${param.registered}">
+          Conta criada! Faça login para continuar.
+        </div>
 
         <form method="post" th:action="@{/login}">
           <div class="field">
@@ -61,6 +64,15 @@
           <!-- Recuperação de senha chega em fase posterior. -->
           <a class="forgot" href="#">Esqueci minha senha</a>
         </form>
+
+        <div th:if="${googleEnabled}">
+          <div class="divider"><span>ou</span></div>
+          <a class="btn-google" th:href="@{/oauth2/authorization/google}">
+            Entrar com Google
+          </a>
+        </div>
+
+        <a class="forgot" th:href="@{/signup}">Criar conta</a>
       </div>
     </main>
   </body>
