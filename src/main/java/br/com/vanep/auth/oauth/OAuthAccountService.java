@@ -31,9 +31,17 @@ public class OAuthAccountService {
     Optional<OAuthAccount> existing =
         oauthAccounts.findByProviderAndProviderUid(provider, providerUid);
     if (existing.isPresent()) {
-      User user = existing.get().getUser();
+      // Busca o User direto do repositório (não do proxy da OAuthAccount) para garantir que
+      // todos os campos estejam inicializados fora da sessão Hibernate.
+      User user =
+          users
+              .findById(existing.get().getUser().getId())
+              .orElseThrow(
+                  () ->
+                      new OAuth2AuthenticationException(
+                          new OAuth2Error(
+                              "account_disabled", "Conta vinculada não encontrada.", null)));
       if (user.getDeletedAt() != null) {
-        // Conta excluída logicamente não pode reautenticar pelo vínculo social.
         throw new OAuth2AuthenticationException(
             new OAuth2Error("account_disabled", "Esta conta foi desativada.", null));
       }
