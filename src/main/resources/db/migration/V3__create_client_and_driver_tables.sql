@@ -1,5 +1,3 @@
--- Perfis de Cliente e Motorista vinculados 1:1 a uma conta (`users`).
--- Espelham as tabelas `client` e `driver` do vanep-dbdiagram.
 
 create table client (
     id          bigint generated always as identity primary key,

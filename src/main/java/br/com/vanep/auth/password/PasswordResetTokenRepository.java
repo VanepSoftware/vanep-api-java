@@ -11,7 +11,6 @@ public interface PasswordResetTokenRepository extends JpaRepository<PasswordRese
 
   Optional<PasswordResetToken> findByTokenHash(String tokenHash);
 
-  /** Invalida tokens ainda válidos de um usuário (ao emitir um novo ou após o reset). */
   @Modifying
   @Query(
       "update PasswordResetToken t set t.consumedAt = :now "

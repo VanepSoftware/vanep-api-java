@@ -9,7 +9,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
 
-/** Telas públicas de cadastro por e-mail/senha (cliente e motorista). */
 @Controller
 public class RegistrationController {
 

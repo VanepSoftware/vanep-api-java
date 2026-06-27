@@ -8,11 +8,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-/**
- * Rate limit simples por chave (janela fixa, em memória). Usado pelo {@link RateLimitingFilter}
- * para limitar requisições por IP nos endpoints sensíveis. Para múltiplas instâncias migrar para um
- * store compartilhado (Redis).
- */
 @Component
 public class RateLimiter {
 
@@ -32,7 +27,6 @@ public class RateLimiter {
     this.window = Duration.ofSeconds(windowSeconds);
   }
 
-  /** {@code true} se a requisição é permitida; {@code false} se estourou o limite da janela. */
   public boolean tryAcquire(String key) {
     if (!enabled) {
       return true;

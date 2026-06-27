@@ -26,10 +26,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
 
-/**
- * Passo 2 do cadastro via login social: coleta os dados obrigatórios (tipo, documento, etc.) que o
- * provedor não fornece e cria a conta Vanep, religando a sessão como o usuário recém-criado.
- */
 @Controller
 public class SignupController {
 
@@ -87,12 +83,8 @@ public class SignupController {
     return "redirect:" + (saved != null ? saved.getRedirectUrl() : "/");
   }
 
-  /**
-   * Troca a autenticação social pela conta Vanep recém-criada (nome = e-mail → vira o sub do JWT).
-   */
   private void reauthenticate(User user, HttpServletRequest request, HttpServletResponse response) {
-    // Troca o id de sessão ao elevar o privilégio (de pré-cadastro social para conta completa)
-    // para evitar session fixation.
+
     if (request.getSession(false) != null) {
       request.changeSessionId();
     }

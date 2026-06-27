@@ -21,10 +21,6 @@ import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
-/**
- * Perfil de motorista. 1:1 com {@link User}. Só recebe propostas após aprovação dos admins ({@link
- * DriverApprovalStatus#APPROVED}).
- */
 @Entity
 @Table(name = "driver")
 @Getter

@@ -1,5 +1,3 @@
--- Tokens de uso único para verificação de e-mail e reset de senha. Guardam apenas o hash
--- (SHA-256) do token; o valor bruto vai só no link enviado por e-mail.
 create table email_verification_token (
     id          bigint generated always as identity primary key,
     user_id     bigint       not null references users (id),

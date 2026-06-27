@@ -6,7 +6,6 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 
-/** Serve a tela de login (Thymeleaf), no mesmo modelo do "front" de login dos checklists. */
 @Controller
 public class LoginController {
 
@@ -19,7 +18,7 @@ public class LoginController {
 
   @GetMapping("/login")
   public String login(Model model) {
-    // O botão "Entrar com Google" só aparece quando há provedor social configurado.
+
     model.addAttribute("googleEnabled", clientRegistrationRepository.getIfAvailable() != null);
     return "login";
   }

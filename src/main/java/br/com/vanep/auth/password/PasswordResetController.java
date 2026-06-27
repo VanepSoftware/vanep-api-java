@@ -9,7 +9,6 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
-/** Telas públicas de recuperação de senha (solicitar link e redefinir). */
 @Controller
 public class PasswordResetController {
 
@@ -35,7 +34,7 @@ public class PasswordResetController {
       return "forgot-password";
     }
     passwordReset.requestReset(form.getEmail());
-    // Resposta sempre genérica: não revela se o e-mail existe.
+
     return "redirect:/login?reset-requested";
   }
 

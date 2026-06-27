@@ -14,7 +14,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Cria contas (e o perfil cliente/motorista) a partir do cadastro por e-mail/senha. */
 @Service
 public class RegistrationService {
 

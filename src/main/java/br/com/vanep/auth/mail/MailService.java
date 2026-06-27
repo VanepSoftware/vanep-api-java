@@ -13,15 +13,6 @@ import org.springframework.stereotype.Service;
 import org.thymeleaf.context.Context;
 import org.thymeleaf.spring6.SpringTemplateEngine;
 
-/**
- * Envio de e-mails transacionais (HTML via Thymeleaf). Resiliente por design: se o envio estiver
- * desabilitado ({@code vanep.mail.enabled=false}) ou não houver SMTP configurado, apenas registra o
- * conteúdo no log (útil em dev/CI). Falhas de envio são logadas, não propagadas — não quebram o
- * cadastro nem o reset.
- *
- * <p>Em dev, aponte para o Mailpit ({@code spring.mail.host=localhost}, {@code port=1025}; UI em
- * http://localhost:8025).
- */
 @Service
 public class MailService {
 

@@ -11,12 +11,6 @@ import org.springframework.security.oauth2.server.authorization.token.JwtEncodin
 import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenCustomizer;
 import org.springframework.stereotype.Component;
 
-/**
- * Enriquece o access token (JWT) com claims de autorização que o Resource Server precisa para
- * decidir acesso: papel do usuário ({@code roles}/{@code user_type}), identificador opaco ({@code
- * uid}) e, para motoristas, o status de aprovação ({@code driver_status}). Sem isso o token só
- * carregava o {@code sub} e nenhuma decisão por papel seria possível na API.
- */
 @Component
 public class JwtTokenCustomizer implements OAuth2TokenCustomizer<JwtEncodingContext> {
 

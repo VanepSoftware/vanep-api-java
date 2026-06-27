@@ -5,11 +5,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
-/**
- * Falha o boot em produção quando segredos sensíveis ainda estão com os valores de desenvolvimento
- * (defaults conhecidos) ou em branco. Evita subir produção com chave de "lembrar-me", pepper ou JWK
- * inseguros/forjáveis.
- */
 @Component
 @Profile("prod")
 public class ProductionSecretsValidator implements InitializingBean {

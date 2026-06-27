@@ -7,11 +7,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-/**
- * Bloqueio temporário por conta após excesso de tentativas de login (defesa contra brute-force /
- * credential stuffing). Em memória: para múltiplas instâncias migrar para um store compartilhado
- * (Redis). A janela é medida a partir da última falha; um login bem-sucedido zera o contador.
- */
 @Service
 public class LoginAttemptService {
 

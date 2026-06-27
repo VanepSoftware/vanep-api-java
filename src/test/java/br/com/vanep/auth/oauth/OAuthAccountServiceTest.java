@@ -33,11 +33,13 @@ class OAuthAccountServiceTest {
   @Test
   void resolveReturnsRegisteredWhenAccountExists() {
     User user = new User();
+    user.setId(1L);
     user.setEmail("a@vanep.com");
     OAuthAccount account = new OAuthAccount();
     account.setUser(user);
     when(oauthAccounts.findByProviderAndProviderUid(AuthProvider.GOOGLE, "sub-1"))
         .thenReturn(Optional.of(account));
+    when(users.findById(1L)).thenReturn(Optional.of(user));
 
     OAuthResolution result =
         service.resolve(AuthProvider.GOOGLE, "sub-1", "a@vanep.com", true, "A");
@@ -50,12 +52,14 @@ class OAuthAccountServiceTest {
   @Test
   void resolveThrowsWhenLinkedAccountIsSoftDeleted() {
     User deleted = new User();
+    deleted.setId(99L);
     deleted.setEmail("gone@vanep.com");
     deleted.setDeletedAt(Instant.now());
     OAuthAccount account = new OAuthAccount();
     account.setUser(deleted);
     when(oauthAccounts.findByProviderAndProviderUid(AuthProvider.GOOGLE, "sub-x"))
         .thenReturn(Optional.of(account));
+    when(users.findById(99L)).thenReturn(Optional.of(deleted));
 
     assertThatThrownBy(
             () -> service.resolve(AuthProvider.GOOGLE, "sub-x", "gone@vanep.com", true, "G"))

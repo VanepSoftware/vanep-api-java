@@ -19,7 +19,6 @@ import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
-/** Perfil de cliente (responsável). 1:1 com {@link User}. */
 @Entity
 @Table(name = "client")
 @Getter

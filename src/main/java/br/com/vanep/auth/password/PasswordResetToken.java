@@ -11,7 +11,6 @@ import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 
-/** Token de reset de senha (uso único). Persiste só o hash do token. */
 @Entity
 @Table(name = "password_reset_token")
 @Getter

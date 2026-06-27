@@ -13,7 +13,6 @@ import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Resolve logins sociais: encontra/vincula uma conta ou sinaliza cadastro pendente. */
 @Service
 public class OAuthAccountService {
 
@@ -31,8 +30,7 @@ public class OAuthAccountService {
     Optional<OAuthAccount> existing =
         oauthAccounts.findByProviderAndProviderUid(provider, providerUid);
     if (existing.isPresent()) {
-      // Busca o User direto do repositório (não do proxy da OAuthAccount) para garantir que
-      // todos os campos estejam inicializados fora da sessão Hibernate.
+
       User user =
           users
               .findById(existing.get().getUser().getId())
@@ -48,8 +46,6 @@ public class OAuthAccountService {
       return OAuthResolution.registered(user);
     }
 
-    // Auto-vínculo por e-mail só quando o provedor CONFIRMA o e-mail — caso contrário um e-mail
-    // não verificado igual ao de uma conta local permitiria account takeover.
     if (emailVerified && email != null && !email.isBlank()) {
       Optional<User> byEmail = users.findByEmailAndDeletedAtIsNull(email);
       if (byEmail.isPresent()) {
@@ -72,7 +68,7 @@ public class OAuthAccountService {
     user.setPhone(form.getPhone());
     user.setBirthDate(form.getBirthDate());
     user.setGender(form.getGender());
-    user.setVerified(true); // e-mail já verificado pelo provedor social
+    user.setVerified(true);
     user.setTermsAcceptedAt(Instant.now());
     users.save(user);
 

@@ -10,7 +10,6 @@ import lombok.Getter;
 import lombok.Setter;
 import org.springframework.format.annotation.DateTimeFormat;
 
-/** Campos comuns ao cadastro por e-mail/senha (cliente e motorista). */
 @Getter
 @Setter
 public class AccountSignupForm {

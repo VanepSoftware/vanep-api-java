@@ -13,7 +13,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Emite e consome tokens de reset de senha. Não revela se o e-mail existe. */
 @Service
 public class PasswordResetService {
 
@@ -43,7 +42,6 @@ public class PasswordResetService {
   public void requestReset(String email) {
     users
         .findByEmailAndDeletedAtIsNull(email)
-        // Só contas com senha local — contas só-OAuth não redefinem senha aqui.
         .filter(user -> user.getPassword() != null && !user.getPassword().isBlank())
         .ifPresent(
             user -> {

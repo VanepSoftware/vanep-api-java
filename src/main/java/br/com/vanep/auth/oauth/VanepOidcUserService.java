@@ -15,19 +15,9 @@ import org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.stereotype.Service;
 
-/**
- * Carrega o usuário OIDC (Google) e o cruza com as contas Vanep:
- *
- * <ul>
- *   <li>conta existente → autoridade {@code ROLE_<type>}, nome = e-mail (vira o {@code sub} do
- *       JWT);
- *   <li>sem conta → autoridade {@code ROLE_PRE_REGISTER} (cadastro em 2 passos pendente).
- * </ul>
- */
 @Service
 public class VanepOidcUserService extends OidcUserService {
 
-  /** Autoridade temporária de quem logou no social mas ainda não completou o cadastro. */
   public static final String ROLE_PRE_REGISTER = "ROLE_PRE_REGISTER";
 
   private final OAuthAccountService accounts;

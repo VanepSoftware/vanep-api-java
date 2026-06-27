@@ -26,26 +26,11 @@ import org.springframework.security.web.authentication.LoginUrlAuthenticationEnt
 import org.springframework.security.web.util.matcher.MediaTypeRequestMatcher;
 import org.springframework.security.web.util.matcher.RequestMatcher;
 
-/**
- * Cadeias de segurança. A ordem importa:
- *
- * <ol>
- *   <li>(1) Authorization Server — endpoints OAuth2 ({@code /oauth2/**}); usuário não autenticado é
- *       redirecionado para a tela de login.
- *   <li>(2) Resource Server — API ({@code /api/**}) protegida por JWT (Bearer), stateless, retorna
- *       401 sem token; authorities derivam dos claims {@code roles}/{@code scope}.
- *   <li>(3) Web — tela de login (form login), cadastro, verificação de e-mail e reset de senha.
- * </ol>
- */
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
 public class SecurityConfig {
 
-  /**
-   * Converte o JWT em authorities: papéis vindos do claim {@code roles} (ex.: {@code ROLE_DRIVER})
-   * somados aos escopos OAuth ({@code SCOPE_read}/{@code SCOPE_write}).
-   */
   @Bean
   public JwtAuthenticationConverter jwtAuthenticationConverter() {
     JwtGrantedAuthoritiesConverter scopes = new JwtGrantedAuthoritiesConverter();
@@ -118,12 +103,8 @@ public class SecurityConfig {
                 authorize
                     .requestMatchers("/login", "/error", "/css/**", "/images/**", "/webjars/**")
                     .permitAll()
-                    // Cadastro público por e-mail/senha (não inclui /signup/complete, que é do
-                    // fluxo social e exige autenticação).
                     .requestMatchers("/signup", "/signup/client", "/signup/driver")
                     .permitAll()
-                    // Verificação de e-mail e recuperação de senha são públicas (acessadas via
-                    // link/token, sem sessão).
                     .requestMatchers(
                         "/verify-email",
                         "/verify-email/resend",
@@ -140,7 +121,6 @@ public class SecurityConfig {
         .rememberMe(remember -> remember.key(rememberMeKey).rememberMeParameter("remember-me"))
         .logout(logout -> logout.logoutSuccessUrl("/login?logout").permitAll());
 
-    // Login social só é ativado quando há um provedor configurado (ex.: Google via env).
     if (clientRegistrationRepository.getIfAvailable() != null) {
       http.oauth2Login(
           oauth ->

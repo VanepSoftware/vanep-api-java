@@ -10,18 +10,10 @@ import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Base64;
 
-/**
- * Carrega/gera o par de chaves RSA usado para assinar os JWTs do Authorization Server.
- *
- * <p>Em produção as chaves devem vir da configuração ({@code vanep.oauth.jwk.*}) e ser estáveis: do
- * contrário cada restart invalida todos os tokens e instâncias diferentes assinam com chaves
- * diferentes (a validação falha atrás de um load balancer).
- */
 final class RsaKeys {
 
   private RsaKeys() {}
 
-  /** Constrói a {@link RSAKey} a partir de PEMs (PKCS#8 para a privada, X.509 para a pública). */
   static RSAKey fromPem(String privateKeyPem, String publicKeyPem, String keyId) {
     try {
       KeyFactory factory = KeyFactory.getInstance("RSA");
@@ -37,7 +29,6 @@ final class RsaKeys {
     }
   }
 
-  /** Gera um par RSA efêmero — apenas para desenvolvimento. */
   static RSAKey generate(String keyId) {
     try {
       KeyPairGenerator generator = KeyPairGenerator.getInstance("RSA");

@@ -10,11 +10,6 @@ import org.springframework.security.authentication.event.InteractiveAuthenticati
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Reage aos eventos de autenticação: conta falhas de credencial (alimenta o {@link
- * LoginAttemptService}) e, no login interativo bem-sucedido, zera o contador e grava {@code
- * last_login_at}.
- */
 @Component
 public class AuthenticationEventsListener {
 

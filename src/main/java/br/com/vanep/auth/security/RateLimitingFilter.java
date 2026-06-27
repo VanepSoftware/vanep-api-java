@@ -12,11 +12,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-/**
- * Limita por IP as requisições aos endpoints sensíveis de autenticação (login, cadastro,
- * recuperação de senha e token), retornando 429 quando o limite da janela é estourado. Mitiga
- * brute-force distribuído e spam de cadastro/recuperação.
- */
 @Component
 public class RateLimitingFilter extends OncePerRequestFilter {
 

@@ -1,7 +1,3 @@
--- Estado do Authorization Server (codes, access/refresh tokens) persistido em banco para
--- sobreviver a restarts e funcionar em múltiplas instâncias. Schema oficial do Spring
--- Authorization Server, adaptado para PostgreSQL (blob -> text, timestamp -> timestamptz).
--- Consumido por org.springframework.security.oauth2.server.authorization.JdbcOAuth2AuthorizationService.
 create table oauth2_authorization (
     id                            varchar(100) not null,
     registered_client_id          varchar(100) not null,

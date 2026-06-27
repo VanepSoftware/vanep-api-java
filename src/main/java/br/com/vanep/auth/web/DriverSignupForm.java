@@ -7,7 +7,6 @@ import java.math.BigDecimal;
 import lombok.Getter;
 import lombok.Setter;
 
-/** Cadastro de motorista por e-mail/senha (campos adicionais ao {@link AccountSignupForm}). */
 @Getter
 @Setter
 public class DriverSignupForm extends AccountSignupForm {

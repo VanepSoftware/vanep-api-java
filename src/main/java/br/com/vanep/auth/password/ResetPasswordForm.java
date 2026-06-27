@@ -5,7 +5,6 @@ import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
 
-/** Nova senha + confirmação, carregando o token do link. */
 @Getter
 @Setter
 public class ResetPasswordForm {

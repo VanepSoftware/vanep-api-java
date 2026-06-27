@@ -16,7 +16,6 @@ services:
       timeout: 5s
       retries: 5
 
-  # Servidor SMTP de desenvolvimento (captura os e-mails). UI web em http://localhost:8025.
   mailpit:
     image: axllent/mailpit:latest
     ports:

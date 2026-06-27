@@ -11,7 +11,6 @@ import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 
-/** Token de verificação de e-mail (uso único). Persiste só o hash do token. */
 @Entity
 @Table(name = "email_verification_token")
 @Getter

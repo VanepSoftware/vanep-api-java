@@ -31,27 +31,11 @@ import org.springframework.security.oauth2.server.authorization.settings.Authori
 import org.springframework.security.oauth2.server.authorization.settings.ClientSettings;
 import org.springframework.security.oauth2.server.authorization.settings.TokenSettings;
 
-/**
- * Configuração do Spring Authorization Server — equivalente ao Laravel Passport dos checklists.
- *
- * <p>Expõe os endpoints OAuth2 padrão ({@code /oauth2/authorize}, {@code /oauth2/token}, JWKS, OIDC
- * discovery) e registra o cliente público (PKCE) usado pelos frontends, no mesmo modelo
- * "authorization code + PKCE" que o checklists-frontend usa com o NextAuth.
- *
- * <p>Persistência (produção): a chave de assinatura (JWK) vem da config ({@code vanep.oauth.jwk.*})
- * e o estado de autorização (codes/refresh tokens) é gravado no banco ({@link
- * JdbcOAuth2AuthorizationService}). O repositório de clientes continua em memória por ser
- * determinístico a partir da config (idêntico em todas as instâncias).
- */
 @Configuration
 public class AuthorizationServerConfig {
 
   private static final Logger log = LoggerFactory.getLogger(AuthorizationServerConfig.class);
 
-  /**
-   * Cliente público (sem secret, PKCE obrigatório) usado pelos frontends. Equivale ao client do
-   * Passport com {@code token_endpoint_auth_method: none}.
-   */
   @Bean
   public RegisteredClientRepository registeredClientRepository(
       @Value("${vanep.oauth.client.id}") String clientId,
@@ -91,10 +75,6 @@ public class AuthorizationServerConfig {
     return new InMemoryRegisteredClientRepository(builder.build());
   }
 
-  /**
-   * Persiste codes/tokens no banco (tabela {@code oauth2_authorization}). Fora do profile de teste,
-   * onde o schema vem só das entidades JPA e o store em memória padrão é suficiente.
-   */
   @Bean
   @Profile("!test")
   public OAuth2AuthorizationService authorizationService(
@@ -102,11 +82,6 @@ public class AuthorizationServerConfig {
     return new JdbcOAuth2AuthorizationService(jdbcTemplate, registeredClientRepository);
   }
 
-  /**
-   * Chave de assinatura (RSA) dos JWTs. Em produção é obrigatório configurar {@code
-   * vanep.oauth.jwk.private-key}/{@code public-key} (PEM) para estabilidade entre restarts e
-   * instâncias. Em dev, na ausência da config, uma chave efêmera é gerada (com aviso).
-   */
   @Bean
   public JWKSource<SecurityContext> jwkSource(
       @Value("${vanep.oauth.jwk.private-key:}") String privateKeyPem,
@@ -130,10 +105,6 @@ public class AuthorizationServerConfig {
     return new ImmutableJWKSet<>(new JWKSet(rsaKey));
   }
 
-  /**
-   * Decoder usado pelo Resource Server. Quando {@code vanep.oauth.issuer} está definido, valida
-   * também o {@code iss} do token (além de assinatura e expiração).
-   */
   @Bean
   public JwtDecoder jwtDecoder(
       JWKSource<SecurityContext> jwkSource, @Value("${vanep.oauth.issuer:}") String issuer) {

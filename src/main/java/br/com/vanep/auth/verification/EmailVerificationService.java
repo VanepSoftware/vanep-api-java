@@ -12,7 +12,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Emite e valida tokens de verificação de e-mail e ativa a conta ao confirmar. */
 @Service
 public class EmailVerificationService {
 
@@ -52,9 +51,6 @@ public class EmailVerificationService {
         Map.of("name", user.getName(), "link", link));
   }
 
-  /**
-   * Confirma a conta a partir do token bruto. {@code true} se verificou; {@code false} caso fim.
-   */
   @Transactional
   public boolean verify(String rawToken) {
     if (rawToken == null || rawToken.isBlank()) {
@@ -77,7 +73,6 @@ public class EmailVerificationService {
     return true;
   }
 
-  /** Reenvia a verificação (somente para contas existentes ainda não verificadas). */
   @Transactional
   public void resend(String email) {
     users
