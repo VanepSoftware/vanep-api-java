@@ -25,7 +25,19 @@
           Sessão encerrada com sucesso.
         </div>
         <div class="alert alert-success" th:if="${param.registered}">
-          Conta criada! Faça login para continuar.
+          Conta criada! Enviamos um link de verificação para o seu e-mail.
+        </div>
+        <div class="alert alert-success" th:if="${param.verified}">
+          E-mail verificado! Faça login para continuar.
+        </div>
+        <div class="alert alert-success" th:if="${param['verify-sent'] != null}">
+          Se houver uma conta pendente com esse e-mail, enviamos um novo link.
+        </div>
+        <div class="alert alert-success" th:if="${param['reset-requested'] != null}">
+          Se houver uma conta com esse e-mail, enviamos um link para redefinir a senha.
+        </div>
+        <div class="alert alert-success" th:if="${param.reset}">
+          Senha redefinida! Faça login com a nova senha.
         </div>
 
         <form method="post" th:action="@{/login}">
@@ -61,8 +73,7 @@
 
           <button type="submit" class="btn-submit">Entrar</button>
 
-          <!-- Recuperação de senha chega em fase posterior. -->
-          <a class="forgot" href="#">Esqueci minha senha</a>
+          <a class="forgot" th:href="@{/forgot-password}">Esqueci minha senha</a>
         </form>
 
         <div th:if="${googleEnabled}">

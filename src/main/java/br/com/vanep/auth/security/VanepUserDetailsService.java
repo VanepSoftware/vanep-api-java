@@ -13,9 +13,11 @@ import org.springframework.stereotype.Service;
 public class VanepUserDetailsService implements UserDetailsService {
 
   private final UserRepository users;
+  private final LoginAttemptService loginAttempts;
 
-  public VanepUserDetailsService(UserRepository users) {
+  public VanepUserDetailsService(UserRepository users, LoginAttemptService loginAttempts) {
     this.users = users;
+    this.loginAttempts = loginAttempts;
   }
 
   @Override
@@ -30,9 +32,13 @@ public class VanepUserDetailsService implements UserDetailsService {
       throw new UsernameNotFoundException("Conta sem senha local: " + email);
     }
 
+    // disabled => e-mail não verificado (DisabledException); accountLocked => brute-force
+    // (LockedException). Ambos checados antes da senha pelo DaoAuthenticationProvider.
     return org.springframework.security.core.userdetails.User.withUsername(user.getEmail())
         .password(user.getPassword())
         .authorities(new SimpleGrantedAuthority("ROLE_" + user.getType().name()))
+        .disabled(!user.isVerified())
+        .accountLocked(loginAttempts.isBlocked(user.getEmail()))
         .build();
   }
 }

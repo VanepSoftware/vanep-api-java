@@ -2,6 +2,8 @@ package br.com.vanep.auth.config;
 
 import br.com.vanep.auth.oauth.OAuthLoginSuccessHandler;
 import br.com.vanep.auth.oauth.VanepOidcUserService;
+import java.util.ArrayList;
+import java.util.Collection;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -9,11 +11,16 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.MediaType;
 import org.springframework.security.config.Customizer;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.oauth2.server.authorization.OAuth2AuthorizationServerConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
+import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
 import org.springframework.security.web.util.matcher.MediaTypeRequestMatcher;
@@ -26,18 +33,39 @@ import org.springframework.security.web.util.matcher.RequestMatcher;
  *   <li>(1) Authorization Server — endpoints OAuth2 ({@code /oauth2/**}); usuário não autenticado é
  *       redirecionado para a tela de login.
  *   <li>(2) Resource Server — API ({@code /api/**}) protegida por JWT (Bearer), stateless, retorna
- *       401 sem token.
- *   <li>(3) Web — tela de login (form login) e recursos estáticos.
+ *       401 sem token; authorities derivam dos claims {@code roles}/{@code scope}.
+ *   <li>(3) Web — tela de login (form login), cadastro, verificação de e-mail e reset de senha.
  * </ol>
  */
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity
 public class SecurityConfig {
+
+  /**
+   * Converte o JWT em authorities: papéis vindos do claim {@code roles} (ex.: {@code ROLE_DRIVER})
+   * somados aos escopos OAuth ({@code SCOPE_read}/{@code SCOPE_write}).
+   */
+  @Bean
+  public JwtAuthenticationConverter jwtAuthenticationConverter() {
+    JwtGrantedAuthoritiesConverter scopes = new JwtGrantedAuthoritiesConverter();
+    JwtAuthenticationConverter converter = new JwtAuthenticationConverter();
+    converter.setJwtGrantedAuthoritiesConverter(
+        jwt -> {
+          Collection<GrantedAuthority> authorities = new ArrayList<>(scopes.convert(jwt));
+          Object roles = jwt.getClaim("roles");
+          if (roles instanceof Collection<?> values) {
+            values.forEach(role -> authorities.add(new SimpleGrantedAuthority(role.toString())));
+          }
+          return authorities;
+        });
+    return converter;
+  }
 
   @Bean
   @Order(1)
-  public SecurityFilterChain authorizationServerSecurityFilterChain(HttpSecurity http)
-      throws Exception {
+  public SecurityFilterChain authorizationServerSecurityFilterChain(
+      HttpSecurity http, JwtAuthenticationConverter jwtAuthenticationConverter) throws Exception {
     OAuth2AuthorizationServerConfigurer authorizationServer =
         new OAuth2AuthorizationServerConfigurer();
     RequestMatcher endpointsMatcher = authorizationServer.getEndpointsMatcher();
@@ -51,20 +79,27 @@ public class SecurityConfig {
                 exceptions.defaultAuthenticationEntryPointFor(
                     new LoginUrlAuthenticationEntryPoint("/login"),
                     new MediaTypeRequestMatcher(MediaType.TEXT_HTML)))
-        .oauth2ResourceServer(resourceServer -> resourceServer.jwt(Customizer.withDefaults()));
+        .oauth2ResourceServer(
+            resourceServer ->
+                resourceServer.jwt(
+                    jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter)));
 
     return http.build();
   }
 
   @Bean
   @Order(2)
-  public SecurityFilterChain apiSecurityFilterChain(HttpSecurity http) throws Exception {
+  public SecurityFilterChain apiSecurityFilterChain(
+      HttpSecurity http, JwtAuthenticationConverter jwtAuthenticationConverter) throws Exception {
     http.securityMatcher("/api/**")
         .authorizeHttpRequests(authorize -> authorize.anyRequest().authenticated())
         .csrf(csrf -> csrf.disable())
         .sessionManagement(
             session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-        .oauth2ResourceServer(resourceServer -> resourceServer.jwt(Customizer.withDefaults()));
+        .oauth2ResourceServer(
+            resourceServer ->
+                resourceServer.jwt(
+                    jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter)));
 
     return http.build();
   }
@@ -86,6 +121,14 @@ public class SecurityConfig {
                     // Cadastro público por e-mail/senha (não inclui /signup/complete, que é do
                     // fluxo social e exige autenticação).
                     .requestMatchers("/signup", "/signup/client", "/signup/driver")
+                    .permitAll()
+                    // Verificação de e-mail e recuperação de senha são públicas (acessadas via
+                    // link/token, sem sessão).
+                    .requestMatchers(
+                        "/verify-email",
+                        "/verify-email/resend",
+                        "/forgot-password",
+                        "/reset-password")
                     .permitAll()
                     .requestMatchers("/actuator/health", "/actuator/info")
                     .permitAll()

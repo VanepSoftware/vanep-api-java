@@ -1,10 +1,11 @@
 package br.com.vanep.auth.web;
 
-import br.com.vanep.user.Client;
-import br.com.vanep.user.ClientRepository;
-import br.com.vanep.user.Driver;
-import br.com.vanep.user.DriverApprovalStatus;
-import br.com.vanep.user.DriverRepository;
+import br.com.vanep.auth.verification.EmailVerificationService;
+import br.com.vanep.client.Client;
+import br.com.vanep.client.ClientRepository;
+import br.com.vanep.driver.Driver;
+import br.com.vanep.driver.DriverApprovalStatus;
+import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.user.User;
 import br.com.vanep.user.UserRepository;
 import br.com.vanep.user.UserType;
@@ -21,16 +22,19 @@ public class RegistrationService {
   private final ClientRepository clients;
   private final DriverRepository drivers;
   private final PasswordEncoder passwordEncoder;
+  private final EmailVerificationService emailVerification;
 
   public RegistrationService(
       UserRepository users,
       ClientRepository clients,
       DriverRepository drivers,
-      PasswordEncoder passwordEncoder) {
+      PasswordEncoder passwordEncoder,
+      EmailVerificationService emailVerification) {
     this.users = users;
     this.clients = clients;
     this.drivers = drivers;
     this.passwordEncoder = passwordEncoder;
+    this.emailVerification = emailVerification;
   }
 
   @Transactional
@@ -39,6 +43,7 @@ public class RegistrationService {
     Client client = new Client();
     client.setUser(user);
     clients.save(client);
+    emailVerification.startVerification(user);
     return user;
   }
 
@@ -53,6 +58,7 @@ public class RegistrationService {
     driver.setBasePrice(form.getBasePrice());
     driver.setApprovalStatus(DriverApprovalStatus.PENDING);
     drivers.save(driver);
+    emailVerification.startVerification(user);
     return user;
   }
 

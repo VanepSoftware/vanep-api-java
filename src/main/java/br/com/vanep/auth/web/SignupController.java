@@ -91,6 +91,11 @@ public class SignupController {
    * Troca a autenticação social pela conta Vanep recém-criada (nome = e-mail → vira o sub do JWT).
    */
   private void reauthenticate(User user, HttpServletRequest request, HttpServletResponse response) {
+    // Troca o id de sessão ao elevar o privilégio (de pré-cadastro social para conta completa)
+    // para evitar session fixation.
+    if (request.getSession(false) != null) {
+      request.changeSessionId();
+    }
     Authentication authentication =
         new UsernamePasswordAuthenticationToken(
             user.getEmail(),

@@ -1,4 +1,4 @@
-package br.com.vanep.user;
+package br.com.vanep.client;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 

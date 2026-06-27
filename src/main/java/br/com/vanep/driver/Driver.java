@@ -1,5 +1,6 @@
-package br.com.vanep.user;
+package br.com.vanep.driver;
 
+import br.com.vanep.user.User;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;

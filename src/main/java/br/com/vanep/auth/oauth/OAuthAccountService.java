@@ -8,6 +8,8 @@ import br.com.vanep.user.User;
 import br.com.vanep.user.UserRepository;
 import java.time.Instant;
 import java.util.Optional;
+import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
+import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,17 +27,24 @@ public class OAuthAccountService {
 
   @Transactional
   public OAuthResolution resolve(
-      AuthProvider provider, String providerUid, String email, String name) {
+      AuthProvider provider, String providerUid, String email, boolean emailVerified, String name) {
     Optional<OAuthAccount> existing =
         oauthAccounts.findByProviderAndProviderUid(provider, providerUid);
     if (existing.isPresent()) {
-      return OAuthResolution.registered(existing.get().getUser());
+      User user = existing.get().getUser();
+      if (user.getDeletedAt() != null) {
+        // Conta excluída logicamente não pode reautenticar pelo vínculo social.
+        throw new OAuth2AuthenticationException(
+            new OAuth2Error("account_disabled", "Esta conta foi desativada.", null));
+      }
+      return OAuthResolution.registered(user);
     }
 
-    if (email != null && !email.isBlank()) {
+    // Auto-vínculo por e-mail só quando o provedor CONFIRMA o e-mail — caso contrário um e-mail
+    // não verificado igual ao de uma conta local permitiria account takeover.
+    if (emailVerified && email != null && !email.isBlank()) {
       Optional<User> byEmail = users.findByEmailAndDeletedAtIsNull(email);
       if (byEmail.isPresent()) {
-        // Conta local já existe com este e-mail (verificado pelo provedor) → vincula.
         OAuthAccount linked = link(byEmail.get(), provider, providerUid, email);
         return OAuthResolution.registered(linked.getUser());
       }

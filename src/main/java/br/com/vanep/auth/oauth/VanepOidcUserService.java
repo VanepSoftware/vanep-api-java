@@ -43,9 +43,11 @@ public class VanepOidcUserService extends OidcUserService {
     AuthProvider provider = providerOf(userRequest.getClientRegistration().getRegistrationId());
     String providerUid = oidcUser.getSubject();
     String email = oidcUser.getEmail();
+    boolean emailVerified = Boolean.TRUE.equals(oidcUser.getEmailVerified());
     String name = oidcUser.getFullName() != null ? oidcUser.getFullName() : email;
 
-    OAuthResolution resolution = accounts.resolve(provider, providerUid, email, name);
+    OAuthResolution resolution =
+        accounts.resolve(provider, providerUid, email, emailVerified, name);
 
     Map<String, Object> claims = new HashMap<>(oidcUser.getClaims());
     if (resolution.registered()) {
