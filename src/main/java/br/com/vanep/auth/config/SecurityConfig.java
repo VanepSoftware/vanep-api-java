@@ -111,6 +111,8 @@ public class SecurityConfig {
                         "/forgot-password",
                         "/reset-password")
                     .permitAll()
+                    .requestMatchers("/auth/sso-logout")
+                    .permitAll()
                     .requestMatchers("/actuator/health", "/actuator/info")
                     .permitAll()
                     .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html")
