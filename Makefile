@@ -2,12 +2,14 @@ MVNW = ./mvnw
 COMPOSE = docker compose
 SERVICE = vanep
 POSTGRES_SERVICE = postgres
+MAILPIT_SERVICE = mailpit
 
 ENV_FILE = .env
 ENV_EXAMPLE = .env.example
 
 .PHONY: up down nuke restart logs shell test test-coverage check boot-run build clean \
-	docker-build lint lint-fix db-up db-down db-logs db-psql db-migrate db-seed up-build dev setup-env
+	docker-build lint lint-fix db-up db-down db-logs db-psql db-migrate db-seed up-build dev setup-env \
+	mail-up mail-down mail-logs
 
 # Docker Compose exige `.env` na raiz (sem defaults sensíveis no compose).
 setup-env:
@@ -69,7 +71,7 @@ db-seed: db-up db-migrate setup-env
 up-build: setup-env
 	$(COMPOSE) up -d --build
 
-dev: db-up setup-env
+dev: db-up mail-up setup-env
 	@bash -euo pipefail -c '\
 		port="$$(grep -E "^POSTGRES_PORT=" "$(ENV_FILE)" | cut -d= -f2-)"; \
 		port="$${port:-5432}"; \
@@ -99,6 +101,15 @@ build:
 
 clean:
 	$(MVNW) clean
+
+mail-up: setup-env
+	$(COMPOSE) up -d $(MAILPIT_SERVICE)
+
+mail-down:
+	$(COMPOSE) stop $(MAILPIT_SERVICE)
+
+mail-logs:
+	$(COMPOSE) logs -f $(MAILPIT_SERVICE)
 
 lint:
 	$(MVNW) spotless:check
