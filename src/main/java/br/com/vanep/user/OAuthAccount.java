@@ -19,7 +19,6 @@ import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
-/** Vínculo de um provedor OAuth (Google/Apple) a uma {@link User conta}. */
 @Entity
 @Table(name = "oauth_account")
 @Getter

@@ -1,5 +1,6 @@
-package br.com.vanep.user;
+package br.com.vanep.driver;
 
+import br.com.vanep.user.User;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -20,10 +21,6 @@ import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
-/**
- * Perfil de motorista. 1:1 com {@link User}. Só recebe propostas após aprovação dos admins ({@link
- * DriverApprovalStatus#APPROVED}).
- */
 @Entity
 @Table(name = "driver")
 @Getter

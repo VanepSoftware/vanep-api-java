@@ -16,6 +16,12 @@ services:
       timeout: 5s
       retries: 5
 
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - "${MAILPIT_SMTP_PORT:-1025}:1025"
+      - "${MAILPIT_UI_PORT:-8025}:8025"
+
   vanep:
     build:
       context: .
@@ -27,6 +33,8 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: docker
       POSTGRES_HOST: postgres
+      MAIL_HOST: mailpit
+      MAIL_PORT: 1025
       JAVA_OPTS: "${JAVA_OPTS:--XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0}"
     depends_on:
       postgres:

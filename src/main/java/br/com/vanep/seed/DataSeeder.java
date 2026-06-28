@@ -11,10 +11,6 @@ import org.springframework.boot.ApplicationRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
-/**
- * Semeia dados básicos no boot quando habilitado. Honra {@code vanep.seed.only=true} usado pelo
- * {@code make db-seed} (a app roda com {@code web-application-type=none} e encerra após o seed).
- */
 @Component
 public class DataSeeder implements ApplicationRunner {
 

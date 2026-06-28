@@ -8,11 +8,6 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.web.authentication.SavedRequestAwareAuthenticationSuccessHandler;
 import org.springframework.stereotype.Component;
 
-/**
- * Após o login social: se a conta ainda não foi completada (autoridade {@link
- * VanepOidcUserService#ROLE_PRE_REGISTER}), envia para o passo 2 do cadastro preservando o pedido
- * original (a tela de autorização OAuth). Caso contrário, segue para o destino salvo.
- */
 @Component
 public class OAuthLoginSuccessHandler extends SavedRequestAwareAuthenticationSuccessHandler {
 

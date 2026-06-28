@@ -76,7 +76,7 @@ Substitua **`18-main`** pelo nome que aparecer na lista (pode ser `17-main`, etc
 
 ### 4. Caminho recomendado: Postgres no Docker + API com Maven
 
-Sobe o Postgres, espera a porta TCP em **`127.0.0.1`** e inicia a API com perfil **`local`** (o Make carrega o `.env` na raiz):
+Sobe o Postgres e o Mailpit, espera a porta TCP em **`127.0.0.1`** e inicia a API com perfil **`local`** (o Make carrega o `.env` na raiz):
 
 ```bash
 make dev
@@ -203,15 +203,47 @@ Ao concluir, o usuário é levado a `/login?registered`. E-mail e documento (CPF
 
 ### Variáveis de ambiente (ver `.env.example`)
 
-- **`VANEP_PASSWORD_PEPPER`** — segredo do servidor para o hash de senhas. **Obrigatório em runtime.**
-- **`VANEP_OAUTH_CLIENT_ID`** — id do cliente público dos frontends (default `vanep-frontend`).
-- **`VANEP_OAUTH_REDIRECT_URIS`** — callbacks permitidas (separadas por vírgula).
-- **`VANEP_OAUTH_POST_LOGOUT_REDIRECT_URIS`**, **`VANEP_OAUTH_ACCESS_TOKEN_TTL_MINUTES`** (default 15), **`VANEP_OAUTH_REFRESH_TOKEN_TTL_DAYS`** (default 90).
-- **`VANEP_REMEMBER_ME_KEY`** — chave do cookie "lembrar-me".
-- **`VANEP_SEED_ENABLED`** — `true` semeia um admin de teste no boot.
+| Variável | Default | Descrição |
+| --- | --- | --- |
+| **`VANEP_PASSWORD_PEPPER`** | *(obrigatório)* | Pepper do Argon2 (HMAC-SHA256 antes do hash). **Gere uma vez e nunca troque** após ter usuários. `openssl rand -hex 32` |
+| **`VANEP_REMEMBER_ME_KEY`** | *(obrigatório)* | Chave HMAC do cookie "lembrar-me". `openssl rand -hex 32` |
+| **`VANEP_OAUTH_JWK_PRIVATE_KEY`** | *(vazio = efêmera)* | Chave RSA privada (PEM) para assinar JWTs. Em dev pode deixar vazio (chave efêmera gerada no boot). **Obrigatório em produção.** |
+| **`VANEP_OAUTH_JWK_PUBLIC_KEY`** | *(vazio = efêmera)* | Chave RSA pública (PEM). Par da privada. |
+| **`VANEP_OAUTH_JWK_KEY_ID`** | `vanep-rsa-key` | Identificador da chave no JWKS. |
+| **`VANEP_OAUTH_ISSUER`** | *(vazio)* | URL pública da API usada como `iss` nos JWTs. Vazio em dev (sem validação). Ex: `https://api.vanep.com.br` |
+| **`VANEP_APP_BASE_URL`** | `http://localhost:8080` | URL base da API para links nos e-mails (verificação, reset). |
+| **`VANEP_OAUTH_CLIENT_ID`** | `vanep-frontend` | ID do cliente público (PKCE) dos frontends. |
+| **`VANEP_OAUTH_REDIRECT_URIS`** | | Callbacks permitidas (separadas por vírgula). |
+| **`VANEP_OAUTH_POST_LOGOUT_REDIRECT_URIS`** | | URIs de redirecionamento pós-logout (separadas por vírgula). |
+| **`VANEP_OAUTH_ACCESS_TOKEN_TTL_MINUTES`** | `15` | TTL do access token. |
+| **`VANEP_OAUTH_REFRESH_TOKEN_TTL_DAYS`** | `90` | TTL do refresh token. |
+| **`GOOGLE_CLIENT_ID`** | *(vazio = desligado)* | Client ID do Google OAuth. Sem ele o botão "Entrar com Google" não aparece. |
+| **`GOOGLE_CLIENT_SECRET`** | *(vazio)* | Client secret do Google OAuth. |
+| **`VANEP_LOGIN_MAX_ATTEMPTS`** | `5` | Tentativas de login erradas antes de bloquear a conta. |
+| **`VANEP_LOGIN_LOCK_MINUTES`** | `15` | Minutos de bloqueio após exceder tentativas. |
+| **`VANEP_RATE_LIMIT_ENABLED`** | `true` | Habilita rate limit por IP. |
+| **`VANEP_RATE_LIMIT_CAPACITY`** | `30` | Máximo de requests por janela de tempo. |
+| **`VANEP_RATE_LIMIT_WINDOW_SECONDS`** | `60` | Janela do rate limit em segundos. |
+| **`VANEP_SEED_ENABLED`** | `false` | `true` cria admin de teste no boot (`admin@vanep.com.br` / `password`). |
 
-> **Chave JWT:** nesta fase a chave RSA de assinatura é gerada em memória no boot (tokens deixam de
-> ser válidos ao reiniciar). Persistir a chave por env/keystore é um próximo passo para produção.
+Para variáveis de e-mail, ver a seção **E-mail** abaixo.
+
+### Logout (SSO)
+
+O frontend (NextAuth) revoga os tokens OAuth2 ao fazer logout, mas a **sessão HTTP do Spring** (criada pelo login social com Google ou pelo form login) permanece ativa no navegador. Sem invalidá-la, o próximo `/oauth2/authorize` re-autentica automaticamente sem mostrar a tela de login.
+
+Para resolver, a API expõe o endpoint **`GET /auth/sso-logout`**:
+
+1. Invalida a sessão HTTP do Spring (`HttpSession.invalidate()`)
+2. Limpa o `SecurityContext`
+3. Redireciona para a URI informada em `redirect_uri` (validada contra `VANEP_OAUTH_POST_LOGOUT_REDIRECT_URIS`)
+
+**Fluxo completo de logout (frontend → backend):**
+
+1. Frontend chama `signOut({ redirect: false })` do NextAuth (limpa JWT + revoga tokens)
+2. Frontend redireciona o navegador para `/api/auth/sso-logout` (rota Next.js)
+3. Rota Next.js redireciona para `${AUTH_URL}/auth/sso-logout?redirect_uri=${NEXTAUTH_URL}`
+4. Backend invalida a sessão e redireciona de volta ao frontend
 
 ### Usuário de teste (dev)
 
@@ -220,6 +252,49 @@ No perfil **`local`** o seed vem habilitado. Também dá para semear sob demanda
 ```bash
 make db-seed   # cria admin@vanep.com.br / password
 ```
+
+---
+
+## E-mail (verificação de conta e reset de senha)
+
+A API envia e-mails transacionais em dois fluxos: **verificação de e-mail** (no cadastro por e-mail/senha) e **reset de senha** (esqueci minha senha). O login exige e-mail verificado — sem e-mail funcional, usuários cadastrados por e-mail/senha não conseguem logar.
+
+### Desenvolvimento local (Mailpit)
+
+O **[Mailpit](https://mailpit.axllent.org/)** já está configurado no `docker-compose.yml`. Ele captura todos os e-mails enviados pela aplicação sem precisar de conta, API key ou domínio verificado.
+
+```bash
+make mail-up       # sobe só o Mailpit
+make dev           # sobe Postgres + Mailpit + API (tudo de uma vez)
+```
+
+| Serviço | URL |
+| --- | --- |
+| **SMTP** (usado pela app) | `localhost:1025` |
+| **UI web** (ver e-mails capturados) | `http://localhost:8025` |
+
+O perfil `local` (`application-local.properties`) já aponta para `localhost:1025` sem autenticação — não precisa configurar nada no `.env` além do que já vem no `.env.example`.
+
+Para **desativar** o envio de e-mails completamente (e-mails vão só pro log da aplicação):
+
+```
+VANEP_MAIL_ENABLED=false
+```
+
+> **Atenção:** com mail desativado, usuários cadastrados via e-mail/senha não conseguem logar, pois o login exige e-mail verificado. Use só em testes onde você verifica o token manualmente no log.
+
+### Variáveis de e-mail (ver `.env.example`)
+
+| Variável | Default | Descrição |
+| --- | --- | --- |
+| `MAIL_HOST` | `localhost` | Host SMTP |
+| `MAIL_PORT` | `1025` | Porta SMTP |
+| `MAIL_USERNAME` | *(vazio)* | Usuário SMTP (vazio em dev) |
+| `MAIL_PASSWORD` | *(vazio)* | Senha SMTP (vazio em dev) |
+| `VANEP_MAIL_FROM` | `no-reply@vanep.com.br` | Endereço remetente |
+| `VANEP_MAIL_ENABLED` | `true` | `false` desativa envio (só log) |
+| `VANEP_MAIL_VERIFICATION_TTL_HOURS` | `24` | Validade do link de verificação |
+| `VANEP_MAIL_RESET_TTL_MINUTES` | `60` | Validade do link de reset de senha |
 
 ---
 
@@ -261,12 +336,15 @@ Na raiz do repositório (com `make` instalado):
 | Alvo | O que faz |
 | --- | --- |
 | `make setup-env` | Falha com mensagem útil se **`.env`** não existir (obrigatório para Compose e recomendado para `boot-run`) |
-| `make dev` | `setup-env` → sobe Postgres (`db-up`) → espera porta → **`./mvnw spring-boot:run`** (perfil **local**, `.env` carregado pelo Make) |
+| `make dev` | `setup-env` → sobe Postgres + Mailpit → espera porta → **`./mvnw spring-boot:run`** (perfil **local**, `.env` carregado pelo Make) |
 | `make db-up` | Exige **`.env`**; `docker compose up -d postgres` |
 | `make db-down` | `docker compose stop postgres` |
 | `make db-logs` | Logs do Postgres (`docker compose logs -f postgres`) |
 | `make db-psql` | **`psql`** no container com o usuário e o banco definidos no `.env` |
-| `make up` | Exige **`.env`**; `docker compose up -d` — Postgres + API |
+| `make mail-up` | Sobe o Mailpit (`docker compose up -d mailpit`) — UI em `http://localhost:8025` |
+| `make mail-down` | `docker compose stop mailpit` |
+| `make mail-logs` | Logs do Mailpit (`docker compose logs -f mailpit`) |
+| `make up` | Exige **`.env`**; `docker compose up -d` — Postgres + Mailpit + API |
 | `make up-build` | Igual ao `up`, com `--build` |
 | `make down` | `docker compose down` |
 | `make nuke` | `docker compose down -v` — remove volumes (**apaga dados locais do Postgres**) |
@@ -328,7 +406,7 @@ Outros comandos úteis:
 
 A imagem usa **multi-stage Dockerfile** (JDK 25 build, JRE 25 runtime). O **`Dockerfile`** define **`SPRING_PROFILES_ACTIVE=docker`** por padrão; o Compose pode reforçar o mesmo valor.
 
-O **`docker-compose.yml`** define **postgres** e **vanep**, com **`env_file: .env`** para credenciais e portas no host. O serviço **vanep** usa **`POSTGRES_HOST=postgres`** na rede interna.
+O **`docker-compose.yml`** define **postgres**, **mailpit** e **vanep**, com **`env_file: .env`** para credenciais e portas no host. O serviço **vanep** usa **`POSTGRES_HOST=postgres`** e **`MAIL_HOST=mailpit`** na rede interna.
 
 ```bash
 cp .env.example .env   # preencher

@@ -1,5 +1,6 @@
-package br.com.vanep.user;
+package br.com.vanep.client;
 
+import br.com.vanep.user.User;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -18,7 +19,6 @@ import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
-/** Perfil de cliente (responsável). 1:1 com {@link User}. */
 @Entity
 @Table(name = "client")
 @Getter

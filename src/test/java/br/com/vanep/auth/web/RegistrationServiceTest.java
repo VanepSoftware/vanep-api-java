@@ -6,11 +6,12 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import br.com.vanep.user.Client;
-import br.com.vanep.user.ClientRepository;
-import br.com.vanep.user.Driver;
-import br.com.vanep.user.DriverApprovalStatus;
-import br.com.vanep.user.DriverRepository;
+import br.com.vanep.auth.verification.EmailVerificationService;
+import br.com.vanep.client.Client;
+import br.com.vanep.client.ClientRepository;
+import br.com.vanep.driver.Driver;
+import br.com.vanep.driver.DriverApprovalStatus;
+import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.user.User;
 import br.com.vanep.user.UserRepository;
 import br.com.vanep.user.UserType;
@@ -29,11 +30,12 @@ class RegistrationServiceTest {
   @Mock private ClientRepository clients;
   @Mock private DriverRepository drivers;
   @Mock private PasswordEncoder passwordEncoder;
+  @Mock private EmailVerificationService emailVerification;
 
   private RegistrationService service() {
     when(users.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
     when(passwordEncoder.encode(anyString())).thenReturn("hashed");
-    return new RegistrationService(users, clients, drivers, passwordEncoder);
+    return new RegistrationService(users, clients, drivers, passwordEncoder, emailVerification);
   }
 
   @Test

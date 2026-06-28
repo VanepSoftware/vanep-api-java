@@ -1,6 +1,7 @@
 package br.com.vanep.auth.oauth;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -13,12 +14,14 @@ import br.com.vanep.user.OAuthAccountRepository;
 import br.com.vanep.user.User;
 import br.com.vanep.user.UserRepository;
 import br.com.vanep.user.UserType;
+import java.time.Instant;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 
 @ExtendWith(MockitoExtension.class)
 class OAuthAccountServiceTest {
@@ -30,13 +33,16 @@ class OAuthAccountServiceTest {
   @Test
   void resolveReturnsRegisteredWhenAccountExists() {
     User user = new User();
+    user.setId(1L);
     user.setEmail("a@vanep.com");
     OAuthAccount account = new OAuthAccount();
     account.setUser(user);
     when(oauthAccounts.findByProviderAndProviderUid(AuthProvider.GOOGLE, "sub-1"))
         .thenReturn(Optional.of(account));
+    when(users.findById(1L)).thenReturn(Optional.of(user));
 
-    OAuthResolution result = service.resolve(AuthProvider.GOOGLE, "sub-1", "a@vanep.com", "A");
+    OAuthResolution result =
+        service.resolve(AuthProvider.GOOGLE, "sub-1", "a@vanep.com", true, "A");
 
     assertThat(result.registered()).isTrue();
     assertThat(result.user()).isSameAs(user);
@@ -44,7 +50,24 @@ class OAuthAccountServiceTest {
   }
 
   @Test
-  void resolveLinksAccountWhenUserWithEmailExists() {
+  void resolveThrowsWhenLinkedAccountIsSoftDeleted() {
+    User deleted = new User();
+    deleted.setId(99L);
+    deleted.setEmail("gone@vanep.com");
+    deleted.setDeletedAt(Instant.now());
+    OAuthAccount account = new OAuthAccount();
+    account.setUser(deleted);
+    when(oauthAccounts.findByProviderAndProviderUid(AuthProvider.GOOGLE, "sub-x"))
+        .thenReturn(Optional.of(account));
+    when(users.findById(99L)).thenReturn(Optional.of(deleted));
+
+    assertThatThrownBy(
+            () -> service.resolve(AuthProvider.GOOGLE, "sub-x", "gone@vanep.com", true, "G"))
+        .isInstanceOf(OAuth2AuthenticationException.class);
+  }
+
+  @Test
+  void resolveLinksAccountWhenVerifiedEmailUserExists() {
     when(oauthAccounts.findByProviderAndProviderUid(AuthProvider.GOOGLE, "sub-2"))
         .thenReturn(Optional.empty());
     User existing = new User();
@@ -52,11 +75,25 @@ class OAuthAccountServiceTest {
     when(users.findByEmailAndDeletedAtIsNull("b@vanep.com")).thenReturn(Optional.of(existing));
     when(oauthAccounts.save(any(OAuthAccount.class))).thenAnswer(inv -> inv.getArgument(0));
 
-    OAuthResolution result = service.resolve(AuthProvider.GOOGLE, "sub-2", "b@vanep.com", "B");
+    OAuthResolution result =
+        service.resolve(AuthProvider.GOOGLE, "sub-2", "b@vanep.com", true, "B");
 
     assertThat(result.registered()).isTrue();
     assertThat(result.user()).isSameAs(existing);
     verify(oauthAccounts).save(any(OAuthAccount.class));
+  }
+
+  @Test
+  void resolveDoesNotLinkWhenEmailNotVerified() {
+    when(oauthAccounts.findByProviderAndProviderUid(AuthProvider.GOOGLE, "sub-5"))
+        .thenReturn(Optional.empty());
+
+    OAuthResolution result =
+        service.resolve(AuthProvider.GOOGLE, "sub-5", "b@vanep.com", false, "B");
+
+    assertThat(result.registered()).isFalse();
+    verify(users, never()).findByEmailAndDeletedAtIsNull(any());
+    verify(oauthAccounts, never()).save(any());
   }
 
   @Test
@@ -65,7 +102,8 @@ class OAuthAccountServiceTest {
         .thenReturn(Optional.empty());
     when(users.findByEmailAndDeletedAtIsNull("c@vanep.com")).thenReturn(Optional.empty());
 
-    OAuthResolution result = service.resolve(AuthProvider.GOOGLE, "sub-3", "c@vanep.com", "C");
+    OAuthResolution result =
+        service.resolve(AuthProvider.GOOGLE, "sub-3", "c@vanep.com", true, "C");
 
     assertThat(result.registered()).isFalse();
     assertThat(result.provider()).isEqualTo(AuthProvider.GOOGLE);

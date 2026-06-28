@@ -10,7 +10,6 @@ import lombok.Getter;
 import lombok.Setter;
 import org.springframework.format.annotation.DateTimeFormat;
 
-/** Dados do passo 2 do cadastro (após o login social) para completar a conta. */
 @Getter
 @Setter
 public class SignupForm {

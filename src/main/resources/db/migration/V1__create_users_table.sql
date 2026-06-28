@@ -1,7 +1,3 @@
--- Domínio 1 — Identidade & Controle de Acesso
--- Tabela `user` do dbdiagram. Em PostgreSQL `user` é palavra reservada, por isso
--- a tabela é nomeada `users`. role_id/country_id ficam como colunas nullable sem
--- FK por enquanto (as tabelas role/country chegam em fases posteriores).
 create table users (
     id                  bigint generated always as identity primary key,
     token               varchar(32)  not null unique,

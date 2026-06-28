@@ -1,5 +1,3 @@
--- Vincula provedores OAuth (Google/Apple) a uma conta. Uma conta pode ter vários.
--- Espelha a tabela `oauth_account` do vanep-dbdiagram.
 create table oauth_account (
     id            bigint generated always as identity primary key,
     token         varchar(32)  not null unique,

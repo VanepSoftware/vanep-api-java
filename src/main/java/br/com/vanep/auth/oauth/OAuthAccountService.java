@@ -8,10 +8,11 @@ import br.com.vanep.user.User;
 import br.com.vanep.user.UserRepository;
 import java.time.Instant;
 import java.util.Optional;
+import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
+import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Resolve logins sociais: encontra/vincula uma conta ou sinaliza cadastro pendente. */
 @Service
 public class OAuthAccountService {
 
@@ -25,17 +26,29 @@ public class OAuthAccountService {
 
   @Transactional
   public OAuthResolution resolve(
-      AuthProvider provider, String providerUid, String email, String name) {
+      AuthProvider provider, String providerUid, String email, boolean emailVerified, String name) {
     Optional<OAuthAccount> existing =
         oauthAccounts.findByProviderAndProviderUid(provider, providerUid);
     if (existing.isPresent()) {
-      return OAuthResolution.registered(existing.get().getUser());
+
+      User user =
+          users
+              .findById(existing.get().getUser().getId())
+              .orElseThrow(
+                  () ->
+                      new OAuth2AuthenticationException(
+                          new OAuth2Error(
+                              "account_disabled", "Conta vinculada não encontrada.", null)));
+      if (user.getDeletedAt() != null) {
+        throw new OAuth2AuthenticationException(
+            new OAuth2Error("account_disabled", "Esta conta foi desativada.", null));
+      }
+      return OAuthResolution.registered(user);
     }
 
-    if (email != null && !email.isBlank()) {
+    if (emailVerified && email != null && !email.isBlank()) {
       Optional<User> byEmail = users.findByEmailAndDeletedAtIsNull(email);
       if (byEmail.isPresent()) {
-        // Conta local já existe com este e-mail (verificado pelo provedor) → vincula.
         OAuthAccount linked = link(byEmail.get(), provider, providerUid, email);
         return OAuthResolution.registered(linked.getUser());
       }
@@ -55,7 +68,7 @@ public class OAuthAccountService {
     user.setPhone(form.getPhone());
     user.setBirthDate(form.getBirthDate());
     user.setGender(form.getGender());
-    user.setVerified(true); // e-mail já verificado pelo provedor social
+    user.setVerified(true);
     user.setTermsAcceptedAt(Instant.now());
     users.save(user);
 

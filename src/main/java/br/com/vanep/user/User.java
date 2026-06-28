@@ -17,10 +17,6 @@ import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
-/**
- * Conta de usuário. Dona de toda a autenticação (local + OAuth via oauth_account). Espelha a tabela
- * `user` do dbdiagram (nomeada `users` por `user` ser palavra reservada no PostgreSQL).
- */
 @Entity
 @Table(name = "users")
 @Getter
@@ -53,7 +49,6 @@ public class User {
   @Column(unique = true)
   private String username;
 
-  /** Nullable: contas só-OAuth não têm senha local. */
   @Column private String password;
 
   @Column(nullable = false, unique = true, length = 64)

@@ -52,6 +52,7 @@ class AuthEndpointsTest {
     user.setEmail(EMAIL);
     user.setDocument("12345678901");
     user.setPassword(passwordEncoder.encode(PASSWORD));
+    user.setVerified(true);
     users.save(user);
   }
 
