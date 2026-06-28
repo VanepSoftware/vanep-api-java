@@ -31,7 +31,10 @@ services:
     ports:
       - "${APP_PORT}:8080"
     environment:
-      SPRING_PROFILES_ACTIVE: docker
+      # Dev usa o profile "docker". Produção define SPRING_PROFILES_ACTIVE=docker,prod
+      # no .env do servidor (ativa application-prod: cookie secure, swagger off, etc.).
+      # NÃO fixe "docker,prod" aqui: quebraria o login local (cookie.secure exige HTTPS).
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-docker}
       POSTGRES_HOST: postgres
       # Mail vem do .env (env_file). Sem MAIL_HOST definido, o profile docker usa
       # mailpit como default (dev). Em produção, defina MAIL_* no .env (SMTP real).
