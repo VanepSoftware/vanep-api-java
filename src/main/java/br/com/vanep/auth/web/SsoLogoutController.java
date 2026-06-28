@@ -37,7 +37,8 @@ public class SsoLogoutController {
     }
 
     if (!allowedRedirectUris.isEmpty()) {
-      String first = allowedRedirectUris.stream().filter(u -> !u.isBlank()).findFirst().orElse(null);
+      String first =
+          allowedRedirectUris.stream().filter(u -> !u.isBlank()).findFirst().orElse(null);
       if (first != null) {
         return "redirect:" + first;
       }
