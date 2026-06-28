@@ -1,6 +1,7 @@
 package br.com.vanep.auth.config;
 
 import com.nimbusds.jose.jwk.RSAKey;
+import java.nio.charset.StandardCharsets;
 import java.security.KeyFactory;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
@@ -44,8 +45,14 @@ final class RsaKeys {
   }
 
   private static byte[] decodePem(String pem) {
+    String source = pem.trim();
+    // Se não começa com "-----", assume base64 do PEM inteiro (ex.: `base64 -w0 private.pem`).
+    if (!source.startsWith("-----")) {
+      source = new String(Base64.getDecoder().decode(source), StandardCharsets.UTF_8);
+    }
     String base64 =
-        pem.replaceAll("-----BEGIN (.*)-----", "")
+        source
+            .replaceAll("-----BEGIN (.*)-----", "")
             .replaceAll("-----END (.*)-----", "")
             .replaceAll("\\s", "");
     return Base64.getDecoder().decode(base64);

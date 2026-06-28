@@ -25,6 +25,19 @@ class RsaKeysTest {
   }
 
   @Test
+  void loadsKeyFromBase64EncodedPem() throws Exception {
+    KeyPair keyPair = newKeyPair();
+    String privatePem = pem("PRIVATE KEY", keyPair.getPrivate().getEncoded());
+    String publicPem = pem("PUBLIC KEY", keyPair.getPublic().getEncoded());
+
+    RSAKey key = RsaKeys.fromPem(base64(privatePem), base64(publicPem), "kid-b64");
+
+    assertThat(key.getKeyID()).isEqualTo("kid-b64");
+    assertThat(key.toRSAPublicKey()).isEqualTo(keyPair.getPublic());
+    assertThat(key.isPrivate()).isTrue();
+  }
+
+  @Test
   void generateProducesUsableKey() {
     RSAKey key = RsaKeys.generate("kid-2");
     assertThat(key.getKeyID()).isEqualTo("kid-2");
@@ -35,6 +48,11 @@ class RsaKeysTest {
   void invalidPemThrows() {
     assertThatThrownBy(() -> RsaKeys.fromPem("not-a-key", "not-a-key", "kid"))
         .isInstanceOf(IllegalStateException.class);
+  }
+
+  private static String base64(String pem) {
+    return Base64.getEncoder()
+        .encodeToString(pem.getBytes(java.nio.charset.StandardCharsets.UTF_8));
   }
 
   private static KeyPair newKeyPair() throws Exception {
