@@ -40,5 +40,4 @@ out/
 .vscode/
 
 ### Agent tooling ###
-.claude/
-.cursor/
+
