@@ -6,22 +6,38 @@
   padding: 0;
 }
 
+/* ─── Paleta Vanep ──────────────────────────────────────────────────────────
+   Para reusar em outras telas, basta importar auth.css e referenciar as
+   variáveis abaixo. Todas as cores do sistema estão definidas aqui.
+   ─────────────────────────────────────────────────────────────────────────── */
 :root {
-  --bg: #000000;
-  --card: #0d0d0d;
-  --border: #232323;
-  --text: #ffffff;
-  --muted: #9aa0a6;
-  --accent: #ff4200;
-  --accent-hover: #ff5a24;
-  --error-bg: #2a0d0d;
-  --error-border: #5b1a1a;
-  --success-bg: #0d2a16;
-  --success-border: #1f5b35;
+  /* Brand — azul navy extraído do logo Vanep */
+  --vanep-navy:        #1a2d4a;
+  --vanep-navy-hover:  #243b5e;
+  --vanep-navy-subtle: #eef1f6;
+
+  /* Superfície */
+  --bg:                #f4f4f5;
+  --card:              #ffffff;
+  --border:            #e4e4e7;
+
+  /* Tipografia */
+  --text:              #0a0a0a;
+  --muted:             #71717a;
+
+  /* Feedback — erro */
+  --error-bg:          #fef2f2;
+  --error-border:      #fca5a5;
+  --error-text:        #dc2626;
+
+  /* Feedback — sucesso */
+  --success-bg:        #f0fdf4;
+  --success-border:    #86efac;
+  --success-text:      #16a34a;
 }
 
 body {
-  font-family: "Figtree", system-ui, sans-serif;
+  font-family: "Geist", system-ui, sans-serif;
   min-height: 100vh;
   background: var(--bg);
   color: var(--text);
@@ -42,6 +58,7 @@ body {
   border: 1px solid var(--border);
   border-radius: 16px;
   padding: 2.5rem 2rem;
+  box-shadow: 0 1px 4px 0 rgb(0 0 0 / 0.06);
 }
 
 .brand {
@@ -49,6 +66,7 @@ body {
   font-weight: 700;
   letter-spacing: -1px;
   text-align: center;
+  color: var(--vanep-navy);
 }
 
 .subtitle {
@@ -69,13 +87,13 @@ body {
 .alert-error {
   background: var(--error-bg);
   border: 1px solid var(--error-border);
-  color: #ff8a73;
+  color: var(--error-text);
 }
 
 .alert-success {
   background: var(--success-bg);
   border: 1px solid var(--success-border);
-  color: #74e3a0;
+  color: var(--success-text);
 }
 
 .field {
@@ -90,20 +108,23 @@ body {
   color: var(--muted);
 }
 
-.field input {
+.field input,
+.field select {
   width: 100%;
   padding: 0.75rem 0.9rem;
-  background: #050505;
+  background: var(--card);
   border: 1px solid var(--border);
   border-radius: 10px;
   color: var(--text);
   font-size: 0.95rem;
+  font-family: inherit;
   outline: none;
   transition: border-color 0.15s ease;
 }
 
-.field input:focus {
-  border-color: var(--accent);
+.field input:focus,
+.field select:focus {
+  border-color: var(--vanep-navy);
 }
 
 .remember {
@@ -117,24 +138,28 @@ body {
 }
 
 .remember input {
-  accent-color: var(--accent);
+  accent-color: var(--vanep-navy);
 }
 
 .btn-submit {
+  display: block;
   width: 100%;
   padding: 0.8rem;
-  background: var(--accent);
+  background: var(--vanep-navy);
   color: #ffffff;
   border: none;
   border-radius: 10px;
   font-size: 0.95rem;
   font-weight: 600;
+  font-family: inherit;
   cursor: pointer;
+  text-align: center;
+  text-decoration: none;
   transition: background 0.15s ease;
 }
 
 .btn-submit:hover {
-  background: var(--accent-hover);
+  background: var(--vanep-navy-hover);
 }
 
 .forgot {
@@ -172,22 +197,23 @@ body {
   width: 100%;
   padding: 0.75rem;
   text-align: center;
-  background: #ffffff;
-  color: #111111;
+  background: var(--card);
+  color: var(--text);
   border: 1px solid var(--border);
   border-radius: 10px;
   font-size: 0.9rem;
   font-weight: 600;
+  font-family: inherit;
   text-decoration: none;
-  transition: opacity 0.15s ease;
+  transition: background 0.15s ease;
 }
 
 .btn-google:hover {
-  opacity: 0.9;
+  background: var(--bg);
 }
 
 .form-error {
-  color: #ff8a73;
+  color: var(--error-text);
   font-size: 0.8rem;
   margin-top: 0.35rem;
 }
