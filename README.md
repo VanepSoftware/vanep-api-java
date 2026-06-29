@@ -358,6 +358,8 @@ Na raiz do repositório (com `make` instalado):
 | `make test-coverage` / `make check` | `./mvnw verify` (Spotless + testes + JaCoCo ≥ 75 % linhas) |
 | `make boot-run` | `setup-env` → `./mvnw spring-boot:run` (perfil **local**, `.env` via `source`) — Postgres precisa estar acessível (ex.: `make db-up`) |
 | `make build` | `./mvnw package -DskipTests` |
+| `make install` | `./mvnw install` — ciclo completo (compile + testes + package) e instala o artefato no repo local `~/.m2` |
+| `make clean-install` | `./mvnw clean install` — limpa `target/` e roda o `install` do zero |
 | `make clean` | `./mvnw clean` |
 
 ---

@@ -9,7 +9,7 @@ ENV_EXAMPLE = .env.example
 
 .PHONY: up down nuke restart logs shell test test-coverage check boot-run build clean \
 	docker-build lint lint-fix db-up db-down db-logs db-psql db-migrate db-seed up-build dev setup-env \
-	mail-up mail-down mail-logs
+	mail-up mail-down mail-logs install clean-install
 
 # Docker Compose exige `.env` na raiz (sem defaults sensíveis no compose).
 setup-env:
@@ -98,6 +98,14 @@ boot-run: setup-env
 
 build:
 	$(MVNW) package -DskipTests
+
+# Instala o artefato no repo local (~/.m2) — roda o ciclo completo (compile + test + package + install).
+install:
+	$(MVNW) install
+
+# `clean install` do zero — apaga target/ antes de buildar e instalar.
+clean-install:
+	$(MVNW) clean install
 
 clean:
 	$(MVNW) clean
