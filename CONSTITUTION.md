@@ -19,8 +19,8 @@ Rules that MUST be followed in this codebase. Stack: **Java 25, Spring Boot 4, M
 
 ## API design
 
-10. **Validate request input with Bean Validation on dedicated request objects** (the `*Form` classes), applied via `@Valid` in the controller — do not validate ad hoc inside business logic.
-11. **Never bind a request body directly to a JPA entity.** Accept a request DTO/`*Form`, map explicitly to the entity. This is our equivalent of guarding against mass assignment.
+10. **Validate request input with Bean Validation on dedicated request DTOs**, applied via `@Valid` in the controller — do not validate ad hoc inside business logic.
+11. **Never bind a request body directly to a JPA entity.** Accept a request DTO, map explicitly to the entity. This is our equivalent of guarding against mass assignment.
 12. **Shape responses with explicit response DTOs** — never return raw JPA entity graphs to clients (avoids lazy-loading leaks and over-exposure).
 13. **Expose and accept public resource identifiers as opaque `token` strings** (see `SecureTokens`), never internal numeric/sequential `id`s.
 14. **Represent fixed sets of values as backed Java `enum`s**, not loose strings or ints.
@@ -63,7 +63,7 @@ Rules that MUST be followed in this codebase. Stack: **Java 25, Spring Boot 4, M
 36. **One dependency layer per PR**; never mix artifacts from different layers, and never ship an interface and its implementation in the same PR. If an upper layer ships first, use stubs/mocks until the dependency PR merges.
 37. **PRs in the same layer may be reviewed in parallel** only when they do not depend on each other.
 38. **Cap each PR at ~600 productive lines and 10 new files**; subdivide before implementing if exceeded.
-39. **Per phase, implement in order:** test → migration → entity → repository → security/authorization → request/`Form` → service → controller → response DTO. Run migrations before tasks that depend on the new schema.
+39. **Per phase, implement in order:** test → migration → entity → repository → security/authorization → request DTO → service → controller → response DTO. Run migrations before tasks that depend on the new schema.
 40. **Every phase includes its own automated tests** (unit + slice) covering only the code delivered in that phase; do not defer testing to a later phase. CI must pass after each phase.
 41. **Run `./mvnw spotless:check` (`make lint`) and `./mvnw verify` (`make test-coverage`) before opening each phase PR.**
 
