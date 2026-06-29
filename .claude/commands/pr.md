@@ -6,7 +6,7 @@ Please generate a comprehensive Pull Request description that follows the struct
 
 1. **Analyze the changes**: Compare the current branch against the `main` branch to understand what was modified, added, or removed. Ignore merge commits, use git diff to see what are the real changes.
 
-2. **Generate the PR title**: Format as `[N-XX](github issue prefix)  Feature | Change Request | Bug` (ask me for the ticket number if not obvious from commit messages).
+2. **Generate the PR title**: Format as `[N-XX](github issue prefix) Feature | Change Request | Bug` (ask me for the ticket number if not obvious from commit messages).
 
 3. **Write a clear description**: 
    - Explain what the PR does and why
