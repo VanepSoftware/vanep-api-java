@@ -1,4 +1,4 @@
-package br.com.vanep.client;
+package br.com.vanep.client.model;
 
 import br.com.vanep.user.User;
 import jakarta.persistence.Column;
@@ -26,7 +26,7 @@ import org.hibernate.annotations.UpdateTimestamp;
 @SoftDelete(columnName = "deleted_at", strategy = SoftDeleteType.TIMESTAMP)
 @Getter
 @Setter
-public class Client {
+public class ClientModel {
 
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)

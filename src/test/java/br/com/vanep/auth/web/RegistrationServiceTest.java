@@ -7,8 +7,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import br.com.vanep.auth.verification.EmailVerificationService;
-import br.com.vanep.client.Client;
-import br.com.vanep.client.ClientRepository;
+import br.com.vanep.client.model.ClientModel;
+import br.com.vanep.client.repository.ClientRepository;
 import br.com.vanep.driver.Driver;
 import br.com.vanep.driver.DriverApprovalStatus;
 import br.com.vanep.driver.DriverRepository;
@@ -54,7 +54,7 @@ class RegistrationServiceTest {
     assertThat(user.getPassword()).isEqualTo("hashed");
     assertThat(user.getTermsAcceptedAt()).isNotNull();
 
-    ArgumentCaptor<Client> client = ArgumentCaptor.forClass(Client.class);
+    ArgumentCaptor<ClientModel> client = ArgumentCaptor.forClass(ClientModel.class);
     verify(clients).save(client.capture());
     assertThat(client.getValue().getUser()).isSameAs(user);
   }

@@ -1,8 +1,8 @@
 package br.com.vanep.auth.web;
 
 import br.com.vanep.auth.verification.EmailVerificationService;
-import br.com.vanep.client.Client;
-import br.com.vanep.client.ClientRepository;
+import br.com.vanep.client.model.ClientModel;
+import br.com.vanep.client.repository.ClientRepository;
 import br.com.vanep.driver.Driver;
 import br.com.vanep.driver.DriverApprovalStatus;
 import br.com.vanep.driver.DriverRepository;
@@ -39,7 +39,7 @@ public class RegistrationService {
   @Transactional
   public User registerClient(ClientSignupForm form) {
     User user = createUser(UserType.CLIENT, form);
-    Client client = new Client();
+    ClientModel client = new ClientModel();
     client.setUser(user);
     clients.save(client);
     emailVerification.startVerification(user);
