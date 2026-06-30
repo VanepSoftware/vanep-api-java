@@ -9,11 +9,24 @@ ENV_EXAMPLE = .env.example
 
 .PHONY: up down nuke restart logs shell test test-coverage check boot-run build clean \
 	docker-build lint lint-fix db-up db-down db-logs db-psql db-migrate db-seed up-build dev setup-env \
-	mail-up mail-down mail-logs
+	mail-up mail-down mail-logs install clean-install env
+
+# Gera um `.env` pronto para dev a partir do `.env.example`, com os segredos
+# obrigatórios (pepper + remember-me) gerados via `openssl rand -hex 32`.
+# Idempotente: não sobrescreve um `.env` existente (evita trocar o pepper de quem já tem usuários).
+env:
+	@if [ -f $(ENV_FILE) ]; then \
+		echo "=> $(ENV_FILE) já existe — não vou sobrescrever. Apague-o antes se quiser regerar."; \
+	else \
+		cp $(ENV_EXAMPLE) $(ENV_FILE); \
+		sed -i "s|^VANEP_PASSWORD_PEPPER=.*|VANEP_PASSWORD_PEPPER=$$(openssl rand -hex 32)|" $(ENV_FILE); \
+		sed -i "s|^VANEP_REMEMBER_ME_KEY=.*|VANEP_REMEMBER_ME_KEY=$$(openssl rand -hex 32)|" $(ENV_FILE); \
+		echo "=> $(ENV_FILE) criado com segredos gerados. Pronto para 'make dev'."; \
+	fi
 
 # Docker Compose exige `.env` na raiz (sem defaults sensíveis no compose).
 setup-env:
-	@test -f $(ENV_FILE) || (echo "=> Crie $(ENV_FILE): cp $(ENV_EXAMPLE) $(ENV_FILE) e preencha POSTGRES_* , POSTGRES_PORT e APP_PORT." >&2 && exit 1)
+	@test -f $(ENV_FILE) || (echo "=> Crie $(ENV_FILE): rode 'make env' (gera tudo para dev) ou 'cp $(ENV_EXAMPLE) $(ENV_FILE)' e preencha POSTGRES_* , POSTGRES_PORT e APP_PORT." >&2 && exit 1)
 
 up: setup-env
 	$(COMPOSE) up -d
@@ -98,6 +111,14 @@ boot-run: setup-env
 
 build:
 	$(MVNW) package -DskipTests
+
+# Instala o artefato no repo local (~/.m2) — roda o ciclo completo (compile + test + package + install).
+install:
+	$(MVNW) install
+
+# `clean install` do zero — apaga target/ antes de buildar e instalar.
+clean-install:
+	$(MVNW) clean install
 
 clean:
 	$(MVNW) clean

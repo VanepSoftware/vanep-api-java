@@ -51,6 +51,16 @@ cd vanep-api-java
 
 ### 2. Criar o `.env` na raiz
 
+**Atalho (dev):** gera um `.env` pronto, com os segredos obrigatórios já criados:
+
+```bash
+make env
+```
+
+Isso copia o `.env.example` e injeta **`VANEP_PASSWORD_PEPPER`** e **`VANEP_REMEMBER_ME_KEY`** via `openssl rand -hex 32`. Os demais valores de dev já vêm com defaults que funcionam (Postgres `postgres/postgres`, Mailpit, JWK efêmera). Credenciais externas (Google OAuth, SMTP real) são opcionais em dev. O alvo é **idempotente**: não sobrescreve um `.env` existente.
+
+**Manual:**
+
 ```bash
 cp .env.example .env
 ```
@@ -335,6 +345,7 @@ Na raiz do repositório (com `make` instalado):
 
 | Alvo | O que faz |
 | --- | --- |
+| `make env` | Gera um **`.env`** pronto para dev a partir do `.env.example`, com os segredos (`VANEP_PASSWORD_PEPPER`, `VANEP_REMEMBER_ME_KEY`) gerados via `openssl rand -hex 32`. Idempotente: não sobrescreve um `.env` existente |
 | `make setup-env` | Falha com mensagem útil se **`.env`** não existir (obrigatório para Compose e recomendado para `boot-run`) |
 | `make dev` | `setup-env` → sobe Postgres + Mailpit → espera porta → **`./mvnw spring-boot:run`** (perfil **local**, `.env` carregado pelo Make) |
 | `make db-up` | Exige **`.env`**; `docker compose up -d postgres` |
@@ -358,6 +369,8 @@ Na raiz do repositório (com `make` instalado):
 | `make test-coverage` / `make check` | `./mvnw verify` (Spotless + testes + JaCoCo ≥ 75 % linhas) |
 | `make boot-run` | `setup-env` → `./mvnw spring-boot:run` (perfil **local**, `.env` via `source`) — Postgres precisa estar acessível (ex.: `make db-up`) |
 | `make build` | `./mvnw package -DskipTests` |
+| `make install` | `./mvnw install` — ciclo completo (compile + testes + package) e instala o artefato no repo local `~/.m2` |
+| `make clean-install` | `./mvnw clean install` — limpa `target/` e roda o `install` do zero |
 | `make clean` | `./mvnw clean` |
 
 ---
