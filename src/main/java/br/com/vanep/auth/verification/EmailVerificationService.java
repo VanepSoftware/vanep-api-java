@@ -75,9 +75,6 @@ public class EmailVerificationService {
 
   @Transactional
   public void resend(String email) {
-    users
-        .findByEmailAndDeletedAtIsNull(email)
-        .filter(user -> !user.isVerified())
-        .ifPresent(this::startVerification);
+    users.findByEmail(email).filter(user -> !user.isVerified()).ifPresent(this::startVerification);
   }
 }

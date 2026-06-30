@@ -40,8 +40,7 @@ class VanepUserDetailsServiceTest {
 
   @Test
   void loadsEnabledUnlockedUser() {
-    when(users.findByEmailAndDeletedAtIsNull("a@vanep.com"))
-        .thenReturn(Optional.of(verifiedUser()));
+    when(users.findByEmail("a@vanep.com")).thenReturn(Optional.of(verifiedUser()));
     when(loginAttempts.isBlocked("a@vanep.com")).thenReturn(false);
 
     UserDetails details = service.loadUserByUsername("a@vanep.com");
@@ -57,15 +56,14 @@ class VanepUserDetailsServiceTest {
   void unverifiedUserIsDisabled() {
     User user = verifiedUser();
     user.setVerified(false);
-    when(users.findByEmailAndDeletedAtIsNull("a@vanep.com")).thenReturn(Optional.of(user));
+    when(users.findByEmail("a@vanep.com")).thenReturn(Optional.of(user));
 
     assertThat(service.loadUserByUsername("a@vanep.com").isEnabled()).isFalse();
   }
 
   @Test
   void blockedUserIsLocked() {
-    when(users.findByEmailAndDeletedAtIsNull("a@vanep.com"))
-        .thenReturn(Optional.of(verifiedUser()));
+    when(users.findByEmail("a@vanep.com")).thenReturn(Optional.of(verifiedUser()));
     when(loginAttempts.isBlocked("a@vanep.com")).thenReturn(true);
 
     assertThat(service.loadUserByUsername("a@vanep.com").isAccountNonLocked()).isFalse();
@@ -73,7 +71,7 @@ class VanepUserDetailsServiceTest {
 
   @Test
   void unknownUserThrows() {
-    when(users.findByEmailAndDeletedAtIsNull("ghost@vanep.com")).thenReturn(Optional.empty());
+    when(users.findByEmail("ghost@vanep.com")).thenReturn(Optional.empty());
     assertThatThrownBy(() -> service.loadUserByUsername("ghost@vanep.com"))
         .isInstanceOf(UsernameNotFoundException.class);
   }
@@ -82,7 +80,7 @@ class VanepUserDetailsServiceTest {
   void accountWithoutLocalPasswordThrows() {
     User user = verifiedUser();
     user.setPassword(null);
-    when(users.findByEmailAndDeletedAtIsNull("a@vanep.com")).thenReturn(Optional.of(user));
+    when(users.findByEmail("a@vanep.com")).thenReturn(Optional.of(user));
     assertThatThrownBy(() -> service.loadUserByUsername("a@vanep.com"))
         .isInstanceOf(UsernameNotFoundException.class);
   }

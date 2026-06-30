@@ -28,7 +28,7 @@ public class JwtTokenCustomizer implements OAuth2TokenCustomizer<JwtEncodingCont
       return;
     }
     String email = context.getPrincipal().getName();
-    Optional<User> maybe = users.findByEmailAndDeletedAtIsNull(email);
+    Optional<User> maybe = users.findByEmail(email);
     if (maybe.isEmpty()) {
       return;
     }

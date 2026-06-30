@@ -34,9 +34,7 @@ public class AuthenticationEventsListener {
     String email = event.getAuthentication().getName();
     loginAttempts.loginSucceeded(email);
     try {
-      users
-          .findByEmailAndDeletedAtIsNull(email)
-          .ifPresent(user -> user.setLastLoginAt(Instant.now()));
+      users.findByEmail(email).ifPresent(user -> user.setLastLoginAt(Instant.now()));
     } catch (RuntimeException ex) {
       log.warn("Falha ao atualizar last_login_at de {}.", email, ex);
     }

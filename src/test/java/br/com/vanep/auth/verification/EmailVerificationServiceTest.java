@@ -94,7 +94,7 @@ class EmailVerificationServiceTest {
     user.setEmail("b@vanep.com");
     user.setName("B");
     user.setVerified(false);
-    when(users.findByEmailAndDeletedAtIsNull("b@vanep.com")).thenReturn(Optional.of(user));
+    when(users.findByEmail("b@vanep.com")).thenReturn(Optional.of(user));
 
     service.resend("b@vanep.com");
 
@@ -105,7 +105,7 @@ class EmailVerificationServiceTest {
   void resendDoesNothingForVerifiedUser() {
     User user = new User();
     user.setVerified(true);
-    when(users.findByEmailAndDeletedAtIsNull("c@vanep.com")).thenReturn(Optional.of(user));
+    when(users.findByEmail("c@vanep.com")).thenReturn(Optional.of(user));
 
     service.resend("c@vanep.com");
 

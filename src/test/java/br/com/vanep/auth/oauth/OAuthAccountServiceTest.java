@@ -14,7 +14,6 @@ import br.com.vanep.user.OAuthAccountRepository;
 import br.com.vanep.user.User;
 import br.com.vanep.user.UserRepository;
 import br.com.vanep.user.UserType;
-import java.time.Instant;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -54,12 +53,12 @@ class OAuthAccountServiceTest {
     User deleted = new User();
     deleted.setId(99L);
     deleted.setEmail("gone@vanep.com");
-    deleted.setDeletedAt(Instant.now());
     OAuthAccount account = new OAuthAccount();
     account.setUser(deleted);
     when(oauthAccounts.findByProviderAndProviderUid(AuthProvider.GOOGLE, "sub-x"))
         .thenReturn(Optional.of(account));
-    when(users.findById(99L)).thenReturn(Optional.of(deleted));
+    // @SoftDelete: usuário desativado não é retornado por findById.
+    when(users.findById(99L)).thenReturn(Optional.empty());
 
     assertThatThrownBy(
             () -> service.resolve(AuthProvider.GOOGLE, "sub-x", "gone@vanep.com", true, "G"))
@@ -72,7 +71,7 @@ class OAuthAccountServiceTest {
         .thenReturn(Optional.empty());
     User existing = new User();
     existing.setEmail("b@vanep.com");
-    when(users.findByEmailAndDeletedAtIsNull("b@vanep.com")).thenReturn(Optional.of(existing));
+    when(users.findByEmail("b@vanep.com")).thenReturn(Optional.of(existing));
     when(oauthAccounts.save(any(OAuthAccount.class))).thenAnswer(inv -> inv.getArgument(0));
 
     OAuthResolution result =
@@ -92,7 +91,7 @@ class OAuthAccountServiceTest {
         service.resolve(AuthProvider.GOOGLE, "sub-5", "b@vanep.com", false, "B");
 
     assertThat(result.registered()).isFalse();
-    verify(users, never()).findByEmailAndDeletedAtIsNull(any());
+    verify(users, never()).findByEmail(any());
     verify(oauthAccounts, never()).save(any());
   }
 
@@ -100,7 +99,7 @@ class OAuthAccountServiceTest {
   void resolveReturnsPendingWhenNothingMatches() {
     when(oauthAccounts.findByProviderAndProviderUid(AuthProvider.GOOGLE, "sub-3"))
         .thenReturn(Optional.empty());
-    when(users.findByEmailAndDeletedAtIsNull("c@vanep.com")).thenReturn(Optional.empty());
+    when(users.findByEmail("c@vanep.com")).thenReturn(Optional.empty());
 
     OAuthResolution result =
         service.resolve(AuthProvider.GOOGLE, "sub-3", "c@vanep.com", true, "C");

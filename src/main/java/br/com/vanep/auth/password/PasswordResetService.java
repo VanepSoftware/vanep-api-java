@@ -41,7 +41,7 @@ public class PasswordResetService {
   @Transactional
   public void requestReset(String email) {
     users
-        .findByEmailAndDeletedAtIsNull(email)
+        .findByEmail(email)
         .filter(user -> user.getPassword() != null && !user.getPassword().isBlank())
         .ifPresent(
             user -> {
