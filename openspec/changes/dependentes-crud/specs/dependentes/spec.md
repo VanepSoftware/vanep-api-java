@@ -2,7 +2,9 @@
 
 ### Requirement: Persistência de dependentes com soft delete
 
-O sistema MUST persistir dependentes na tabela `dependent` conforme o schema do DBML (`vanep-dbdiagram`), incluindo coluna `deleted_at` para soft delete. Registros com `deleted_at` preenchido MUST ser tratados como excluídos em operações de leitura e listagem padrão.
+O sistema MUST persistir dependentes na tabela `dependent` conforme o schema do DBML (`vanep-dbdiagram`), incluindo coluna `deleted_at` para soft delete. A entity MUST usar `@SoftDelete(columnName = "deleted_at", strategy = SoftDeleteType.TIMESTAMP)` — mesmo padrão de `User`, `Client` e `Driver` (PR #54). Registros com `deleted_at` preenchido MUST ser filtrados automaticamente pelo Hibernate em queries JPA padrão.
+
+A migration MUST criar índices únicos parciais (`WHERE deleted_at IS NULL`) em `token` e `document`, seguindo o padrão da `V6__soft_delete_partial_unique_indexes.sql`.
 
 #### Scenario: Registro ativo visível
 
@@ -23,6 +25,15 @@ O sistema MUST expor e aceitar identificadores de dependente como `token` opaco 
 
 - **WHEN** um cliente consulta um dependente
 - **THEN** a resposta contém `token` e não contém o campo `id` interno
+
+### Requirement: Nomenclatura feature-based com sufixos explícitos
+
+Arquivos da feature MUST seguir a CONSTITUTION regra 5: subpacotes por papel (`controller`, `dto`, `entity`, `enums`, `mapper`, `repository`, `service`, `seed`) e sufixos que casam o subpacote (`DependenteController`, `DependenteEntity`, `DependenteCreateDTO`, etc.).
+
+#### Scenario: Entity no subpacote correto
+
+- **WHEN** a feature é implementada
+- **THEN** a entity JPA vive em `entity/DependenteEntity.java` com `@SoftDelete`
 
 ### Requirement: Criação de dependente
 
@@ -98,13 +109,13 @@ O sistema MUST permitir `PATCH /api/dependentes/{token}` para atualização parc
 
 ### Requirement: Soft delete de dependente
 
-O sistema MUST permitir `DELETE /api/dependentes/{token}` preenchendo `deleted_at` com o timestamp atual, sem remover o registro do banco.
+O sistema MUST permitir `DELETE /api/dependentes/{token}` via `repository.delete(entity)`, que sob `@SoftDelete` preenche `deleted_at` com timestamp atual sem remover o registro do banco.
 
 #### Scenario: Delete bem-sucedido
 
 - **WHEN** o dono ou admin envia `DELETE /api/dependentes/{token}` para dependente ativo
 - **THEN** o sistema retorna HTTP 204
-- **AND** `deleted_at` é preenchido
+- **AND** `deleted_at` é preenchido pelo Hibernate
 
 #### Scenario: Delete de registro já deletado
 
@@ -113,13 +124,13 @@ O sistema MUST permitir `DELETE /api/dependentes/{token}` preenchendo `deleted_a
 
 ### Requirement: Restore de dependente soft-deleted
 
-O sistema MUST permitir `POST /api/dependentes/{token}/restore` para limpar `deleted_at` e reativar o registro.
+O sistema MUST permitir `POST /api/dependentes/{token}/restore` para limpar `deleted_at` e reativar o registro. Como `@SoftDelete` impede ler registros deletados via JPA, o restore MUST usar native query no repository (`UPDATE dependent SET deleted_at = NULL WHERE token = :token`).
 
 #### Scenario: Restore bem-sucedido
 
 - **WHEN** o dono ou admin envia `POST /api/dependentes/{token}/restore` para dependente soft-deleted
 - **THEN** o sistema retorna HTTP 200 com o dependente restaurado
-- **AND** `deleted_at` volta a ser nulo
+- **AND** `deleted_at` volta a ser nulo via native query
 
 #### Scenario: Restore de registro ativo
 
@@ -183,9 +194,14 @@ Com `vanep.seed.enabled=true`, o sistema MUST popular dependentes de teste váli
 
 ### Requirement: Cobertura de testes automatizados
 
-O sistema MUST incluir testes automatizados cobrindo todos os endpoints (`create`, `read`, `update`, `delete`, `restore`), incluindo cenários de autenticação (401), autorização (403), not found (404) e regras RN12.
+O sistema MUST incluir testes automatizados cobrindo todos os endpoints (`create`, `read`, `update`, `delete`, `restore`), incluindo cenários de autenticação (401), autorização (403), not found (404) e regras RN12. O cleanup entre testes MUST usar `src/test/resources/db/clean.sql` com DELETE nativo (incluindo `dependent`), pois `repository.deleteAll()` é soft delete sob `@SoftDelete`.
 
 #### Scenario: CI verde
 
 - **WHEN** `./mvnw verify` é executado após a implementação
 - **THEN** todos os testes passam e a cobertura mínima JaCoCo é atingida
+
+#### Scenario: Cleanup entre testes
+
+- **WHEN** um teste de integração precisa limpar dependentes
+- **THEN** usa script SQL nativo em `clean.sql`, não `repository.deleteAll()`
