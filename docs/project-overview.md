@@ -16,6 +16,23 @@ O código de negócio é organizado **por funcionalidade (feature)**, não só p
 
 - Cada feature vive sob um pacote coeso, por exemplo: `br.com.vanep.users` com subpacotes `controller`, `dto`, `entity`, `enums`, `mapper`, `repository`, `service` (e outros que a feature precisar, como `seed`).
 - Isto melhora navegação, ownership e evolução independente de cada domínio.
+- **Ao criar um arquivo, o nome deve dizer explicitamente o que ele é**, com o sufixo do papel correspondente ao subpacote. Evite nomes genéricos (`Handler`, `Manager`, `Util`, `Data`) para esses papéis. Estrutura por feature (entidade):
+
+```
+br.com.vanep.cliente            (entidade: cliente)
+├── controller
+│   └── ClienteController
+├── dto
+│   └── ClienteDTO
+├── repository
+│   └── ClienteRepository
+├── service
+│   └── ClienteService
+├── mapper
+│   └── ClienteMapper
+└── entity
+    └── ClienteEntity
+```
 
 > **Nota de nomenclatura:** aqui “feature-based” refere-se à **estrutura de pastas/pacotes por funcionalidade**. Não confundir com *feature flags* (liga/desliga comportamento em runtime). Se no futuro existirem toggles de produto, documente-os à parte (config, ADR ou doc específico).
 

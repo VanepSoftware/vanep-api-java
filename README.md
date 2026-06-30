@@ -6,6 +6,34 @@ API Spring Boot do projeto Vanep. Este repositório usa **Maven** para desenvolv
 
 ---
 
+## Arquitetura
+
+O código de negócio é organizado **por funcionalidade (feature-based)**, não por tipo técnico na raiz do pacote. Cada feature vive sob um pacote coeso `br.com.vanep.<feature>` com subpacotes `controller`, `dto`, `entity`, `enums`, `mapper`, `repository`, `service` (e outros que a feature precisar). Código compartilhado por duas ou mais features é promovido para uma área comum (`config`, bases JPA, utilitários genéricos) em vez de duplicado.
+
+> "Feature-based" aqui se refere à **estrutura de pacotes por funcionalidade**, não a *feature flags* (toggles em runtime).
+
+Ao criar um arquivo, o **nome deve dizer explicitamente o que ele é**, com o sufixo do papel na arquitetura. Nada de nomes genéricos como `Handler` ou `Manager`. Por feature (entidade), cada subpacote recebe o arquivo nomeado pelo seu papel:
+
+```
+br.com.vanep.cliente            (entidade: cliente)
+├── controller
+│   └── ClienteController
+├── dto
+│   └── ClienteDTO
+├── repository
+│   └── ClienteRepository
+├── service
+│   └── ClienteService
+├── mapper
+│   └── ClienteMapper
+└── entity
+    └── ClienteEntity
+```
+
+Detalhes e regras completas: [docs/project-overview.md](docs/project-overview.md) e [CONSTITUTION.md](CONSTITUTION.md).
+
+---
+
 ## Versões principais
 
 | Componente | Versão |
