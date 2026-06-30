@@ -19,20 +19,22 @@ O código de negócio é organizado **por funcionalidade (feature)**, não só p
 - **Ao criar um arquivo, o nome deve dizer explicitamente o que ele é**, com o sufixo do papel correspondente ao subpacote. Evite nomes genéricos (`Handler`, `Manager`, `Util`, `Data`) para esses papéis. Estrutura por feature (entidade):
 
 ```
-br.com.vanep.cliente            (entidade: cliente)
+br.com.vanep.client            (feature: client)
 ├── controller
-│   └── ClienteController
+│   └── ClientController
 ├── dto
-│   └── ClienteDTO
+│   └── ClientDTO
 ├── repository
-│   └── ClienteRepository
+│   └── ClientRepository
 ├── service
-│   └── ClienteService
+│   └── ClientService
 ├── mapper
-│   └── ClienteMapper
+│   └── ClientMapper
 └── entity
-    └── ClienteEntity
+    └── Client
 ```
+
+> Nomes de arquivos, classes, pacotes e identificadores são sempre em **inglês**, nunca pt-BR (só mensagens ao usuário e descrições de commit/PR ficam em pt-BR).
 
 > **Nota de nomenclatura:** aqui “feature-based” refere-se à **estrutura de pastas/pacotes por funcionalidade**. Não confundir com *feature flags* (liga/desliga comportamento em runtime). Se no futuro existirem toggles de produto, documente-os à parte (config, ADR ou doc específico).
 
