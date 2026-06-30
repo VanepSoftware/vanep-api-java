@@ -43,7 +43,7 @@ class AuthenticationEventsListenerTest {
   void onInteractiveSuccessResetsAndStampsLastLogin() {
     Authentication auth = new TestingAuthenticationToken("a@vanep.com", null);
     User user = new User();
-    when(users.findByEmailAndDeletedAtIsNull("a@vanep.com")).thenReturn(Optional.of(user));
+    when(users.findByEmail("a@vanep.com")).thenReturn(Optional.of(user));
 
     listener.onInteractiveSuccess(new InteractiveAuthenticationSuccessEvent(auth, getClass()));
 

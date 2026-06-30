@@ -31,23 +31,19 @@ public class OAuthAccountService {
         oauthAccounts.findByProviderAndProviderUid(provider, providerUid);
     if (existing.isPresent()) {
 
+      // @SoftDelete filtra contas removidas: findById não retorna usuário desativado.
       User user =
           users
               .findById(existing.get().getUser().getId())
               .orElseThrow(
                   () ->
                       new OAuth2AuthenticationException(
-                          new OAuth2Error(
-                              "account_disabled", "Conta vinculada não encontrada.", null)));
-      if (user.getDeletedAt() != null) {
-        throw new OAuth2AuthenticationException(
-            new OAuth2Error("account_disabled", "Esta conta foi desativada.", null));
-      }
+                          new OAuth2Error("account_disabled", "Esta conta foi desativada.", null)));
       return OAuthResolution.registered(user);
     }
 
     if (emailVerified && email != null && !email.isBlank()) {
-      Optional<User> byEmail = users.findByEmailAndDeletedAtIsNull(email);
+      Optional<User> byEmail = users.findByEmail(email);
       if (byEmail.isPresent()) {
         OAuthAccount linked = link(byEmail.get(), provider, providerUid, email);
         return OAuthResolution.registered(linked.getUser());

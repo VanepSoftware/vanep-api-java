@@ -17,12 +17,14 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 @SpringBootTest
 @ActiveProfiles("test")
+@Sql(scripts = "/db/clean.sql", executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
 class GoogleLoginTest {
 
   @Autowired private WebApplicationContext context;
@@ -37,8 +39,6 @@ class GoogleLoginTest {
         MockMvcBuilders.webAppContextSetup(context)
             .apply(SecurityMockMvcConfigurers.springSecurity())
             .build();
-    oauthAccounts.deleteAll();
-    users.deleteAll();
   }
 
   @Test
@@ -86,7 +86,7 @@ class GoogleLoginTest {
                 .param("acceptTerms", "true"))
         .andExpect(status().is3xxRedirection());
 
-    var created = users.findByEmailAndDeletedAtIsNull("buyer@gmail.com");
+    var created = users.findByEmail("buyer@gmail.com");
     assertThat(created).isPresent();
     assertThat(created.get().getDocument()).isEqualTo("12345678901");
     assertThat(oauthAccounts.findByProviderAndProviderUid(AuthProvider.GOOGLE, "g-2")).isPresent();
@@ -104,6 +104,6 @@ class GoogleLoginTest {
         .andExpect(status().isOk())
         .andExpect(content().string(org.hamcrest.Matchers.containsString("Complete seu cadastro")));
 
-    assertThat(users.findByEmailAndDeletedAtIsNull("x@gmail.com")).isEmpty();
+    assertThat(users.findByEmail("x@gmail.com")).isEmpty();
   }
 }

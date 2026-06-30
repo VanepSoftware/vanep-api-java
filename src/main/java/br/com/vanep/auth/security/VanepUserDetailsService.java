@@ -23,7 +23,7 @@ public class VanepUserDetailsService implements UserDetailsService {
   public UserDetails loadUserByUsername(String email) {
     User user =
         users
-            .findByEmailAndDeletedAtIsNull(email)
+            .findByEmail(email)
             .orElseThrow(() -> new UsernameNotFoundException("Conta não encontrada: " + email));
 
     if (user.getPassword() == null || user.getPassword().isBlank()) {

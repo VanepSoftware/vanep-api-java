@@ -43,7 +43,7 @@ class JwtTokenCustomizerTest {
     user.setType(UserType.CLIENT);
     user.setEmail("a@vanep.com");
     user.setToken("tok-1");
-    when(users.findByEmailAndDeletedAtIsNull("a@vanep.com")).thenReturn(Optional.of(user));
+    when(users.findByEmail("a@vanep.com")).thenReturn(Optional.of(user));
 
     JwtEncodingContext ctx = context(OAuth2TokenType.ACCESS_TOKEN, "a@vanep.com");
     new JwtTokenCustomizer(users, drivers).customize(ctx);
@@ -66,7 +66,7 @@ class JwtTokenCustomizerTest {
     user.setToken("tok-2");
     Driver driver = new Driver();
     driver.setApprovalStatus(DriverApprovalStatus.APPROVED);
-    when(users.findByEmailAndDeletedAtIsNull("d@vanep.com")).thenReturn(Optional.of(user));
+    when(users.findByEmail("d@vanep.com")).thenReturn(Optional.of(user));
     when(drivers.findByUserId(2L)).thenReturn(Optional.of(driver));
 
     JwtEncodingContext ctx = context(OAuth2TokenType.ACCESS_TOKEN, "d@vanep.com");
@@ -86,7 +86,7 @@ class JwtTokenCustomizerTest {
 
   @Test
   void skipsUnknownUser() {
-    when(users.findByEmailAndDeletedAtIsNull("x@vanep.com")).thenReturn(Optional.empty());
+    when(users.findByEmail("x@vanep.com")).thenReturn(Optional.empty());
     JwtEncodingContext ctx = context(OAuth2TokenType.ACCESS_TOKEN, "x@vanep.com");
     new JwtTokenCustomizer(users, drivers).customize(ctx);
     Object uid = ctx.getClaims().build().getClaim("uid");

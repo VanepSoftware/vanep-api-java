@@ -45,7 +45,7 @@ class PasswordResetServiceTest {
     user.setEmail("a@vanep.com");
     user.setName("A");
     user.setPassword("hashed");
-    when(users.findByEmailAndDeletedAtIsNull("a@vanep.com")).thenReturn(Optional.of(user));
+    when(users.findByEmail("a@vanep.com")).thenReturn(Optional.of(user));
 
     service.requestReset("a@vanep.com");
 
@@ -56,7 +56,7 @@ class PasswordResetServiceTest {
 
   @Test
   void requestResetIgnoresUnknownEmail() {
-    when(users.findByEmailAndDeletedAtIsNull("x@vanep.com")).thenReturn(Optional.empty());
+    when(users.findByEmail("x@vanep.com")).thenReturn(Optional.empty());
     service.requestReset("x@vanep.com");
     verify(tokens, never()).save(any());
   }
@@ -66,7 +66,7 @@ class PasswordResetServiceTest {
     User user = new User();
     user.setEmail("o@vanep.com");
     user.setPassword(null);
-    when(users.findByEmailAndDeletedAtIsNull("o@vanep.com")).thenReturn(Optional.of(user));
+    when(users.findByEmail("o@vanep.com")).thenReturn(Optional.of(user));
 
     service.requestReset("o@vanep.com");
 

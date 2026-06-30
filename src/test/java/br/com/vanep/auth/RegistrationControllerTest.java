@@ -20,12 +20,14 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 @SpringBootTest
 @ActiveProfiles("test")
+@Sql(scripts = "/db/clean.sql", executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
 class RegistrationControllerTest {
 
   @Autowired private WebApplicationContext context;
@@ -42,9 +44,6 @@ class RegistrationControllerTest {
         MockMvcBuilders.webAppContextSetup(context)
             .apply(SecurityMockMvcConfigurers.springSecurity())
             .build();
-    clients.deleteAll();
-    drivers.deleteAll();
-    users.deleteAll();
   }
 
   @Test
@@ -71,7 +70,7 @@ class RegistrationControllerTest {
         .andExpect(status().is3xxRedirection())
         .andExpect(redirectedUrl("/login?registered"));
 
-    User user = users.findByEmailAndDeletedAtIsNull("ana@vanep.com").orElseThrow();
+    User user = users.findByEmail("ana@vanep.com").orElseThrow();
     assertThat(user.getType()).isEqualTo(UserType.CLIENT);
     assertThat(clients.count()).isEqualTo(1);
   }
@@ -92,7 +91,7 @@ class RegistrationControllerTest {
         .andExpect(status().is3xxRedirection())
         .andExpect(redirectedUrl("/login?registered"));
 
-    User user = users.findByEmailAndDeletedAtIsNull("bruno@vanep.com").orElseThrow();
+    User user = users.findByEmail("bruno@vanep.com").orElseThrow();
     assertThat(user.getType()).isEqualTo(UserType.DRIVER);
     assertThat(drivers.count()).isEqualTo(1);
   }

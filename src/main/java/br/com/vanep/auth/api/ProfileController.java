@@ -23,7 +23,7 @@ public class ProfileController {
     String email = jwt.getSubject();
     User user =
         users
-            .findByEmailAndDeletedAtIsNull(email)
+            .findByEmail(email)
             .orElseThrow(
                 () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Conta não encontrada."));
 
