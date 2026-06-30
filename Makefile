@@ -7,7 +7,7 @@ MAILPIT_SERVICE = mailpit
 ENV_FILE = .env
 ENV_EXAMPLE = .env.example
 
-.PHONY: up down nuke restart logs shell test test-coverage check boot-run build clean \
+.PHONY: up down nuke restart rebuild logs shell test test-coverage check boot-run build clean \
 	docker-build lint lint-fix db-up db-down db-logs db-psql db-migrate db-seed up-build dev setup-env \
 	mail-up mail-down mail-logs install clean-install env
 
@@ -38,6 +38,10 @@ nuke:
 	$(COMPOSE) down -v
 
 restart: down up
+
+# Reconstrói a imagem antes de subir. Use após `git pull`: `restart` (e `up`)
+# reusam a imagem `vanep-api:local` existente e NÃO recompilam o código novo.
+rebuild: down up-build
 
 logs:
 	$(COMPOSE) logs -f $(SERVICE)
