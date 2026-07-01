@@ -28,18 +28,31 @@ The system MUST expose and accept dependent identifiers as opaque `token` string
 
 ### Requirement: Feature-based naming with explicit suffixes
 
-Feature files MUST follow CONSTITUTION rule 5: subpackages by role (`controller`, `dto`, `entity`, `enums`, `mapper`, `repository`, `service`, `seed`) and suffixes matching the subpackage (`DependentController`, `DependentEntity`, `DependentCreateDTO`, etc.).
+Feature files MUST follow CONSTITUTION rule 5: subpackages by role (`controller`, `dto`, `model`, `enums`, `mapper`, `repository`, `service`, `seed`) and suffixes matching the subpackage (`DependentController`, `DependentModel`, `DependentCreateDTO`, etc.).
 
-#### Scenario: Entity in the correct subpackage
+#### Scenario: Model in the correct subpackage
 
 - **WHEN** the feature is implemented
-- **THEN** the JPA entity lives in `entity/DependentEntity.java` with `@SoftDelete`
+- **THEN** the JPA model lives in `model/DependentModel.java` with `@SoftDelete`
+
+### Requirement: Client reference via token in responses
+
+The system MUST NOT expose numeric `client_id` in API responses. When a dependent's client is returned, the system MUST nest a `client` object containing only the client's `token`.
+
+#### Scenario: Response nests client token
+
+- **WHEN** a client queries a dependent
+- **THEN** the response contains `client.token` and does not contain `clientId` or internal client `id`
+
+### Requirement: School and address references via token
+
+The system MUST NOT expose numeric `school_id` or `address_id` in API requests or responses. School and address MUST be referenced by `schoolToken` / `addressToken` on input and nested `school.token` / `address.token` on output. Until `school` and `address` tables exist, the system MUST use pluggable token resolvers (stub implementations return 404 when a token is supplied on create/update).
 
 ### Requirement: Dependent creation
 
 The system MUST allow an authenticated user with `ROLE_CLIENT` to create a dependent linked to their `client_id`. The system MUST allow a user with `ROLE_ADMIN` to create a dependent for any `client_id` supplied in the request.
 
-Accepted creation fields: `name` (required), `birth_date`, `gender`, `document`, `phone`, `email`, `is_self`, `shift`, `school_id`, `address_id`, and `client_id` (ADMIN only).
+Accepted creation fields: `name` (required), `birth_date`, `gender`, `document`, `phone`, `email`, `is_self`, `shift`, `schoolToken`, `addressToken`, and `clientToken` (ADMIN only).
 
 #### Scenario: Client creates dependent successfully
 
