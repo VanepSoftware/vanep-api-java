@@ -30,9 +30,9 @@ public class DependentCreateDTO {
 
   private Shift shift;
 
-  private Long schoolId;
+  private String schoolToken;
 
-  private Long addressId;
+  private String addressToken;
 
-  private Long clientId;
+  private String clientToken;
 }
