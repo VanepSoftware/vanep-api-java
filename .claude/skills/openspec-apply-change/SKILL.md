@@ -11,6 +11,8 @@ metadata:
 
 Implement tasks from an OpenSpec change.
 
+**MANDATORY FIRST STEP:** Before doing anything else, read the entire `constitution.md` at the project root. This is non-negotiable — see `openspec/rules.md`.
+
 **Input**: Optionally specify a change name. If omitted, check if it can be inferred from conversation context. If vague or ambiguous you MUST prompt for available changes.
 
 **Steps**
