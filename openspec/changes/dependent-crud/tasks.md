@@ -1,20 +1,20 @@
 ## 0. Preparation
 
 - [x] 0.1 Create branch `feat/dependent-crud` from `main`
-- [ ] 0.2 Run `git merge origin/main` on the branch (incorporate PR #54 `@SoftDelete` and PR #56 conventions)
-- [ ] 0.3 Review change artifacts (`proposal.md`, `design.md`, `specs/dependent/spec.md`)
+- [x] 0.2 Run `git merge origin/main` on the branch (incorporate PR #54 `@SoftDelete` and PR #56 conventions)
+- [x] 0.3 Review change artifacts (`proposal.md`, `design.md`, `specs/dependent/spec.md`)
 
 ## 1. PR1 — Foundation (schema + persistence)
 
 > Goal: migration, entity, repository. Open PR1 → `main` when done.
 > Commits: 1 file per commit.
 
-- [ ] 1.1 Create `V7__create_dependent_table.sql` (`dependent` table, FK `client_id`, default `shift = MORNING`, partial unique indexes on `token` and `document`)
-- [ ] 1.2 Create enum `br.com.vanep.dependent.enums.Shift` (MORNING, AFTERNOON, NIGHT, FULLTIME)
-- [ ] 1.3 Create `br.com.vanep.dependent.entity.DependentEntity` (`@SoftDelete`, `@PrePersist` for token, no `deletedAt` field)
-- [ ] 1.4 Create `DependentRepository` (`findByToken`, `findByClientId`, `countByClientId`, `existsByDocument`; native `restoreByToken`, `existsDeletedByToken`)
-- [ ] 1.5 Add `findByUserId(Long userId)` to `ClientRepository`
-- [ ] 1.6 Validate: `./mvnw verify` passes after PR1
+- [x] 1.1 Create `V7__create_dependent_table.sql` (`dependent` table, FK `client_id`, default `shift = MORNING`, partial unique indexes on `token` and `document`)
+- [x] 1.2 Create enum `br.com.vanep.dependent.enums.Shift` (MORNING, AFTERNOON, NIGHT, FULLTIME)
+- [x] 1.3 Create `br.com.vanep.dependent.entity.DependentEntity` (`@SoftDelete`, `@PrePersist` for token, no `deletedAt` field)
+- [x] 1.4 Create `DependentRepository` (`findByToken`, `findByClientId`, `countByClientId`, `existsByDocument`; native `restoreByToken`, `existsDeletedByToken`)
+- [x] 1.5 Add `findByUserId(Long userId)` to `ClientRepository`
+- [x] 1.6 Validate: `./mvnw verify` passes after PR1
 - [ ] 1.7 Open PR1 `feat(dependent): phase 1 — foundation` → `main`
 
 ## 2. PR2 — REST API (DTOs + service + controller)
@@ -22,16 +22,16 @@
 > Goal: CRUD endpoints + restore + RN12. Merge `main` into the branch before starting.
 > Commits: 1 file per commit.
 
-- [ ] 2.1 Create `DependentCreateDTO` with Bean Validation (`name` required, others optional)
-- [ ] 2.2 Create `DependentUpdateDTO` (optional fields for PATCH)
-- [ ] 2.3 Create `DependentResponseDTO` (record, no internal `id`)
-- [ ] 2.4 Create `DependentMapper` (DTO → entity, entity → response)
-- [ ] 2.5 Create `DependentService` — create (ownership, RN12 first dependent)
-- [ ] 2.6 Implement in `DependentService` — list, getByToken, update (includes `is_default` change)
-- [ ] 2.7 Implement in `DependentService` — delete via `repository.delete()` + default promotion
-- [ ] 2.8 Implement in `DependentService` — restore via `restoreByToken` (native query)
-- [ ] 2.9 Create `DependentController` with `/api/dependent` routes and `@PreAuthorize`
-- [ ] 2.10 Validate: `./mvnw verify` passes after PR2
+- [x] 2.1 Create `DependentCreateDTO` with Bean Validation (`name` required, others optional)
+- [x] 2.2 Create `DependentUpdateDTO` (optional fields for PATCH)
+- [x] 2.3 Create `DependentResponseDTO` (record, no internal `id`)
+- [x] 2.4 Create `DependentMapper` (DTO → entity, entity → response)
+- [x] 2.5 Create `DependentService` — create (ownership, RN12 first dependent)
+- [x] 2.6 Implement in `DependentService` — list, getByToken, update (includes `is_default` change)
+- [x] 2.7 Implement in `DependentService` — delete via `repository.delete()` + default promotion
+- [x] 2.8 Implement in `DependentService` — restore via `restoreByToken` (native query)
+- [x] 2.9 Create `DependentController` with `/api/dependent` routes and `@PreAuthorize`
+- [x] 2.10 Validate: `./mvnw verify` passes after PR2
 - [ ] 2.11 Open PR2 `feat(dependent): phase 2 — REST API` → `main`
 
 ## 3. PR3 — Seed + tests
