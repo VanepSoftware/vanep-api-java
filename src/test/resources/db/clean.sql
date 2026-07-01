@@ -8,3 +8,4 @@ delete from email_verification_token;
 delete from client;
 delete from driver;
 delete from users;
+delete from roles;
