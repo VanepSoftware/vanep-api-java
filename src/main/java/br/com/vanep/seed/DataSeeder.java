@@ -1,8 +1,12 @@
 package br.com.vanep.seed;
 
+import br.com.vanep.client.Client;
+import br.com.vanep.client.repository.ClientRepository;
 import br.com.vanep.user.User;
 import br.com.vanep.user.UserRepository;
 import br.com.vanep.user.UserType;
+import java.time.Instant;
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -17,6 +21,7 @@ public class DataSeeder implements ApplicationRunner {
   private static final Logger log = LoggerFactory.getLogger(DataSeeder.class);
 
   private final UserRepository users;
+  private final ClientRepository clients;
   private final PasswordEncoder passwordEncoder;
 
   @Value("${vanep.seed.enabled:false}")
@@ -34,8 +39,10 @@ public class DataSeeder implements ApplicationRunner {
   @Value("${vanep.seed.admin.document:00000000000}")
   String adminDocument;
 
-  public DataSeeder(UserRepository users, PasswordEncoder passwordEncoder) {
+  public DataSeeder(
+      UserRepository users, ClientRepository clients, PasswordEncoder passwordEncoder) {
     this.users = users;
+    this.clients = clients;
     this.passwordEncoder = passwordEncoder;
   }
 
@@ -45,6 +52,7 @@ public class DataSeeder implements ApplicationRunner {
       return;
     }
     seedAdmin();
+    seedClients();
     if (seedOnly) {
       log.info("Seed-only: dados semeados; a aplicação será encerrada.");
     }
@@ -64,5 +72,33 @@ public class DataSeeder implements ApplicationRunner {
     admin.setVerified(true);
     users.save(admin);
     log.info("Seed: usuário admin criado ({}).", adminEmail);
+  }
+
+  private void seedClients() {
+    record ClientSeed(String name, String email, String document) {}
+    List<ClientSeed> seeds =
+        List.of(
+            new ClientSeed("Ana Souza", "ana.souza@seed.vanep.com.br", "11111111111"),
+            new ClientSeed("Bruno Lima", "bruno.lima@seed.vanep.com.br", "22222222222"),
+            new ClientSeed("Carla Nunes", "carla.nunes@seed.vanep.com.br", "33333333333"),
+            new ClientSeed("Diego Alves", "diego.alves@seed.vanep.com.br", "44444444444"),
+            new ClientSeed("Elena Rocha", "elena.rocha@seed.vanep.com.br", "55555555555"));
+
+    for (ClientSeed seed : seeds) {
+      if (users.existsByEmail(seed.email())) continue;
+      User user = new User();
+      user.setType(UserType.CLIENT);
+      user.setName(seed.name());
+      user.setEmail(seed.email());
+      user.setDocument(seed.document());
+      user.setPassword(passwordEncoder.encode("password"));
+      user.setVerified(true);
+      user.setTermsAcceptedAt(Instant.now());
+      users.save(user);
+      Client client = new Client();
+      client.setUser(user);
+      clients.save(client);
+      log.info("Seed: client criado ({}).", seed.email());
+    }
   }
 }

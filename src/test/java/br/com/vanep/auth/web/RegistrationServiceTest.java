@@ -8,7 +8,7 @@ import static org.mockito.Mockito.when;
 
 import br.com.vanep.auth.verification.EmailVerificationService;
 import br.com.vanep.client.Client;
-import br.com.vanep.client.ClientRepository;
+import br.com.vanep.client.repository.ClientRepository;
 import br.com.vanep.driver.Driver;
 import br.com.vanep.driver.DriverApprovalStatus;
 import br.com.vanep.driver.DriverRepository;
