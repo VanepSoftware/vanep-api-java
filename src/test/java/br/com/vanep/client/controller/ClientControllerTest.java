@@ -160,7 +160,7 @@ class ClientControllerTest {
             put("/api/clients/" + clientToken)
                 .with(ownerJwt())
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"photo\":\"https://example.com/photo.jpg\",\"addressId\":null}"))
+                .content("{\"photo\":\"https://example.com/photo.jpg\",\"addressToken\":null}"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.token").value(clientToken));
   }

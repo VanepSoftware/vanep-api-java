@@ -9,6 +9,6 @@ public record ClientResponseDTO(
     String email,
     String photo,
     BigDecimal rating,
-    Long addressId,
+    String addressToken,
     boolean active,
     Instant createdAt) {}

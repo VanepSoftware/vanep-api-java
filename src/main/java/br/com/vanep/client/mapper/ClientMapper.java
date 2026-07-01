@@ -14,7 +14,7 @@ public class ClientMapper {
         client.getUser().getEmail(),
         client.getPhoto(),
         client.getRating(),
-        client.getAddressId(),
+        null, // addressToken: pending Address entity implementation
         client.isActive(),
         client.getCreatedAt());
   }

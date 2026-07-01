@@ -35,7 +35,7 @@ public class ClientService {
   public ClientResponseDTO update(String token, ClientUpdateRequestDTO request) {
     Client client = requireByToken(token);
     client.setPhoto(request.photo());
-    client.setAddressId(request.addressId());
+    // addressToken → addressId resolution pending Address entity implementation
     return mapper.toResponse(clients.save(client));
   }
 

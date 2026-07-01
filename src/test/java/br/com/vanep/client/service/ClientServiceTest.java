@@ -88,24 +88,24 @@ class ClientServiceTest {
   void updatePersistsFields() {
     Client client = clientWithToken("tok");
     ClientResponseDTO response =
-        new ClientResponseDTO("tok", "Name", "e@e.com", "photo.jpg", null, 1L, true, null);
+        new ClientResponseDTO("tok", "Name", "e@e.com", "photo.jpg", null, null, true, null);
     when(repository.findByToken("tok")).thenReturn(Optional.of(client));
     when(repository.save(client)).thenReturn(client);
     when(mapper.toResponse(client)).thenReturn(response);
 
-    ClientUpdateRequestDTO req = new ClientUpdateRequestDTO("photo.jpg", 1L);
+    ClientUpdateRequestDTO req = new ClientUpdateRequestDTO("photo.jpg", "addr-token-123");
     ClientResponseDTO result = service.update("tok", req);
 
     assertThat(result).isEqualTo(response);
     assertThat(client.getPhoto()).isEqualTo("photo.jpg");
-    assertThat(client.getAddressId()).isEqualTo(1L);
   }
 
   @Test
   void updateThrows404WhenNotFound() {
     when(repository.findByToken("missing")).thenReturn(Optional.empty());
 
-    assertThatThrownBy(() -> service.update("missing", new ClientUpdateRequestDTO(null, null)))
+    assertThatThrownBy(
+            () -> service.update("missing", new ClientUpdateRequestDTO(null, (String) null)))
         .isInstanceOf(ResponseStatusException.class)
         .hasMessageContaining("404");
   }
