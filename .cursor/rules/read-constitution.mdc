@@ -1,0 +1,14 @@
+---
+description: Read project constitution at the start of every session
+alwaysApply: true
+---
+
+# Read Constitution First
+
+At the start of every new session (first turn of a conversation), before planning, exploring, or editing:
+
+1. *Read* constitution.md at the repo root using the Read tool.
+2. *Follow* all rules in that file — they are non-negotiable project standards (architecture, testing, PR workflow, naming, etc.).
+3. *Re-read* constitution.md if a long session drifts from those conventions or the user asks about project standards.
+
+Do not skip this step even for small or seemingly unrelated requests.
