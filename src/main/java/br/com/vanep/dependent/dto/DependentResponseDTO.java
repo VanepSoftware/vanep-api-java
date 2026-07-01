@@ -7,7 +7,7 @@ import java.time.LocalDate;
 
 public record DependentResponseDTO(
     String token,
-    Long clientId,
+    DependentClientDTO client,
     String name,
     LocalDate birthDate,
     Gender gender,
@@ -17,7 +17,7 @@ public record DependentResponseDTO(
     boolean isSelf,
     boolean isDefault,
     Shift shift,
-    Long schoolId,
-    Long addressId,
+    DependentSchoolDTO school,
+    DependentAddressDTO address,
     Instant createdAt,
     Instant updatedAt) {}
