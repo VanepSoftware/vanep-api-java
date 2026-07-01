@@ -18,6 +18,13 @@ public interface DependentRepository extends JpaRepository<DependentEntity, Long
 
   boolean existsByDocument(String document);
 
+  boolean existsByDocumentAndTokenNot(String document, String token);
+
+  @Query(
+      value = "SELECT client_id FROM dependent WHERE token = :token AND deleted_at IS NOT NULL",
+      nativeQuery = true)
+  Optional<Long> findClientIdOfDeletedByToken(@Param("token") String token);
+
   @Modifying
   @Query(value = "UPDATE dependent SET deleted_at = NULL WHERE token = :token", nativeQuery = true)
   int restoreByToken(@Param("token") String token);
