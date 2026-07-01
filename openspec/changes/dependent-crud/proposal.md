@@ -6,7 +6,7 @@ The Vanep product requires clients (guardians) to register and manage dependents
 
 - New Flyway migration `V7__create_dependent_table.sql` with `deleted_at` column and partial unique indexes (`WHERE deleted_at IS NULL`), aligned with the `V6__soft_delete_partial_unique_indexes.sql` pattern.
 - New feature package `br.com.vanep.dependent` with subpackages by role (`controller`, `dto`, `entity`, `enums`, `mapper`, `repository`, `service`, `seed`) and explicit suffixes (CONSTITUTION rule 5).
-- `DependentEntity` with `@SoftDelete(columnName = "deleted_at", strategy = TIMESTAMP)` — same pattern as `User`, `Client`, and `Driver` (PR #54).
+- `DependentModel` with `@SoftDelete(columnName = "deleted_at", strategy = TIMESTAMP)` — same pattern as `User`, `Client`, and `Driver` (PR #54).
 - New `Shift` enum (`MORNING`, `AFTERNOON`, `NIGHT`, `FULLTIME`).
 - Authenticated REST endpoints under `/api/dependent`:
   - `POST /api/dependent` — create
