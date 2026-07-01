@@ -2,10 +2,12 @@ package br.com.vanep.seed;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import br.com.vanep.client.ClientRepository;
 import br.com.vanep.user.User;
 import br.com.vanep.user.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -20,13 +22,14 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 class DataSeederTest {
 
   @Mock private UserRepository users;
+  @Mock private ClientRepository clients;
   @Mock private PasswordEncoder passwordEncoder;
 
   private DataSeeder seeder;
 
   @BeforeEach
   void setUp() {
-    seeder = new DataSeeder(users, passwordEncoder);
+    seeder = new DataSeeder(users, clients, passwordEncoder);
     seeder.adminEmail = "admin@vanep.com.br";
     seeder.adminPassword = "password";
     seeder.adminDocument = "00000000000";
@@ -50,13 +53,13 @@ class DataSeederTest {
 
     seeder.run(new DefaultApplicationArguments());
 
-    verify(users).save(any(User.class));
+    verify(users, atLeastOnce()).save(any(User.class));
   }
 
   @Test
   void skipsAdminWhenAlreadyPresent() {
     seeder.enabled = true;
-    when(users.existsByEmail("admin@vanep.com.br")).thenReturn(true);
+    when(users.existsByEmail(anyString())).thenReturn(true);
 
     seeder.run(new DefaultApplicationArguments());
 
