@@ -1,80 +1,79 @@
 package br.com.vanep.dependent.mapper;
 
+import br.com.vanep.dependent.dto.DependentAddressDTO;
+import br.com.vanep.dependent.dto.DependentClientDTO;
 import br.com.vanep.dependent.dto.DependentCreateDTO;
 import br.com.vanep.dependent.dto.DependentResponseDTO;
+import br.com.vanep.dependent.dto.DependentSchoolDTO;
 import br.com.vanep.dependent.dto.DependentUpdateDTO;
-import br.com.vanep.dependent.entity.DependentEntity;
 import br.com.vanep.dependent.enums.Shift;
+import br.com.vanep.dependent.model.DependentModel;
 import org.springframework.stereotype.Component;
 
 @Component
 public class DependentMapper {
 
-  public DependentEntity toEntity(DependentCreateDTO dto, Long clientId) {
-    DependentEntity entity = new DependentEntity();
-    entity.setClientId(clientId);
-    entity.setName(dto.getName());
-    entity.setBirthDate(dto.getBirthDate());
-    entity.setGender(dto.getGender());
-    entity.setDocument(dto.getDocument());
-    entity.setPhone(dto.getPhone());
-    entity.setEmail(dto.getEmail());
-    entity.setSelf(Boolean.TRUE.equals(dto.getIsSelf()));
-    entity.setShift(dto.getShift() != null ? dto.getShift() : Shift.MORNING);
-    entity.setSchoolId(dto.getSchoolId());
-    entity.setAddressId(dto.getAddressId());
-    return entity;
+  public DependentModel toModel(
+      DependentCreateDTO dto, Long clientId, Long schoolId, Long addressId) {
+    DependentModel model = new DependentModel();
+    model.setClientId(clientId);
+    model.setSchoolId(schoolId);
+    model.setAddressId(addressId);
+    model.setName(dto.getName());
+    model.setBirthDate(dto.getBirthDate());
+    model.setGender(dto.getGender());
+    model.setDocument(dto.getDocument());
+    model.setPhone(dto.getPhone());
+    model.setEmail(dto.getEmail());
+    model.setSelf(Boolean.TRUE.equals(dto.getIsSelf()));
+    model.setShift(dto.getShift() != null ? dto.getShift() : Shift.MORNING);
+    return model;
   }
 
-  public void applyUpdate(DependentUpdateDTO dto, DependentEntity entity) {
+  public void applyUpdate(DependentUpdateDTO dto, DependentModel model) {
     if (dto.getName() != null) {
-      entity.setName(dto.getName());
+      model.setName(dto.getName());
     }
     if (dto.getBirthDate() != null) {
-      entity.setBirthDate(dto.getBirthDate());
+      model.setBirthDate(dto.getBirthDate());
     }
     if (dto.getGender() != null) {
-      entity.setGender(dto.getGender());
+      model.setGender(dto.getGender());
     }
     if (dto.getDocument() != null) {
-      entity.setDocument(dto.getDocument());
+      model.setDocument(dto.getDocument());
     }
     if (dto.getPhone() != null) {
-      entity.setPhone(dto.getPhone());
+      model.setPhone(dto.getPhone());
     }
     if (dto.getEmail() != null) {
-      entity.setEmail(dto.getEmail());
+      model.setEmail(dto.getEmail());
     }
     if (dto.getIsSelf() != null) {
-      entity.setSelf(dto.getIsSelf());
+      model.setSelf(dto.getIsSelf());
     }
     if (dto.getShift() != null) {
-      entity.setShift(dto.getShift());
-    }
-    if (dto.getSchoolId() != null) {
-      entity.setSchoolId(dto.getSchoolId());
-    }
-    if (dto.getAddressId() != null) {
-      entity.setAddressId(dto.getAddressId());
+      model.setShift(dto.getShift());
     }
   }
 
-  public DependentResponseDTO toResponse(DependentEntity entity) {
+  public DependentResponseDTO toResponse(
+      DependentModel model, String clientToken, String schoolToken, String addressToken) {
     return new DependentResponseDTO(
-        entity.getToken(),
-        entity.getClientId(),
-        entity.getName(),
-        entity.getBirthDate(),
-        entity.getGender(),
-        entity.getDocument(),
-        entity.getPhone(),
-        entity.getEmail(),
-        entity.isSelf(),
-        entity.isDefaultDependent(),
-        entity.getShift(),
-        entity.getSchoolId(),
-        entity.getAddressId(),
-        entity.getCreatedAt(),
-        entity.getUpdatedAt());
+        model.getToken(),
+        new DependentClientDTO(clientToken),
+        model.getName(),
+        model.getBirthDate(),
+        model.getGender(),
+        model.getDocument(),
+        model.getPhone(),
+        model.getEmail(),
+        model.isSelf(),
+        model.isDefaultDependent(),
+        model.getShift(),
+        schoolToken != null ? new DependentSchoolDTO(schoolToken) : null,
+        addressToken != null ? new DependentAddressDTO(addressToken) : null,
+        model.getCreatedAt(),
+        model.getUpdatedAt());
   }
 }
