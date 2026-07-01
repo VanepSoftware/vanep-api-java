@@ -5,13 +5,18 @@ import br.com.vanep.client.ClientRepository;
 import br.com.vanep.dependent.dto.DependentCreateDTO;
 import br.com.vanep.dependent.dto.DependentResponseDTO;
 import br.com.vanep.dependent.dto.DependentUpdateDTO;
-import br.com.vanep.dependent.entity.DependentEntity;
 import br.com.vanep.dependent.mapper.DependentMapper;
+import br.com.vanep.dependent.model.DependentModel;
 import br.com.vanep.dependent.repository.DependentRepository;
+import br.com.vanep.dependent.resolver.AddressTokenResolver;
+import br.com.vanep.dependent.resolver.SchoolTokenResolver;
 import br.com.vanep.user.User;
 import br.com.vanep.user.UserRepository;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.stream.Collectors;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
@@ -25,16 +30,22 @@ public class DependentService {
   private final DependentRepository dependents;
   private final ClientRepository clients;
   private final UserRepository users;
+  private final SchoolTokenResolver schools;
+  private final AddressTokenResolver addresses;
   private final DependentMapper mapper;
 
   public DependentService(
       DependentRepository dependents,
       ClientRepository clients,
       UserRepository users,
+      SchoolTokenResolver schools,
+      AddressTokenResolver addresses,
       DependentMapper mapper) {
     this.dependents = dependents;
     this.clients = clients;
     this.users = users;
+    this.schools = schools;
+    this.addresses = addresses;
     this.mapper = mapper;
   }
 
@@ -43,54 +54,61 @@ public class DependentService {
     Long clientId = resolveClientIdForCreate(jwt, dto);
     assertDocumentAvailable(dto.getDocument(), null);
 
-    DependentEntity entity = mapper.toEntity(dto, clientId);
-    applyDefaultOnCreate(entity, dto, clientId);
+    DependentModel model =
+        mapper.toModel(
+            dto,
+            clientId,
+            resolveSchoolId(dto.getSchoolToken()).orElse(null),
+            resolveAddressId(dto.getAddressToken()).orElse(null));
+    applyDefaultOnCreate(model, dto, clientId);
 
-    DependentEntity saved = dependents.save(entity);
-    return mapper.toResponse(saved);
+    DependentModel saved = dependents.save(model);
+    return toResponse(saved);
   }
 
   @Transactional(readOnly = true)
   public List<DependentResponseDTO> list(Jwt jwt) {
     if (isAdmin(jwt)) {
-      return dependents.findAll().stream().map(mapper::toResponse).toList();
+      return toResponses(dependents.findAll());
     }
     Long clientId = resolveClientIdForClient(jwt);
-    return dependents.findByClientId(clientId).stream().map(mapper::toResponse).toList();
+    return toResponses(dependents.findByClientId(clientId));
   }
 
   @Transactional(readOnly = true)
   public DependentResponseDTO getByToken(Jwt jwt, String token) {
-    DependentEntity entity = findActiveForAccess(jwt, token);
-    return mapper.toResponse(entity);
+    DependentModel model = findActiveForAccess(jwt, token);
+    return toResponse(model);
   }
 
   @Transactional
   public DependentResponseDTO update(Jwt jwt, String token, DependentUpdateDTO dto) {
-    DependentEntity entity = findActiveForAccess(jwt, token);
+    DependentModel model = findActiveForAccess(jwt, token);
     if (dto.getDocument() != null) {
       assertDocumentAvailable(dto.getDocument(), token);
     }
 
-    mapper.applyUpdate(dto, entity);
+    mapper.applyUpdate(dto, model);
+    applySchoolTokenUpdate(dto.getSchoolToken(), model);
+    applyAddressTokenUpdate(dto.getAddressToken(), model);
     if (Boolean.TRUE.equals(dto.getIsDefault())) {
-      clearOtherDefaults(entity.getClientId(), entity.getToken());
-      entity.setDefaultDependent(true);
+      clearOtherDefaults(model.getClientId(), model.getToken());
+      model.setDefaultDependent(true);
     } else if (Boolean.FALSE.equals(dto.getIsDefault())) {
-      entity.setDefaultDependent(false);
+      model.setDefaultDependent(false);
     }
 
-    DependentEntity saved = dependents.save(entity);
-    return mapper.toResponse(saved);
+    DependentModel saved = dependents.save(model);
+    return toResponse(saved);
   }
 
   @Transactional
   public void delete(Jwt jwt, String token) {
-    DependentEntity entity = findActiveForAccess(jwt, token);
-    boolean wasDefault = entity.isDefaultDependent();
-    Long clientId = entity.getClientId();
+    DependentModel model = findActiveForAccess(jwt, token);
+    boolean wasDefault = model.isDefaultDependent();
+    Long clientId = model.getClientId();
 
-    dependents.delete(entity);
+    dependents.delete(model);
     promoteDefaultAfterDelete(clientId, wasDefault);
   }
 
@@ -104,46 +122,130 @@ public class DependentService {
     assertOwnership(jwt, clientId);
 
     dependents.restoreByToken(token);
-    DependentEntity restored = dependents.findByToken(token).orElseThrow(this::notFound);
-    return mapper.toResponse(restored);
+    DependentModel restored = dependents.findByToken(token).orElseThrow(this::notFound);
+    return toResponse(restored);
   }
 
-  private DependentEntity findActiveForAccess(Jwt jwt, String token) {
-    DependentEntity entity = dependents.findByToken(token).orElseThrow(this::notFound);
-    assertOwnership(jwt, entity.getClientId());
-    return entity;
+  private DependentModel findActiveForAccess(Jwt jwt, String token) {
+    DependentModel model = dependents.findByToken(token).orElseThrow(this::notFound);
+    assertOwnership(jwt, model.getClientId());
+    return model;
+  }
+
+  private DependentResponseDTO toResponse(DependentModel model) {
+    String clientToken = resolveClientToken(model.getClientId());
+    String schoolToken = resolveSchoolToken(model.getSchoolId()).orElse(null);
+    String addressToken = resolveAddressToken(model.getAddressId()).orElse(null);
+    return mapper.toResponse(model, clientToken, schoolToken, addressToken);
+  }
+
+  private List<DependentResponseDTO> toResponses(List<DependentModel> models) {
+    Map<Long, String> clientTokens = clientTokensById(models);
+    return models.stream()
+        .map(
+            model ->
+                mapper.toResponse(
+                    model,
+                    clientTokens.get(model.getClientId()),
+                    resolveSchoolToken(model.getSchoolId()).orElse(null),
+                    resolveAddressToken(model.getAddressId()).orElse(null)))
+        .toList();
+  }
+
+  private Map<Long, String> clientTokensById(List<DependentModel> models) {
+    List<Long> clientIds = models.stream().map(DependentModel::getClientId).distinct().toList();
+    return clients.findAllById(clientIds).stream()
+        .collect(Collectors.toMap(Client::getId, Client::getToken));
+  }
+
+  private String resolveClientToken(Long clientId) {
+    return clients
+        .findById(clientId)
+        .map(Client::getToken)
+        .orElseThrow(
+            () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Cliente não encontrado."));
+  }
+
+  private Optional<Long> resolveSchoolId(String schoolToken) {
+    if (schoolToken == null) {
+      return Optional.empty();
+    }
+    if (!StringUtils.hasText(schoolToken)) {
+      return Optional.empty();
+    }
+    return schools.resolveId(schoolToken);
+  }
+
+  private Optional<Long> resolveAddressId(String addressToken) {
+    if (addressToken == null) {
+      return Optional.empty();
+    }
+    if (!StringUtils.hasText(addressToken)) {
+      return Optional.empty();
+    }
+    return addresses.resolveId(addressToken);
+  }
+
+  private Optional<String> resolveSchoolToken(Long schoolId) {
+    if (schoolId == null) {
+      return Optional.empty();
+    }
+    return schools.resolveToken(schoolId);
+  }
+
+  private Optional<String> resolveAddressToken(Long addressId) {
+    if (addressId == null) {
+      return Optional.empty();
+    }
+    return addresses.resolveToken(addressId);
+  }
+
+  private void applySchoolTokenUpdate(String schoolToken, DependentModel model) {
+    if (schoolToken == null) {
+      return;
+    }
+    model.setSchoolId(
+        StringUtils.hasText(schoolToken) ? resolveSchoolId(schoolToken).orElse(null) : null);
+  }
+
+  private void applyAddressTokenUpdate(String addressToken, DependentModel model) {
+    if (addressToken == null) {
+      return;
+    }
+    model.setAddressId(
+        StringUtils.hasText(addressToken) ? resolveAddressId(addressToken).orElse(null) : null);
   }
 
   private void promoteDefaultAfterDelete(Long clientId, boolean wasDefault) {
     if (!wasDefault) {
       return;
     }
-    List<DependentEntity> remaining = dependents.findByClientId(clientId);
+    List<DependentModel> remaining = dependents.findByClientId(clientId);
     if (remaining.size() == 1) {
-      DependentEntity only = remaining.getFirst();
+      DependentModel only = remaining.getFirst();
       only.setDefaultDependent(true);
       dependents.save(only);
     }
   }
 
-  private void applyDefaultOnCreate(DependentEntity entity, DependentCreateDTO dto, Long clientId) {
+  private void applyDefaultOnCreate(DependentModel model, DependentCreateDTO dto, Long clientId) {
     long activeCount = dependents.countByClientId(clientId);
     if (activeCount == 0) {
-      entity.setDefaultDependent(true);
+      model.setDefaultDependent(true);
       return;
     }
     if (Boolean.TRUE.equals(dto.getIsDefault())) {
       clearOtherDefaults(clientId, null);
-      entity.setDefaultDependent(true);
+      model.setDefaultDependent(true);
     } else {
-      entity.setDefaultDependent(false);
+      model.setDefaultDependent(false);
     }
   }
 
   private void clearOtherDefaults(Long clientId, String excludeToken) {
     dependents.findByClientId(clientId).stream()
         .filter(dependent -> excludeToken == null || !dependent.getToken().equals(excludeToken))
-        .filter(DependentEntity::isDefaultDependent)
+        .filter(DependentModel::isDefaultDependent)
         .forEach(
             dependent -> {
               dependent.setDefaultDependent(false);
@@ -167,11 +269,15 @@ public class DependentService {
 
   private Long resolveClientIdForCreate(Jwt jwt, DependentCreateDTO dto) {
     if (isAdmin(jwt)) {
-      if (dto.getClientId() == null) {
+      if (!StringUtils.hasText(dto.getClientToken())) {
         throw new ResponseStatusException(
-            HttpStatus.BAD_REQUEST, "clientId é obrigatório para administradores.");
+            HttpStatus.BAD_REQUEST, "clientToken é obrigatório para administradores.");
       }
-      return dto.getClientId();
+      return clients
+          .findByToken(dto.getClientToken())
+          .map(Client::getId)
+          .orElseThrow(
+              () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Cliente não encontrado."));
     }
     return resolveClientIdForClient(jwt);
   }
