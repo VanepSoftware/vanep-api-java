@@ -188,14 +188,15 @@ class ClientControllerTest {
   }
 
   @Test
-  void updateReturns404WhenMissing() throws Exception {
+  void updateReturns403ForNonExistentToken() throws Exception {
+    // @PreAuthorize runs before service: isOwner returns false for missing token → 403
     mockMvc
         .perform(
             put("/api/clients/doesnotexist")
                 .with(ownerJwt())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{}"))
-        .andExpect(status().isNotFound());
+        .andExpect(status().isForbidden());
   }
 
   // DELETE /api/clients/{token}

@@ -77,15 +77,7 @@ public class SecurityConfig {
   public SecurityFilterChain apiSecurityFilterChain(
       HttpSecurity http, JwtAuthenticationConverter jwtAuthenticationConverter) throws Exception {
     http.securityMatcher("/api/**")
-        .authorizeHttpRequests(
-            authorize ->
-                authorize
-                    .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/clients")
-                    .hasRole("ADMIN")
-                    .requestMatchers(org.springframework.http.HttpMethod.DELETE, "/api/clients/*")
-                    .hasRole("ADMIN")
-                    .anyRequest()
-                    .authenticated())
+        .authorizeHttpRequests(authorize -> authorize.anyRequest().authenticated())
         .csrf(csrf -> csrf.disable())
         .sessionManagement(
             session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))

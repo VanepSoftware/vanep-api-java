@@ -3,7 +3,7 @@ package br.com.vanep.client.dto;
 import java.math.BigDecimal;
 import java.time.Instant;
 
-public record ClientResponse(
+public record ClientResponseDTO(
     String token,
     String name,
     String email,

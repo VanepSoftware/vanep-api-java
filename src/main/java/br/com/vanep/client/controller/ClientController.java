@@ -1,14 +1,13 @@
 package br.com.vanep.client.controller;
 
-import br.com.vanep.client.dto.ClientResponse;
-import br.com.vanep.client.dto.ClientUpdateRequest;
+import br.com.vanep.client.dto.ClientResponseDTO;
+import br.com.vanep.client.dto.ClientUpdateRequestDTO;
 import br.com.vanep.client.service.ClientService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -29,24 +28,26 @@ public class ClientController {
   }
 
   @GetMapping
-  public Page<ClientResponse> list(@PageableDefault(size = 20) Pageable pageable) {
+  @PreAuthorize("hasRole('ADMIN')")
+  public Page<ClientResponseDTO> list(@PageableDefault(size = 20) Pageable pageable) {
     return service.findAll(pageable);
   }
 
   @GetMapping("/{token}")
-  public ClientResponse get(@PathVariable String token, @AuthenticationPrincipal Jwt jwt) {
-    return service.findByToken(token, jwt);
+  @PreAuthorize("hasRole('ADMIN') or @clientSecurity.isOwner(#token, authentication)")
+  public ClientResponseDTO get(@PathVariable String token) {
+    return service.findByToken(token);
   }
 
   @PutMapping("/{token}")
-  public ClientResponse update(
-      @PathVariable String token,
-      @RequestBody ClientUpdateRequest request,
-      @AuthenticationPrincipal Jwt jwt) {
-    return service.update(token, request, jwt);
+  @PreAuthorize("@clientSecurity.isOwner(#token, authentication)")
+  public ClientResponseDTO update(
+      @PathVariable String token, @RequestBody ClientUpdateRequestDTO request) {
+    return service.update(token, request);
   }
 
   @DeleteMapping("/{token}")
+  @PreAuthorize("hasRole('ADMIN')")
   @ResponseStatus(HttpStatus.NO_CONTENT)
   public void delete(@PathVariable String token) {
     service.delete(token);

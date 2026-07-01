@@ -8,8 +8,8 @@ import static org.mockito.Mockito.when;
 
 import br.com.vanep.client.Client;
 import br.com.vanep.client.ClientRepository;
-import br.com.vanep.client.dto.ClientResponse;
-import br.com.vanep.client.dto.ClientUpdateRequest;
+import br.com.vanep.client.dto.ClientResponseDTO;
+import br.com.vanep.client.dto.ClientUpdateRequestDTO;
 import br.com.vanep.client.mapper.ClientMapper;
 import br.com.vanep.user.User;
 import br.com.vanep.user.UserType;
@@ -22,7 +22,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
-import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.server.ResponseStatusException;
 
 @ExtendWith(MockitoExtension.class)
@@ -38,13 +37,13 @@ class ClientServiceTest {
     service = new ClientService(repository, mapper);
   }
 
-  private Client clientWithToken(String token, String userToken) {
+  private Client clientWithToken(String token) {
     User user = new User();
     user.setType(UserType.CLIENT);
     user.setName("Test User");
     user.setEmail("test@vanep.com");
     user.setDocument("12345678901");
-    user.setToken(userToken);
+    user.setToken("owner-uid");
 
     Client client = new Client();
     client.setToken(token);
@@ -52,19 +51,11 @@ class ClientServiceTest {
     return client;
   }
 
-  private Jwt jwtFor(String uid, String... roles) {
-    return Jwt.withTokenValue("token")
-        .header("alg", "RS256")
-        .claim("uid", uid)
-        .claim("roles", List.of(roles))
-        .build();
-  }
-
   @Test
   void findAllReturnsPagedResponses() {
-    Client client = clientWithToken("abc", "user-tok");
-    ClientResponse response =
-        new ClientResponse("abc", "Test", "t@t.com", null, null, null, true, null);
+    Client client = clientWithToken("abc");
+    ClientResponseDTO response =
+        new ClientResponseDTO("abc", "Test", "t@t.com", null, null, null, true, null);
     when(repository.findAll(any(Pageable.class))).thenReturn(new PageImpl<>(List.of(client)));
     when(mapper.toResponse(client)).thenReturn(response);
 
@@ -74,62 +65,36 @@ class ClientServiceTest {
   }
 
   @Test
-  void findByTokenAllowsAdmin() {
-    Client client = clientWithToken("tok", "owner-uid");
-    ClientResponse response =
-        new ClientResponse("tok", "Name", "e@e.com", null, null, null, true, null);
+  void findByTokenReturnsResponse() {
+    Client client = clientWithToken("tok");
+    ClientResponseDTO response =
+        new ClientResponseDTO("tok", "Name", "e@e.com", null, null, null, true, null);
     when(repository.findByToken("tok")).thenReturn(Optional.of(client));
     when(mapper.toResponse(client)).thenReturn(response);
 
-    Jwt admin = jwtFor("other-uid", "ROLE_ADMIN");
-    assertThat(service.findByToken("tok", admin)).isEqualTo(response);
-  }
-
-  @Test
-  void findByTokenAllowsOwner() {
-    Client client = clientWithToken("tok", "owner-uid");
-    ClientResponse response =
-        new ClientResponse("tok", "Name", "e@e.com", null, null, null, true, null);
-    when(repository.findByToken("tok")).thenReturn(Optional.of(client));
-    when(mapper.toResponse(client)).thenReturn(response);
-
-    Jwt owner = jwtFor("owner-uid", "ROLE_CLIENT");
-    assertThat(service.findByToken("tok", owner)).isEqualTo(response);
-  }
-
-  @Test
-  void findByTokenDeniesOtherClient() {
-    Client client = clientWithToken("tok", "owner-uid");
-    when(repository.findByToken("tok")).thenReturn(Optional.of(client));
-
-    Jwt other = jwtFor("other-uid", "ROLE_CLIENT");
-    assertThatThrownBy(() -> service.findByToken("tok", other))
-        .isInstanceOf(ResponseStatusException.class)
-        .hasMessageContaining("403");
+    assertThat(service.findByToken("tok")).isEqualTo(response);
   }
 
   @Test
   void findByTokenThrows404WhenNotFound() {
     when(repository.findByToken("missing")).thenReturn(Optional.empty());
-    Jwt admin = jwtFor("any", "ROLE_ADMIN");
 
-    assertThatThrownBy(() -> service.findByToken("missing", admin))
+    assertThatThrownBy(() -> service.findByToken("missing"))
         .isInstanceOf(ResponseStatusException.class)
         .hasMessageContaining("404");
   }
 
   @Test
-  void updateAllowsOwner() {
-    Client client = clientWithToken("tok", "owner-uid");
-    ClientResponse response =
-        new ClientResponse("tok", "Name", "e@e.com", "photo.jpg", null, 1L, true, null);
+  void updatePersistsFields() {
+    Client client = clientWithToken("tok");
+    ClientResponseDTO response =
+        new ClientResponseDTO("tok", "Name", "e@e.com", "photo.jpg", null, 1L, true, null);
     when(repository.findByToken("tok")).thenReturn(Optional.of(client));
     when(repository.save(client)).thenReturn(client);
     when(mapper.toResponse(client)).thenReturn(response);
 
-    Jwt owner = jwtFor("owner-uid", "ROLE_CLIENT");
-    ClientUpdateRequest req = new ClientUpdateRequest("photo.jpg", 1L);
-    ClientResponse result = service.update("tok", req, owner);
+    ClientUpdateRequestDTO req = new ClientUpdateRequestDTO("photo.jpg", 1L);
+    ClientResponseDTO result = service.update("tok", req);
 
     assertThat(result).isEqualTo(response);
     assertThat(client.getPhoto()).isEqualTo("photo.jpg");
@@ -137,19 +102,17 @@ class ClientServiceTest {
   }
 
   @Test
-  void updateDeniesNonOwner() {
-    Client client = clientWithToken("tok", "owner-uid");
-    when(repository.findByToken("tok")).thenReturn(Optional.of(client));
+  void updateThrows404WhenNotFound() {
+    when(repository.findByToken("missing")).thenReturn(Optional.empty());
 
-    Jwt other = jwtFor("other-uid", "ROLE_CLIENT");
-    assertThatThrownBy(() -> service.update("tok", new ClientUpdateRequest(null, null), other))
+    assertThatThrownBy(() -> service.update("missing", new ClientUpdateRequestDTO(null, null)))
         .isInstanceOf(ResponseStatusException.class)
-        .hasMessageContaining("403");
+        .hasMessageContaining("404");
   }
 
   @Test
   void deleteSoftDeletesClient() {
-    Client client = clientWithToken("tok", "owner-uid");
+    Client client = clientWithToken("tok");
     when(repository.findByToken("tok")).thenReturn(Optional.of(client));
 
     service.delete("tok");

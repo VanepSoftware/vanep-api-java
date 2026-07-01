@@ -1,14 +1,14 @@
 package br.com.vanep.client.mapper;
 
 import br.com.vanep.client.Client;
-import br.com.vanep.client.dto.ClientResponse;
+import br.com.vanep.client.dto.ClientResponseDTO;
 import org.springframework.stereotype.Component;
 
 @Component
 public class ClientMapper {
 
-  public ClientResponse toResponse(Client client) {
-    return new ClientResponse(
+  public ClientResponseDTO toResponse(Client client) {
+    return new ClientResponseDTO(
         client.getToken(),
         client.getUser().getName(),
         client.getUser().getEmail(),
