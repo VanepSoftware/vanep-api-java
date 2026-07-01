@@ -28,7 +28,7 @@ public class DependentUpdateDTO {
 
   private Shift shift;
 
-  private Long schoolId;
+  private String schoolToken;
 
-  private Long addressId;
+  private String addressToken;
 }
