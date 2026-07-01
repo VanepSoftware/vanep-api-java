@@ -1,6 +1,6 @@
 package br.com.vanep.dependent.repository;
 
-import br.com.vanep.dependent.entity.DependentEntity;
+import br.com.vanep.dependent.model.DependentModel;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -8,11 +8,11 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-public interface DependentRepository extends JpaRepository<DependentEntity, Long> {
+public interface DependentRepository extends JpaRepository<DependentModel, Long> {
 
-  Optional<DependentEntity> findByToken(String token);
+  Optional<DependentModel> findByToken(String token);
 
-  List<DependentEntity> findByClientId(Long clientId);
+  List<DependentModel> findByClientId(Long clientId);
 
   long countByClientId(Long clientId);
 
