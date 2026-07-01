@@ -16,6 +16,10 @@ When ready to implement, run /opsx:apply
 
 ---
 
+**MANDATORY FIRST STEP:** Before doing anything else, read the entire `constitution.md` at the project root. This is non-negotiable — see `openspec/rules.md`.
+
+---
+
 **Input**: The argument after `/opsx:propose` is the change name (kebab-case), OR a description of what the user wants to build.
 
 **Steps**
