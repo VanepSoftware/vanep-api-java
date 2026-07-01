@@ -22,16 +22,16 @@
 > Goal: CRUD endpoints + restore + RN12. Merge `main` into the branch before starting.
 > Commits: 1 file per commit.
 
-- [ ] 2.1 Create `DependentCreateDTO` with Bean Validation (`name` required, others optional)
-- [ ] 2.2 Create `DependentUpdateDTO` (optional fields for PATCH)
-- [ ] 2.3 Create `DependentResponseDTO` (record, no internal `id`)
-- [ ] 2.4 Create `DependentMapper` (DTO → entity, entity → response)
-- [ ] 2.5 Create `DependentService` — create (ownership, RN12 first dependent)
-- [ ] 2.6 Implement in `DependentService` — list, getByToken, update (includes `is_default` change)
-- [ ] 2.7 Implement in `DependentService` — delete via `repository.delete()` + default promotion
-- [ ] 2.8 Implement in `DependentService` — restore via `restoreByToken` (native query)
-- [ ] 2.9 Create `DependentController` with `/api/dependent` routes and `@PreAuthorize`
-- [ ] 2.10 Validate: `./mvnw verify` passes after PR2
+- [x] 2.1 Create `DependentCreateDTO` with Bean Validation (`name` required, others optional)
+- [x] 2.2 Create `DependentUpdateDTO` (optional fields for PATCH)
+- [x] 2.3 Create `DependentResponseDTO` (record, no internal `id`)
+- [x] 2.4 Create `DependentMapper` (DTO → entity, entity → response)
+- [x] 2.5 Create `DependentService` — create (ownership, RN12 first dependent)
+- [x] 2.6 Implement in `DependentService` — list, getByToken, update (includes `is_default` change)
+- [x] 2.7 Implement in `DependentService` — delete via `repository.delete()` + default promotion
+- [x] 2.8 Implement in `DependentService` — restore via `restoreByToken` (native query)
+- [x] 2.9 Create `DependentController` with `/api/dependent` routes and `@PreAuthorize`
+- [x] 2.10 Validate: `./mvnw verify` passes after PR2
 - [ ] 2.11 Open PR2 `feat(dependent): phase 2 — REST API` → `main`
 
 ## 3. PR3 — Seed + tests
