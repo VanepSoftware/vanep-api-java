@@ -11,7 +11,7 @@
 
 - [x] 1.1 Create `V7__create_dependent_table.sql` (`dependent` table, FK `client_id`, default `shift = MORNING`, partial unique indexes on `token` and `document`)
 - [x] 1.2 Create enum `br.com.vanep.dependent.enums.Shift` (MORNING, AFTERNOON, NIGHT, FULLTIME)
-- [x] 1.3 Create `br.com.vanep.dependent.entity.DependentEntity` (`@SoftDelete`, `@PrePersist` for token, no `deletedAt` field)
+- [x] 1.3 Create `br.com.vanep.dependent.model.DependentModel` (`@SoftDelete`, `@PrePersist` for token, no `deletedAt` field)
 - [x] 1.4 Create `DependentRepository` (`findByToken`, `findByClientId`, `countByClientId`, `existsByDocument`; native `restoreByToken`, `existsDeletedByToken`)
 - [x] 1.5 Add `findByUserId(Long userId)` to `ClientRepository`
 - [x] 1.6 Validate: `./mvnw verify` passes after PR1
