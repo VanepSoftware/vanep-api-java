@@ -1,10 +1,10 @@
 package br.com.vanep.client.service;
 
 import br.com.vanep.client.Client;
-import br.com.vanep.client.ClientRepository;
 import br.com.vanep.client.dto.ClientResponseDTO;
 import br.com.vanep.client.dto.ClientUpdateRequestDTO;
 import br.com.vanep.client.mapper.ClientMapper;
+import br.com.vanep.client.repository.ClientRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -35,7 +35,6 @@ public class ClientService {
   public ClientResponseDTO update(String token, ClientUpdateRequestDTO request) {
     Client client = requireByToken(token);
     client.setPhoto(request.photo());
-    // addressToken → addressId resolution pending Address entity implementation
     return mapper.toResponse(clients.save(client));
   }
 

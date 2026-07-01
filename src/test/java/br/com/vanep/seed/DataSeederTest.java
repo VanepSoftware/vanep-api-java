@@ -7,7 +7,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import br.com.vanep.client.ClientRepository;
+import br.com.vanep.client.repository.ClientRepository;
 import br.com.vanep.user.User;
 import br.com.vanep.user.UserRepository;
 import org.junit.jupiter.api.BeforeEach;

@@ -7,10 +7,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import br.com.vanep.client.Client;
-import br.com.vanep.client.ClientRepository;
 import br.com.vanep.client.dto.ClientResponseDTO;
 import br.com.vanep.client.dto.ClientUpdateRequestDTO;
 import br.com.vanep.client.mapper.ClientMapper;
+import br.com.vanep.client.repository.ClientRepository;
 import br.com.vanep.user.User;
 import br.com.vanep.user.UserType;
 import java.util.List;

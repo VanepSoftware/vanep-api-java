@@ -1,7 +1,7 @@
 package br.com.vanep.seed;
 
 import br.com.vanep.client.Client;
-import br.com.vanep.client.ClientRepository;
+import br.com.vanep.client.repository.ClientRepository;
 import br.com.vanep.user.User;
 import br.com.vanep.user.UserRepository;
 import br.com.vanep.user.UserType;

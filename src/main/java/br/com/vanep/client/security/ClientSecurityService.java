@@ -1,6 +1,6 @@
 package br.com.vanep.client.security;
 
-import br.com.vanep.client.ClientRepository;
+import br.com.vanep.client.repository.ClientRepository;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.stereotype.Service;

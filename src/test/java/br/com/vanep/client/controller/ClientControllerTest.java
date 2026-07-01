@@ -9,7 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import br.com.vanep.client.Client;
-import br.com.vanep.client.ClientRepository;
+import br.com.vanep.client.repository.ClientRepository;
 import br.com.vanep.user.User;
 import br.com.vanep.user.UserRepository;
 import br.com.vanep.user.UserType;
@@ -82,8 +82,6 @@ class ClientControllerTest {
         .authorities(new SimpleGrantedAuthority("ROLE_CLIENT"));
   }
 
-  // GET /api/clients — admin only
-
   @Test
   void listRequiresAuthentication() throws Exception {
     mockMvc.perform(get("/api/clients")).andExpect(status().isUnauthorized());
@@ -102,8 +100,6 @@ class ClientControllerTest {
         .andExpect(jsonPath("$.content").isArray())
         .andExpect(jsonPath("$.content[0].token").value(clientToken));
   }
-
-  // GET /api/clients/{token}
 
   @Test
   void getByTokenRequiresAuthentication() throws Exception {
@@ -140,8 +136,6 @@ class ClientControllerTest {
         .perform(get("/api/clients/doesnotexist").with(adminJwt()))
         .andExpect(status().isNotFound());
   }
-
-  // PUT /api/clients/{token}
 
   @Test
   void updateRequiresAuthentication() throws Exception {
@@ -189,7 +183,6 @@ class ClientControllerTest {
 
   @Test
   void updateReturns403ForNonExistentToken() throws Exception {
-    // @PreAuthorize runs before service: isOwner returns false for missing token → 403
     mockMvc
         .perform(
             put("/api/clients/doesnotexist")
@@ -198,8 +191,6 @@ class ClientControllerTest {
                 .content("{}"))
         .andExpect(status().isForbidden());
   }
-
-  // DELETE /api/clients/{token}
 
   @Test
   void deleteRequiresAuthentication() throws Exception {
