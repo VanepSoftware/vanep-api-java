@@ -1,0 +1,25 @@
+package br.com.vanep.role.repository;
+
+import br.com.vanep.role.Role;
+import java.util.Optional;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.transaction.annotation.Transactional;
+
+public interface RoleRepository extends JpaRepository<Role, Long> {
+
+  Optional<Role> findByToken(String token);
+
+  boolean existsByName(String name);
+
+  @Query(
+      value = "SELECT * FROM roles WHERE token = :token AND deleted_at IS NOT NULL",
+      nativeQuery = true)
+  Optional<Role> findDeletedByToken(String token);
+
+  @Modifying
+  @Transactional
+  @Query(value = "UPDATE roles SET deleted_at = NULL WHERE token = :token", nativeQuery = true)
+  void restore(String token);
+}

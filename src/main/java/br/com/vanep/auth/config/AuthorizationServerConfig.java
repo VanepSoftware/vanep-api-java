@@ -76,7 +76,7 @@ public class AuthorizationServerConfig {
   }
 
   @Bean
-  @Profile("!test")
+  @Profile("docker | prod")
   public OAuth2AuthorizationService authorizationService(
       JdbcTemplate jdbcTemplate, RegisteredClientRepository registeredClientRepository) {
     return new JdbcOAuth2AuthorizationService(jdbcTemplate, registeredClientRepository);
