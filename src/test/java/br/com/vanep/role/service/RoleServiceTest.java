@@ -6,11 +6,11 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import br.com.vanep.role.Role;
 import br.com.vanep.role.dto.RoleCreateRequestDTO;
 import br.com.vanep.role.dto.RoleResponseDTO;
 import br.com.vanep.role.dto.RoleUpdateRequestDTO;
 import br.com.vanep.role.mapper.RoleMapper;
+import br.com.vanep.role.model.RoleModel;
 import br.com.vanep.role.repository.RoleRepository;
 import java.util.List;
 import java.util.Optional;
@@ -36,8 +36,8 @@ class RoleServiceTest {
     service = new RoleService(repository, mapper);
   }
 
-  private Role roleWithToken(String token) {
-    Role role = new Role();
+  private RoleModel roleWithToken(String token) {
+    RoleModel role = new RoleModel();
     role.setToken(token);
     role.setName("Admin");
     role.setDescription("Administrator role");
@@ -46,7 +46,7 @@ class RoleServiceTest {
 
   @Test
   void findAllReturnsPagedResponses() {
-    Role role = roleWithToken("abc");
+    RoleModel role = roleWithToken("abc");
     RoleResponseDTO response = new RoleResponseDTO("abc", "Admin", "Administrator role", null);
     when(repository.findAll(any(Pageable.class))).thenReturn(new PageImpl<>(List.of(role)));
     when(mapper.toResponse(role)).thenReturn(response);
@@ -58,7 +58,7 @@ class RoleServiceTest {
 
   @Test
   void findByTokenReturnsResponse() {
-    Role role = roleWithToken("tok");
+    RoleModel role = roleWithToken("tok");
     RoleResponseDTO response = new RoleResponseDTO("tok", "Admin", "desc", null);
     when(repository.findByToken("tok")).thenReturn(Optional.of(role));
     when(mapper.toResponse(role)).thenReturn(response);
@@ -78,20 +78,20 @@ class RoleServiceTest {
   @Test
   void createPersistsRole() {
     RoleCreateRequestDTO req = new RoleCreateRequestDTO("Admin", "Administrator role");
-    Role saved = roleWithToken("tok");
+    RoleModel saved = roleWithToken("tok");
     RoleResponseDTO response = new RoleResponseDTO("tok", "Admin", "Administrator role", null);
-    when(repository.save(any(Role.class))).thenReturn(saved);
+    when(repository.save(any(RoleModel.class))).thenReturn(saved);
     when(mapper.toResponse(saved)).thenReturn(response);
 
     RoleResponseDTO result = service.create(req);
 
     assertThat(result).isEqualTo(response);
-    verify(repository).save(any(Role.class));
+    verify(repository).save(any(RoleModel.class));
   }
 
   @Test
   void updatePersistsFields() {
-    Role role = roleWithToken("tok");
+    RoleModel role = roleWithToken("tok");
     RoleResponseDTO response = new RoleResponseDTO("tok", "Updated", "new desc", null);
     when(repository.findByToken("tok")).thenReturn(Optional.of(role));
     when(repository.save(role)).thenReturn(role);
@@ -115,7 +115,7 @@ class RoleServiceTest {
 
   @Test
   void deleteSoftDeletesRole() {
-    Role role = roleWithToken("tok");
+    RoleModel role = roleWithToken("tok");
     when(repository.findByToken("tok")).thenReturn(Optional.of(role));
 
     service.delete("tok");
@@ -134,7 +134,7 @@ class RoleServiceTest {
 
   @Test
   void restoreReturnsResponse() {
-    Role role = roleWithToken("tok");
+    RoleModel role = roleWithToken("tok");
     RoleResponseDTO response = new RoleResponseDTO("tok", "Admin", "desc", null);
     when(repository.findDeletedByToken("tok")).thenReturn(Optional.of(role));
     when(repository.findByToken("tok")).thenReturn(Optional.of(role));

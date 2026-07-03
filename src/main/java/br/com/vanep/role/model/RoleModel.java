@@ -1,4 +1,4 @@
-package br.com.vanep.role;
+package br.com.vanep.role.model;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -21,7 +21,7 @@ import org.hibernate.annotations.UpdateTimestamp;
 @SoftDelete(columnName = "deleted_at", strategy = SoftDeleteType.TIMESTAMP)
 @Getter
 @Setter
-public class Role {
+public class RoleModel {
 
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)

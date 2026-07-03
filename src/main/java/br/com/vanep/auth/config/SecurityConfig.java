@@ -2,6 +2,7 @@ package br.com.vanep.auth.config;
 
 import br.com.vanep.auth.oauth.OAuthLoginSuccessHandler;
 import br.com.vanep.auth.oauth.VanepOidcUserService;
+import br.com.vanep.auth.security.AppPermissionEvaluator;
 import java.util.ArrayList;
 import java.util.Collection;
 import org.springframework.beans.factory.ObjectProvider;
@@ -10,6 +11,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.MediaType;
+import org.springframework.security.access.expression.method.DefaultMethodSecurityExpressionHandler;
+import org.springframework.security.access.expression.method.MethodSecurityExpressionHandler;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -30,6 +33,14 @@ import org.springframework.security.web.util.matcher.RequestMatcher;
 @EnableWebSecurity
 @EnableMethodSecurity
 public class SecurityConfig {
+
+  @Bean
+  public MethodSecurityExpressionHandler methodSecurityExpressionHandler(
+      AppPermissionEvaluator permissionEvaluator) {
+    DefaultMethodSecurityExpressionHandler handler = new DefaultMethodSecurityExpressionHandler();
+    handler.setPermissionEvaluator(permissionEvaluator);
+    return handler;
+  }
 
   @Bean
   public JwtAuthenticationConverter jwtAuthenticationConverter() {

@@ -2,7 +2,7 @@ package br.com.vanep.seed;
 
 import br.com.vanep.client.Client;
 import br.com.vanep.client.repository.ClientRepository;
-import br.com.vanep.role.Role;
+import br.com.vanep.role.model.RoleModel;
 import br.com.vanep.role.repository.RoleRepository;
 import br.com.vanep.user.User;
 import br.com.vanep.user.UserRepository;
@@ -92,7 +92,7 @@ public class DataSeeder implements ApplicationRunner {
 
     for (RoleSeed seed : seeds) {
       if (roles.existsByName(seed.name())) continue;
-      Role role = new Role();
+      RoleModel role = new RoleModel();
       role.setName(seed.name());
       role.setDescription(seed.description());
       roles.save(role);

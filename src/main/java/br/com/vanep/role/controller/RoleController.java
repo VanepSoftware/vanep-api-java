@@ -22,7 +22,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/roles")
-@PreAuthorize("hasRole('ADMIN')")
 public class RoleController {
 
   private final RoleService service;
@@ -32,22 +31,26 @@ public class RoleController {
   }
 
   @GetMapping
+  @PreAuthorize("hasPermission(null, 'roles:list')")
   public Page<RoleResponseDTO> list(@PageableDefault(size = 20) Pageable pageable) {
     return service.findAll(pageable);
   }
 
   @GetMapping("/{token}")
+  @PreAuthorize("hasPermission(null, 'roles:read')")
   public RoleResponseDTO get(@PathVariable String token) {
     return service.findByToken(token);
   }
 
   @PostMapping
   @ResponseStatus(HttpStatus.CREATED)
+  @PreAuthorize("hasPermission(null, 'roles:create')")
   public RoleResponseDTO create(@RequestBody @Valid RoleCreateRequestDTO request) {
     return service.create(request);
   }
 
   @PutMapping("/{token}")
+  @PreAuthorize("hasPermission(null, 'roles:update')")
   public RoleResponseDTO update(
       @PathVariable String token, @RequestBody @Valid RoleUpdateRequestDTO request) {
     return service.update(token, request);
@@ -55,11 +58,13 @@ public class RoleController {
 
   @DeleteMapping("/{token}")
   @ResponseStatus(HttpStatus.NO_CONTENT)
+  @PreAuthorize("hasPermission(null, 'roles:delete')")
   public void delete(@PathVariable String token) {
     service.delete(token);
   }
 
   @PostMapping("/{token}/restore")
+  @PreAuthorize("hasPermission(null, 'roles:restore')")
   public RoleResponseDTO restore(@PathVariable String token) {
     return service.restore(token);
   }
