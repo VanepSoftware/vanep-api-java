@@ -212,7 +212,7 @@ também o **Resource Server**.
 
 | Papel | Como |
 |---|---|
-| **Authorization Server** | Endpoints OAuth2 padrão: `/oauth2/authorize`, `/oauth2/token`, `/oauth2/jwks`. Fluxo **authorization code + PKCE** (cliente público, sem secret — igual ao `token_endpoint_auth_method: none` do checklists-frontend). |
+| **Authorization Server** | Endpoints OAuth2 padrão: `/oauth2/authorize`, `/oauth2/token`, `/oauth2/jwks`. Fluxo **authorization code + PKCE** (cliente público, sem secret — igual ao `token_endpoint_auth_method: none` do vanep-frontend). |
 | **Tela de login** | Servida pela própria API (Thymeleaf) em **`/login`** — fundo preto, marca Vanep, e-mail + senha. É a tela mostrada durante o fluxo de autorização. |
 | **Login social (Google)** | Botão **"Entrar com Google"** (OAuth2 Client / OIDC). Aparece só quando há `GOOGLE_CLIENT_ID` configurado. |
 | **Resource Server** | Rotas **`/api/**`** são protegidas por **JWT** (Bearer). Sem token → **401**. Ex.: `GET /api/user/profile` devolve o perfil da conta autenticada (consumido pelo front como "userinfo"). |

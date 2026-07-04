@@ -2,14 +2,14 @@
 
 O RBAC do Vanep está montado pela metade: a tabela `roles` existe (migração V7) e `users.role_id` está mapeado em `User`, mas nada popula ou lê esse vínculo. A autorização real acontece por `@PreAuthorize("hasRole('ADMIN')")`, que só reflete o `user_type` — o `JwtTokenCustomizer` emite `roles = ["ROLE_" + user_type]` e o `SecurityConfig` converte esse claim em authorities. Não há permissões finas.
 
-O projeto `checklists` (Laravel) já validou o modelo-alvo: um `role` aponta para um bundle `role_permissions` que guarda uma lista JSON de strings de permissão (`verb_resource`), um `PermissionsEnum` + `PermissionsRegistry` como fonte de verdade, e checagem por `in_array(permission, bundle.permissions)`. O `vanep-dbdiagram` confirma a modelagem (`role.role_permissions_id` 1-1 com `role_permissions`).
+O modelo-alvo: um `role` aponta para um bundle `role_permissions` que guarda uma lista JSON de strings de permissão (`verb_resource`), com um `PermissionEnum` + `PermissionRegistry` como fonte de verdade. O `vanep-dbdiagram` confirma a modelagem (`role.role_permissions_id` 1-1 com `role_permissions`).
 
 Stack e regras vinculantes: Java 25 / Spring Boot 4 / Flyway / OAuth2 Authorization Server; código por feature com sufixos de papel (`*Model`, `*Repository`, ...); nunca editar migração aplicada; identificadores em inglês, mensagens de usuário em pt-BR; entrega faseada em PRs empilhados (constituição, regras 33–41).
 
 ## Goals / Non-Goals
 
 **Goals:**
-- Ativar RBAC com permissões finas replicando o padrão do `checklists`.
+- Ativar RBAC com permissões finas via bundles nomeados de permissão.
 - Persistir `role_permissions` (bundle JSON) com relação 1-1 a `role`.
 - Emitir as permissões do usuário no access token e convertê-las em authorities.
 - Trocar `hasRole('ADMIN')` por `hasAuthority('<permission>')` nas rotas hoje gateadas por papel, sem regredir ADMIN (seed com todas as permissões).
@@ -28,7 +28,7 @@ Stack e regras vinculantes: Java 25 / Spring Boot 4 / Flyway / OAuth2 Authorizat
 
 ### D1 — Enforcement por `hasAuthority`, não `hasPermission`/PermissionEvaluator
 
-Permissões são strings globais e planas (`list_roles`). `hasAuthority('list_roles')` é nativo do Spring e faz exatamente a comparação de string que o modelo do `checklists` (`in_array`) faz — zero beans extras.
+Permissões são strings globais e planas (`list_roles`). `hasAuthority('list_roles')` é nativo do Spring e faz exatamente a comparação de string que o modelo precisa — zero beans extras.
 
 **Alternativa considerada:** `hasPermission(target, permission)` + `AppPermissionEvaluator`. Rejeitada: a assinatura é ACL-shaped (dois argumentos, alvo + permissão), forçaria remontar `roles`+`list`→`list_roles`, exige registrar `MethodSecurityExpressionHandler`, e **já foi introduzida e revertida** (commits 13c4f67 → e5f4ae0) como stub `return isAdmin(auth)`. Sem caso de decisão por objeto, não se paga.
 
@@ -40,13 +40,13 @@ O `JwtTokenCustomizer` resolve `user.role_id → role → role_permissions.permi
 
 ### D3 — `permissions` como coluna JSON, mapeada a `List<String>`
 
-Espelha `role_permissions.permissions json` do dbdiagram/checklists. Em Postgres usamos `jsonb`; no JPA, um converter `List<String>` ⇄ JSON (ou tipo JSON do Hibernate 6). H2 nos testes aceita o mesmo mapeamento via fallback de coluna `text`/`json` — validar no slice de persistência.
+Espelha `role_permissions.permissions json` do `vanep-dbdiagram`. Em Postgres usamos `jsonb`; no JPA, um converter `List<String>` ⇄ JSON (ou tipo JSON do Hibernate 6). H2 nos testes aceita o mesmo mapeamento via fallback de coluna `text`/`json` — validar no slice de persistência.
 
-**Alternativa considerada:** tabela de junção `role_permission_items` (linha por permissão). Rejeitada: diverge do `checklists` que fomos mandados copiar e adiciona joins sem ganho — o conjunto é lido inteiro sempre.
+**Alternativa considerada:** tabela de junção `role_permission_items` (linha por permissão). Rejeitada: adiciona joins sem ganho — o conjunto é sempre lido inteiro, não há necessidade de indexar permissão individual.
 
 ### D4 — `PermissionEnum` + `PermissionRegistry` em `br.com.vanep.auth.security` (compartilhado)
 
-Permissões cruzam features (roles, clients, ...), então o catálogo é código compartilhado, não de uma feature (constituição, regra 5). O enum agrupa por recurso e oferece helper `crudFor(resource)` como no `checklists`. `PermissionRegistry.all()` é a fonte única para o `Rule::in` equivalente (validação Bean Validation custom).
+Permissões cruzam features (roles, clients, ...), então o catálogo é código compartilhado, não de uma feature (constituição, regra 5). O enum agrupa por recurso e oferece helper `crudFor(resource)`. `PermissionRegistry.all()` é a fonte única para a validação Bean Validation custom.
 
 ### D5 — Recursos cobertos agora
 
