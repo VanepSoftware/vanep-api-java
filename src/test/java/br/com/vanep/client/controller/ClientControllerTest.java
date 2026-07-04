@@ -67,7 +67,11 @@ class ClientControllerTest {
   private JwtRequestPostProcessor adminJwt() {
     return jwt()
         .jwt(t -> t.claim("uid", "admin-uid").claim("roles", List.of("ROLE_ADMIN")))
-        .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"));
+        .authorities(
+            new SimpleGrantedAuthority("ROLE_ADMIN"),
+            new SimpleGrantedAuthority("list_clients"),
+            new SimpleGrantedAuthority("show_client"),
+            new SimpleGrantedAuthority("delete_client"));
   }
 
   private JwtRequestPostProcessor ownerJwt() {
@@ -119,6 +123,19 @@ class ClientControllerTest {
   void getByTokenReturns200ForOwner() throws Exception {
     mockMvc
         .perform(get("/api/clients/" + clientToken).with(ownerJwt()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.token").value(clientToken));
+  }
+
+  @Test
+  void getByTokenReturns200ForCallerWithShowClientPermissionOnly() throws Exception {
+    JwtRequestPostProcessor withShowClient =
+        jwt()
+            .jwt(t -> t.claim("uid", "other-uid"))
+            .authorities(new SimpleGrantedAuthority("show_client"));
+
+    mockMvc
+        .perform(get("/api/clients/" + clientToken).with(withShowClient))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.token").value(clientToken));
   }

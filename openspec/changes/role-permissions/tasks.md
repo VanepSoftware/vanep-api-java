@@ -77,7 +77,7 @@ JwtTokenCustomizer  RolePermission service/  │
 
 ## 4. Fase 4 — Migração das rotas existentes
 
-- [ ] 4.1 Atualizar slice de `RoleControllerTest` e `ClientControllerTest`: permitido com a permissão, 403 sem ela, branch de posse do client preservado
-- [ ] 4.2 `RoleController`: trocar `hasRole('ADMIN')` por `hasAuthority('list_roles'|show_role|create_role|update_role|delete_role)` por método (restore → `update_role`)
-- [ ] 4.3 `ClientController`: `list`→`hasAuthority('list_clients')`, `get`→`hasAuthority('show_client') or @clientSecurity.isOwner(...)`, `delete`→`hasAuthority('delete_client')`; `update` (posse) inalterado
-- [ ] 4.4 `make lint` + `make test-coverage` verdes; abrir PR da Fase 4
+- [x] 4.1 Atualizar slice de `RoleControllerTest` e `ClientControllerTest`: permitido com a permissão, 403 sem ela, branch de posse do client preservado
+- [x] 4.2 `RoleController`: trocar `hasRole('ADMIN')` por `hasAuthority('list_roles'|show_role|create_role|update_role|delete_role)` por método (restore → `update_role`)
+- [x] 4.3 `ClientController`: `list`→`hasAuthority('list_clients')`, `get`→`hasAuthority('show_client') or @clientSecurity.isOwner(...)`, `delete`→`hasAuthority('delete_client')`; `update` (posse) inalterado
+- [x] 4.4 `make lint` + `make test-coverage` verdes; abrir PR da Fase 4

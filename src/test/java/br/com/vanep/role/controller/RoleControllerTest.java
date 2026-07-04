@@ -49,7 +49,13 @@ class RoleControllerTest {
   private JwtRequestPostProcessor adminJwt() {
     return jwt()
         .jwt(t -> t.claim("uid", "admin-uid"))
-        .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"));
+        .authorities(
+            new SimpleGrantedAuthority("ROLE_ADMIN"),
+            new SimpleGrantedAuthority("list_roles"),
+            new SimpleGrantedAuthority("show_role"),
+            new SimpleGrantedAuthority("create_role"),
+            new SimpleGrantedAuthority("update_role"),
+            new SimpleGrantedAuthority("delete_role"));
   }
 
   private JwtRequestPostProcessor clientJwt() {

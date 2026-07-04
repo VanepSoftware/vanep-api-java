@@ -31,26 +31,26 @@ public class RoleController {
   }
 
   @GetMapping
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAuthority('list_roles')")
   public Page<RoleResponseDTO> list(@PageableDefault(size = 20) Pageable pageable) {
     return service.findAll(pageable);
   }
 
   @GetMapping("/{token}")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAuthority('show_role')")
   public RoleResponseDTO get(@PathVariable String token) {
     return service.findByToken(token);
   }
 
   @PostMapping
   @ResponseStatus(HttpStatus.CREATED)
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAuthority('create_role')")
   public RoleResponseDTO create(@RequestBody @Valid RoleCreateRequestDTO request) {
     return service.create(request);
   }
 
   @PutMapping("/{token}")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAuthority('update_role')")
   public RoleResponseDTO update(
       @PathVariable String token, @RequestBody @Valid RoleUpdateRequestDTO request) {
     return service.update(token, request);
@@ -58,13 +58,13 @@ public class RoleController {
 
   @DeleteMapping("/{token}")
   @ResponseStatus(HttpStatus.NO_CONTENT)
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAuthority('delete_role')")
   public void delete(@PathVariable String token) {
     service.delete(token);
   }
 
   @PostMapping("/{token}/restore")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAuthority('update_role')")
   public RoleResponseDTO restore(@PathVariable String token) {
     return service.restore(token);
   }

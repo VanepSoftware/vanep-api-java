@@ -28,13 +28,13 @@ public class ClientController {
   }
 
   @GetMapping
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAuthority('list_clients')")
   public Page<ClientResponseDTO> list(@PageableDefault(size = 20) Pageable pageable) {
     return service.findAll(pageable);
   }
 
   @GetMapping("/{token}")
-  @PreAuthorize("hasRole('ADMIN') or @clientSecurity.isOwner(#token, authentication)")
+  @PreAuthorize("hasAuthority('show_client') or @clientSecurity.isOwner(#token, authentication)")
   public ClientResponseDTO get(@PathVariable String token) {
     return service.findByToken(token);
   }
@@ -47,7 +47,7 @@ public class ClientController {
   }
 
   @DeleteMapping("/{token}")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAuthority('delete_client')")
   @ResponseStatus(HttpStatus.NO_CONTENT)
   public void delete(@PathVariable String token) {
     service.delete(token);
