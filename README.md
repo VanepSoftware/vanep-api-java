@@ -393,6 +393,7 @@ Na raiz do repositório (com `make` instalado):
 | `make logs` | Logs do serviço `vanep` |
 | `make shell` | Shell no container da API (`docker compose exec vanep sh`) |
 | `make docker-build` | `docker compose build` |
+| `make pr <numero>` | Cria a branch **`N-<numero>`** a partir do HEAD atual, dá `git push -u origin` e abre a PR com `gh` (título **`N-<numero>`**). **Não comita nada** — só sobe o que já está comitado. Ex.: `make pr 27` → branch/PR `N-27` |
 | `make lint` | `./mvnw spotless:check` |
 | `make lint-fix` | `./mvnw spotless:apply` |
 | `make test` | `./mvnw test` |

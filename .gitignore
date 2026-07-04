@@ -39,5 +39,7 @@ out/
 ### VS Code ###
 .vscode/
 
+.claude/settings.json
+
 ### Agent tooling ###
 
