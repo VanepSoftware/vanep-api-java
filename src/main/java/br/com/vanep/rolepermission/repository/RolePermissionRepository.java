@@ -9,4 +9,6 @@ public interface RolePermissionRepository extends JpaRepository<RolePermissionMo
   Optional<RolePermissionModel> findByToken(String token);
 
   boolean existsByName(String name);
+
+  boolean existsByNameAndTokenNot(String name, String token);
 }

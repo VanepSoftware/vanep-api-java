@@ -66,14 +66,14 @@ JwtTokenCustomizer  RolePermission service/  │
 
 ## 3. Fase 3 — CRUD de role-permissions
 
-- [ ] 3.1 Teste `RolePermissionServiceTest` (Mockito): create/update validam nome único e permissões no registry; find/delete por token
-- [ ] 3.2 Slice `RolePermissionControllerTest` (`MockMvc`+security): 201/200/404/400 e 403 sem a permissão exigida
-- [ ] 3.3 Criar request DTOs (`RolePermissionCreateRequestDTO`, `RolePermissionUpdateRequestDTO`) com `@Valid`/validador do 1.10
-- [ ] 3.4 Criar `RolePermissionService` (create, findAll paginado, findByToken, update, delete soft)
-- [ ] 3.5 Criar `RolePermissionMapper`
-- [ ] 3.6 Criar `RolePermissionResponseDTO` (expõe `token`, nunca `id`)
-- [ ] 3.7 Criar `RolePermissionController` (`/api/role-permissions`) com `@PreAuthorize("hasAuthority('...')")` por método
-- [ ] 3.8 `make lint` + `make test-coverage` verdes; abrir PR da Fase 3
+- [x] 3.1 Teste `RolePermissionServiceTest` (Mockito): create/update validam nome único e permissões no registry; find/delete por token
+- [x] 3.2 Slice `RolePermissionControllerTest` (`MockMvc`+security): 201/200/404/400 e 403 sem a permissão exigida
+- [x] 3.3 Criar request DTOs (`RolePermissionCreateRequestDTO`, `RolePermissionUpdateRequestDTO`) com `@Valid`/validador do 1.10
+- [x] 3.4 Criar `RolePermissionService` (create, findAll paginado, findByToken, update, delete soft)
+- [x] 3.5 Criar `RolePermissionMapper`
+- [x] 3.6 Criar `RolePermissionResponseDTO` (expõe `token`, nunca `id`)
+- [x] 3.7 Criar `RolePermissionController` (`/api/role-permissions`) com `@PreAuthorize("hasAuthority('...')")` por método
+- [x] 3.8 `make lint` + `make test-coverage` verdes; abrir PR da Fase 3
 
 ## 4. Fase 4 — Migração das rotas existentes
 
