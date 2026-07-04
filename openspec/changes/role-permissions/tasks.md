@@ -38,19 +38,19 @@ JwtTokenCustomizer  RolePermission service/  │
 
 ## 1. Fase 1 — Fundação (schema + catálogo de permissões)
 
-- [ ] 1.1 Teste unitário `PermissionRegistryTest`: `all()` retorna exatamente os valores do enum, sem duplicatas
-- [ ] 1.2 Teste unitário `PermissionEnumTest`: todos os valores são `verb_resource` minúsculo em inglês; `crudFor("roles")` retorna os 5 esperados
-- [ ] 1.3 Slice/persistência `RolePermissionRepositoryTest` (H2): round-trip de `permissions` `List<String>` ⇄ JSON; soft delete some da listagem padrão
-- [ ] 1.4 Teste `RoleRepositoryTest`: `findByRoleName` localiza a role independente do valor atual de `name` (renomear não quebra o lookup)
-- [ ] 1.5 Criar migração `V8__create_role_permissions_table.sql`: tabela `role_permissions` (id, token, name unique, permissions jsonb, timestamps, deleted_at) + `roles.role_permissions_id` (nullable, unique, FK) + `roles.role_name` (nullable, unique, varchar) — não editar V1–V7
-- [ ] 1.6 Criar `PermissionEnum` em `br.com.vanep.auth.security` (CRUD de roles, role_permissions, clients; helper `crudFor`)
-- [ ] 1.7 Criar `PermissionRegistry.all()` (fonte única de valores válidos)
-- [ ] 1.8 Criar `RoleName` enum (`ADMIN`, `CLIENT`, `DRIVER`) em `br.com.vanep.role`
-- [ ] 1.9 Criar `RolePermissionModel` em `br.com.vanep.rolepermission.model` (token via `@PrePersist`, `@SoftDelete`, converter/tipo JSON para `List<String>`)
-- [ ] 1.10 Adicionar em `RoleModel`: relação com o bundle (`role_permissions_id`) e `@Enumerated(EnumType.STRING) roleName` (nullable, unique) — `name` (string livre, CRUD existente) permanece intocado
-- [ ] 1.11 Criar `RolePermissionRepository`; estender `RoleRepository` com `findByRoleName(RoleName)`
-- [ ] 1.12 Criar validador Bean Validation `@PermissionsInRegistry` (ou validador de lista) checando cada string contra `PermissionRegistry`
-- [ ] 1.13 `make lint` + `make test-coverage` verdes; abrir PR da Fase 1
+- [x] 1.1 Teste unitário `PermissionRegistryTest`: `all()` retorna exatamente os valores do enum, sem duplicatas
+- [x] 1.2 Teste unitário `PermissionEnumTest`: todos os valores são `verb_resource` minúsculo em inglês; `crudFor("roles")` retorna os 5 esperados
+- [x] 1.3 Slice/persistência `RolePermissionRepositoryTest` (H2): round-trip de `permissions` `List<String>` ⇄ JSON; soft delete some da listagem padrão
+- [x] 1.4 Teste `RoleRepositoryTest`: `findByRoleName` localiza a role independente do valor atual de `name` (renomear não quebra o lookup)
+- [x] 1.5 Criar migração `V8__create_role_permissions_table.sql`: tabela `role_permissions` (id, token, name unique, permissions jsonb, timestamps, deleted_at) + `roles.role_permissions_id` (nullable, unique, FK) + `roles.role_name` (nullable, unique, varchar) — não editar V1–V7
+- [x] 1.6 Criar `PermissionEnum` em `br.com.vanep.auth.security` (CRUD de roles, role_permissions, clients; helper `crudFor`)
+- [x] 1.7 Criar `PermissionRegistry.all()` (fonte única de valores válidos)
+- [x] 1.8 Criar `RoleName` enum (`ADMIN`, `CLIENT`, `DRIVER`) em `br.com.vanep.role`
+- [x] 1.9 Criar `RolePermissionModel` em `br.com.vanep.rolepermission.model` (token via `@PrePersist`, `@SoftDelete`, converter/tipo JSON para `List<String>`)
+- [x] 1.10 Adicionar em `RoleModel`: relação com o bundle (`role_permissions_id`) e `@Enumerated(EnumType.STRING) roleName` (nullable, unique) — `name` (string livre, CRUD existente) permanece intocado
+- [x] 1.11 Criar `RolePermissionRepository`; estender `RoleRepository` com `findByRoleName(RoleName)`
+- [x] 1.12 Criar validador Bean Validation `@PermissionsInRegistry` (ou validador de lista) checando cada string contra `PermissionRegistry`
+- [x] 1.13 `make lint` + `make test-coverage` verdes; abrir PR da Fase 1
 
 ## 2. Fase 2 — Token + seed + auto-atribuição (ativa a cadeia)
 
