@@ -7,18 +7,19 @@ Entrega faseada (constituição, regras 33–41): PRs empilhados, uma camada de 
 ```
 Fase 1  PermissionEnum ─┐
         PermissionRegistry ─┤
-        V8 migration ─┐     │
+        V8 migration ─┐     │  (+ roles.role_name)
                       ▼     ▼
-        RolePermissionModel ── RoleModel.rolePermission (relação)
+        RolePermissionModel ── RoleModel.rolePermission + roleName (relação)
                       │
                       ▼
-        RolePermissionRepository + PermissionListValidator
+        RolePermissionRepository + PermissionListValidator + RoleRepository.findByRoleName
                       │
    ┌──────────────────┼──────────────────────┐
    ▼ Fase 2           ▼ Fase 3               │
 JwtTokenCustomizer  RolePermission service/  │
 + SecurityConfig    controller/DTOs/mapper   │
-+ DataSeeder(seed)  (usa hasAuthority)        │
++ DataSeeder(seed, roleName tags, seedDrivers) (usa hasAuthority)
++ RegistrationService (auto role_id)   │       │
    │                   │                       │
    └─────────┬─────────┘                       │
              ▼ Fase 4                           │
@@ -30,8 +31,8 @@ JwtTokenCustomizer  RolePermission service/  │
 
 | Phase | Contents | Depends on | Parallel with |
 |---|---|---|---|
-| 1 — Fundação | V8 migration, PermissionEnum, PermissionRegistry, RolePermissionModel, RoleModel relação, repository, validador + testes | — | — |
-| 2 — Token + seed | JwtTokenCustomizer (claim `permissions`), SecurityConfig converter, DataSeeder (bundle ADMIN + role + backfill) + testes | 1 | 3 |
+| 1 — Fundação | V8 migration (+ `role_name`), PermissionEnum, PermissionRegistry, RoleName, RolePermissionModel, RoleModel relação, repositories (`findByRoleName`), validador + testes | — | — |
+| 2 — Token + seed + auto-atribuição | JwtTokenCustomizer (claim `permissions`), SecurityConfig converter, DataSeeder (bundle ADMIN + role + backfill + `role_name` tags + `seedDrivers`), RegistrationService (auto `role_id` em Client/Driver) + testes | 1 | 3 |
 | 3 — CRUD role-permissions | DTOs, mapper, service, controller (`hasAuthority`) + testes | 1 | 2 |
 | 4 — Migração de rotas | RoleController + ClientController `hasRole`→`hasAuthority` + testes | 2, 3 | — |
 
@@ -40,24 +41,28 @@ JwtTokenCustomizer  RolePermission service/  │
 - [ ] 1.1 Teste unitário `PermissionRegistryTest`: `all()` retorna exatamente os valores do enum, sem duplicatas
 - [ ] 1.2 Teste unitário `PermissionEnumTest`: todos os valores são `verb_resource` minúsculo em inglês; `crudFor("roles")` retorna os 5 esperados
 - [ ] 1.3 Slice/persistência `RolePermissionRepositoryTest` (H2): round-trip de `permissions` `List<String>` ⇄ JSON; soft delete some da listagem padrão
-- [ ] 1.4 Criar migração `V8__create_role_permissions_table.sql`: tabela `role_permissions` (id, token, name unique, permissions jsonb, timestamps, deleted_at) + `roles.role_permissions_id` (nullable, unique, FK) — não editar V1–V7
-- [ ] 1.5 Criar `PermissionEnum` em `br.com.vanep.auth.security` (CRUD de roles, role_permissions, clients; helper `crudFor`)
-- [ ] 1.6 Criar `PermissionRegistry.all()` (fonte única de valores válidos)
-- [ ] 1.7 Criar `RolePermissionModel` em `br.com.vanep.rolepermission.model` (token via `@PrePersist`, `@SoftDelete`, converter/tipo JSON para `List<String>`)
-- [ ] 1.8 Adicionar relação em `RoleModel` para o bundle (`role_permissions_id`)
-- [ ] 1.9 Criar `RolePermissionRepository`
-- [ ] 1.10 Criar validador Bean Validation `@PermissionsInRegistry` (ou validador de lista) checando cada string contra `PermissionRegistry`
-- [ ] 1.11 `make lint` + `make test-coverage` verdes; abrir PR da Fase 1
+- [ ] 1.4 Teste `RoleRepositoryTest`: `findByRoleName` localiza a role independente do valor atual de `name` (renomear não quebra o lookup)
+- [ ] 1.5 Criar migração `V8__create_role_permissions_table.sql`: tabela `role_permissions` (id, token, name unique, permissions jsonb, timestamps, deleted_at) + `roles.role_permissions_id` (nullable, unique, FK) + `roles.role_name` (nullable, unique, varchar) — não editar V1–V7
+- [ ] 1.6 Criar `PermissionEnum` em `br.com.vanep.auth.security` (CRUD de roles, role_permissions, clients; helper `crudFor`)
+- [ ] 1.7 Criar `PermissionRegistry.all()` (fonte única de valores válidos)
+- [ ] 1.8 Criar `RoleName` enum (`ADMIN`, `CLIENT`, `DRIVER`) em `br.com.vanep.role`
+- [ ] 1.9 Criar `RolePermissionModel` em `br.com.vanep.rolepermission.model` (token via `@PrePersist`, `@SoftDelete`, converter/tipo JSON para `List<String>`)
+- [ ] 1.10 Adicionar em `RoleModel`: relação com o bundle (`role_permissions_id`) e `@Enumerated(EnumType.STRING) roleName` (nullable, unique) — `name` (string livre, CRUD existente) permanece intocado
+- [ ] 1.11 Criar `RolePermissionRepository`; estender `RoleRepository` com `findByRoleName(RoleName)`
+- [ ] 1.12 Criar validador Bean Validation `@PermissionsInRegistry` (ou validador de lista) checando cada string contra `PermissionRegistry`
+- [ ] 1.13 `make lint` + `make test-coverage` verdes; abrir PR da Fase 1
 
-## 2. Fase 2 — Token + seed (ativa a cadeia)
+## 2. Fase 2 — Token + seed + auto-atribuição (ativa a cadeia)
 
 - [ ] 2.1 Teste `JwtTokenCustomizerTest`: usuário com bundle → claim `permissions` = lista do bundle + `roles` preservado; usuário sem role → `permissions` vazio
 - [ ] 2.2 Teste do converter em `SecurityConfig`: claim `permissions` vira `SimpleGrantedAuthority` sem prefixo
-- [ ] 2.3 Teste `DataSeederTest`: cria bundle ADMIN com `PermissionRegistry.all()`, role ADMIN ligado, e é idempotente
-- [ ] 2.4 Alterar `JwtTokenCustomizer` para resolver `role_id → role → role_permissions.permissions` e emitir o claim `permissions`
-- [ ] 2.5 Estender o converter do `SecurityConfig` para mapear `permissions` → authorities (sem `ROLE_`)
-- [ ] 2.6 Alterar `DataSeeder`: bundle ADMIN + role ADMIN + backfill de `role_id` em usuários ADMIN (idempotente)
-- [ ] 2.7 `make lint` + `make test-coverage` verdes; abrir PR da Fase 2
+- [ ] 2.3 Teste `DataSeederTest`: cria bundle ADMIN com `PermissionRegistry.all()`, role ADMIN ligado (via `RoleName.ADMIN`), e é idempotente; `seedRoles()` tageia as 3 roles com `role_name`; `seedDrivers()` cria driver(s) `APPROVED` e idempotente
+- [ ] 2.4 Teste `RegistrationServiceTest`: `registerClient`/`registerDriver` setam `user.role_id` para a role tagueada `CLIENT`/`DRIVER` respectivamente
+- [ ] 2.5 Alterar `JwtTokenCustomizer` para resolver `role_id → role → role_permissions.permissions` e emitir o claim `permissions`
+- [ ] 2.6 Estender o converter do `SecurityConfig` para mapear `permissions` → authorities (sem `ROLE_`)
+- [ ] 2.7 Alterar `DataSeeder`: `seedRoles()` passa a tagear `role_name`; bundle ADMIN + role ADMIN (por `RoleName.ADMIN`) + backfill de `role_id` em usuários ADMIN (idempotente); novo `seedDrivers()` (paralelo a `seedClients()`, driver(s) `approval_status = APPROVED`)
+- [ ] 2.8 Alterar `RegistrationService.registerClient`/`registerDriver` para resolver a role via `RoleRepository.findByRoleName` e setar `user.role_id` antes de salvar; aplicar o mesmo em `DataSeeder.seedClients()`
+- [ ] 2.9 `make lint` + `make test-coverage` verdes; abrir PR da Fase 2
 
 ## 3. Fase 3 — CRUD de role-permissions
 

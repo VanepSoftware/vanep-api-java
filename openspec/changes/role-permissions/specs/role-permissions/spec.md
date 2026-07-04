@@ -1,5 +1,52 @@
 ## ADDED Requirements
 
+### Requirement: Role identity enum
+
+The system SHALL define a `RoleName` enum with exactly three values — `ADMIN`, `CLIENT`, `DRIVER` — and add a nullable, unique `role_name` column to `role`, populated only for the three system-seeded rows. This tag is independent from the existing free-text, admin-editable `name` column (unaffected by this change): renaming a role's `name` SHALL NOT change its `role_name` tag or break lookups by it.
+
+#### Scenario: Lookup by role name is stable across renames
+
+- **WHEN** the system looks up the role tagged `RoleName.CLIENT`
+- **THEN** it SHALL return that role regardless of the current value of its free-text `name`
+
+#### Scenario: Existing role CRUD is unaffected
+
+- **WHEN** an admin creates, updates, or deletes a role through the existing `RoleController` endpoints
+- **THEN** the operation SHALL behave exactly as before this change; `role_name` is not exposed or settable through that API
+
+### Requirement: New Client and Driver users are auto-assigned their system role
+
+When a `Client` is created (via signup or seed), the system SHALL set the owning `User`'s `role_id` to the role tagged `RoleName.CLIENT`. When a `Driver` is created (via signup or seed), the system SHALL set the owning `User`'s `role_id` to the role tagged `RoleName.DRIVER`.
+
+#### Scenario: Client signup assigns the CLIENT role
+
+- **WHEN** a new user completes client signup (`RegistrationService.registerClient`)
+- **THEN** the created `User`'s `role_id` SHALL reference the role tagged `RoleName.CLIENT`
+
+#### Scenario: Driver signup assigns the DRIVER role
+
+- **WHEN** a new user completes driver signup (`RegistrationService.registerDriver`)
+- **THEN** the created `User`'s `role_id` SHALL reference the role tagged `RoleName.DRIVER`
+
+#### Scenario: Seeded clients and drivers are also assigned
+
+- **WHEN** `DataSeeder` creates client or driver seed users
+- **THEN** each seeded `User`'s `role_id` SHALL be set the same way as the signup path
+
+### Requirement: Driver seed data
+
+The system SHALL seed at least one `Driver` record (`DataSeeder.seedDrivers()`), created with `approval_status = APPROVED` and active, so a usable driver test account exists without going through the (not-yet-built) admin approval flow. Seeding SHALL be idempotent.
+
+#### Scenario: Seeding creates an approved driver
+
+- **WHEN** the seeder runs on an empty database
+- **THEN** it SHALL create a `Driver` whose `approval_status` is `APPROVED` and whose `User.role_id` references the role tagged `RoleName.DRIVER`
+
+#### Scenario: Seeding is idempotent
+
+- **WHEN** the seeder runs again against a database that already has the seeded driver(s)
+- **THEN** it SHALL not create duplicates
+
 ### Requirement: Permission catalog
 
 The system SHALL define the complete set of valid permission strings as a backed Java `enum` (`PermissionEnum`) using the `verb_resource` convention (e.g. `list_roles`, `create_client`), and SHALL expose them through a single `PermissionRegistry` used as the source of truth for validation. No permission string outside the enum SHALL be accepted or persisted.
