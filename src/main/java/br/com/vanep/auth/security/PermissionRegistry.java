@@ -10,7 +10,7 @@ public final class PermissionRegistry {
 
   public static Set<String> all() {
     return Arrays.stream(PermissionEnum.values())
-        .map(PermissionEnum::value)
+        .map(permission -> permission.value())
         .collect(Collectors.toUnmodifiableSet());
   }
 

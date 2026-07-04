@@ -1,7 +1,6 @@
 package br.com.vanep.auth.oauth;
 
 import br.com.vanep.driver.DriverRepository;
-import br.com.vanep.role.model.RoleModel;
 import br.com.vanep.role.repository.RoleRepository;
 import br.com.vanep.user.User;
 import br.com.vanep.user.UserRepository;
@@ -56,7 +55,7 @@ public class JwtTokenCustomizer implements OAuth2TokenCustomizer<JwtEncodingCont
     }
     return roles
         .findById(user.getRoleId())
-        .map(RoleModel::getRolePermission)
+        .map(role -> role.getRolePermission())
         .map(bundle -> List.copyOf(bundle.getPermissions()))
         .orElse(List.of());
   }

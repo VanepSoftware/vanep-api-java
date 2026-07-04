@@ -6,6 +6,8 @@ import br.com.vanep.rolepermission.dto.RolePermissionUpdateRequestDTO;
 import br.com.vanep.rolepermission.mapper.RolePermissionMapper;
 import br.com.vanep.rolepermission.model.RolePermissionModel;
 import br.com.vanep.rolepermission.repository.RolePermissionRepository;
+import org.springframework.context.MessageSource;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -18,10 +20,17 @@ public class RolePermissionService {
 
   private final RolePermissionRepository bundles;
   private final RolePermissionMapper mapper;
+  private final MessageSource messages;
 
-  public RolePermissionService(RolePermissionRepository bundles, RolePermissionMapper mapper) {
+  public RolePermissionService(
+      RolePermissionRepository bundles, RolePermissionMapper mapper, MessageSource messages) {
     this.bundles = bundles;
     this.mapper = mapper;
+    this.messages = messages;
+  }
+
+  private String message(String key) {
+    return messages.getMessage(key, null, LocaleContextHolder.getLocale());
   }
 
   public Page<RolePermissionResponseDTO> findAll(Pageable pageable) {
@@ -36,7 +45,7 @@ public class RolePermissionService {
   public RolePermissionResponseDTO create(RolePermissionCreateRequestDTO request) {
     if (bundles.existsByName(request.name())) {
       throw new ResponseStatusException(
-          HttpStatus.BAD_REQUEST, "Nome já utilizado por outro bundle de permissões.");
+          HttpStatus.BAD_REQUEST, message("role_permission.name.duplicate"));
     }
     RolePermissionModel bundle = new RolePermissionModel();
     bundle.setName(request.name());
@@ -49,7 +58,7 @@ public class RolePermissionService {
     RolePermissionModel bundle = requireByToken(token);
     if (bundles.existsByNameAndTokenNot(request.name(), token)) {
       throw new ResponseStatusException(
-          HttpStatus.BAD_REQUEST, "Nome já utilizado por outro bundle de permissões.");
+          HttpStatus.BAD_REQUEST, message("role_permission.name.duplicate"));
     }
     bundle.setName(request.name());
     bundle.setPermissions(request.permissions());
@@ -67,6 +76,6 @@ public class RolePermissionService {
         .orElseThrow(
             () ->
                 new ResponseStatusException(
-                    HttpStatus.NOT_FOUND, "Bundle de permissões não encontrado."));
+                    HttpStatus.NOT_FOUND, message("role_permission.not_found")));
   }
 }
