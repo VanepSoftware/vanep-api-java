@@ -8,6 +8,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import br.com.vanep.client.repository.ClientRepository;
+import br.com.vanep.role.repository.RoleRepository;
 import br.com.vanep.user.User;
 import br.com.vanep.user.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -23,13 +24,14 @@ class DataSeederTest {
 
   @Mock private UserRepository users;
   @Mock private ClientRepository clients;
+  @Mock private RoleRepository roles;
   @Mock private PasswordEncoder passwordEncoder;
 
   private DataSeeder seeder;
 
   @BeforeEach
   void setUp() {
-    seeder = new DataSeeder(users, clients, passwordEncoder);
+    seeder = new DataSeeder(users, clients, roles, passwordEncoder);
     seeder.adminEmail = "admin@vanep.com.br";
     seeder.adminPassword = "password";
     seeder.adminDocument = "00000000000";
@@ -48,7 +50,7 @@ class DataSeederTest {
   @Test
   void createsAdminWhenEnabledAndMissing() {
     seeder.enabled = true;
-    when(users.existsByEmail("admin@vanep.com.br")).thenReturn(false);
+    when(users.existsByEmail(anyString())).thenReturn(false);
     when(passwordEncoder.encode(anyString())).thenReturn("hashed");
 
     seeder.run(new DefaultApplicationArguments());
@@ -60,6 +62,7 @@ class DataSeederTest {
   void skipsAdminWhenAlreadyPresent() {
     seeder.enabled = true;
     when(users.existsByEmail(anyString())).thenReturn(true);
+    when(roles.existsByName(anyString())).thenReturn(true);
 
     seeder.run(new DefaultApplicationArguments());
 

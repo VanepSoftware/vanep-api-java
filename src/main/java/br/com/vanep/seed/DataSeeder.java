@@ -2,6 +2,8 @@ package br.com.vanep.seed;
 
 import br.com.vanep.client.Client;
 import br.com.vanep.client.repository.ClientRepository;
+import br.com.vanep.role.model.RoleModel;
+import br.com.vanep.role.repository.RoleRepository;
 import br.com.vanep.user.User;
 import br.com.vanep.user.UserRepository;
 import br.com.vanep.user.UserType;
@@ -22,6 +24,7 @@ public class DataSeeder implements ApplicationRunner {
 
   private final UserRepository users;
   private final ClientRepository clients;
+  private final RoleRepository roles;
   private final PasswordEncoder passwordEncoder;
 
   @Value("${vanep.seed.enabled:false}")
@@ -40,9 +43,13 @@ public class DataSeeder implements ApplicationRunner {
   String adminDocument;
 
   public DataSeeder(
-      UserRepository users, ClientRepository clients, PasswordEncoder passwordEncoder) {
+      UserRepository users,
+      ClientRepository clients,
+      RoleRepository roles,
+      PasswordEncoder passwordEncoder) {
     this.users = users;
     this.clients = clients;
+    this.roles = roles;
     this.passwordEncoder = passwordEncoder;
   }
 
@@ -51,6 +58,7 @@ public class DataSeeder implements ApplicationRunner {
     if (!enabled && !seedOnly) {
       return;
     }
+    seedRoles();
     seedAdmin();
     seedClients();
     if (seedOnly) {
@@ -72,6 +80,24 @@ public class DataSeeder implements ApplicationRunner {
     admin.setVerified(true);
     users.save(admin);
     log.info("Seed: usuário admin criado ({}).", adminEmail);
+  }
+
+  private void seedRoles() {
+    record RoleSeed(String name, String description) {}
+    List<RoleSeed> seeds =
+        List.of(
+            new RoleSeed("admin", "Full system access"),
+            new RoleSeed("client", "Standard client access"),
+            new RoleSeed("driver", "Driver access"));
+
+    for (RoleSeed seed : seeds) {
+      if (roles.existsByName(seed.name())) continue;
+      RoleModel role = new RoleModel();
+      role.setName(seed.name());
+      role.setDescription(seed.description());
+      roles.save(role);
+      log.info("Seed: role criada ({}).", seed.name());
+    }
   }
 
   private void seedClients() {

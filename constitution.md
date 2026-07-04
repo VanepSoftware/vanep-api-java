@@ -11,22 +11,22 @@ Rules that MUST be followed in this codebase. Stack: **Java 25, Spring Boot 4, M
 
 ## Architecture & code organization
 
-5. **Organize business code by feature** (`br.com.vanep.<feature>` with `controller`, `dto`, `entity`, `enums`, `mapper`, `repository`, `service` subpackages). Code shared by two or more features moves to a shared area (`config`, shared `entity` bases, generic utils) instead of being duplicated. The codebase is **feature-based** (packages by functionality), not type-based at the package root — and not to be confused with runtime *feature flags*. **Name every new file for exactly what it is**, with the architectural-role suffix that matches its subpackage — e.g. `ClientController`, `ClientService`, `ClientRepository`, `ClientDTO` (request/response DTOs), `ClientMapper`, and the `Client` entity (a `*Repository` lives in `repository`, a `*DTO` in `dto`, …). No generic names like `Handler`, `Manager`, `Util`, or `Data` for these roles. Per feature (entity), each subpackage holds the file named for its role:
+5. **Organize business code by feature** (`br.com.vanep.<feature>` with `controller`, `dto`, `model`, `enums`, `mapper`, `repository`, `service` subpackages). Code shared by two or more features moves to a shared area (`config`, shared `model` bases, generic utils) instead of being duplicated. The codebase is **feature-based** (packages by functionality), not type-based at the package root — and not to be confused with runtime *feature flags*. **Name every new file for exactly what it is**, with the architectural-role suffix that matches its subpackage — e.g. `ClientController`, `ClientService`, `ClientRepository`, `ClientDTO` (request/response DTOs), `ClientMapper`, and the `ClientModel` entity inside a `model/` subfolder (a `*Repository` lives in `repository`, a `*DTO` in `dto`, …). No generic names like `Handler`, `Manager`, `Util`, or `Data` for these roles. Per feature (entity), each subpackage holds the file named for its role:
 
    ```
-   br.com.vanep.client            (feature: client)
+   br.com.vanep.role              (feature: role)
    ├── controller
-   │   └── ClientController
+   │   └── RoleController
    ├── dto
-   │   └── ClientDTO
+   │   └── RoleDTO
    ├── repository
-   │   └── ClientRepository
+   │   └── RoleRepository
    ├── service
-   │   └── ClientService
+   │   └── RoleService
    ├── mapper
-   │   └── ClientMapper
-   └── entity
-       └── Client
+   │   └── RoleMapper
+   └── model
+       └── RoleModel
    ```
 6. **Before adding anything new, search for existing code** (class, package, migration, property) that can be reused or extended. Reuse or refactor before duplicating (DRY). This applies to code, tests, config patterns, and Flyway migrations.
 7. **Keep controllers thin** — orchestration only (parse request, delegate, return response). No business logic in controllers.
