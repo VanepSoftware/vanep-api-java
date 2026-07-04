@@ -54,15 +54,15 @@ JwtTokenCustomizer  RolePermission service/  │
 
 ## 2. Fase 2 — Token + seed + auto-atribuição (ativa a cadeia)
 
-- [ ] 2.1 Teste `JwtTokenCustomizerTest`: usuário com bundle → claim `permissions` = lista do bundle + `roles` preservado; usuário sem role → `permissions` vazio
-- [ ] 2.2 Teste do converter em `SecurityConfig`: claim `permissions` vira `SimpleGrantedAuthority` sem prefixo
-- [ ] 2.3 Teste `DataSeederTest`: cria bundle ADMIN com `PermissionRegistry.all()`, role ADMIN ligado (via `RoleName.ADMIN`), e é idempotente; `seedRoles()` tageia as 3 roles com `role_name`; `seedDrivers()` cria driver(s) `APPROVED` e idempotente
-- [ ] 2.4 Teste `RegistrationServiceTest`: `registerClient`/`registerDriver` setam `user.role_id` para a role tagueada `CLIENT`/`DRIVER` respectivamente
-- [ ] 2.5 Alterar `JwtTokenCustomizer` para resolver `role_id → role → role_permissions.permissions` e emitir o claim `permissions`
-- [ ] 2.6 Estender o converter do `SecurityConfig` para mapear `permissions` → authorities (sem `ROLE_`)
-- [ ] 2.7 Alterar `DataSeeder`: `seedRoles()` passa a tagear `role_name`; bundle ADMIN + role ADMIN (por `RoleName.ADMIN`) + backfill de `role_id` em usuários ADMIN (idempotente); novo `seedDrivers()` (paralelo a `seedClients()`, driver(s) `approval_status = APPROVED`)
-- [ ] 2.8 Alterar `RegistrationService.registerClient`/`registerDriver` para resolver a role via `RoleRepository.findByRoleName` e setar `user.role_id` antes de salvar; aplicar o mesmo em `DataSeeder.seedClients()`
-- [ ] 2.9 `make lint` + `make test-coverage` verdes; abrir PR da Fase 2
+- [x] 2.1 Teste `JwtTokenCustomizerTest`: usuário com bundle → claim `permissions` = lista do bundle + `roles` preservado; usuário sem role → `permissions` vazio
+- [x] 2.2 Teste do converter em `SecurityConfig`: claim `permissions` vira `SimpleGrantedAuthority` sem prefixo
+- [x] 2.3 Teste `DataSeederTest`: cria bundle ADMIN com `PermissionRegistry.all()`, role ADMIN ligado (via `RoleName.ADMIN`), e é idempotente; `seedRoles()` tageia as 3 roles com `role_name`; `seedDrivers()` cria driver(s) `APPROVED` e idempotente
+- [x] 2.4 Teste `RegistrationServiceTest`: `registerClient`/`registerDriver` setam `user.role_id` para a role tagueada `CLIENT`/`DRIVER` respectivamente
+- [x] 2.5 Alterar `JwtTokenCustomizer` para resolver `role_id → role → role_permissions.permissions` e emitir o claim `permissions`
+- [x] 2.6 Estender o converter do `SecurityConfig` para mapear `permissions` → authorities (sem `ROLE_`)
+- [x] 2.7 Alterar `DataSeeder`: `seedRoles()` passa a tagear `role_name`; bundle ADMIN + role ADMIN (por `RoleName.ADMIN`) + backfill de `role_id` em usuários ADMIN (idempotente); novo `seedDrivers()` (paralelo a `seedClients()`, driver(s) `approval_status = APPROVED`)
+- [x] 2.8 Alterar `RegistrationService.registerClient`/`registerDriver` para resolver a role via `RoleRepository.findByRoleName` e setar `user.role_id` antes de salvar; aplicar o mesmo em `DataSeeder.seedClients()`
+- [x] 2.9 `make lint` + `make test-coverage` verdes; abrir PR da Fase 2
 
 ## 3. Fase 3 — CRUD de role-permissions
 

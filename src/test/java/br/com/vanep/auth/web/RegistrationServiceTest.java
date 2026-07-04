@@ -12,10 +12,14 @@ import br.com.vanep.client.repository.ClientRepository;
 import br.com.vanep.driver.Driver;
 import br.com.vanep.driver.DriverApprovalStatus;
 import br.com.vanep.driver.DriverRepository;
+import br.com.vanep.role.RoleName;
+import br.com.vanep.role.model.RoleModel;
+import br.com.vanep.role.repository.RoleRepository;
 import br.com.vanep.user.User;
 import br.com.vanep.user.UserRepository;
 import br.com.vanep.user.UserType;
 import java.math.BigDecimal;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -29,18 +33,30 @@ class RegistrationServiceTest {
   @Mock private UserRepository users;
   @Mock private ClientRepository clients;
   @Mock private DriverRepository drivers;
+  @Mock private RoleRepository roles;
   @Mock private PasswordEncoder passwordEncoder;
   @Mock private EmailVerificationService emailVerification;
+
+  private RoleModel roleTaggedAs(RoleName roleName, long id) {
+    RoleModel role = new RoleModel();
+    role.setId(id);
+    role.setName(roleName.name().toLowerCase());
+    role.setRoleName(roleName);
+    return role;
+  }
 
   private RegistrationService service() {
     when(users.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
     when(passwordEncoder.encode(anyString())).thenReturn("hashed");
-    return new RegistrationService(users, clients, drivers, passwordEncoder, emailVerification);
+    return new RegistrationService(
+        users, clients, drivers, roles, passwordEncoder, emailVerification);
   }
 
   @Test
   void registerClientCreatesUserAndClientProfile() {
     RegistrationService service = service();
+    when(roles.findByRoleName(RoleName.CLIENT))
+        .thenReturn(Optional.of(roleTaggedAs(RoleName.CLIENT, 2L)));
     ClientSignupForm form = new ClientSignupForm();
     form.setName("Ana");
     form.setEmail("ana@vanep.com");
@@ -53,6 +69,7 @@ class RegistrationServiceTest {
     assertThat(user.getType()).isEqualTo(UserType.CLIENT);
     assertThat(user.getPassword()).isEqualTo("hashed");
     assertThat(user.getTermsAcceptedAt()).isNotNull();
+    assertThat(user.getRoleId()).isEqualTo(2L);
 
     ArgumentCaptor<Client> client = ArgumentCaptor.forClass(Client.class);
     verify(clients).save(client.capture());
@@ -62,6 +79,8 @@ class RegistrationServiceTest {
   @Test
   void registerDriverCreatesUserAndPendingDriverProfile() {
     RegistrationService service = service();
+    when(roles.findByRoleName(RoleName.DRIVER))
+        .thenReturn(Optional.of(roleTaggedAs(RoleName.DRIVER, 3L)));
     DriverSignupForm form = new DriverSignupForm();
     form.setName("Bruno");
     form.setEmail("bruno@vanep.com");
@@ -75,6 +94,7 @@ class RegistrationServiceTest {
     User user = service.registerDriver(form);
 
     assertThat(user.getType()).isEqualTo(UserType.DRIVER);
+    assertThat(user.getRoleId()).isEqualTo(3L);
 
     ArgumentCaptor<Driver> driver = ArgumentCaptor.forClass(Driver.class);
     verify(drivers).save(driver.capture());

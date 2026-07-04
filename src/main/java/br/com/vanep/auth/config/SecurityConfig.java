@@ -42,6 +42,11 @@ public class SecurityConfig {
           if (roles instanceof Collection<?> values) {
             values.forEach(role -> authorities.add(new SimpleGrantedAuthority(role.toString())));
           }
+          Object permissions = jwt.getClaim("permissions");
+          if (permissions instanceof Collection<?> values) {
+            values.forEach(
+                permission -> authorities.add(new SimpleGrantedAuthority(permission.toString())));
+          }
           return authorities;
         });
     return converter;
