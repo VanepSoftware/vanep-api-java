@@ -1,9 +1,9 @@
-package br.com.vanep.role.controller;
+package br.com.vanep.rolepermission.controller;
 
-import br.com.vanep.role.dto.RoleCreateRequestDTO;
-import br.com.vanep.role.dto.RoleResponseDTO;
-import br.com.vanep.role.dto.RoleUpdateRequestDTO;
-import br.com.vanep.role.service.RoleService;
+import br.com.vanep.rolepermission.dto.RolePermissionCreateRequestDTO;
+import br.com.vanep.rolepermission.dto.RolePermissionResponseDTO;
+import br.com.vanep.rolepermission.dto.RolePermissionUpdateRequestDTO;
+import br.com.vanep.rolepermission.service.RolePermissionService;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -21,51 +21,46 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/roles")
-public class RoleController {
+@RequestMapping("/api/role-permissions")
+public class RolePermissionController {
 
-  private final RoleService service;
+  private final RolePermissionService service;
 
-  public RoleController(RoleService service) {
+  public RolePermissionController(RolePermissionService service) {
     this.service = service;
   }
 
   @GetMapping
-  @PreAuthorize("hasAuthority('list_roles')")
-  public Page<RoleResponseDTO> list(@PageableDefault(size = 20) Pageable pageable) {
+  @PreAuthorize("hasAuthority('list_role_permissions')")
+  public Page<RolePermissionResponseDTO> list(@PageableDefault(size = 20) Pageable pageable) {
     return service.findAll(pageable);
   }
 
   @GetMapping("/{token}")
-  @PreAuthorize("hasAuthority('show_role')")
-  public RoleResponseDTO get(@PathVariable String token) {
+  @PreAuthorize("hasAuthority('show_role_permission')")
+  public RolePermissionResponseDTO get(@PathVariable String token) {
     return service.findByToken(token);
   }
 
   @PostMapping
   @ResponseStatus(HttpStatus.CREATED)
-  @PreAuthorize("hasAuthority('create_role')")
-  public RoleResponseDTO create(@RequestBody @Valid RoleCreateRequestDTO request) {
+  @PreAuthorize("hasAuthority('create_role_permission')")
+  public RolePermissionResponseDTO create(
+      @RequestBody @Valid RolePermissionCreateRequestDTO request) {
     return service.create(request);
   }
 
   @PutMapping("/{token}")
-  @PreAuthorize("hasAuthority('update_role')")
-  public RoleResponseDTO update(
-      @PathVariable String token, @RequestBody @Valid RoleUpdateRequestDTO request) {
+  @PreAuthorize("hasAuthority('update_role_permission')")
+  public RolePermissionResponseDTO update(
+      @PathVariable String token, @RequestBody @Valid RolePermissionUpdateRequestDTO request) {
     return service.update(token, request);
   }
 
   @DeleteMapping("/{token}")
   @ResponseStatus(HttpStatus.NO_CONTENT)
-  @PreAuthorize("hasAuthority('delete_role')")
+  @PreAuthorize("hasAuthority('delete_role_permission')")
   public void delete(@PathVariable String token) {
     service.delete(token);
-  }
-
-  @PostMapping("/{token}/restore")
-  @PreAuthorize("hasAuthority('update_role')")
-  public RoleResponseDTO restore(@PathVariable String token) {
-    return service.restore(token);
   }
 }

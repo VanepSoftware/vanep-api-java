@@ -12,7 +12,7 @@ class PermissionRegistryTest {
   void allReturnsExactlyEnumValuesWithoutDuplicates() {
     var expected =
         Arrays.stream(PermissionEnum.values())
-            .map(PermissionEnum::value)
+            .map(permission -> permission.value())
             .collect(Collectors.toSet());
 
     var result = PermissionRegistry.all();

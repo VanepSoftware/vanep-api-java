@@ -6,7 +6,6 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
-import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 
@@ -32,7 +31,7 @@ class SecurityConfigTest {
 
     var authorities = converter.convert(jwt).getAuthorities();
 
-    assertThat(authorities.stream().map(GrantedAuthority::getAuthority))
+    assertThat(authorities.stream().map(authority -> authority.getAuthority()))
         .contains("list_roles", "delete_role")
         .noneMatch(
             authority -> authority.startsWith("ROLE_list") || authority.startsWith("ROLE_delete"));
@@ -49,7 +48,7 @@ class SecurityConfigTest {
 
     var authorities = converter.convert(jwt).getAuthorities();
 
-    assertThat(authorities.stream().map(GrantedAuthority::getAuthority))
+    assertThat(authorities.stream().map(authority -> authority.getAuthority()))
         .contains("ROLE_ADMIN", "list_roles");
   }
 }
