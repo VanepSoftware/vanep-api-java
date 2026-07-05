@@ -2,10 +2,10 @@ package br.com.vanep.auth.oauth;
 
 import br.com.vanep.auth.web.SignupForm;
 import br.com.vanep.user.AuthProvider;
-import br.com.vanep.user.OAuthAccount;
 import br.com.vanep.user.OAuthAccountRepository;
-import br.com.vanep.user.User;
 import br.com.vanep.user.UserRepository;
+import br.com.vanep.user.model.OAuthAccountModel;
+import br.com.vanep.user.model.UserModel;
 import java.time.Instant;
 import java.util.Optional;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
@@ -27,12 +27,12 @@ public class OAuthAccountService {
   @Transactional
   public OAuthResolution resolve(
       AuthProvider provider, String providerUid, String email, boolean emailVerified, String name) {
-    Optional<OAuthAccount> existing =
+    Optional<OAuthAccountModel> existing =
         oauthAccounts.findByProviderAndProviderUid(provider, providerUid);
     if (existing.isPresent()) {
 
       // @SoftDelete filtra contas removidas: findById não retorna usuário desativado.
-      User user =
+      UserModel user =
           users
               .findById(existing.get().getUser().getId())
               .orElseThrow(
@@ -43,9 +43,9 @@ public class OAuthAccountService {
     }
 
     if (emailVerified && email != null && !email.isBlank()) {
-      Optional<User> byEmail = users.findByEmail(email);
+      Optional<UserModel> byEmail = users.findByEmail(email);
       if (byEmail.isPresent()) {
-        OAuthAccount linked = link(byEmail.get(), provider, providerUid, email);
+        OAuthAccountModel linked = link(byEmail.get(), provider, providerUid, email);
         return OAuthResolution.registered(linked.getUser());
       }
     }
@@ -54,9 +54,9 @@ public class OAuthAccountService {
   }
 
   @Transactional
-  public User completeRegistration(
+  public UserModel completeRegistration(
       AuthProvider provider, String providerUid, String email, String name, SignupForm form) {
-    User user = new User();
+    UserModel user = new UserModel();
     user.setType(form.getType());
     user.setName(name != null && !name.isBlank() ? name : form.getName());
     user.setEmail(email);
@@ -72,8 +72,9 @@ public class OAuthAccountService {
     return user;
   }
 
-  private OAuthAccount link(User user, AuthProvider provider, String providerUid, String email) {
-    OAuthAccount account = new OAuthAccount();
+  private OAuthAccountModel link(
+      UserModel user, AuthProvider provider, String providerUid, String email) {
+    OAuthAccountModel account = new OAuthAccountModel();
     account.setUser(user);
     account.setProvider(provider);
     account.setProviderUid(providerUid);

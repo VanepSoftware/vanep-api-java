@@ -1,9 +1,10 @@
 package br.com.vanep.auth.password;
 
 import br.com.vanep.auth.mail.MailService;
+import br.com.vanep.auth.password.model.PasswordResetTokenModel;
 import br.com.vanep.auth.token.SecureTokens;
-import br.com.vanep.user.User;
 import br.com.vanep.user.UserRepository;
+import br.com.vanep.user.model.UserModel;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
@@ -47,7 +48,7 @@ public class PasswordResetService {
             user -> {
               tokens.consumeAllActive(user.getId(), Instant.now());
               String raw = SecureTokens.generate();
-              PasswordResetToken token = new PasswordResetToken();
+              PasswordResetTokenModel token = new PasswordResetTokenModel();
               token.setUserId(user.getId());
               token.setTokenHash(SecureTokens.hash(raw));
               token.setExpiresAt(Instant.now().plus(ttl));
@@ -68,12 +69,12 @@ public class PasswordResetService {
 
   @Transactional
   public boolean reset(String rawToken, String newPassword) {
-    Optional<PasswordResetToken> maybe = findValid(rawToken);
+    Optional<PasswordResetTokenModel> maybe = findValid(rawToken);
     if (maybe.isEmpty()) {
       return false;
     }
-    PasswordResetToken token = maybe.get();
-    Optional<User> user = users.findById(token.getUserId());
+    PasswordResetTokenModel token = maybe.get();
+    Optional<UserModel> user = users.findById(token.getUserId());
     if (user.isEmpty()) {
       return false;
     }
@@ -82,7 +83,7 @@ public class PasswordResetService {
     return true;
   }
 
-  private Optional<PasswordResetToken> findValid(String rawToken) {
+  private Optional<PasswordResetTokenModel> findValid(String rawToken) {
     if (rawToken == null || rawToken.isBlank()) {
       return Optional.empty();
     }

@@ -1,4 +1,4 @@
-package br.com.vanep.auth.verification;
+package br.com.vanep.auth.verification.model;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -15,7 +15,7 @@ import org.hibernate.annotations.CreationTimestamp;
 @Table(name = "email_verification_token")
 @Getter
 @Setter
-public class EmailVerificationToken {
+public class EmailVerificationTokenModel {
 
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)

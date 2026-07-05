@@ -9,11 +9,11 @@ import static org.mockito.Mockito.when;
 
 import br.com.vanep.auth.web.SignupForm;
 import br.com.vanep.user.AuthProvider;
-import br.com.vanep.user.OAuthAccount;
 import br.com.vanep.user.OAuthAccountRepository;
-import br.com.vanep.user.User;
 import br.com.vanep.user.UserRepository;
 import br.com.vanep.user.UserType;
+import br.com.vanep.user.model.OAuthAccountModel;
+import br.com.vanep.user.model.UserModel;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -31,10 +31,10 @@ class OAuthAccountServiceTest {
 
   @Test
   void resolveReturnsRegisteredWhenAccountExists() {
-    User user = new User();
+    UserModel user = new UserModel();
     user.setId(1L);
     user.setEmail("a@vanep.com");
-    OAuthAccount account = new OAuthAccount();
+    OAuthAccountModel account = new OAuthAccountModel();
     account.setUser(user);
     when(oauthAccounts.findByProviderAndProviderUid(AuthProvider.GOOGLE, "sub-1"))
         .thenReturn(Optional.of(account));
@@ -50,10 +50,10 @@ class OAuthAccountServiceTest {
 
   @Test
   void resolveThrowsWhenLinkedAccountIsSoftDeleted() {
-    User deleted = new User();
+    UserModel deleted = new UserModel();
     deleted.setId(99L);
     deleted.setEmail("gone@vanep.com");
-    OAuthAccount account = new OAuthAccount();
+    OAuthAccountModel account = new OAuthAccountModel();
     account.setUser(deleted);
     when(oauthAccounts.findByProviderAndProviderUid(AuthProvider.GOOGLE, "sub-x"))
         .thenReturn(Optional.of(account));
@@ -69,17 +69,17 @@ class OAuthAccountServiceTest {
   void resolveLinksAccountWhenVerifiedEmailUserExists() {
     when(oauthAccounts.findByProviderAndProviderUid(AuthProvider.GOOGLE, "sub-2"))
         .thenReturn(Optional.empty());
-    User existing = new User();
+    UserModel existing = new UserModel();
     existing.setEmail("b@vanep.com");
     when(users.findByEmail("b@vanep.com")).thenReturn(Optional.of(existing));
-    when(oauthAccounts.save(any(OAuthAccount.class))).thenAnswer(inv -> inv.getArgument(0));
+    when(oauthAccounts.save(any(OAuthAccountModel.class))).thenAnswer(inv -> inv.getArgument(0));
 
     OAuthResolution result =
         service.resolve(AuthProvider.GOOGLE, "sub-2", "b@vanep.com", true, "B");
 
     assertThat(result.registered()).isTrue();
     assertThat(result.user()).isSameAs(existing);
-    verify(oauthAccounts).save(any(OAuthAccount.class));
+    verify(oauthAccounts).save(any(OAuthAccountModel.class));
   }
 
   @Test
@@ -113,8 +113,8 @@ class OAuthAccountServiceTest {
 
   @Test
   void completeRegistrationCreatesUserAndLinksAccount() {
-    when(users.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
-    when(oauthAccounts.save(any(OAuthAccount.class))).thenAnswer(inv -> inv.getArgument(0));
+    when(users.save(any(UserModel.class))).thenAnswer(inv -> inv.getArgument(0));
+    when(oauthAccounts.save(any(OAuthAccountModel.class))).thenAnswer(inv -> inv.getArgument(0));
 
     SignupForm form = new SignupForm();
     form.setType(UserType.DRIVER);
@@ -122,7 +122,7 @@ class OAuthAccountServiceTest {
     form.setPhone("11999998888");
     form.setAcceptTerms(true);
 
-    User created =
+    UserModel created =
         service.completeRegistration(AuthProvider.GOOGLE, "sub-4", "d@vanep.com", "Driver D", form);
 
     assertThat(created.getType()).isEqualTo(UserType.DRIVER);
@@ -131,7 +131,7 @@ class OAuthAccountServiceTest {
     assertThat(created.getDocument()).isEqualTo("99999999999");
     assertThat(created.isVerified()).isTrue();
     assertThat(created.getTermsAcceptedAt()).isNotNull();
-    verify(users).save(any(User.class));
-    verify(oauthAccounts).save(any(OAuthAccount.class));
+    verify(users).save(any(UserModel.class));
+    verify(oauthAccounts).save(any(OAuthAccountModel.class));
   }
 }

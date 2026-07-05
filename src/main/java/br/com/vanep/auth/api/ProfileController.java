@@ -1,7 +1,7 @@
 package br.com.vanep.auth.api;
 
-import br.com.vanep.user.User;
 import br.com.vanep.user.UserRepository;
+import br.com.vanep.user.model.UserModel;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -21,7 +21,7 @@ public class ProfileController {
   @GetMapping("/api/user/profile")
   public ProfileResponse profile(@AuthenticationPrincipal Jwt jwt) {
     String email = jwt.getSubject();
-    User user =
+    UserModel user =
         users
             .findByEmail(email)
             .orElseThrow(

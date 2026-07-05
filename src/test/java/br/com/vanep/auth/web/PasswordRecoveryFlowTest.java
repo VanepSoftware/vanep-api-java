@@ -8,14 +8,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import br.com.vanep.auth.password.PasswordResetToken;
 import br.com.vanep.auth.password.PasswordResetTokenRepository;
+import br.com.vanep.auth.password.model.PasswordResetTokenModel;
 import br.com.vanep.auth.token.SecureTokens;
-import br.com.vanep.auth.verification.EmailVerificationToken;
 import br.com.vanep.auth.verification.EmailVerificationTokenRepository;
-import br.com.vanep.user.User;
+import br.com.vanep.auth.verification.model.EmailVerificationTokenModel;
 import br.com.vanep.user.UserRepository;
 import br.com.vanep.user.UserType;
+import br.com.vanep.user.model.UserModel;
 import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -50,8 +50,8 @@ class PasswordRecoveryFlowTest {
             .build();
   }
 
-  private User saveUser(boolean verified) {
-    User user = new User();
+  private UserModel saveUser(boolean verified) {
+    UserModel user = new UserModel();
     user.setType(UserType.CLIENT);
     user.setName("Rec");
     user.setEmail("rec@vanep.com");
@@ -84,9 +84,9 @@ class PasswordRecoveryFlowTest {
 
   @Test
   void fullResetFlowChangesPassword() throws Exception {
-    User user = saveUser(true);
+    UserModel user = saveUser(true);
     String raw = SecureTokens.generate();
-    PasswordResetToken token = new PasswordResetToken();
+    PasswordResetTokenModel token = new PasswordResetTokenModel();
     token.setUserId(user.getId());
     token.setTokenHash(SecureTokens.hash(raw));
     token.setExpiresAt(Instant.now().plusSeconds(3600));
@@ -104,15 +104,15 @@ class PasswordRecoveryFlowTest {
         .andExpect(status().is3xxRedirection())
         .andExpect(redirectedUrl("/login?reset"));
 
-    User reloaded = users.findById(user.getId()).orElseThrow();
+    UserModel reloaded = users.findById(user.getId()).orElseThrow();
     assertThat(passwordEncoder.matches("newpass12", reloaded.getPassword())).isTrue();
   }
 
   @Test
   void verifyEmailActivatesAccount() throws Exception {
-    User user = saveUser(false);
+    UserModel user = saveUser(false);
     String raw = SecureTokens.generate();
-    EmailVerificationToken token = new EmailVerificationToken();
+    EmailVerificationTokenModel token = new EmailVerificationTokenModel();
     token.setUserId(user.getId());
     token.setTokenHash(SecureTokens.hash(raw));
     token.setExpiresAt(Instant.now().plusSeconds(3600));

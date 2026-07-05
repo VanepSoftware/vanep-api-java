@@ -1,20 +1,18 @@
-package br.com.vanep.driver;
+package br.com.vanep.user.model;
 
-import br.com.vanep.user.User;
+import br.com.vanep.user.Gender;
+import br.com.vanep.user.UserType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
-import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.OneToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
-import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.UUID;
 import lombok.Getter;
 import lombok.Setter;
@@ -24,11 +22,11 @@ import org.hibernate.annotations.SoftDeleteType;
 import org.hibernate.annotations.UpdateTimestamp;
 
 @Entity
-@Table(name = "driver")
+@Table(name = "users")
 @SoftDelete(columnName = "deleted_at", strategy = SoftDeleteType.TIMESTAMP)
 @Getter
 @Setter
-public class Driver {
+public class UserModel {
 
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -37,34 +35,50 @@ public class Driver {
   @Column(nullable = false, unique = true, length = 32)
   private String token;
 
-  @OneToOne(fetch = FetchType.LAZY, optional = false)
-  @JoinColumn(name = "user_id", nullable = false, unique = true)
-  private User user;
+  @Enumerated(EnumType.STRING)
+  @Column(nullable = false, length = 16)
+  private UserType type;
 
-  @Column private String photo;
+  @Column(name = "role_id")
+  private Long roleId;
 
-  @Column(precision = 3, scale = 2)
-  private BigDecimal rating;
+  @Column(name = "country_id")
+  private Long countryId;
 
-  @Column private String cnpj;
+  @Column(nullable = false)
+  private String name;
 
-  @Column(name = "experience_years")
-  private Integer experienceYears;
+  @Column(nullable = false, unique = true)
+  private String email;
 
-  @Column private String city;
+  @Column(unique = true)
+  private String username;
 
-  @Column(name = "base_price", nullable = false, precision = 12, scale = 2)
-  private BigDecimal basePrice;
+  @Column private String password;
+
+  @Column(nullable = false, unique = true, length = 64)
+  private String document;
+
+  @Column private String phone;
+
+  @Column(name = "birth_date")
+  private LocalDate birthDate;
 
   @Enumerated(EnumType.STRING)
-  @Column(name = "approval_status", nullable = false, length = 16)
-  private DriverApprovalStatus approvalStatus = DriverApprovalStatus.PENDING;
+  @Column(length = 16)
+  private Gender gender;
 
-  @Column(name = "is_active", nullable = false)
-  private boolean active = true;
+  @Column(nullable = false)
+  private boolean verified = false;
 
-  @Column(name = "is_available", nullable = false)
-  private boolean available = false;
+  @Column(name = "terms_accepted_at")
+  private Instant termsAcceptedAt;
+
+  @Column(name = "last_name_change_at")
+  private Instant lastNameChangeAt;
+
+  @Column(name = "last_login_at")
+  private Instant lastLoginAt;
 
   @CreationTimestamp
   @Column(name = "created_at", nullable = false, updatable = false)

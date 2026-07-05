@@ -1,16 +1,16 @@
 package br.com.vanep.auth.web;
 
 import br.com.vanep.auth.verification.EmailVerificationService;
-import br.com.vanep.client.Client;
+import br.com.vanep.client.model.ClientModel;
 import br.com.vanep.client.repository.ClientRepository;
-import br.com.vanep.driver.Driver;
 import br.com.vanep.driver.DriverApprovalStatus;
 import br.com.vanep.driver.DriverRepository;
+import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.role.RoleName;
 import br.com.vanep.role.repository.RoleRepository;
-import br.com.vanep.user.User;
 import br.com.vanep.user.UserRepository;
 import br.com.vanep.user.UserType;
+import br.com.vanep.user.model.UserModel;
 import java.time.Instant;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -42,9 +42,9 @@ public class RegistrationService {
   }
 
   @Transactional
-  public User registerClient(ClientSignupForm form) {
-    User user = createUser(UserType.CLIENT, RoleName.CLIENT, form);
-    Client client = new Client();
+  public UserModel registerClient(ClientSignupForm form) {
+    UserModel user = createUser(UserType.CLIENT, RoleName.CLIENT, form);
+    ClientModel client = new ClientModel();
     client.setUser(user);
     clients.save(client);
     emailVerification.startVerification(user);
@@ -52,9 +52,9 @@ public class RegistrationService {
   }
 
   @Transactional
-  public User registerDriver(DriverSignupForm form) {
-    User user = createUser(UserType.DRIVER, RoleName.DRIVER, form);
-    Driver driver = new Driver();
+  public UserModel registerDriver(DriverSignupForm form) {
+    UserModel user = createUser(UserType.DRIVER, RoleName.DRIVER, form);
+    DriverModel driver = new DriverModel();
     driver.setUser(user);
     driver.setCnpj(form.getCnpj());
     driver.setExperienceYears(form.getExperienceYears());
@@ -66,8 +66,8 @@ public class RegistrationService {
     return user;
   }
 
-  private User createUser(UserType type, RoleName roleName, AccountSignupForm form) {
-    User user = new User();
+  private UserModel createUser(UserType type, RoleName roleName, AccountSignupForm form) {
+    UserModel user = new UserModel();
     user.setType(type);
     roles.findByRoleName(roleName).ifPresent(role -> user.setRoleId(role.getId()));
     user.setName(form.getName());

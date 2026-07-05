@@ -3,15 +3,15 @@ package br.com.vanep.auth.oauth;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
-import br.com.vanep.driver.Driver;
 import br.com.vanep.driver.DriverApprovalStatus;
 import br.com.vanep.driver.DriverRepository;
+import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.role.model.RoleModel;
 import br.com.vanep.role.repository.RoleRepository;
 import br.com.vanep.rolepermission.model.RolePermissionModel;
-import br.com.vanep.user.User;
 import br.com.vanep.user.UserRepository;
 import br.com.vanep.user.UserType;
+import br.com.vanep.user.model.UserModel;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
@@ -42,7 +42,7 @@ class JwtTokenCustomizerTest {
 
   @Test
   void addsRoleAndIdentityClaimsForClient() {
-    User user = new User();
+    UserModel user = new UserModel();
     user.setId(1L);
     user.setType(UserType.CLIENT);
     user.setEmail("a@vanep.com");
@@ -63,12 +63,12 @@ class JwtTokenCustomizerTest {
 
   @Test
   void addsDriverStatusForDriver() {
-    User user = new User();
+    UserModel user = new UserModel();
     user.setId(2L);
     user.setType(UserType.DRIVER);
     user.setEmail("d@vanep.com");
     user.setToken("tok-2");
-    Driver driver = new Driver();
+    DriverModel driver = new DriverModel();
     driver.setApprovalStatus(DriverApprovalStatus.APPROVED);
     when(users.findByEmail("d@vanep.com")).thenReturn(Optional.of(user));
     when(drivers.findByUserId(2L)).thenReturn(Optional.of(driver));
@@ -82,7 +82,7 @@ class JwtTokenCustomizerTest {
 
   @Test
   void addsPermissionsClaimFromUsersRoleBundle() {
-    User user = new User();
+    UserModel user = new UserModel();
     user.setId(1L);
     user.setRoleId(10L);
     user.setType(UserType.CLIENT);
@@ -104,7 +104,7 @@ class JwtTokenCustomizerTest {
 
   @Test
   void permissionsClaimIsEmptyWhenUserHasNoRole() {
-    User user = new User();
+    UserModel user = new UserModel();
     user.setId(1L);
     user.setType(UserType.CLIENT);
     user.setEmail("a@vanep.com");

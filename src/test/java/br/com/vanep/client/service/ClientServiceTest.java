@@ -6,13 +6,13 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import br.com.vanep.client.Client;
 import br.com.vanep.client.dto.ClientResponseDTO;
 import br.com.vanep.client.dto.ClientUpdateRequestDTO;
 import br.com.vanep.client.mapper.ClientMapper;
+import br.com.vanep.client.model.ClientModel;
 import br.com.vanep.client.repository.ClientRepository;
-import br.com.vanep.user.User;
 import br.com.vanep.user.UserType;
+import br.com.vanep.user.model.UserModel;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -37,15 +37,15 @@ class ClientServiceTest {
     service = new ClientService(repository, mapper);
   }
 
-  private Client clientWithToken(String token) {
-    User user = new User();
+  private ClientModel clientWithToken(String token) {
+    UserModel user = new UserModel();
     user.setType(UserType.CLIENT);
     user.setName("Test User");
     user.setEmail("test@vanep.com");
     user.setDocument("12345678901");
     user.setToken("owner-uid");
 
-    Client client = new Client();
+    ClientModel client = new ClientModel();
     client.setToken(token);
     client.setUser(user);
     return client;
@@ -53,7 +53,7 @@ class ClientServiceTest {
 
   @Test
   void findAllReturnsPagedResponses() {
-    Client client = clientWithToken("abc");
+    ClientModel client = clientWithToken("abc");
     ClientResponseDTO response =
         new ClientResponseDTO("abc", "Test", "t@t.com", null, null, null, true, null);
     when(repository.findAll(any(Pageable.class))).thenReturn(new PageImpl<>(List.of(client)));
@@ -66,7 +66,7 @@ class ClientServiceTest {
 
   @Test
   void findByTokenReturnsResponse() {
-    Client client = clientWithToken("tok");
+    ClientModel client = clientWithToken("tok");
     ClientResponseDTO response =
         new ClientResponseDTO("tok", "Name", "e@e.com", null, null, null, true, null);
     when(repository.findByToken("tok")).thenReturn(Optional.of(client));
@@ -86,7 +86,7 @@ class ClientServiceTest {
 
   @Test
   void updatePersistsFields() {
-    Client client = clientWithToken("tok");
+    ClientModel client = clientWithToken("tok");
     ClientResponseDTO response =
         new ClientResponseDTO("tok", "Name", "e@e.com", "photo.jpg", null, null, true, null);
     when(repository.findByToken("tok")).thenReturn(Optional.of(client));
@@ -112,7 +112,7 @@ class ClientServiceTest {
 
   @Test
   void deleteSoftDeletesClient() {
-    Client client = clientWithToken("tok");
+    ClientModel client = clientWithToken("tok");
     when(repository.findByToken("tok")).thenReturn(Optional.of(client));
 
     service.delete("tok");

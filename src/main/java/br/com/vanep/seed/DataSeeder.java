@@ -1,19 +1,19 @@
 package br.com.vanep.seed;
 
 import br.com.vanep.auth.security.PermissionRegistry;
-import br.com.vanep.client.Client;
+import br.com.vanep.client.model.ClientModel;
 import br.com.vanep.client.repository.ClientRepository;
-import br.com.vanep.driver.Driver;
 import br.com.vanep.driver.DriverApprovalStatus;
 import br.com.vanep.driver.DriverRepository;
+import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.role.RoleName;
 import br.com.vanep.role.model.RoleModel;
 import br.com.vanep.role.repository.RoleRepository;
 import br.com.vanep.rolepermission.model.RolePermissionModel;
 import br.com.vanep.rolepermission.repository.RolePermissionRepository;
-import br.com.vanep.user.User;
 import br.com.vanep.user.UserRepository;
 import br.com.vanep.user.UserType;
+import br.com.vanep.user.model.UserModel;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
@@ -136,7 +136,7 @@ public class DataSeeder implements ApplicationRunner {
       return;
     }
     RoleModel adminRole = roles.findByRoleName(RoleName.ADMIN).orElseThrow();
-    User admin = new User();
+    UserModel admin = new UserModel();
     admin.setType(UserType.ADMIN);
     admin.setRoleId(adminRole.getId());
     admin.setName("Vanep Admin");
@@ -161,7 +161,7 @@ public class DataSeeder implements ApplicationRunner {
     RoleModel clientRole = roles.findByRoleName(RoleName.CLIENT).orElseThrow();
     for (ClientSeed seed : seeds) {
       if (users.existsByEmail(seed.email())) continue;
-      User user = new User();
+      UserModel user = new UserModel();
       user.setType(UserType.CLIENT);
       user.setRoleId(clientRole.getId());
       user.setName(seed.name());
@@ -171,7 +171,7 @@ public class DataSeeder implements ApplicationRunner {
       user.setVerified(true);
       user.setTermsAcceptedAt(Instant.now());
       users.save(user);
-      Client client = new Client();
+      ClientModel client = new ClientModel();
       client.setUser(user);
       clients.save(client);
       log.info("Seed: client criado ({}).", seed.email());
@@ -191,7 +191,7 @@ public class DataSeeder implements ApplicationRunner {
     RoleModel driverRole = roles.findByRoleName(RoleName.DRIVER).orElseThrow();
     for (DriverSeed seed : seeds) {
       if (users.existsByEmail(seed.email())) continue;
-      User user = new User();
+      UserModel user = new UserModel();
       user.setType(UserType.DRIVER);
       user.setRoleId(driverRole.getId());
       user.setName(seed.name());
@@ -201,7 +201,7 @@ public class DataSeeder implements ApplicationRunner {
       user.setVerified(true);
       user.setTermsAcceptedAt(Instant.now());
       users.save(user);
-      Driver driver = new Driver();
+      DriverModel driver = new DriverModel();
       driver.setUser(user);
       driver.setCnpj(seed.cnpj());
       driver.setBasePrice(BigDecimal.valueOf(50));

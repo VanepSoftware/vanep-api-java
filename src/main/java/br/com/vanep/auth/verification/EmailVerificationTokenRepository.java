@@ -1,10 +1,11 @@
 package br.com.vanep.auth.verification;
 
+import br.com.vanep.auth.verification.model.EmailVerificationTokenModel;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface EmailVerificationTokenRepository
-    extends JpaRepository<EmailVerificationToken, Long> {
+    extends JpaRepository<EmailVerificationTokenModel, Long> {
 
-  Optional<EmailVerificationToken> findByTokenHash(String tokenHash);
+  Optional<EmailVerificationTokenModel> findByTokenHash(String tokenHash);
 }
