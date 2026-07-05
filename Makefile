@@ -9,7 +9,7 @@ ENV_EXAMPLE = .env.example
 
 .PHONY: up down nuke restart rebuild logs shell test test-coverage check boot-run build clean \
 	docker-build lint lint-fix db-up db-down db-logs db-psql db-migrate db-seed up-build dev setup-env \
-	mail-up mail-down mail-logs install clean-install env
+	mail-up mail-down mail-logs install clean-install env pr
 
 # Gera um `.env` pronto para dev a partir do `.env.example`, com os segredos
 # obrigatórios (pepper + remember-me) gerados via `openssl rand -hex 32`.
@@ -135,6 +135,38 @@ mail-down:
 
 mail-logs:
 	$(COMPOSE) logs -f $(MAILPIT_SERVICE)
+
+# Cria a branch `N-<numero>` a partir do HEAD atual, sobe pro origin e abre a PR
+# via `gh`. NÃO comita nada — assume que o trabalho já está comitado localmente.
+# Uso: make pr <numero>  (ex.: make pr 27 -> branch/PR "N-27")
+PR_ARG = $(filter-out pr,$(MAKECMDGOALS))
+
+pr:
+	@test -n "$(PR_ARG)" || { echo "Uso: make pr <numero> (ex.: make pr 27)" >&2; exit 1; }
+	@bash -euo pipefail -c '\
+		branch="N-$(PR_ARG)"; \
+		git checkout -b "$$branch"; \
+		git push -u origin "$$branch"; \
+		body=$$(mktemp); \
+		{ \
+			echo "## Descrição"; \
+			echo "Descreva o que este PR faz e por quê."; \
+			echo; \
+			echo "## Como testar"; \
+			echo "- [ ] Passo 1"; \
+			echo "- [ ] Passo 2"; \
+			echo; \
+			echo "## Checklist"; \
+			echo "- [ ] Rodei a aplicação e as migrações localmente."; \
+			echo "- [ ] Revisei as mudanças."; \
+			echo "- [ ] Os testes passam localmente."; \
+		} > "$$body"; \
+		gh pr create --title "$$branch" --body-file "$$body"; \
+		rm -f "$$body"'
+
+# Permite `make pr 27` sem que make trate "27" como um alvo próprio.
+%:
+	@:
 
 lint:
 	$(MVNW) spotless:check

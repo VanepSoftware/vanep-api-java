@@ -1,10 +1,20 @@
 package br.com.vanep.seed;
 
+import br.com.vanep.auth.security.PermissionRegistry;
 import br.com.vanep.client.Client;
 import br.com.vanep.client.repository.ClientRepository;
+import br.com.vanep.driver.Driver;
+import br.com.vanep.driver.DriverApprovalStatus;
+import br.com.vanep.driver.DriverRepository;
+import br.com.vanep.role.RoleName;
+import br.com.vanep.role.model.RoleModel;
+import br.com.vanep.role.repository.RoleRepository;
+import br.com.vanep.rolepermission.model.RolePermissionModel;
+import br.com.vanep.rolepermission.repository.RolePermissionRepository;
 import br.com.vanep.user.User;
 import br.com.vanep.user.UserRepository;
 import br.com.vanep.user.UserType;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import org.slf4j.Logger;
@@ -19,9 +29,13 @@ import org.springframework.stereotype.Component;
 public class DataSeeder implements ApplicationRunner {
 
   private static final Logger log = LoggerFactory.getLogger(DataSeeder.class);
+  private static final String ADMIN_BUNDLE_NAME = "ADMIN";
 
   private final UserRepository users;
   private final ClientRepository clients;
+  private final DriverRepository drivers;
+  private final RoleRepository roles;
+  private final RolePermissionRepository rolePermissions;
   private final PasswordEncoder passwordEncoder;
 
   @Value("${vanep.seed.enabled:false}")
@@ -40,9 +54,17 @@ public class DataSeeder implements ApplicationRunner {
   String adminDocument;
 
   public DataSeeder(
-      UserRepository users, ClientRepository clients, PasswordEncoder passwordEncoder) {
+      UserRepository users,
+      ClientRepository clients,
+      DriverRepository drivers,
+      RoleRepository roles,
+      RolePermissionRepository rolePermissions,
+      PasswordEncoder passwordEncoder) {
     this.users = users;
     this.clients = clients;
+    this.drivers = drivers;
+    this.roles = roles;
+    this.rolePermissions = rolePermissions;
     this.passwordEncoder = passwordEncoder;
   }
 
@@ -51,11 +73,61 @@ public class DataSeeder implements ApplicationRunner {
     if (!enabled && !seedOnly) {
       return;
     }
+    seedRoles();
+    seedAdminPermissions();
     seedAdmin();
     seedClients();
+    seedDrivers();
     if (seedOnly) {
       log.info("Seed-only: dados semeados; a aplicação será encerrada.");
     }
+  }
+
+  private void seedRoles() {
+    record RoleSeed(String name, String description, RoleName roleName) {}
+    List<RoleSeed> seeds =
+        List.of(
+            new RoleSeed("admin", "Full system access", RoleName.ADMIN),
+            new RoleSeed("client", "Standard client access", RoleName.CLIENT),
+            new RoleSeed("driver", "Driver access", RoleName.DRIVER));
+
+    for (RoleSeed seed : seeds) {
+      if (roles.findByRoleName(seed.roleName()).isPresent()) continue;
+      RoleModel role = roles.findByName(seed.name()).orElseGet(RoleModel::new);
+      role.setName(seed.name());
+      role.setDescription(seed.description());
+      role.setRoleName(seed.roleName());
+      roles.save(role);
+      log.info("Seed: role tagueada com role_name ({}).", seed.roleName());
+    }
+  }
+
+  private void seedAdminPermissions() {
+    RoleModel adminRole =
+        roles
+            .findByRoleName(RoleName.ADMIN)
+            .orElseThrow(() -> new IllegalStateException("Seed: role ADMIN não encontrada."));
+    if (adminRole.getRolePermission() == null) {
+      RolePermissionModel bundle = new RolePermissionModel();
+      bundle.setName(ADMIN_BUNDLE_NAME);
+      bundle.setPermissions(List.copyOf(PermissionRegistry.all()));
+      bundle = rolePermissions.save(bundle);
+      adminRole.setRolePermission(bundle);
+      roles.save(adminRole);
+      log.info("Seed: bundle ADMIN criado com todas as permissões.");
+    }
+    backfillAdminRoleId(adminRole);
+  }
+
+  private void backfillAdminRoleId(RoleModel adminRole) {
+    users
+        .findByTypeAndRoleIdIsNull(UserType.ADMIN)
+        .forEach(
+            admin -> {
+              admin.setRoleId(adminRole.getId());
+              users.save(admin);
+              log.info("Seed: role_id do admin {} atualizado.", admin.getEmail());
+            });
   }
 
   private void seedAdmin() {
@@ -63,8 +135,10 @@ public class DataSeeder implements ApplicationRunner {
       log.info("Seed: usuário admin já existe ({}).", adminEmail);
       return;
     }
+    RoleModel adminRole = roles.findByRoleName(RoleName.ADMIN).orElseThrow();
     User admin = new User();
     admin.setType(UserType.ADMIN);
+    admin.setRoleId(adminRole.getId());
     admin.setName("Vanep Admin");
     admin.setEmail(adminEmail);
     admin.setPassword(passwordEncoder.encode(adminPassword));
@@ -84,10 +158,12 @@ public class DataSeeder implements ApplicationRunner {
             new ClientSeed("Diego Alves", "diego.alves@seed.vanep.com.br", "44444444444"),
             new ClientSeed("Elena Rocha", "elena.rocha@seed.vanep.com.br", "55555555555"));
 
+    RoleModel clientRole = roles.findByRoleName(RoleName.CLIENT).orElseThrow();
     for (ClientSeed seed : seeds) {
       if (users.existsByEmail(seed.email())) continue;
       User user = new User();
       user.setType(UserType.CLIENT);
+      user.setRoleId(clientRole.getId());
       user.setName(seed.name());
       user.setEmail(seed.email());
       user.setDocument(seed.document());
@@ -99,6 +175,39 @@ public class DataSeeder implements ApplicationRunner {
       client.setUser(user);
       clients.save(client);
       log.info("Seed: client criado ({}).", seed.email());
+    }
+  }
+
+  private void seedDrivers() {
+    record DriverSeed(String name, String email, String document, String cnpj) {}
+    List<DriverSeed> seeds =
+        List.of(
+            new DriverSeed(
+                "Fabio Teixeira",
+                "fabio.teixeira@seed.vanep.com.br",
+                "66666666666",
+                "11222333000181"));
+
+    RoleModel driverRole = roles.findByRoleName(RoleName.DRIVER).orElseThrow();
+    for (DriverSeed seed : seeds) {
+      if (users.existsByEmail(seed.email())) continue;
+      User user = new User();
+      user.setType(UserType.DRIVER);
+      user.setRoleId(driverRole.getId());
+      user.setName(seed.name());
+      user.setEmail(seed.email());
+      user.setDocument(seed.document());
+      user.setPassword(passwordEncoder.encode("password"));
+      user.setVerified(true);
+      user.setTermsAcceptedAt(Instant.now());
+      users.save(user);
+      Driver driver = new Driver();
+      driver.setUser(user);
+      driver.setCnpj(seed.cnpj());
+      driver.setBasePrice(BigDecimal.valueOf(50));
+      driver.setApprovalStatus(DriverApprovalStatus.APPROVED);
+      drivers.save(driver);
+      log.info("Seed: driver criado ({}).", seed.email());
     }
   }
 }

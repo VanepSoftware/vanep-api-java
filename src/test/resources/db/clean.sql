@@ -9,3 +9,5 @@ delete from client;
 delete from vehicle;
 delete from driver;
 delete from users;
+delete from roles;
+delete from role_permissions;
