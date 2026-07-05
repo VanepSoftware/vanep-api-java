@@ -1,12 +1,12 @@
 package br.com.vanep.client.repository;
 
-import br.com.vanep.client.Client;
+import br.com.vanep.client.model.ClientModel;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 
-public interface ClientRepository extends JpaRepository<Client, Long> {
+public interface ClientRepository extends JpaRepository<ClientModel, Long> {
 
-  Optional<Client> findByToken(String token);
+  Optional<ClientModel> findByToken(String token);
 
-  Optional<Client> findByUserId(Long userId);
+  Optional<ClientModel> findByUserId(Long userId);
 }

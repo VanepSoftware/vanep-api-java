@@ -1,7 +1,7 @@
 package br.com.vanep.auth.security;
 
-import br.com.vanep.user.User;
 import br.com.vanep.user.UserRepository;
+import br.com.vanep.user.model.UserModel;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -21,7 +21,7 @@ public class VanepUserDetailsService implements UserDetailsService {
 
   @Override
   public UserDetails loadUserByUsername(String email) {
-    User user =
+    UserModel user =
         users
             .findByEmail(email)
             .orElseThrow(() -> new UsernameNotFoundException("Conta não encontrada: " + email));

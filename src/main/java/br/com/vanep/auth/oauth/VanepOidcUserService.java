@@ -1,7 +1,7 @@
 package br.com.vanep.auth.oauth;
 
 import br.com.vanep.user.AuthProvider;
-import br.com.vanep.user.User;
+import br.com.vanep.user.model.UserModel;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -41,7 +41,7 @@ public class VanepOidcUserService extends OidcUserService {
 
     Map<String, Object> claims = new HashMap<>(oidcUser.getClaims());
     if (resolution.registered()) {
-      User user = resolution.user();
+      UserModel user = resolution.user();
       claims.put("email", user.getEmail());
       List<GrantedAuthority> authorities =
           List.of(new SimpleGrantedAuthority("ROLE_" + user.getType().name()));

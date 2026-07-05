@@ -2,8 +2,9 @@ package br.com.vanep.auth.verification;
 
 import br.com.vanep.auth.mail.MailService;
 import br.com.vanep.auth.token.SecureTokens;
-import br.com.vanep.user.User;
+import br.com.vanep.auth.verification.model.EmailVerificationTokenModel;
 import br.com.vanep.user.UserRepository;
+import br.com.vanep.user.model.UserModel;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
@@ -35,9 +36,9 @@ public class EmailVerificationService {
   }
 
   @Transactional
-  public void startVerification(User user) {
+  public void startVerification(UserModel user) {
     String raw = SecureTokens.generate();
-    EmailVerificationToken token = new EmailVerificationToken();
+    EmailVerificationTokenModel token = new EmailVerificationTokenModel();
     token.setUserId(user.getId());
     token.setTokenHash(SecureTokens.hash(raw));
     token.setExpiresAt(Instant.now().plus(ttl));
@@ -56,15 +57,16 @@ public class EmailVerificationService {
     if (rawToken == null || rawToken.isBlank()) {
       return false;
     }
-    Optional<EmailVerificationToken> maybe = tokens.findByTokenHash(SecureTokens.hash(rawToken));
+    Optional<EmailVerificationTokenModel> maybe =
+        tokens.findByTokenHash(SecureTokens.hash(rawToken));
     if (maybe.isEmpty()) {
       return false;
     }
-    EmailVerificationToken token = maybe.get();
+    EmailVerificationTokenModel token = maybe.get();
     if (token.getConsumedAt() != null || token.getExpiresAt().isBefore(Instant.now())) {
       return false;
     }
-    Optional<User> user = users.findById(token.getUserId());
+    Optional<UserModel> user = users.findById(token.getUserId());
     if (user.isEmpty()) {
       return false;
     }

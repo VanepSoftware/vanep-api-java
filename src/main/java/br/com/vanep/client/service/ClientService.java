@@ -1,9 +1,9 @@
 package br.com.vanep.client.service;
 
-import br.com.vanep.client.Client;
 import br.com.vanep.client.dto.ClientResponseDTO;
 import br.com.vanep.client.dto.ClientUpdateRequestDTO;
 import br.com.vanep.client.mapper.ClientMapper;
+import br.com.vanep.client.model.ClientModel;
 import br.com.vanep.client.repository.ClientRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -33,7 +33,7 @@ public class ClientService {
 
   @Transactional
   public ClientResponseDTO update(String token, ClientUpdateRequestDTO request) {
-    Client client = requireByToken(token);
+    ClientModel client = requireByToken(token);
     client.setPhoto(request.photo());
     return mapper.toResponse(clients.save(client));
   }
@@ -43,7 +43,7 @@ public class ClientService {
     clients.delete(requireByToken(token));
   }
 
-  private Client requireByToken(String token) {
+  private ClientModel requireByToken(String token) {
     return clients
         .findByToken(token)
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Client not found."));

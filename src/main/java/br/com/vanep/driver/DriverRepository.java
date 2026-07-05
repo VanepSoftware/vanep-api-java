@@ -1,9 +1,10 @@
 package br.com.vanep.driver;
 
+import br.com.vanep.driver.model.DriverModel;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 
-public interface DriverRepository extends JpaRepository<Driver, Long> {
+public interface DriverRepository extends JpaRepository<DriverModel, Long> {
 
-  Optional<Driver> findByUserId(Long userId);
+  Optional<DriverModel> findByUserId(Long userId);
 }

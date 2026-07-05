@@ -11,17 +11,17 @@ import static org.mockito.Mockito.when;
 
 import br.com.vanep.auth.security.PermissionRegistry;
 import br.com.vanep.client.repository.ClientRepository;
-import br.com.vanep.driver.Driver;
 import br.com.vanep.driver.DriverApprovalStatus;
 import br.com.vanep.driver.DriverRepository;
+import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.role.RoleName;
 import br.com.vanep.role.model.RoleModel;
 import br.com.vanep.role.repository.RoleRepository;
 import br.com.vanep.rolepermission.model.RolePermissionModel;
 import br.com.vanep.rolepermission.repository.RolePermissionRepository;
-import br.com.vanep.user.User;
 import br.com.vanep.user.UserRepository;
 import br.com.vanep.user.UserType;
+import br.com.vanep.user.model.UserModel;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -135,7 +135,7 @@ class DataSeederTest {
 
     seeder.run(new DefaultApplicationArguments());
 
-    verify(users, atLeastOnce()).save(any(User.class));
+    verify(users, atLeastOnce()).save(any(UserModel.class));
   }
 
   @Test
@@ -154,7 +154,7 @@ class DataSeederTest {
 
     seeder.run(new DefaultApplicationArguments());
 
-    ArgumentCaptor<Driver> captor = ArgumentCaptor.forClass(Driver.class);
+    ArgumentCaptor<DriverModel> captor = ArgumentCaptor.forClass(DriverModel.class);
     verify(drivers, times(1)).save(captor.capture());
     assertThat(captor.getValue().getApprovalStatus()).isEqualTo(DriverApprovalStatus.APPROVED);
     assertThat(captor.getValue().getUser().getRoleId()).isEqualTo(driverRole.getId());

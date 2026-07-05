@@ -2,7 +2,7 @@ package br.com.vanep.auth.web;
 
 import br.com.vanep.auth.oauth.OAuthAccountService;
 import br.com.vanep.user.AuthProvider;
-import br.com.vanep.user.User;
+import br.com.vanep.user.model.UserModel;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
@@ -69,7 +69,7 @@ public class SignupController {
       return "signup-complete";
     }
 
-    User user =
+    UserModel user =
         accounts.completeRegistration(
             AuthProvider.GOOGLE,
             principal.getSubject(),
@@ -83,7 +83,8 @@ public class SignupController {
     return "redirect:" + (saved != null ? saved.getRedirectUrl() : "/");
   }
 
-  private void reauthenticate(User user, HttpServletRequest request, HttpServletResponse response) {
+  private void reauthenticate(
+      UserModel user, HttpServletRequest request, HttpServletResponse response) {
 
     if (request.getSession(false) != null) {
       request.changeSessionId();

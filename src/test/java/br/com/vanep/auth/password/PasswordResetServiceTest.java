@@ -10,9 +10,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import br.com.vanep.auth.mail.MailService;
+import br.com.vanep.auth.password.model.PasswordResetTokenModel;
 import br.com.vanep.auth.token.SecureTokens;
-import br.com.vanep.user.User;
 import br.com.vanep.user.UserRepository;
+import br.com.vanep.user.model.UserModel;
 import java.time.Instant;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -40,7 +41,7 @@ class PasswordResetServiceTest {
 
   @Test
   void requestResetEmitsTokenForLocalUser() {
-    User user = new User();
+    UserModel user = new UserModel();
     user.setId(1L);
     user.setEmail("a@vanep.com");
     user.setName("A");
@@ -50,7 +51,7 @@ class PasswordResetServiceTest {
     service.requestReset("a@vanep.com");
 
     verify(tokens).consumeAllActive(org.mockito.ArgumentMatchers.eq(1L), any(Instant.class));
-    verify(tokens).save(any(PasswordResetToken.class));
+    verify(tokens).save(any(PasswordResetTokenModel.class));
     verify(mail).send(eq("a@vanep.com"), anyString(), eq("email/password-reset"), anyMap());
   }
 
@@ -63,7 +64,7 @@ class PasswordResetServiceTest {
 
   @Test
   void requestResetIgnoresOauthOnlyAccount() {
-    User user = new User();
+    UserModel user = new UserModel();
     user.setEmail("o@vanep.com");
     user.setPassword(null);
     when(users.findByEmail("o@vanep.com")).thenReturn(Optional.of(user));
@@ -76,11 +77,11 @@ class PasswordResetServiceTest {
   @Test
   void resetChangesPasswordForValidToken() {
     String raw = "raw";
-    PasswordResetToken token = new PasswordResetToken();
+    PasswordResetTokenModel token = new PasswordResetTokenModel();
     token.setUserId(1L);
     token.setExpiresAt(Instant.now().plusSeconds(60));
     when(tokens.findByTokenHash(SecureTokens.hash(raw))).thenReturn(Optional.of(token));
-    User user = new User();
+    UserModel user = new UserModel();
     when(users.findById(1L)).thenReturn(Optional.of(user));
     when(passwordEncoder.encode("newpass12")).thenReturn("new-hash");
 
@@ -98,7 +99,7 @@ class PasswordResetServiceTest {
   @Test
   void isValidTokenReflectsExpiry() {
     String raw = "raw";
-    PasswordResetToken token = new PasswordResetToken();
+    PasswordResetTokenModel token = new PasswordResetTokenModel();
     token.setExpiresAt(Instant.now().plusSeconds(60));
     when(tokens.findByTokenHash(SecureTokens.hash(raw))).thenReturn(Optional.of(token));
 
