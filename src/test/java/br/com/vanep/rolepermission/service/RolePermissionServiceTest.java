@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.MessageSource;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.web.server.ResponseStatusException;
@@ -28,12 +29,13 @@ class RolePermissionServiceTest {
 
   @Mock private RolePermissionRepository repository;
   @Mock private RolePermissionMapper mapper;
+  @Mock private MessageSource messages;
 
   private RolePermissionService service;
 
   @BeforeEach
   void setUp() {
-    service = new RolePermissionService(repository, mapper);
+    service = new RolePermissionService(repository, mapper, messages);
   }
 
   private RolePermissionModel bundleWithToken(String token) {
