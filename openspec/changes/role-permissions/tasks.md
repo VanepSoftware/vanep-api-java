@@ -54,30 +54,30 @@ JwtTokenCustomizer  RolePermission service/  │
 
 ## 2. Fase 2 — Token + seed + auto-atribuição (ativa a cadeia)
 
-- [ ] 2.1 Teste `JwtTokenCustomizerTest`: usuário com bundle → claim `permissions` = lista do bundle + `roles` preservado; usuário sem role → `permissions` vazio
-- [ ] 2.2 Teste do converter em `SecurityConfig`: claim `permissions` vira `SimpleGrantedAuthority` sem prefixo
-- [ ] 2.3 Teste `DataSeederTest`: cria bundle ADMIN com `PermissionRegistry.all()`, role ADMIN ligado (via `RoleName.ADMIN`), e é idempotente; `seedRoles()` tageia as 3 roles com `role_name`; `seedDrivers()` cria driver(s) `APPROVED` e idempotente
-- [ ] 2.4 Teste `RegistrationServiceTest`: `registerClient`/`registerDriver` setam `user.role_id` para a role tagueada `CLIENT`/`DRIVER` respectivamente
-- [ ] 2.5 Alterar `JwtTokenCustomizer` para resolver `role_id → role → role_permissions.permissions` e emitir o claim `permissions`
-- [ ] 2.6 Estender o converter do `SecurityConfig` para mapear `permissions` → authorities (sem `ROLE_`)
-- [ ] 2.7 Alterar `DataSeeder`: `seedRoles()` passa a tagear `role_name`; bundle ADMIN + role ADMIN (por `RoleName.ADMIN`) + backfill de `role_id` em usuários ADMIN (idempotente); novo `seedDrivers()` (paralelo a `seedClients()`, driver(s) `approval_status = APPROVED`)
-- [ ] 2.8 Alterar `RegistrationService.registerClient`/`registerDriver` para resolver a role via `RoleRepository.findByRoleName` e setar `user.role_id` antes de salvar; aplicar o mesmo em `DataSeeder.seedClients()`
-- [ ] 2.9 `make lint` + `make test-coverage` verdes; abrir PR da Fase 2
+- [x] 2.1 Teste `JwtTokenCustomizerTest`: usuário com bundle → claim `permissions` = lista do bundle + `roles` preservado; usuário sem role → `permissions` vazio
+- [x] 2.2 Teste do converter em `SecurityConfig`: claim `permissions` vira `SimpleGrantedAuthority` sem prefixo
+- [x] 2.3 Teste `DataSeederTest`: cria bundle ADMIN com `PermissionRegistry.all()`, role ADMIN ligado (via `RoleName.ADMIN`), e é idempotente; `seedRoles()` tageia as 3 roles com `role_name`; `seedDrivers()` cria driver(s) `APPROVED` e idempotente
+- [x] 2.4 Teste `RegistrationServiceTest`: `registerClient`/`registerDriver` setam `user.role_id` para a role tagueada `CLIENT`/`DRIVER` respectivamente
+- [x] 2.5 Alterar `JwtTokenCustomizer` para resolver `role_id → role → role_permissions.permissions` e emitir o claim `permissions`
+- [x] 2.6 Estender o converter do `SecurityConfig` para mapear `permissions` → authorities (sem `ROLE_`)
+- [x] 2.7 Alterar `DataSeeder`: `seedRoles()` passa a tagear `role_name`; bundle ADMIN + role ADMIN (por `RoleName.ADMIN`) + backfill de `role_id` em usuários ADMIN (idempotente); novo `seedDrivers()` (paralelo a `seedClients()`, driver(s) `approval_status = APPROVED`)
+- [x] 2.8 Alterar `RegistrationService.registerClient`/`registerDriver` para resolver a role via `RoleRepository.findByRoleName` e setar `user.role_id` antes de salvar; aplicar o mesmo em `DataSeeder.seedClients()`
+- [x] 2.9 `make lint` + `make test-coverage` verdes; abrir PR da Fase 2
 
 ## 3. Fase 3 — CRUD de role-permissions
 
-- [ ] 3.1 Teste `RolePermissionServiceTest` (Mockito): create/update validam nome único e permissões no registry; find/delete por token
-- [ ] 3.2 Slice `RolePermissionControllerTest` (`MockMvc`+security): 201/200/404/400 e 403 sem a permissão exigida
-- [ ] 3.3 Criar request DTOs (`RolePermissionCreateRequestDTO`, `RolePermissionUpdateRequestDTO`) com `@Valid`/validador do 1.10
-- [ ] 3.4 Criar `RolePermissionService` (create, findAll paginado, findByToken, update, delete soft)
-- [ ] 3.5 Criar `RolePermissionMapper`
-- [ ] 3.6 Criar `RolePermissionResponseDTO` (expõe `token`, nunca `id`)
-- [ ] 3.7 Criar `RolePermissionController` (`/api/role-permissions`) com `@PreAuthorize("hasAuthority('...')")` por método
-- [ ] 3.8 `make lint` + `make test-coverage` verdes; abrir PR da Fase 3
+- [x] 3.1 Teste `RolePermissionServiceTest` (Mockito): create/update validam nome único e permissões no registry; find/delete por token
+- [x] 3.2 Slice `RolePermissionControllerTest` (`MockMvc`+security): 201/200/404/400 e 403 sem a permissão exigida
+- [x] 3.3 Criar request DTOs (`RolePermissionCreateRequestDTO`, `RolePermissionUpdateRequestDTO`) com `@Valid`/validador do 1.10
+- [x] 3.4 Criar `RolePermissionService` (create, findAll paginado, findByToken, update, delete soft)
+- [x] 3.5 Criar `RolePermissionMapper`
+- [x] 3.6 Criar `RolePermissionResponseDTO` (expõe `token`, nunca `id`)
+- [x] 3.7 Criar `RolePermissionController` (`/api/role-permissions`) com `@PreAuthorize("hasAuthority('...')")` por método
+- [x] 3.8 `make lint` + `make test-coverage` verdes; abrir PR da Fase 3
 
 ## 4. Fase 4 — Migração das rotas existentes
 
-- [ ] 4.1 Atualizar slice de `RoleControllerTest` e `ClientControllerTest`: permitido com a permissão, 403 sem ela, branch de posse do client preservado
-- [ ] 4.2 `RoleController`: trocar `hasRole('ADMIN')` por `hasAuthority('list_roles'|show_role|create_role|update_role|delete_role)` por método (restore → `update_role`)
-- [ ] 4.3 `ClientController`: `list`→`hasAuthority('list_clients')`, `get`→`hasAuthority('show_client') or @clientSecurity.isOwner(...)`, `delete`→`hasAuthority('delete_client')`; `update` (posse) inalterado
-- [ ] 4.4 `make lint` + `make test-coverage` verdes; abrir PR da Fase 4
+- [x] 4.1 Atualizar slice de `RoleControllerTest` e `ClientControllerTest`: permitido com a permissão, 403 sem ela, branch de posse do client preservado
+- [x] 4.2 `RoleController`: trocar `hasRole('ADMIN')` por `hasAuthority('list_roles'|show_role|create_role|update_role|delete_role)` por método (restore → `update_role`)
+- [x] 4.3 `ClientController`: `list`→`hasAuthority('list_clients')`, `get`→`hasAuthority('show_client') or @clientSecurity.isOwner(...)`, `delete`→`hasAuthority('delete_client')`; `update` (posse) inalterado
+- [x] 4.4 `make lint` + `make test-coverage` verdes; abrir PR da Fase 4

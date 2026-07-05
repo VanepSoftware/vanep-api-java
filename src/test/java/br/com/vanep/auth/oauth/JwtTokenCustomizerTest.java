@@ -6,6 +6,9 @@ import static org.mockito.Mockito.when;
 import br.com.vanep.driver.Driver;
 import br.com.vanep.driver.DriverApprovalStatus;
 import br.com.vanep.driver.DriverRepository;
+import br.com.vanep.role.model.RoleModel;
+import br.com.vanep.role.repository.RoleRepository;
+import br.com.vanep.rolepermission.model.RolePermissionModel;
 import br.com.vanep.user.User;
 import br.com.vanep.user.UserRepository;
 import br.com.vanep.user.UserType;
@@ -27,6 +30,7 @@ class JwtTokenCustomizerTest {
 
   @Mock private UserRepository users;
   @Mock private DriverRepository drivers;
+  @Mock private RoleRepository roles;
 
   private JwtEncodingContext context(OAuth2TokenType type, String principal) {
     return JwtEncodingContext.with(
@@ -46,7 +50,7 @@ class JwtTokenCustomizerTest {
     when(users.findByEmail("a@vanep.com")).thenReturn(Optional.of(user));
 
     JwtEncodingContext ctx = context(OAuth2TokenType.ACCESS_TOKEN, "a@vanep.com");
-    new JwtTokenCustomizer(users, drivers).customize(ctx);
+    new JwtTokenCustomizer(users, drivers, roles).customize(ctx);
     JwtClaimsSet claims = ctx.getClaims().build();
 
     String userType = claims.getClaim("user_type");
@@ -70,16 +74,54 @@ class JwtTokenCustomizerTest {
     when(drivers.findByUserId(2L)).thenReturn(Optional.of(driver));
 
     JwtEncodingContext ctx = context(OAuth2TokenType.ACCESS_TOKEN, "d@vanep.com");
-    new JwtTokenCustomizer(users, drivers).customize(ctx);
+    new JwtTokenCustomizer(users, drivers, roles).customize(ctx);
 
     String status = ctx.getClaims().build().getClaim("driver_status");
     assertThat(status).isEqualTo("APPROVED");
   }
 
   @Test
+  void addsPermissionsClaimFromUsersRoleBundle() {
+    User user = new User();
+    user.setId(1L);
+    user.setRoleId(10L);
+    user.setType(UserType.CLIENT);
+    user.setEmail("a@vanep.com");
+    user.setToken("tok-1");
+    RolePermissionModel bundle = new RolePermissionModel();
+    bundle.setPermissions(List.of("list_roles", "delete_role"));
+    RoleModel role = new RoleModel();
+    role.setRolePermission(bundle);
+    when(users.findByEmail("a@vanep.com")).thenReturn(Optional.of(user));
+    when(roles.findById(10L)).thenReturn(Optional.of(role));
+
+    JwtEncodingContext ctx = context(OAuth2TokenType.ACCESS_TOKEN, "a@vanep.com");
+    new JwtTokenCustomizer(users, drivers, roles).customize(ctx);
+
+    List<String> permissions = ctx.getClaims().build().getClaim("permissions");
+    assertThat(permissions).containsExactly("list_roles", "delete_role");
+  }
+
+  @Test
+  void permissionsClaimIsEmptyWhenUserHasNoRole() {
+    User user = new User();
+    user.setId(1L);
+    user.setType(UserType.CLIENT);
+    user.setEmail("a@vanep.com");
+    user.setToken("tok-1");
+    when(users.findByEmail("a@vanep.com")).thenReturn(Optional.of(user));
+
+    JwtEncodingContext ctx = context(OAuth2TokenType.ACCESS_TOKEN, "a@vanep.com");
+    new JwtTokenCustomizer(users, drivers, roles).customize(ctx);
+
+    List<String> permissions = ctx.getClaims().build().getClaim("permissions");
+    assertThat(permissions).isEmpty();
+  }
+
+  @Test
   void skipsNonAccessTokens() {
     JwtEncodingContext ctx = context(OAuth2TokenType.REFRESH_TOKEN, "a@vanep.com");
-    new JwtTokenCustomizer(users, drivers).customize(ctx);
+    new JwtTokenCustomizer(users, drivers, roles).customize(ctx);
     Object userType = ctx.getClaims().build().getClaim("user_type");
     assertThat(userType).isNull();
   }
@@ -88,7 +130,7 @@ class JwtTokenCustomizerTest {
   void skipsUnknownUser() {
     when(users.findByEmail("x@vanep.com")).thenReturn(Optional.empty());
     JwtEncodingContext ctx = context(OAuth2TokenType.ACCESS_TOKEN, "x@vanep.com");
-    new JwtTokenCustomizer(users, drivers).customize(ctx);
+    new JwtTokenCustomizer(users, drivers, roles).customize(ctx);
     Object uid = ctx.getClaims().build().getClaim("uid");
     assertThat(uid).isNull();
   }

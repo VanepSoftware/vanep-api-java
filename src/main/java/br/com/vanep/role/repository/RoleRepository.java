@@ -14,6 +14,8 @@ public interface RoleRepository extends JpaRepository<RoleModel, Long> {
 
   Optional<RoleModel> findByRoleName(RoleName roleName);
 
+  Optional<RoleModel> findByName(String name);
+
   boolean existsByName(String name);
 
   @Query(
