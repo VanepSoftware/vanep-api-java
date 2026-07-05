@@ -48,7 +48,7 @@ class VanepUserDetailsServiceTest {
     assertThat(details.isEnabled()).isTrue();
     assertThat(details.isAccountNonLocked()).isTrue();
     assertThat(details.getAuthorities())
-        .extracting(Object::toString)
+        .extracting(authority -> authority.toString())
         .containsExactly("ROLE_CLIENT");
   }
 
