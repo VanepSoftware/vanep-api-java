@@ -112,7 +112,14 @@ class VehicleControllerTest {
                 t.claim("uid", "admin-uid")
                     .claim("roles", List.of("ROLE_ADMIN"))
                     .subject("admin@vanep.com"))
-        .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"));
+        .authorities(
+            new SimpleGrantedAuthority("ROLE_ADMIN"),
+            new SimpleGrantedAuthority("list_vehicles"),
+            new SimpleGrantedAuthority("show_vehicle"),
+            new SimpleGrantedAuthority("create_vehicle"),
+            new SimpleGrantedAuthority("update_vehicle"),
+            new SimpleGrantedAuthority("delete_vehicle"),
+            new SimpleGrantedAuthority("restore_vehicle"));
   }
 
   private JwtRequestPostProcessor driverJwt() {
@@ -122,7 +129,10 @@ class VehicleControllerTest {
                 t.claim("uid", ownerUid)
                     .claim("roles", List.of("ROLE_DRIVER"))
                     .subject(driverEmail))
-        .authorities(new SimpleGrantedAuthority("ROLE_DRIVER"));
+        .authorities(
+            new SimpleGrantedAuthority("ROLE_DRIVER"),
+            new SimpleGrantedAuthority("list_vehicles"),
+            new SimpleGrantedAuthority("create_vehicle"));
   }
 
   private JwtRequestPostProcessor otherDriverJwt() {
@@ -132,7 +142,10 @@ class VehicleControllerTest {
                 t.claim("uid", otherOwnerUid)
                     .claim("roles", List.of("ROLE_DRIVER"))
                     .subject(otherDriverEmail))
-        .authorities(new SimpleGrantedAuthority("ROLE_DRIVER"));
+        .authorities(
+            new SimpleGrantedAuthority("ROLE_DRIVER"),
+            new SimpleGrantedAuthority("list_vehicles"),
+            new SimpleGrantedAuthority("create_vehicle"));
   }
 
   private JwtRequestPostProcessor clientJwt() {

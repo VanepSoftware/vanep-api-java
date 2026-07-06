@@ -17,7 +17,13 @@ public enum PermissionEnum {
   SHOW_CLIENT("show_client"),
   CREATE_CLIENT("create_client"),
   UPDATE_CLIENT("update_client"),
-  DELETE_CLIENT("delete_client");
+  DELETE_CLIENT("delete_client"),
+  LIST_VEHICLES("list_vehicles"),
+  SHOW_VEHICLE("show_vehicle"),
+  CREATE_VEHICLE("create_vehicle"),
+  UPDATE_VEHICLE("update_vehicle"),
+  DELETE_VEHICLE("delete_vehicle"),
+  RESTORE_VEHICLE("restore_vehicle");
 
   private final String value;
 

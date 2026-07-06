@@ -32,7 +32,7 @@ public class VehicleController {
 
   @PostMapping
   @ResponseStatus(HttpStatus.CREATED)
-  @PreAuthorize("hasAnyRole('DRIVER', 'ADMIN')")
+  @PreAuthorize("hasAuthority('create_vehicle')")
   public VehicleResponseDTO create(
       @Valid @RequestBody VehicleRequestDTO request,
       @AuthenticationPrincipal Jwt jwt,
@@ -44,7 +44,7 @@ public class VehicleController {
   }
 
   @GetMapping
-  @PreAuthorize("hasAnyRole('DRIVER', 'ADMIN')")
+  @PreAuthorize("hasAuthority('list_vehicles')")
   public List<VehicleResponseDTO> list(
       @AuthenticationPrincipal Jwt jwt, Authentication authentication) {
     boolean isAdmin =
@@ -54,27 +54,30 @@ public class VehicleController {
   }
 
   @GetMapping("/{token}")
-  @PreAuthorize("hasRole('ADMIN') or @vehicleSecurity.isOwner(#token, authentication)")
+  @PreAuthorize("hasAuthority('show_vehicle') or @vehicleSecurity.isOwner(#token, authentication)")
   public VehicleResponseDTO get(@PathVariable String token) {
     return service.findByToken(token);
   }
 
   @PutMapping("/{token}")
-  @PreAuthorize("hasRole('ADMIN') or @vehicleSecurity.isOwner(#token, authentication)")
+  @PreAuthorize(
+      "hasAuthority('update_vehicle') or @vehicleSecurity.isOwner(#token, authentication)")
   public VehicleResponseDTO update(
       @PathVariable String token, @Valid @RequestBody VehicleRequestDTO request) {
     return service.update(token, request);
   }
 
   @DeleteMapping("/{token}")
-  @PreAuthorize("hasRole('ADMIN') or @vehicleSecurity.isOwner(#token, authentication)")
+  @PreAuthorize(
+      "hasAuthority('delete_vehicle') or @vehicleSecurity.isOwner(#token, authentication)")
   @ResponseStatus(HttpStatus.NO_CONTENT)
   public void delete(@PathVariable String token) {
     service.delete(token);
   }
 
   @PostMapping("/{token}/restore")
-  @PreAuthorize("hasRole('ADMIN') or @vehicleSecurity.isOwner(#token, authentication)")
+  @PreAuthorize(
+      "hasAuthority('restore_vehicle') or @vehicleSecurity.isOwner(#token, authentication)")
   public VehicleResponseDTO restore(@PathVariable String token) {
     return service.restore(token);
   }
