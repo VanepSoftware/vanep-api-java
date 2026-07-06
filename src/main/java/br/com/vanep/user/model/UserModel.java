@@ -1,5 +1,7 @@
-package br.com.vanep.user;
+package br.com.vanep.user.model;
 
+import br.com.vanep.user.Gender;
+import br.com.vanep.user.UserType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -24,7 +26,7 @@ import org.hibernate.annotations.UpdateTimestamp;
 @SoftDelete(columnName = "deleted_at", strategy = SoftDeleteType.TIMESTAMP)
 @Getter
 @Setter
-public class User {
+public class UserModel {
 
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)

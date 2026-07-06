@@ -11,8 +11,9 @@ import static org.mockito.Mockito.when;
 
 import br.com.vanep.auth.mail.MailService;
 import br.com.vanep.auth.token.SecureTokens;
-import br.com.vanep.user.User;
+import br.com.vanep.auth.verification.model.EmailVerificationTokenModel;
 import br.com.vanep.user.UserRepository;
+import br.com.vanep.user.model.UserModel;
 import java.time.Instant;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -37,25 +38,25 @@ class EmailVerificationServiceTest {
 
   @Test
   void startVerificationSavesTokenAndSendsEmail() {
-    User user = new User();
+    UserModel user = new UserModel();
     user.setId(1L);
     user.setEmail("a@vanep.com");
     user.setName("A");
 
     service.startVerification(user);
 
-    verify(tokens).save(any(EmailVerificationToken.class));
+    verify(tokens).save(any(EmailVerificationTokenModel.class));
     verify(mail).send(eq("a@vanep.com"), anyString(), eq("email/verification"), anyMap());
   }
 
   @Test
   void verifyActivatesUser() {
     String raw = "raw-token";
-    EmailVerificationToken token = new EmailVerificationToken();
+    EmailVerificationTokenModel token = new EmailVerificationTokenModel();
     token.setUserId(1L);
     token.setExpiresAt(Instant.now().plusSeconds(60));
     when(tokens.findByTokenHash(SecureTokens.hash(raw))).thenReturn(Optional.of(token));
-    User user = new User();
+    UserModel user = new UserModel();
     when(users.findById(1L)).thenReturn(Optional.of(user));
 
     assertThat(service.verify(raw)).isTrue();
@@ -66,7 +67,7 @@ class EmailVerificationServiceTest {
   @Test
   void verifyFailsForExpiredToken() {
     String raw = "raw-token";
-    EmailVerificationToken token = new EmailVerificationToken();
+    EmailVerificationTokenModel token = new EmailVerificationTokenModel();
     token.setUserId(1L);
     token.setExpiresAt(Instant.now().minusSeconds(60));
     when(tokens.findByTokenHash(SecureTokens.hash(raw))).thenReturn(Optional.of(token));
@@ -89,7 +90,7 @@ class EmailVerificationServiceTest {
 
   @Test
   void resendSendsForUnverifiedUserOnly() {
-    User user = new User();
+    UserModel user = new UserModel();
     user.setId(2L);
     user.setEmail("b@vanep.com");
     user.setName("B");
@@ -98,12 +99,12 @@ class EmailVerificationServiceTest {
 
     service.resend("b@vanep.com");
 
-    verify(tokens).save(any(EmailVerificationToken.class));
+    verify(tokens).save(any(EmailVerificationTokenModel.class));
   }
 
   @Test
   void resendDoesNothingForVerifiedUser() {
-    User user = new User();
+    UserModel user = new UserModel();
     user.setVerified(true);
     when(users.findByEmail("c@vanep.com")).thenReturn(Optional.of(user));
 

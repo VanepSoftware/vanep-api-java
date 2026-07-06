@@ -212,7 +212,7 @@ também o **Resource Server**.
 
 | Papel | Como |
 |---|---|
-| **Authorization Server** | Endpoints OAuth2 padrão: `/oauth2/authorize`, `/oauth2/token`, `/oauth2/jwks`. Fluxo **authorization code + PKCE** (cliente público, sem secret — igual ao `token_endpoint_auth_method: none` do checklists-frontend). |
+| **Authorization Server** | Endpoints OAuth2 padrão: `/oauth2/authorize`, `/oauth2/token`, `/oauth2/jwks`. Fluxo **authorization code + PKCE** (cliente público, sem secret — igual ao `token_endpoint_auth_method: none` do vanep-frontend). |
 | **Tela de login** | Servida pela própria API (Thymeleaf) em **`/login`** — fundo preto, marca Vanep, e-mail + senha. É a tela mostrada durante o fluxo de autorização. |
 | **Login social (Google)** | Botão **"Entrar com Google"** (OAuth2 Client / OIDC). Aparece só quando há `GOOGLE_CLIENT_ID` configurado. |
 | **Resource Server** | Rotas **`/api/**`** são protegidas por **JWT** (Bearer). Sem token → **401**. Ex.: `GET /api/user/profile` devolve o perfil da conta autenticada (consumido pelo front como "userinfo"). |
@@ -393,6 +393,7 @@ Na raiz do repositório (com `make` instalado):
 | `make logs` | Logs do serviço `vanep` |
 | `make shell` | Shell no container da API (`docker compose exec vanep sh`) |
 | `make docker-build` | `docker compose build` |
+| `make pr <numero>` | Cria a branch **`N-<numero>`** a partir do HEAD atual, dá `git push -u origin` e abre a PR com `gh` (título **`N-<numero>`**). **Não comita nada** — só sobe o que já está comitado. Ex.: `make pr 27` → branch/PR `N-27` |
 | `make lint` | `./mvnw spotless:check` |
 | `make lint-fix` | `./mvnw spotless:apply` |
 | `make test` | `./mvnw test` |

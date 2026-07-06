@@ -1,17 +1,17 @@
 package br.com.vanep.auth.oauth;
 
 import br.com.vanep.user.AuthProvider;
-import br.com.vanep.user.User;
+import br.com.vanep.user.model.UserModel;
 
 public record OAuthResolution(
     boolean registered,
-    User user,
+    UserModel user,
     AuthProvider provider,
     String providerUid,
     String email,
     String name) {
 
-  public static OAuthResolution registered(User user) {
+  public static OAuthResolution registered(UserModel user) {
     return new OAuthResolution(true, user, null, null, null, null);
   }
 

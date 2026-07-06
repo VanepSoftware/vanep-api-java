@@ -42,6 +42,11 @@ public class SecurityConfig {
           if (roles instanceof Collection<?> values) {
             values.forEach(role -> authorities.add(new SimpleGrantedAuthority(role.toString())));
           }
+          Object permissions = jwt.getClaim("permissions");
+          if (permissions instanceof Collection<?> values) {
+            values.forEach(
+                permission -> authorities.add(new SimpleGrantedAuthority(permission.toString())));
+          }
           return authorities;
         });
     return converter;
@@ -113,7 +118,7 @@ public class SecurityConfig {
                     .permitAll()
                     .requestMatchers("/auth/sso-logout")
                     .permitAll()
-                    .requestMatchers("/actuator/health", "/actuator/info")
+                    .requestMatchers("/actuator/health", "/actuator/info", "/actuator/mappings")
                     .permitAll()
                     .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html")
                     .permitAll()

@@ -4,9 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
 
-import br.com.vanep.user.User;
 import br.com.vanep.user.UserRepository;
 import br.com.vanep.user.UserType;
+import br.com.vanep.user.model.UserModel;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -29,8 +29,8 @@ class VanepUserDetailsServiceTest {
     service = new VanepUserDetailsService(users, loginAttempts);
   }
 
-  private User verifiedUser() {
-    User user = new User();
+  private UserModel verifiedUser() {
+    UserModel user = new UserModel();
     user.setEmail("a@vanep.com");
     user.setPassword("hashed");
     user.setType(UserType.CLIENT);
@@ -48,13 +48,13 @@ class VanepUserDetailsServiceTest {
     assertThat(details.isEnabled()).isTrue();
     assertThat(details.isAccountNonLocked()).isTrue();
     assertThat(details.getAuthorities())
-        .extracting(Object::toString)
+        .extracting(authority -> authority.toString())
         .containsExactly("ROLE_CLIENT");
   }
 
   @Test
   void unverifiedUserIsDisabled() {
-    User user = verifiedUser();
+    UserModel user = verifiedUser();
     user.setVerified(false);
     when(users.findByEmail("a@vanep.com")).thenReturn(Optional.of(user));
 
@@ -78,7 +78,7 @@ class VanepUserDetailsServiceTest {
 
   @Test
   void accountWithoutLocalPasswordThrows() {
-    User user = verifiedUser();
+    UserModel user = verifiedUser();
     user.setPassword(null);
     when(users.findByEmail("a@vanep.com")).thenReturn(Optional.of(user));
     assertThatThrownBy(() -> service.loadUserByUsername("a@vanep.com"))

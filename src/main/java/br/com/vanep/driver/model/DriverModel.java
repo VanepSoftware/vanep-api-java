@@ -1,8 +1,11 @@
-package br.com.vanep.client;
+package br.com.vanep.driver.model;
 
-import br.com.vanep.user.User;
+import br.com.vanep.driver.DriverApprovalStatus;
+import br.com.vanep.user.model.UserModel;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -22,11 +25,11 @@ import org.hibernate.annotations.SoftDeleteType;
 import org.hibernate.annotations.UpdateTimestamp;
 
 @Entity
-@Table(name = "client")
+@Table(name = "driver")
 @SoftDelete(columnName = "deleted_at", strategy = SoftDeleteType.TIMESTAMP)
 @Getter
 @Setter
-public class Client {
+public class DriverModel {
 
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -35,20 +38,34 @@ public class Client {
   @Column(nullable = false, unique = true, length = 32)
   private String token;
 
-  @OneToOne(fetch = FetchType.LAZY, optional = false)
+  @OneToOne(fetch = FetchType.EAGER, optional = false)
   @JoinColumn(name = "user_id", nullable = false, unique = true)
-  private User user;
+  private UserModel user;
 
   @Column private String photo;
 
   @Column(precision = 3, scale = 2)
   private BigDecimal rating;
 
-  @Column(name = "address_id")
-  private Long addressId;
+  @Column private String cnpj;
+
+  @Column(name = "experience_years")
+  private Integer experienceYears;
+
+  @Column private String city;
+
+  @Column(name = "base_price", nullable = false, precision = 12, scale = 2)
+  private BigDecimal basePrice;
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = "approval_status", nullable = false, length = 16)
+  private DriverApprovalStatus approvalStatus = DriverApprovalStatus.PENDING;
 
   @Column(name = "is_active", nullable = false)
   private boolean active = true;
+
+  @Column(name = "is_available", nullable = false)
+  private boolean available = false;
 
   @CreationTimestamp
   @Column(name = "created_at", nullable = false, updatable = false)

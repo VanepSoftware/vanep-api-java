@@ -1,6 +1,7 @@
-package br.com.vanep.driver;
+package br.com.vanep.role.model;
 
-import br.com.vanep.user.User;
+import br.com.vanep.role.RoleName;
+import br.com.vanep.rolepermission.model.RolePermissionModel;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -13,7 +14,6 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
-import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 import lombok.Getter;
@@ -24,11 +24,11 @@ import org.hibernate.annotations.SoftDeleteType;
 import org.hibernate.annotations.UpdateTimestamp;
 
 @Entity
-@Table(name = "driver")
+@Table(name = "roles")
 @SoftDelete(columnName = "deleted_at", strategy = SoftDeleteType.TIMESTAMP)
 @Getter
 @Setter
-public class Driver {
+public class RoleModel {
 
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -37,34 +37,19 @@ public class Driver {
   @Column(nullable = false, unique = true, length = 32)
   private String token;
 
-  @OneToOne(fetch = FetchType.LAZY, optional = false)
-  @JoinColumn(name = "user_id", nullable = false, unique = true)
-  private User user;
+  @Column(nullable = false, unique = true, length = 64)
+  private String name;
 
-  @Column private String photo;
+  @Column(columnDefinition = "text")
+  private String description;
 
-  @Column(precision = 3, scale = 2)
-  private BigDecimal rating;
-
-  @Column private String cnpj;
-
-  @Column(name = "experience_years")
-  private Integer experienceYears;
-
-  @Column private String city;
-
-  @Column(name = "base_price", nullable = false, precision = 12, scale = 2)
-  private BigDecimal basePrice;
+  @OneToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "role_permissions_id", unique = true)
+  private RolePermissionModel rolePermission;
 
   @Enumerated(EnumType.STRING)
-  @Column(name = "approval_status", nullable = false, length = 16)
-  private DriverApprovalStatus approvalStatus = DriverApprovalStatus.PENDING;
-
-  @Column(name = "is_active", nullable = false)
-  private boolean active = true;
-
-  @Column(name = "is_available", nullable = false)
-  private boolean available = false;
+  @Column(name = "role_name", unique = true, length = 16)
+  private RoleName roleName;
 
   @CreationTimestamp
   @Column(name = "created_at", nullable = false, updatable = false)

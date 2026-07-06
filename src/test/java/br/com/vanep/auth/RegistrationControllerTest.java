@@ -8,11 +8,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import br.com.vanep.client.ClientRepository;
+import br.com.vanep.client.repository.ClientRepository;
 import br.com.vanep.driver.DriverRepository;
-import br.com.vanep.user.User;
 import br.com.vanep.user.UserRepository;
 import br.com.vanep.user.UserType;
+import br.com.vanep.user.model.UserModel;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -70,7 +70,7 @@ class RegistrationControllerTest {
         .andExpect(status().is3xxRedirection())
         .andExpect(redirectedUrl("/login?registered"));
 
-    User user = users.findByEmail("ana@vanep.com").orElseThrow();
+    UserModel user = users.findByEmail("ana@vanep.com").orElseThrow();
     assertThat(user.getType()).isEqualTo(UserType.CLIENT);
     assertThat(clients.count()).isEqualTo(1);
   }
@@ -91,14 +91,14 @@ class RegistrationControllerTest {
         .andExpect(status().is3xxRedirection())
         .andExpect(redirectedUrl("/login?registered"));
 
-    User user = users.findByEmail("bruno@vanep.com").orElseThrow();
+    UserModel user = users.findByEmail("bruno@vanep.com").orElseThrow();
     assertThat(user.getType()).isEqualTo(UserType.DRIVER);
     assertThat(drivers.count()).isEqualTo(1);
   }
 
   @Test
   void rejectsDuplicateEmail() throws Exception {
-    User existing = new User();
+    UserModel existing = new UserModel();
     existing.setType(UserType.CLIENT);
     existing.setName("Existing");
     existing.setEmail("dup@vanep.com");

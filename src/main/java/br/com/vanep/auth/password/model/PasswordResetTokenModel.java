@@ -1,4 +1,4 @@
-package br.com.vanep.auth.password;
+package br.com.vanep.auth.password.model;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -15,7 +15,7 @@ import org.hibernate.annotations.CreationTimestamp;
 @Table(name = "password_reset_token")
 @Getter
 @Setter
-public class PasswordResetToken {
+public class PasswordResetTokenModel {
 
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)

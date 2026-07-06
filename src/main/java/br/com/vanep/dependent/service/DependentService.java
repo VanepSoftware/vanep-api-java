@@ -1,15 +1,15 @@
 package br.com.vanep.dependent.service;
 
-import br.com.vanep.client.Client;
-import br.com.vanep.client.ClientRepository;
+import br.com.vanep.client.model.ClientModel;
+import br.com.vanep.client.repository.ClientRepository;
 import br.com.vanep.dependent.dto.DependentCreateDTO;
 import br.com.vanep.dependent.dto.DependentResponseDTO;
 import br.com.vanep.dependent.dto.DependentUpdateDTO;
 import br.com.vanep.dependent.mapper.DependentMapper;
 import br.com.vanep.dependent.model.DependentModel;
 import br.com.vanep.dependent.repository.DependentRepository;
-import br.com.vanep.user.User;
 import br.com.vanep.user.UserRepository;
+import br.com.vanep.user.model.UserModel;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -147,13 +147,13 @@ public class DependentService {
   private Map<Long, String> clientTokensById(List<DependentModel> models) {
     List<Long> clientIds = models.stream().map(DependentModel::getClientId).distinct().toList();
     return clients.findAllById(clientIds).stream()
-        .collect(Collectors.toMap(Client::getId, Client::getToken));
+        .collect(Collectors.toMap(ClientModel::getId, ClientModel::getToken));
   }
 
   private String resolveClientToken(Long clientId) {
     return clients
         .findById(clientId)
-        .map(Client::getToken)
+        .map(ClientModel::getToken)
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Client not found."));
   }
 
@@ -262,7 +262,7 @@ public class DependentService {
       }
       return clients
           .findByToken(dto.getClientToken())
-          .map(Client::getId)
+          .map(ClientModel::getId)
           .orElseThrow(
               () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Client not found."));
     }
@@ -270,15 +270,15 @@ public class DependentService {
   }
 
   private Long resolveClientIdForClient(Jwt jwt) {
-    User user = requireUser(jwt);
+    UserModel user = requireUser(jwt);
     return clients
         .findByUserId(user.getId())
-        .map(Client::getId)
+        .map(ClientModel::getId)
         .orElseThrow(
             () -> new ResponseStatusException(HttpStatus.FORBIDDEN, "Client profile not found."));
   }
 
-  private User requireUser(Jwt jwt) {
+  private UserModel requireUser(Jwt jwt) {
     return users
         .findByEmail(jwt.getSubject())
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Account not found."));
