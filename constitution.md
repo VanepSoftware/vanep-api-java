@@ -86,6 +86,7 @@ Rules that MUST be followed in this codebase. Stack: **Java 25, Spring Boot 4, M
 ## Conventions
 
 42. **The build requires Spotless (Google Java Format).** Auto-fix with `make lint-fix` / `./mvnw spotless:apply`; verify with `make lint` / `./mvnw spotless:check`. Unformatted code fails CI. Never exclude `db/migration/` from migration-checksum protection while formatting (see rule 2).
-43. **Write user-facing validation and business error messages in Portuguese (pt-BR)**, consistent with existing controllers.
+43. **Write user-facing validation and business error messages in English**, consistent with rule 46.
 44. **Write commit messages and PR descriptions in pt-BR.** Include test and lint status in the PR description, and link the PR to its GitHub issue (`Closes #N` / via the GitHub Project) — we track work through native GitHub Issues/Projects, not ticket-prefixed titles.
-45. **Name files, classes, packages, and code identifiers in English — never pt-BR.** The codebase is English (`client`, `driver`, `user`, `ClientController`, `ClientRepository`); a new file must follow the same. This is the deliberate inverse of rules 43–44: *only* user-facing messages (rule 43) and commit/PR descriptions (rule 44) are pt-BR; everything in source — file names, identifiers, types — stays English.
+45. **Name files, classes, packages, and code identifiers in English — never pt-BR.** The codebase is English (`client`, `driver`, `user`, `ClientController`, `ClientRepository`); a new file must follow the same. Commit/PR descriptions (rule 44) remain pt-BR.
+46. **Keep all string literals in source code in English** — validation messages, API error messages, logs, comments, and internal constants.

@@ -11,7 +11,7 @@ import lombok.Setter;
 @Setter
 public class DependentCreateDTO {
 
-  @NotBlank(message = "Nome é obrigatório.")
+  @NotBlank(message = "Name is required.")
   private String name;
 
   private LocalDate birthDate;

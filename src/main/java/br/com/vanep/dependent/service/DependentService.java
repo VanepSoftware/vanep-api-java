@@ -115,7 +115,7 @@ public class DependentService {
   @Transactional
   public DependentResponseDTO restore(Jwt jwt, String token) {
     if (dependents.findByToken(token).isPresent()) {
-      throw new ResponseStatusException(HttpStatus.CONFLICT, "Dependente já está ativo.");
+      throw new ResponseStatusException(HttpStatus.CONFLICT, "Dependent is already active.");
     }
 
     Long clientId = dependents.findClientIdOfDeletedByToken(token).orElseThrow(this::notFound);
@@ -163,7 +163,7 @@ public class DependentService {
         .findById(clientId)
         .map(Client::getToken)
         .orElseThrow(
-            () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Cliente não encontrado."));
+            () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Client not found."));
   }
 
   private Optional<Long> resolveSchoolId(String schoolToken) {
@@ -263,7 +263,7 @@ public class DependentService {
             : dependents.existsByDocumentAndTokenNot(document, excludeToken);
     if (duplicate) {
       throw new ResponseStatusException(
-          HttpStatus.CONFLICT, "Documento já cadastrado para outro dependente.");
+          HttpStatus.CONFLICT, "Document is already registered for another dependent.");
     }
   }
 
@@ -271,13 +271,13 @@ public class DependentService {
     if (isAdmin(jwt)) {
       if (!StringUtils.hasText(dto.getClientToken())) {
         throw new ResponseStatusException(
-            HttpStatus.BAD_REQUEST, "clientToken é obrigatório para administradores.");
+            HttpStatus.BAD_REQUEST, "clientToken is required for administrators.");
       }
       return clients
           .findByToken(dto.getClientToken())
           .map(Client::getId)
           .orElseThrow(
-              () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Cliente não encontrado."));
+              () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Client not found."));
     }
     return resolveClientIdForClient(jwt);
   }
@@ -290,14 +290,14 @@ public class DependentService {
         .orElseThrow(
             () ->
                 new ResponseStatusException(
-                    HttpStatus.FORBIDDEN, "Perfil de cliente não encontrado."));
+                    HttpStatus.FORBIDDEN, "Client profile not found."));
   }
 
   private User requireUser(Jwt jwt) {
     return users
         .findByEmail(jwt.getSubject())
         .orElseThrow(
-            () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Conta não encontrada."));
+            () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Account not found."));
   }
 
   private void assertOwnership(Jwt jwt, Long clientId) {
@@ -307,7 +307,7 @@ public class DependentService {
     Long actorClientId = resolveClientIdForClient(jwt);
     if (!actorClientId.equals(clientId)) {
       throw new ResponseStatusException(
-          HttpStatus.FORBIDDEN, "Sem permissão para acessar este dependente.");
+          HttpStatus.FORBIDDEN, "Not allowed to access this dependent.");
     }
   }
 
@@ -320,6 +320,6 @@ public class DependentService {
   }
 
   private ResponseStatusException notFound() {
-    return new ResponseStatusException(HttpStatus.NOT_FOUND, "Dependente não encontrado.");
+    return new ResponseStatusException(HttpStatus.NOT_FOUND, "Dependent not found.");
   }
 }

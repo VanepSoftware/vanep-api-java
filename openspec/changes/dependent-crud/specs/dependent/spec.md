@@ -69,7 +69,7 @@ Accepted creation fields: `name` (required), `birth_date`, `gender`, `document`,
 #### Scenario: Name required
 
 - **WHEN** an authenticated user sends a create request without `name`
-- **THEN** the system returns HTTP 400 with a validation message in pt-BR
+- **THEN** the system returns HTTP 400 with a validation message in English
 
 ### Requirement: Dependent listing
 
@@ -103,7 +103,7 @@ The system MUST allow `GET /api/dependent/{token}` for `ROLE_CLIENT` (only if ow
 #### Scenario: Dependent not found or deleted
 
 - **WHEN** the `token` does not exist or the record is soft-deleted
-- **THEN** the system returns HTTP 404 with a message in pt-BR
+- **THEN** the system returns HTTP 404 with a message in English
 
 ### Requirement: Dependent update
 
@@ -148,7 +148,7 @@ The system MUST allow `POST /api/dependent/{token}/restore` to clear `deleted_at
 #### Scenario: Restore of active record
 
 - **WHEN** attempting to restore a dependent that is not soft-deleted
-- **THEN** the system returns HTTP 409 with a message in pt-BR
+- **THEN** the system returns HTTP 409 with a message in English
 
 ### Requirement: Default dependent (RN12)
 
@@ -194,7 +194,7 @@ The system MUST validate requests with Bean Validation on dedicated DTOs (`@Vali
 #### Scenario: Duplicate document
 
 - **WHEN** a create or update sets `document` already used by another active dependent
-- **THEN** the system returns HTTP 409 with a message in pt-BR
+- **THEN** the system returns HTTP 409 with a message in English
 
 ### Requirement: Test dependent seeder
 
