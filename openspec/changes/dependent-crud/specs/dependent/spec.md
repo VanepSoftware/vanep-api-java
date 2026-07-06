@@ -46,7 +46,7 @@ The system MUST NOT expose numeric `client_id` in API responses. When a dependen
 
 ### Requirement: School and address references via token
 
-The system MUST NOT expose numeric `school_id` or `address_id` in API requests or responses. School and address MUST be referenced by `schoolToken` / `addressToken` on input and nested `school.token` / `address.token` on output. Until `school` and `address` tables exist, the system MUST use pluggable token resolvers (stub implementations return 404 when a token is supplied on create/update).
+The system MUST NOT expose numeric `school_id` or `address_id` in API requests or responses. School and address MUST be referenced by `schoolToken` / `addressToken` on input and nested `school.token` / `address.token` on output. Until `school` and `address` tables exist, supplying `schoolToken` or `addressToken` on create/update MUST return HTTP 400.
 
 ### Requirement: Dependent creation
 

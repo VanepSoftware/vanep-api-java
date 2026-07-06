@@ -8,8 +8,6 @@ import br.com.vanep.dependent.dto.DependentUpdateDTO;
 import br.com.vanep.dependent.mapper.DependentMapper;
 import br.com.vanep.dependent.model.DependentModel;
 import br.com.vanep.dependent.repository.DependentRepository;
-import br.com.vanep.dependent.resolver.AddressTokenResolver;
-import br.com.vanep.dependent.resolver.SchoolTokenResolver;
 import br.com.vanep.user.User;
 import br.com.vanep.user.UserRepository;
 import java.util.Collection;
@@ -30,22 +28,16 @@ public class DependentService {
   private final DependentRepository dependents;
   private final ClientRepository clients;
   private final UserRepository users;
-  private final SchoolTokenResolver schools;
-  private final AddressTokenResolver addresses;
   private final DependentMapper mapper;
 
   public DependentService(
       DependentRepository dependents,
       ClientRepository clients,
       UserRepository users,
-      SchoolTokenResolver schools,
-      AddressTokenResolver addresses,
       DependentMapper mapper) {
     this.dependents = dependents;
     this.clients = clients;
     this.users = users;
-    this.schools = schools;
-    this.addresses = addresses;
     this.mapper = mapper;
   }
 
@@ -162,58 +154,53 @@ public class DependentService {
     return clients
         .findById(clientId)
         .map(Client::getToken)
-        .orElseThrow(
-            () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Client not found."));
+        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Client not found."));
   }
 
   private Optional<Long> resolveSchoolId(String schoolToken) {
-    if (schoolToken == null) {
+    if (schoolToken == null || !StringUtils.hasText(schoolToken)) {
       return Optional.empty();
     }
-    if (!StringUtils.hasText(schoolToken)) {
-      return Optional.empty();
-    }
-    return schools.resolveId(schoolToken);
+    throw new ResponseStatusException(
+        HttpStatus.BAD_REQUEST, "schoolToken is not supported in this phase.");
   }
 
   private Optional<Long> resolveAddressId(String addressToken) {
-    if (addressToken == null) {
+    if (addressToken == null || !StringUtils.hasText(addressToken)) {
       return Optional.empty();
     }
-    if (!StringUtils.hasText(addressToken)) {
-      return Optional.empty();
-    }
-    return addresses.resolveId(addressToken);
+    throw new ResponseStatusException(
+        HttpStatus.BAD_REQUEST, "addressToken is not supported in this phase.");
   }
 
   private Optional<String> resolveSchoolToken(Long schoolId) {
-    if (schoolId == null) {
-      return Optional.empty();
-    }
-    return schools.resolveToken(schoolId);
+    return Optional.empty();
   }
 
   private Optional<String> resolveAddressToken(Long addressId) {
-    if (addressId == null) {
-      return Optional.empty();
-    }
-    return addresses.resolveToken(addressId);
+    return Optional.empty();
   }
 
   private void applySchoolTokenUpdate(String schoolToken, DependentModel model) {
     if (schoolToken == null) {
       return;
     }
-    model.setSchoolId(
-        StringUtils.hasText(schoolToken) ? resolveSchoolId(schoolToken).orElse(null) : null);
+    if (!StringUtils.hasText(schoolToken)) {
+      model.setSchoolId(null);
+      return;
+    }
+    model.setSchoolId(resolveSchoolId(schoolToken).orElse(null));
   }
 
   private void applyAddressTokenUpdate(String addressToken, DependentModel model) {
     if (addressToken == null) {
       return;
     }
-    model.setAddressId(
-        StringUtils.hasText(addressToken) ? resolveAddressId(addressToken).orElse(null) : null);
+    if (!StringUtils.hasText(addressToken)) {
+      model.setAddressId(null);
+      return;
+    }
+    model.setAddressId(resolveAddressId(addressToken).orElse(null));
   }
 
   private void promoteDefaultAfterDelete(Long clientId, boolean wasDefault) {
@@ -288,16 +275,13 @@ public class DependentService {
         .findByUserId(user.getId())
         .map(Client::getId)
         .orElseThrow(
-            () ->
-                new ResponseStatusException(
-                    HttpStatus.FORBIDDEN, "Client profile not found."));
+            () -> new ResponseStatusException(HttpStatus.FORBIDDEN, "Client profile not found."));
   }
 
   private User requireUser(Jwt jwt) {
     return users
         .findByEmail(jwt.getSubject())
-        .orElseThrow(
-            () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Account not found."));
+        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Account not found."));
   }
 
   private void assertOwnership(Jwt jwt, Long clientId) {
