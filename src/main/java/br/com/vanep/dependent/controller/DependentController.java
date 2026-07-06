@@ -22,7 +22,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/dependent")
-@PreAuthorize("hasAnyRole('CLIENT','ADMIN')")
 public class DependentController {
 
   private final DependentService service;
@@ -32,6 +31,7 @@ public class DependentController {
   }
 
   @PostMapping
+  @PreAuthorize("hasAnyRole('CLIENT','ADMIN')")
   @ResponseStatus(HttpStatus.CREATED)
   public DependentResponseDTO create(
       @AuthenticationPrincipal Jwt jwt, @Valid @RequestBody DependentCreateDTO dto) {
@@ -39,17 +39,20 @@ public class DependentController {
   }
 
   @GetMapping
+  @PreAuthorize("hasAnyRole('CLIENT','ADMIN')")
   public List<DependentResponseDTO> list(@AuthenticationPrincipal Jwt jwt) {
     return service.list(jwt);
   }
 
   @GetMapping("/{token}")
+  @PreAuthorize("hasAnyRole('CLIENT','ADMIN')")
   public DependentResponseDTO getByToken(
       @AuthenticationPrincipal Jwt jwt, @PathVariable String token) {
     return service.getByToken(jwt, token);
   }
 
   @PatchMapping("/{token}")
+  @PreAuthorize("hasAnyRole('CLIENT','ADMIN')")
   public DependentResponseDTO update(
       @AuthenticationPrincipal Jwt jwt,
       @PathVariable String token,
@@ -58,12 +61,14 @@ public class DependentController {
   }
 
   @DeleteMapping("/{token}")
+  @PreAuthorize("hasAnyRole('CLIENT','ADMIN')")
   @ResponseStatus(HttpStatus.NO_CONTENT)
   public void delete(@AuthenticationPrincipal Jwt jwt, @PathVariable String token) {
     service.delete(jwt, token);
   }
 
   @PostMapping("/{token}/restore")
+  @PreAuthorize("hasAnyRole('CLIENT','ADMIN')")
   public DependentResponseDTO restore(
       @AuthenticationPrincipal Jwt jwt, @PathVariable String token) {
     return service.restore(jwt, token);
