@@ -31,7 +31,7 @@ public class DependentController {
   }
 
   @PostMapping
-  @PreAuthorize("hasAnyRole('CLIENT','ADMIN')")
+  @PreAuthorize("hasAuthority('create_dependent')")
   @ResponseStatus(HttpStatus.CREATED)
   public DependentResponseDTO create(
       @AuthenticationPrincipal Jwt jwt, @Valid @RequestBody DependentCreateDTO dto) {
@@ -39,20 +39,20 @@ public class DependentController {
   }
 
   @GetMapping
-  @PreAuthorize("hasAnyRole('CLIENT','ADMIN')")
+  @PreAuthorize("hasAuthority('list_dependents')")
   public List<DependentResponseDTO> list(@AuthenticationPrincipal Jwt jwt) {
     return service.list(jwt);
   }
 
   @GetMapping("/{token}")
-  @PreAuthorize("hasAnyRole('CLIENT','ADMIN')")
+  @PreAuthorize("hasAuthority('show_dependent')")
   public DependentResponseDTO getByToken(
       @AuthenticationPrincipal Jwt jwt, @PathVariable String token) {
     return service.getByToken(jwt, token);
   }
 
   @PatchMapping("/{token}")
-  @PreAuthorize("hasAnyRole('CLIENT','ADMIN')")
+  @PreAuthorize("hasAuthority('update_dependent')")
   public DependentResponseDTO update(
       @AuthenticationPrincipal Jwt jwt,
       @PathVariable String token,
@@ -61,14 +61,14 @@ public class DependentController {
   }
 
   @DeleteMapping("/{token}")
-  @PreAuthorize("hasAnyRole('CLIENT','ADMIN')")
+  @PreAuthorize("hasAuthority('delete_dependent')")
   @ResponseStatus(HttpStatus.NO_CONTENT)
   public void delete(@AuthenticationPrincipal Jwt jwt, @PathVariable String token) {
     service.delete(jwt, token);
   }
 
   @PostMapping("/{token}/restore")
-  @PreAuthorize("hasAnyRole('CLIENT','ADMIN')")
+  @PreAuthorize("hasAuthority('update_dependent')")
   public DependentResponseDTO restore(
       @AuthenticationPrincipal Jwt jwt, @PathVariable String token) {
     return service.restore(jwt, token);

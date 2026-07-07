@@ -17,7 +17,12 @@ public enum PermissionEnum {
   SHOW_CLIENT("show_client"),
   CREATE_CLIENT("create_client"),
   UPDATE_CLIENT("update_client"),
-  DELETE_CLIENT("delete_client");
+  DELETE_CLIENT("delete_client"),
+  LIST_DEPENDENTS("list_dependents"),
+  SHOW_DEPENDENT("show_dependent"),
+  CREATE_DEPENDENT("create_dependent"),
+  UPDATE_DEPENDENT("update_dependent"),
+  DELETE_DEPENDENT("delete_dependent");
 
   private final String value;
 
