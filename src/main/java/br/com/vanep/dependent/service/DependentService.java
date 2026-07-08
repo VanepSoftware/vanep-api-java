@@ -1,6 +1,5 @@
 package br.com.vanep.dependent.service;
 
-import br.com.vanep.client.model.ClientModel;
 import br.com.vanep.client.repository.ClientRepository;
 import br.com.vanep.dependent.dto.DependentCreateDTO;
 import br.com.vanep.dependent.dto.DependentResponseDTO;
@@ -145,15 +144,15 @@ public class DependentService {
   }
 
   private Map<Long, String> clientTokensById(List<DependentModel> models) {
-    List<Long> clientIds = models.stream().map(DependentModel::getClientId).distinct().toList();
+    List<Long> clientIds = models.stream().map(model -> model.getClientId()).distinct().toList();
     return clients.findAllById(clientIds).stream()
-        .collect(Collectors.toMap(ClientModel::getId, ClientModel::getToken));
+        .collect(Collectors.toMap(client -> client.getId(), client -> client.getToken()));
   }
 
   private String resolveClientToken(Long clientId) {
     return clients
         .findById(clientId)
-        .map(ClientModel::getToken)
+        .map(client -> client.getToken())
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Client not found."));
   }
 
@@ -232,7 +231,7 @@ public class DependentService {
   private void clearOtherDefaults(Long clientId, String excludeToken) {
     dependents.findByClientId(clientId).stream()
         .filter(dependent -> excludeToken == null || !dependent.getToken().equals(excludeToken))
-        .filter(DependentModel::isDefaultDependent)
+        .filter(dependent -> dependent.isDefaultDependent())
         .forEach(
             dependent -> {
               dependent.setDefaultDependent(false);
@@ -262,7 +261,7 @@ public class DependentService {
       }
       return clients
           .findByToken(dto.getClientToken())
-          .map(ClientModel::getId)
+          .map(client -> client.getId())
           .orElseThrow(
               () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Client not found."));
     }
@@ -273,7 +272,7 @@ public class DependentService {
     UserModel user = requireUser(jwt);
     return clients
         .findByUserId(user.getId())
-        .map(ClientModel::getId)
+        .map(client -> client.getId())
         .orElseThrow(
             () -> new ResponseStatusException(HttpStatus.FORBIDDEN, "Client profile not found."));
   }
