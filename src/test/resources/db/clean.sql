@@ -5,6 +5,7 @@
 delete from oauth_account;
 delete from password_reset_token;
 delete from email_verification_token;
+delete from dependent;
 delete from client;
 delete from driver;
 delete from users;
