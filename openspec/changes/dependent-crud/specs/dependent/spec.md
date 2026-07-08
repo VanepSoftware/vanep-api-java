@@ -48,6 +48,11 @@ The system MUST NOT expose numeric `client_id` in API responses. When a dependen
 
 The system MUST NOT expose numeric `school_id` or `address_id` in API requests or responses. School and address MUST be referenced by `schoolToken` / `addressToken` on input and nested `school.token` / `address.token` on output. Until `school` and `address` tables exist, supplying `schoolToken` or `addressToken` on create/update MUST return HTTP 400.
 
+#### Scenario: School or address token rejected until tables exist
+
+- **WHEN** an authenticated user sends a create or update request with `schoolToken` or `addressToken`
+- **THEN** the system returns HTTP 400 with a message in English
+
 ### Requirement: Dependent creation
 
 The system MUST allow an authenticated user with `ROLE_CLIENT` to create a dependent linked to their `client_id`. The system MUST allow a user with `ROLE_ADMIN` to create a dependent for any `client_id` supplied in the request.
