@@ -12,6 +12,7 @@ import static org.mockito.Mockito.when;
 import br.com.vanep.auth.security.PermissionEnum;
 import br.com.vanep.auth.security.PermissionRegistry;
 import br.com.vanep.client.repository.ClientRepository;
+import br.com.vanep.dependent.seed.DependentSeeder;
 import br.com.vanep.driver.DriverApprovalStatus;
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
@@ -42,13 +43,16 @@ class DataSeederTest {
   @Mock private DriverRepository drivers;
   @Mock private RoleRepository roles;
   @Mock private RolePermissionRepository rolePermissions;
+  @Mock private DependentSeeder dependentSeeder;
   @Mock private PasswordEncoder passwordEncoder;
 
   private DataSeeder seeder;
 
   @BeforeEach
   void setUp() {
-    seeder = new DataSeeder(users, clients, drivers, roles, rolePermissions, passwordEncoder);
+    seeder =
+        new DataSeeder(
+            users, clients, drivers, roles, rolePermissions, dependentSeeder, passwordEncoder);
     seeder.adminEmail = "admin@vanep.com.br";
     seeder.adminPassword = "password";
     seeder.adminDocument = "00000000000";
