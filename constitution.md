@@ -11,22 +11,22 @@ Rules that MUST be followed in this codebase. Stack: **Java 25, Spring Boot 4, M
 
 ## Architecture & code organization
 
-5. **Organize business code by feature** (`br.com.vanep.<feature>` with `controller`, `dto`, `model`, `enums`, `mapper`, `repository`, `service` subpackages). Code shared by two or more features moves to a shared area (`config`, shared `model` bases, generic utils) instead of being duplicated. The codebase is **feature-based** (packages by functionality), not type-based at the package root — and not to be confused with runtime *feature flags*. **Name every new file for exactly what it is**, with the architectural-role suffix that matches its subpackage — e.g. `ClientController`, `ClientService`, `ClientRepository`, `ClientDTO` (request/response DTOs), `ClientMapper`, and the `ClientModel` entity inside a `model/` subfolder (a `*Repository` lives in `repository`, a `*DTO` in `dto`, …). No generic names like `Handler`, `Manager`, `Util`, or `Data` for these roles. Per feature (entity), each subpackage holds the file named for its role:
+5. **Organize business code by feature** (`br.com.vanep.<feature>` with `controller`, `dto`, `entity`, `enums`, `mapper`, `repository`, `service` subpackages). Code shared by two or more features moves to a shared area (`config`, shared `entity` bases, generic utils) instead of being duplicated. The codebase is **feature-based** (packages by functionality), not type-based at the package root — and not to be confused with runtime *feature flags*. **Name every new file for exactly what it is**, with the architectural-role suffix that matches its subpackage — e.g. `ClientController`, `ClientService`, `ClientRepository`, `ClientDTO` (request/response DTOs), `ClientMapper`, and the `Client` entity (a `*Repository` lives in `repository`, a `*DTO` in `dto`, …). No generic names like `Handler`, `Manager`, `Util`, or `Data` for these roles. Per feature (entity), each subpackage holds the file named for its role:
 
    ```
-   br.com.vanep.role              (feature: role)
+   br.com.vanep.client            (feature: client)
    ├── controller
-   │   └── RoleController
+   │   └── ClientController
    ├── dto
-   │   └── RoleDTO
+   │   └── ClientDTO
    ├── repository
-   │   └── RoleRepository
+   │   └── ClientRepository
    ├── service
-   │   └── RoleService
+   │   └── ClientService
    ├── mapper
-   │   └── RoleMapper
-   └── model
-       └── RoleModel
+   │   └── ClientMapper
+   └── entity
+       └── Client
    ```
 6. **Before adding anything new, search for existing code** (class, package, migration, property) that can be reused or extended. Reuse or refactor before duplicating (DRY). This applies to code, tests, config patterns, and Flyway migrations.
 7. **Keep controllers thin** — orchestration only (parse request, delegate, return response). No business logic in controllers.
@@ -89,3 +89,4 @@ Rules that MUST be followed in this codebase. Stack: **Java 25, Spring Boot 4, M
 43. **Write user-facing validation and business error messages in Portuguese (pt-BR)**, consistent with existing controllers. Never hardcode the pt-BR string at the throw site — use an English message *key* (e.g. `role_permission.name.duplicate`) resolved through Spring's `MessageSource` (`src/main/resources/messages.properties` for the English default, `messages_pt_BR.properties` for the pt-BR translation actually served; `spring.mvc.locale=pt_BR` is fixed in `application.properties`). Inject `MessageSource` into the `@Service` and resolve with `messages.getMessage(key, args, LocaleContextHolder.getLocale())` before throwing.
 44. **Write commit messages and PR descriptions in pt-BR.** Include test and lint status in the PR description, and link the PR to its GitHub issue (`Closes #N` / via the GitHub Project) — we track work through native GitHub Issues/Projects, not ticket-prefixed titles.
 45. **Name files, classes, packages, and code identifiers in English — never pt-BR.** The codebase is English (`client`, `driver`, `user`, `ClientController`, `ClientRepository`); a new file must follow the same. This is the deliberate inverse of rules 43–44: *only* user-facing messages (rule 43) and commit/PR descriptions (rule 44) are pt-BR; everything in source — file names, identifiers, types — stays English.
+46. **Keep all non-user-facing string literals in source code in English** — MessageSource keys, logs, comments, and internal constants.
