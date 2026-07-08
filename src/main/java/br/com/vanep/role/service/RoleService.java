@@ -24,10 +24,12 @@ public class RoleService {
     this.mapper = mapper;
   }
 
+  @Transactional(readOnly = true)
   public Page<RoleResponseDTO> findAll(Pageable pageable) {
     return roles.findAll(pageable).map(mapper::toResponse);
   }
 
+  @Transactional(readOnly = true)
   public RoleResponseDTO findByToken(String token) {
     return mapper.toResponse(requireByToken(token));
   }

@@ -8,11 +8,11 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import br.com.vanep.client.Client;
+import br.com.vanep.client.model.ClientModel;
 import br.com.vanep.client.repository.ClientRepository;
-import br.com.vanep.user.User;
 import br.com.vanep.user.UserRepository;
 import br.com.vanep.user.UserType;
+import br.com.vanep.user.model.UserModel;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -46,7 +46,7 @@ class ClientControllerTest {
   void setUp() {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
 
-    User user = new User();
+    UserModel user = new UserModel();
     user.setType(UserType.CLIENT);
     user.setName("Test Client");
     user.setEmail("client@vanep.com");
@@ -57,7 +57,7 @@ class ClientControllerTest {
 
     ownerUid = user.getToken();
 
-    Client client = new Client();
+    ClientModel client = new ClientModel();
     client.setUser(user);
     client = clients.save(client);
 

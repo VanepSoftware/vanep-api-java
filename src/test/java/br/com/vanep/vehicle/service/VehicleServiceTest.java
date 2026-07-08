@@ -8,14 +8,14 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import br.com.vanep.driver.Driver;
 import br.com.vanep.driver.DriverRepository;
-import br.com.vanep.user.User;
+import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.user.UserRepository;
 import br.com.vanep.user.UserType;
-import br.com.vanep.vehicle.Vehicle;
+import br.com.vanep.user.model.UserModel;
 import br.com.vanep.vehicle.dto.VehicleRequestDTO;
 import br.com.vanep.vehicle.mapper.VehicleMapper;
+import br.com.vanep.vehicle.model.VehicleModel;
 import br.com.vanep.vehicle.repository.VehicleRepository;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -39,8 +39,8 @@ class VehicleServiceTest {
 
   @InjectMocks private VehicleService service;
 
-  private Driver driver;
-  private User user;
+  private DriverModel driver;
+  private UserModel user;
   private VehicleRequestDTO request;
 
   @BeforeEach
@@ -48,13 +48,13 @@ class VehicleServiceTest {
     lenient()
         .when(messages.getMessage(any(), any(), any()))
         .thenAnswer(invocation -> invocation.getArgument(0));
-    user = new User();
+    user = new UserModel();
     user.setId(1L);
     user.setType(UserType.DRIVER);
     user.setEmail("driver@vanep.com");
     user.setToken("user-token-123");
 
-    driver = new Driver();
+    driver = new DriverModel();
     driver.setId(10L);
     driver.setUser(user);
     driver.setToken("driver-token-123");
@@ -88,7 +88,7 @@ class VehicleServiceTest {
               assertThat(ex.getReason()).contains("vehicle.plate.duplicate");
             });
 
-    verify(vehicleRepository, never()).save(any(Vehicle.class));
+    verify(vehicleRepository, never()).save(any(VehicleModel.class));
   }
 
   @Test
@@ -97,20 +97,20 @@ class VehicleServiceTest {
     when(driverRepository.findByUserId(1L)).thenReturn(Optional.of(driver));
     when(vehicleRepository.existsByPlate("ABC1D23")).thenReturn(false);
 
-    Vehicle savedVehicle = new Vehicle();
+    VehicleModel savedVehicle = new VehicleModel();
     savedVehicle.setDriver(driver);
     savedVehicle.setPlate("ABC1D23");
 
-    when(vehicleRepository.save(any(Vehicle.class))).thenReturn(savedVehicle);
+    when(vehicleRepository.save(any(VehicleModel.class))).thenReturn(savedVehicle);
 
     service.create(request, "driver@vanep.com");
 
-    verify(vehicleRepository).save(any(Vehicle.class));
+    verify(vehicleRepository).save(any(VehicleModel.class));
   }
 
   @Test
   void restoreThrowsConflictWhenVehicleAlreadyActive() {
-    Vehicle activeVehicle = new Vehicle();
+    VehicleModel activeVehicle = new VehicleModel();
     activeVehicle.setToken("veh-123");
 
     when(vehicleRepository.existsDeletedByToken("veh-123")).thenReturn(false);
@@ -132,7 +132,7 @@ class VehicleServiceTest {
   void restoreSuccessfullyWhenVehicleDeleted() {
     when(vehicleRepository.existsDeletedByToken("veh-123")).thenReturn(true);
 
-    Vehicle restored = new Vehicle();
+    VehicleModel restored = new VehicleModel();
     restored.setToken("veh-123");
     restored.setPlate("ABC1D23");
     restored.setDriver(driver);

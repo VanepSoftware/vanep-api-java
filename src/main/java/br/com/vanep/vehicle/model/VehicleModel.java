@@ -1,6 +1,6 @@
-package br.com.vanep.vehicle;
+package br.com.vanep.vehicle.model;
 
-import br.com.vanep.driver.Driver;
+import br.com.vanep.driver.model.DriverModel;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -25,7 +25,7 @@ import org.hibernate.annotations.UpdateTimestamp;
 @SoftDelete(columnName = "deleted_at", strategy = SoftDeleteType.TIMESTAMP)
 @Getter
 @Setter
-public class Vehicle {
+public class VehicleModel {
 
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -36,7 +36,7 @@ public class Vehicle {
 
   @ManyToOne(fetch = FetchType.EAGER, optional = false)
   @JoinColumn(name = "driver_id", nullable = false)
-  private Driver driver;
+  private DriverModel driver;
 
   @Column(nullable = false, length = 10)
   private String plate;

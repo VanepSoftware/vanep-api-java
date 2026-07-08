@@ -4,8 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import br.com.vanep.user.User;
 import br.com.vanep.user.UserRepository;
+import br.com.vanep.user.model.UserModel;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -42,7 +42,7 @@ class AuthenticationEventsListenerTest {
   @Test
   void onInteractiveSuccessResetsAndStampsLastLogin() {
     Authentication auth = new TestingAuthenticationToken("a@vanep.com", null);
-    User user = new User();
+    UserModel user = new UserModel();
     when(users.findByEmail("a@vanep.com")).thenReturn(Optional.of(user));
 
     listener.onInteractiveSuccess(new InteractiveAuthenticationSuccessEvent(auth, getClass()));

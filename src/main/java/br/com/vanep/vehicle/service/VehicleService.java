@@ -1,14 +1,14 @@
 package br.com.vanep.vehicle.service;
 
-import br.com.vanep.driver.Driver;
 import br.com.vanep.driver.DriverRepository;
-import br.com.vanep.user.User;
+import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.user.UserRepository;
 import br.com.vanep.user.UserType;
-import br.com.vanep.vehicle.Vehicle;
+import br.com.vanep.user.model.UserModel;
 import br.com.vanep.vehicle.dto.VehicleRequestDTO;
 import br.com.vanep.vehicle.dto.VehicleResponseDTO;
 import br.com.vanep.vehicle.mapper.VehicleMapper;
+import br.com.vanep.vehicle.model.VehicleModel;
 import br.com.vanep.vehicle.repository.VehicleRepository;
 import java.util.List;
 import org.springframework.context.MessageSource;
@@ -46,7 +46,7 @@ public class VehicleService {
 
   @Transactional
   public VehicleResponseDTO create(VehicleRequestDTO request, String callerEmail) {
-    User caller =
+    UserModel caller =
         userRepository
             .findByEmail(callerEmail)
             .orElseThrow(
@@ -54,7 +54,7 @@ public class VehicleService {
                     new ResponseStatusException(
                         HttpStatus.NOT_FOUND, message("user.account.not_found")));
 
-    Driver driver;
+    DriverModel driver;
     if (caller.getType() == UserType.ADMIN
         && request.driverToken() != null
         && !request.driverToken().isBlank()) {
@@ -79,7 +79,7 @@ public class VehicleService {
       throw new ResponseStatusException(HttpStatus.CONFLICT, message("vehicle.plate.duplicate"));
     }
 
-    Vehicle vehicle = new Vehicle();
+    VehicleModel vehicle = new VehicleModel();
     vehicle.setDriver(driver);
     vehicle.setPlate(request.plate());
     vehicle.setBrand(request.brand());
@@ -95,7 +95,7 @@ public class VehicleService {
   }
 
   public List<VehicleResponseDTO> findAll(String callerEmail) {
-    User caller =
+    UserModel caller =
         userRepository
             .findByEmail(callerEmail)
             .orElseThrow(
@@ -103,11 +103,11 @@ public class VehicleService {
                     new ResponseStatusException(
                         HttpStatus.NOT_FOUND, message("user.account.not_found")));
 
-    List<Vehicle> vehicles;
+    List<VehicleModel> vehicles;
     if (caller.getType() == UserType.ADMIN) {
       vehicles = vehicleRepository.findAll();
     } else {
-      Driver driver =
+      DriverModel driver =
           driverRepository
               .findByUserId(caller.getId())
               .orElseThrow(
@@ -125,7 +125,7 @@ public class VehicleService {
 
   @Transactional
   public VehicleResponseDTO update(String token, VehicleRequestDTO request) {
-    Vehicle vehicle = requireByToken(token);
+    VehicleModel vehicle = requireByToken(token);
 
     if (!vehicle.getPlate().equalsIgnoreCase(request.plate())
         && vehicleRepository.existsByPlate(request.plate())) {
@@ -154,7 +154,7 @@ public class VehicleService {
   public VehicleResponseDTO restore(String token) {
     if (vehicleRepository.existsDeletedByToken(token)) {
       vehicleRepository.restoreByToken(token);
-      Vehicle restored = requireByToken(token);
+      VehicleModel restored = requireByToken(token);
       return mapper.toResponse(restored);
     }
 
@@ -165,8 +165,8 @@ public class VehicleService {
     throw new ResponseStatusException(HttpStatus.NOT_FOUND, message("vehicle.not_found"));
   }
 
-  private Driver getDriverFromEmail(String email) {
-    User user =
+  private DriverModel getDriverFromEmail(String email) {
+    UserModel user =
         userRepository
             .findByEmail(email)
             .orElseThrow(
@@ -181,7 +181,7 @@ public class VehicleService {
                     HttpStatus.NOT_FOUND, message("user.driver_profile.not_found")));
   }
 
-  private Vehicle requireByToken(String token) {
+  private VehicleModel requireByToken(String token) {
     return vehicleRepository
         .findByToken(token)
         .orElseThrow(

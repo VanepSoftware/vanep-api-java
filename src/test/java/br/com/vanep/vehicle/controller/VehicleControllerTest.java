@@ -9,12 +9,12 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import br.com.vanep.driver.Driver;
 import br.com.vanep.driver.DriverRepository;
-import br.com.vanep.user.User;
+import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.user.UserRepository;
 import br.com.vanep.user.UserType;
-import br.com.vanep.vehicle.Vehicle;
+import br.com.vanep.user.model.UserModel;
+import br.com.vanep.vehicle.model.VehicleModel;
 import br.com.vanep.vehicle.repository.VehicleRepository;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -56,7 +56,7 @@ class VehicleControllerTest {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
 
     // 1. Create main driver
-    User user = new User();
+    UserModel user = new UserModel();
     user.setType(UserType.DRIVER);
     user.setName("Test Driver");
     user.setEmail("driver@vanep.com");
@@ -68,14 +68,14 @@ class VehicleControllerTest {
     ownerUid = user.getToken();
     driverEmail = user.getEmail();
 
-    Driver driver = new Driver();
+    DriverModel driver = new DriverModel();
     driver.setUser(user);
     driver.setBasePrice(new BigDecimal("100.00"));
     driver = drivers.save(driver);
     driverToken = driver.getToken();
 
     // 2. Create another driver for ownership tests
-    User user2 = new User();
+    UserModel user2 = new UserModel();
     user2.setType(UserType.DRIVER);
     user2.setName("Other Driver");
     user2.setEmail("otherdriver@vanep.com");
@@ -87,13 +87,13 @@ class VehicleControllerTest {
     otherOwnerUid = user2.getToken();
     otherDriverEmail = user2.getEmail();
 
-    Driver driver2 = new Driver();
+    DriverModel driver2 = new DriverModel();
     driver2.setUser(user2);
     driver2.setBasePrice(new BigDecimal("150.00"));
     driver2 = drivers.save(driver2);
 
     // 3. Create admin user
-    User admin = new User();
+    UserModel admin = new UserModel();
     admin.setType(UserType.ADMIN);
     admin.setName("Admin User");
     admin.setEmail("admin@vanep.com");
@@ -104,7 +104,7 @@ class VehicleControllerTest {
     users.save(admin);
 
     // 4. Create a vehicle for the main driver
-    Vehicle vehicle = new Vehicle();
+    VehicleModel vehicle = new VehicleModel();
     vehicle.setDriver(driver);
     vehicle.setPlate("ABC1D23");
     vehicle.setBrand("Ford");

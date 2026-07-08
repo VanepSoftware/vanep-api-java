@@ -1,6 +1,6 @@
 package br.com.vanep.vehicle.repository;
 
-import br.com.vanep.vehicle.Vehicle;
+import br.com.vanep.vehicle.model.VehicleModel;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -8,11 +8,11 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-public interface VehicleRepository extends JpaRepository<Vehicle, Long> {
+public interface VehicleRepository extends JpaRepository<VehicleModel, Long> {
 
-  Optional<Vehicle> findByToken(String token);
+  Optional<VehicleModel> findByToken(String token);
 
-  List<Vehicle> findByDriverId(Long driverId);
+  List<VehicleModel> findByDriverId(Long driverId);
 
   boolean existsByPlate(String plate);
 

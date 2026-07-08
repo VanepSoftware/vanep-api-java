@@ -47,7 +47,8 @@ class RoleServiceTest {
   @Test
   void findAllReturnsPagedResponses() {
     RoleModel role = roleWithToken("abc");
-    RoleResponseDTO response = new RoleResponseDTO("abc", "Admin", "Administrator role", null);
+    RoleResponseDTO response =
+        new RoleResponseDTO("abc", "Admin", "Administrator role", null, null);
     when(repository.findAll(any(Pageable.class))).thenReturn(new PageImpl<>(List.of(role)));
     when(mapper.toResponse(role)).thenReturn(response);
 
@@ -59,7 +60,7 @@ class RoleServiceTest {
   @Test
   void findByTokenReturnsResponse() {
     RoleModel role = roleWithToken("tok");
-    RoleResponseDTO response = new RoleResponseDTO("tok", "Admin", "desc", null);
+    RoleResponseDTO response = new RoleResponseDTO("tok", "Admin", "desc", null, null);
     when(repository.findByToken("tok")).thenReturn(Optional.of(role));
     when(mapper.toResponse(role)).thenReturn(response);
 
@@ -79,7 +80,8 @@ class RoleServiceTest {
   void createPersistsRole() {
     RoleCreateRequestDTO req = new RoleCreateRequestDTO("Admin", "Administrator role");
     RoleModel saved = roleWithToken("tok");
-    RoleResponseDTO response = new RoleResponseDTO("tok", "Admin", "Administrator role", null);
+    RoleResponseDTO response =
+        new RoleResponseDTO("tok", "Admin", "Administrator role", null, null);
     when(repository.save(any(RoleModel.class))).thenReturn(saved);
     when(mapper.toResponse(saved)).thenReturn(response);
 
@@ -92,7 +94,7 @@ class RoleServiceTest {
   @Test
   void updatePersistsFields() {
     RoleModel role = roleWithToken("tok");
-    RoleResponseDTO response = new RoleResponseDTO("tok", "Updated", "new desc", null);
+    RoleResponseDTO response = new RoleResponseDTO("tok", "Updated", "new desc", null, null);
     when(repository.findByToken("tok")).thenReturn(Optional.of(role));
     when(repository.save(role)).thenReturn(role);
     when(mapper.toResponse(role)).thenReturn(response);
@@ -135,7 +137,7 @@ class RoleServiceTest {
   @Test
   void restoreReturnsResponse() {
     RoleModel role = roleWithToken("tok");
-    RoleResponseDTO response = new RoleResponseDTO("tok", "Admin", "desc", null);
+    RoleResponseDTO response = new RoleResponseDTO("tok", "Admin", "desc", null, null);
     when(repository.findDeletedByToken("tok")).thenReturn(Optional.of(role));
     when(repository.findByToken("tok")).thenReturn(Optional.of(role));
     when(mapper.toResponse(role)).thenReturn(response);

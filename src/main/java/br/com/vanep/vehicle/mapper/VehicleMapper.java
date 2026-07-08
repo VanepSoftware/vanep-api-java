@@ -1,13 +1,13 @@
 package br.com.vanep.vehicle.mapper;
 
-import br.com.vanep.vehicle.Vehicle;
 import br.com.vanep.vehicle.dto.VehicleResponseDTO;
+import br.com.vanep.vehicle.model.VehicleModel;
 import org.springframework.stereotype.Component;
 
 @Component
 public class VehicleMapper {
 
-  public VehicleResponseDTO toResponse(Vehicle vehicle) {
+  public VehicleResponseDTO toResponse(VehicleModel vehicle) {
     return new VehicleResponseDTO(
         vehicle.getToken(),
         vehicle.getDriver().getToken(),
