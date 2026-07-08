@@ -39,18 +39,18 @@
 > Goal: test data and full coverage. Merge `main` into the branch before starting.
 > Commits: 1 file per commit.
 
-- [ ] 3.1 Extend seed with CLIENT user + test `client` profile (if not already present)
-- [ ] 3.2 Create `DependentSeeder` (2 dependents: one default, one non-default; idempotent)
-- [ ] 3.3 Integrate `DependentSeeder` into `DataSeeder`
-- [ ] 3.4 Extend `src/test/resources/db/clean.sql` with `delete from dependent;` (before `client`)
-- [ ] 3.5 Create `DependentServiceTest` — RN12 (first default, default switch, promotion on delete)
-- [ ] 3.6 Create `DependentControllerTest` — POST create (201, 401, 400)
-- [ ] 3.7 Add tests — GET list/detail (200, 403, 404)
-- [ ] 3.8 Add tests — PATCH update (200, 403)
-- [ ] 3.9 Add tests — DELETE (204) + GET after delete (404)
-- [ ] 3.10 Add tests — POST restore (200, 409) + GET after restore (200)
-- [ ] 3.11 Add tests — ROLE_ADMIN accesses dependents of any client
-- [ ] 3.12 Validate: `./mvnw spotless:check` and `./mvnw verify` (JaCoCo) pass
+- [x] 3.1 Extend seed with CLIENT user + test `client` profile (if not already present)
+- [x] 3.2 Create `DependentSeeder` (2 dependents: one default, one non-default; idempotent)
+- [x] 3.3 Integrate `DependentSeeder` into `DataSeeder`
+- [x] 3.4 Extend `src/test/resources/db/clean.sql` with `delete from dependent;` (before `client`)
+- [x] 3.5 Create `DependentServiceTest` — RN12 (first default, default switch, promotion on delete)
+- [x] 3.6 Create `DependentControllerTest` — POST create (201, 401, 400)
+- [x] 3.7 Add tests — GET list/detail (200, 403, 404)
+- [x] 3.8 Add tests — PATCH update (200, 403)
+- [x] 3.9 Add tests — DELETE (204) + GET after delete (404)
+- [x] 3.10 Add tests — POST restore (200, 409) + GET after restore (200)
+- [x] 3.11 Add tests — ROLE_ADMIN accesses dependents of any client
+- [x] 3.12 Validate: `./mvnw spotless:check` and `./mvnw verify` (JaCoCo) pass
 - [ ] 3.13 Open PR3 `feat(dependent): phase 3 — seed and tests` → `main`
 
 ## 4. Wrap-up
