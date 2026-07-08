@@ -7,7 +7,6 @@ import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -34,23 +33,14 @@ public class VehicleController {
   @ResponseStatus(HttpStatus.CREATED)
   @PreAuthorize("hasAuthority('create_vehicle')")
   public VehicleResponseDTO create(
-      @Valid @RequestBody VehicleRequestDTO request,
-      @AuthenticationPrincipal Jwt jwt,
-      Authentication authentication) {
-    boolean isAdmin =
-        authentication.getAuthorities().stream()
-            .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
-    return service.create(request, jwt, isAdmin);
+      @Valid @RequestBody VehicleRequestDTO request, @AuthenticationPrincipal Jwt jwt) {
+    return service.create(request, jwt.getSubject());
   }
 
   @GetMapping
   @PreAuthorize("hasAuthority('list_vehicles')")
-  public List<VehicleResponseDTO> list(
-      @AuthenticationPrincipal Jwt jwt, Authentication authentication) {
-    boolean isAdmin =
-        authentication.getAuthorities().stream()
-            .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
-    return service.findAll(jwt, isAdmin);
+  public List<VehicleResponseDTO> list(@AuthenticationPrincipal Jwt jwt) {
+    return service.findAll(jwt.getSubject());
   }
 
   @GetMapping("/{token}")

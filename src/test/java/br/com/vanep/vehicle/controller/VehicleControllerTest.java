@@ -92,7 +92,18 @@ class VehicleControllerTest {
     driver2.setBasePrice(new BigDecimal("150.00"));
     driver2 = drivers.save(driver2);
 
-    // 3. Create a vehicle for the main driver
+    // 3. Create admin user
+    User admin = new User();
+    admin.setType(UserType.ADMIN);
+    admin.setName("Admin User");
+    admin.setEmail("admin@vanep.com");
+    admin.setDocument("00000000000");
+    admin.setToken("admin-uid");
+    admin.setVerified(true);
+    admin.setTermsAcceptedAt(Instant.now());
+    users.save(admin);
+
+    // 4. Create a vehicle for the main driver
     Vehicle vehicle = new Vehicle();
     vehicle.setDriver(driver);
     vehicle.setPlate("ABC1D23");

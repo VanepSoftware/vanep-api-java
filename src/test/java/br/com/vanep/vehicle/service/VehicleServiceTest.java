@@ -3,6 +3,7 @@ package br.com.vanep.vehicle.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -11,6 +12,7 @@ import br.com.vanep.driver.Driver;
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.user.User;
 import br.com.vanep.user.UserRepository;
+import br.com.vanep.user.UserType;
 import br.com.vanep.vehicle.Vehicle;
 import br.com.vanep.vehicle.dto.VehicleRequestDTO;
 import br.com.vanep.vehicle.mapper.VehicleMapper;
@@ -22,8 +24,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.MessageSource;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.server.ResponseStatusException;
 
 @ExtendWith(MockitoExtension.class)
@@ -33,6 +35,7 @@ class VehicleServiceTest {
   @Mock private DriverRepository driverRepository;
   @Mock private UserRepository userRepository;
   @Mock private VehicleMapper mapper;
+  @Mock private MessageSource messages;
 
   @InjectMocks private VehicleService service;
 
@@ -42,8 +45,12 @@ class VehicleServiceTest {
 
   @BeforeEach
   void setUp() {
+    lenient()
+        .when(messages.getMessage(any(), any(), any()))
+        .thenAnswer(invocation -> invocation.getArgument(0));
     user = new User();
     user.setId(1L);
+    user.setType(UserType.DRIVER);
     user.setEmail("driver@vanep.com");
     user.setToken("user-token-123");
 
@@ -68,19 +75,17 @@ class VehicleServiceTest {
 
   @Test
   void createThrowsConflictWhenPlateExists() {
-    Jwt jwt = org.mockito.Mockito.mock(Jwt.class);
-    when(jwt.getSubject()).thenReturn("driver@vanep.com");
     when(userRepository.findByEmail("driver@vanep.com")).thenReturn(Optional.of(user));
     when(driverRepository.findByUserId(1L)).thenReturn(Optional.of(driver));
     when(vehicleRepository.existsByPlate("ABC1D23")).thenReturn(true);
 
-    assertThatThrownBy(() -> service.create(request, jwt, false))
+    assertThatThrownBy(() -> service.create(request, "driver@vanep.com"))
         .isInstanceOf(ResponseStatusException.class)
         .satisfies(
             e -> {
               ResponseStatusException ex = (ResponseStatusException) e;
               assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
-              assertThat(ex.getReason()).contains("Já existe um veículo cadastrado com esta placa");
+              assertThat(ex.getReason()).contains("vehicle.plate.duplicate");
             });
 
     verify(vehicleRepository, never()).save(any(Vehicle.class));
@@ -88,8 +93,6 @@ class VehicleServiceTest {
 
   @Test
   void createSavesVehicleSuccessfully() {
-    Jwt jwt = org.mockito.Mockito.mock(Jwt.class);
-    when(jwt.getSubject()).thenReturn("driver@vanep.com");
     when(userRepository.findByEmail("driver@vanep.com")).thenReturn(Optional.of(user));
     when(driverRepository.findByUserId(1L)).thenReturn(Optional.of(driver));
     when(vehicleRepository.existsByPlate("ABC1D23")).thenReturn(false);
@@ -100,7 +103,7 @@ class VehicleServiceTest {
 
     when(vehicleRepository.save(any(Vehicle.class))).thenReturn(savedVehicle);
 
-    service.create(request, jwt, false);
+    service.create(request, "driver@vanep.com");
 
     verify(vehicleRepository).save(any(Vehicle.class));
   }
@@ -119,7 +122,7 @@ class VehicleServiceTest {
             e -> {
               ResponseStatusException ex = (ResponseStatusException) e;
               assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
-              assertThat(ex.getReason()).contains("O veículo já está ativo");
+              assertThat(ex.getReason()).contains("vehicle.already_active");
             });
 
     verify(vehicleRepository, never()).restoreByToken(any());
