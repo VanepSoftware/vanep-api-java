@@ -165,22 +165,6 @@ public class VehicleService {
     throw new ResponseStatusException(HttpStatus.NOT_FOUND, message("vehicle.not_found"));
   }
 
-  private DriverModel getDriverFromEmail(String email) {
-    UserModel user =
-        userRepository
-            .findByEmail(email)
-            .orElseThrow(
-                () ->
-                    new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, message("user.account.not_found")));
-    return driverRepository
-        .findByUserId(user.getId())
-        .orElseThrow(
-            () ->
-                new ResponseStatusException(
-                    HttpStatus.NOT_FOUND, message("user.driver_profile.not_found")));
-  }
-
   private VehicleModel requireByToken(String token) {
     return vehicleRepository
         .findByToken(token)
