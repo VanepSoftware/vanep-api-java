@@ -1,5 +1,6 @@
 package br.com.vanep.seed;
 
+import br.com.vanep.auth.security.PermissionEnum;
 import br.com.vanep.auth.security.PermissionRegistry;
 import br.com.vanep.client.model.ClientModel;
 import br.com.vanep.client.repository.ClientRepository;
@@ -30,6 +31,7 @@ public class DataSeeder implements ApplicationRunner {
 
   private static final Logger log = LoggerFactory.getLogger(DataSeeder.class);
   private static final String ADMIN_BUNDLE_NAME = "ADMIN";
+  private static final String CLIENT_BUNDLE_NAME = "CLIENT";
 
   private final UserRepository users;
   private final ClientRepository clients;
@@ -75,11 +77,12 @@ public class DataSeeder implements ApplicationRunner {
     }
     seedRoles();
     seedAdminPermissions();
+    seedClientPermissions();
     seedAdmin();
     seedClients();
     seedDrivers();
     if (seedOnly) {
-      log.info("Seed-only: dados semeados; a aplicação será encerrada.");
+      log.info("Seed-only: data seeded; the application will shut down.");
     }
   }
 
@@ -98,7 +101,7 @@ public class DataSeeder implements ApplicationRunner {
       role.setDescription(seed.description());
       role.setRoleName(seed.roleName());
       roles.save(role);
-      log.info("Seed: role tagueada com role_name ({}).", seed.roleName());
+      log.info("Seed: role tagged with role_name ({}).", seed.roleName());
     }
   }
 
@@ -106,7 +109,7 @@ public class DataSeeder implements ApplicationRunner {
     RoleModel adminRole =
         roles
             .findByRoleName(RoleName.ADMIN)
-            .orElseThrow(() -> new IllegalStateException("Seed: role ADMIN não encontrada."));
+            .orElseThrow(() -> new IllegalStateException("Seed: ADMIN role not found."));
     if (adminRole.getRolePermission() == null) {
       RolePermissionModel bundle = new RolePermissionModel();
       bundle.setName(ADMIN_BUNDLE_NAME);
@@ -114,9 +117,25 @@ public class DataSeeder implements ApplicationRunner {
       bundle = rolePermissions.save(bundle);
       adminRole.setRolePermission(bundle);
       roles.save(adminRole);
-      log.info("Seed: bundle ADMIN criado com todas as permissões.");
+      log.info("Seed: ADMIN bundle created with all permissions.");
     }
     backfillAdminRoleId(adminRole);
+  }
+
+  private void seedClientPermissions() {
+    RoleModel clientRole =
+        roles
+            .findByRoleName(RoleName.CLIENT)
+            .orElseThrow(() -> new IllegalStateException("Seed: CLIENT role not found."));
+    if (clientRole.getRolePermission() == null) {
+      RolePermissionModel bundle = new RolePermissionModel();
+      bundle.setName(CLIENT_BUNDLE_NAME);
+      bundle.setPermissions(List.copyOf(PermissionEnum.crudFor("dependents")));
+      bundle = rolePermissions.save(bundle);
+      clientRole.setRolePermission(bundle);
+      roles.save(clientRole);
+      log.info("Seed: CLIENT bundle created with dependents permissions.");
+    }
   }
 
   private void backfillAdminRoleId(RoleModel adminRole) {
@@ -126,13 +145,13 @@ public class DataSeeder implements ApplicationRunner {
             admin -> {
               admin.setRoleId(adminRole.getId());
               users.save(admin);
-              log.info("Seed: role_id do admin {} atualizado.", admin.getEmail());
+              log.info("Seed: role_id of admin {} updated.", admin.getEmail());
             });
   }
 
   private void seedAdmin() {
     if (users.existsByEmail(adminEmail)) {
-      log.info("Seed: usuário admin já existe ({}).", adminEmail);
+      log.info("Seed: admin user already exists ({}).", adminEmail);
       return;
     }
     RoleModel adminRole = roles.findByRoleName(RoleName.ADMIN).orElseThrow();
@@ -145,7 +164,7 @@ public class DataSeeder implements ApplicationRunner {
     admin.setDocument(adminDocument);
     admin.setVerified(true);
     users.save(admin);
-    log.info("Seed: usuário admin criado ({}).", adminEmail);
+    log.info("Seed: admin user created ({}).", adminEmail);
   }
 
   private void seedClients() {
@@ -174,7 +193,7 @@ public class DataSeeder implements ApplicationRunner {
       ClientModel client = new ClientModel();
       client.setUser(user);
       clients.save(client);
-      log.info("Seed: client criado ({}).", seed.email());
+      log.info("Seed: client created ({}).", seed.email());
     }
   }
 
@@ -207,7 +226,7 @@ public class DataSeeder implements ApplicationRunner {
       driver.setBasePrice(BigDecimal.valueOf(50));
       driver.setApprovalStatus(DriverApprovalStatus.APPROVED);
       drivers.save(driver);
-      log.info("Seed: driver criado ({}).", seed.email());
+      log.info("Seed: driver created ({}).", seed.email());
     }
   }
 }

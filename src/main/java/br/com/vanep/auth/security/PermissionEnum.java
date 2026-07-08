@@ -23,7 +23,12 @@ public enum PermissionEnum {
   CREATE_VEHICLE("create_vehicle"),
   UPDATE_VEHICLE("update_vehicle"),
   DELETE_VEHICLE("delete_vehicle"),
-  RESTORE_VEHICLE("restore_vehicle");
+  RESTORE_VEHICLE("restore_vehicle"),
+  LIST_DEPENDENTS("list_dependents"),
+  SHOW_DEPENDENT("show_dependent"),
+  CREATE_DEPENDENT("create_dependent"),
+  UPDATE_DEPENDENT("update_dependent"),
+  DELETE_DEPENDENT("delete_dependent");
 
   private final String value;
 

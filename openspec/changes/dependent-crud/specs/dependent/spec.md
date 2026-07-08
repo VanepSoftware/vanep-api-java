@@ -28,18 +28,31 @@ The system MUST expose and accept dependent identifiers as opaque `token` string
 
 ### Requirement: Feature-based naming with explicit suffixes
 
-Feature files MUST follow CONSTITUTION rule 5: subpackages by role (`controller`, `dto`, `entity`, `enums`, `mapper`, `repository`, `service`, `seed`) and suffixes matching the subpackage (`DependentController`, `DependentEntity`, `DependentCreateDTO`, etc.).
+Feature files MUST follow CONSTITUTION rule 5: subpackages by role (`controller`, `dto`, `model`, `enums`, `mapper`, `repository`, `service`, `seed`) and suffixes matching the subpackage (`DependentController`, `DependentModel`, `DependentCreateDTO`, etc.).
 
-#### Scenario: Entity in the correct subpackage
+#### Scenario: Model in the correct subpackage
 
 - **WHEN** the feature is implemented
-- **THEN** the JPA entity lives in `entity/DependentEntity.java` with `@SoftDelete`
+- **THEN** the JPA model lives in `model/DependentModel.java` with `@SoftDelete`
+
+### Requirement: Client reference via token in responses
+
+The system MUST NOT expose numeric `client_id` in API responses. When a dependent's client is returned, the system MUST nest a `client` object containing only the client's `token`.
+
+#### Scenario: Response nests client token
+
+- **WHEN** a client queries a dependent
+- **THEN** the response contains `client.token` and does not contain `clientId` or internal client `id`
+
+### Requirement: School and address references via token
+
+The system MUST NOT expose numeric `school_id` or `address_id` in API requests or responses. School and address MUST be referenced by `schoolToken` / `addressToken` on input and nested `school.token` / `address.token` on output. Until `school` and `address` tables exist, supplying `schoolToken` or `addressToken` on create/update MUST return HTTP 400.
 
 ### Requirement: Dependent creation
 
 The system MUST allow an authenticated user with `ROLE_CLIENT` to create a dependent linked to their `client_id`. The system MUST allow a user with `ROLE_ADMIN` to create a dependent for any `client_id` supplied in the request.
 
-Accepted creation fields: `name` (required), `birth_date`, `gender`, `document`, `phone`, `email`, `is_self`, `shift`, `school_id`, `address_id`, and `client_id` (ADMIN only).
+Accepted creation fields: `name` (required), `birth_date`, `gender`, `document`, `phone`, `email`, `is_self`, `shift`, `schoolToken`, `addressToken`, and `clientToken` (ADMIN only).
 
 #### Scenario: Client creates dependent successfully
 
@@ -56,7 +69,7 @@ Accepted creation fields: `name` (required), `birth_date`, `gender`, `document`,
 #### Scenario: Name required
 
 - **WHEN** an authenticated user sends a create request without `name`
-- **THEN** the system returns HTTP 400 with a validation message in pt-BR
+- **THEN** the system returns HTTP 400 with a validation message in English
 
 ### Requirement: Dependent listing
 
@@ -90,7 +103,7 @@ The system MUST allow `GET /api/dependent/{token}` for `ROLE_CLIENT` (only if ow
 #### Scenario: Dependent not found or deleted
 
 - **WHEN** the `token` does not exist or the record is soft-deleted
-- **THEN** the system returns HTTP 404 with a message in pt-BR
+- **THEN** the system returns HTTP 404 with a message in English
 
 ### Requirement: Dependent update
 
@@ -135,7 +148,7 @@ The system MUST allow `POST /api/dependent/{token}/restore` to clear `deleted_at
 #### Scenario: Restore of active record
 
 - **WHEN** attempting to restore a dependent that is not soft-deleted
-- **THEN** the system returns HTTP 409 with a message in pt-BR
+- **THEN** the system returns HTTP 409 with a message in English
 
 ### Requirement: Default dependent (RN12)
 
@@ -181,7 +194,7 @@ The system MUST validate requests with Bean Validation on dedicated DTOs (`@Vali
 #### Scenario: Duplicate document
 
 - **WHEN** a create or update sets `document` already used by another active dependent
-- **THEN** the system returns HTTP 409 with a message in pt-BR
+- **THEN** the system returns HTTP 409 with a message in English
 
 ### Requirement: Test dependent seeder
 

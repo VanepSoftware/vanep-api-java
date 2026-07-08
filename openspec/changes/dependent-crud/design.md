@@ -31,8 +31,8 @@ The `dependent` schema is defined in `vanep-dbdiagram/vanep-diagram.dbml` (domai
 
 ### 1. English naming throughout
 
-- **Decision:** table `dependent`, REST routes under `/api/dependent` (singular, like `/api/user/profile`), feature package `br.com.vanep.dependent`, classes prefixed with `Dependent` — consistent with `client`, `driver`, and `user`.
-- **Rationale:** single English vocabulary in singular form across DB, API, code, and product specs.
+- **Decision:** table `dependent`, REST routes under `/api/dependent` (singular, like `/api/user/profile`), feature package `br.com.vanep.dependent`, classes prefixed with `Dependent` — consistent with `client`, `driver`, and `user`. JPA class lives in `model/DependentModel` (not `entity/`).
+- **Rationale:** single English vocabulary in singular form across DB, API, code, and product specs; `Model` suffix for persistence classes in new features.
 
 ### 2. Public identifier: `token`, never `id`
 
@@ -153,8 +153,8 @@ br.com.vanep.dependent/
 │   ├── DependentCreateDTO.java
 │   ├── DependentUpdateDTO.java
 │   └── DependentResponseDTO.java
-├── entity/
-│   └── DependentEntity.java        @SoftDelete, table "dependent"
+├── model/
+│   └── DependentModel.java         @SoftDelete, table "dependent"
 ├── enums/
 │   └── Shift.java
 ├── mapper/
@@ -184,7 +184,7 @@ br.com.vanep.dependent/
 
 | PR | Base | Contents |
 |----|------|----------|
-| PR1 — Foundation | `main` | V7 migration, `Shift`, `DependentEntity`, `DependentRepository`, `ClientRepository.findByUserId` |
+| PR1 — Foundation | `main` | V7 migration, `Shift`, `DependentModel`, `DependentRepository`, `ClientRepository.findByUserId` |
 | PR2 — API | `main` (after PR1 merge) | DTOs, mapper, service, controller |
 | PR3 — Seed + tests | `main` (after PR2 merge) | seeder, `clean.sql`, full test suite |
 
