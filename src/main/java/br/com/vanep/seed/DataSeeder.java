@@ -4,6 +4,7 @@ import br.com.vanep.auth.security.PermissionEnum;
 import br.com.vanep.auth.security.PermissionRegistry;
 import br.com.vanep.client.model.ClientModel;
 import br.com.vanep.client.repository.ClientRepository;
+import br.com.vanep.dependent.seed.DependentSeeder;
 import br.com.vanep.driver.DriverApprovalStatus;
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
@@ -38,6 +39,7 @@ public class DataSeeder implements ApplicationRunner {
   private final DriverRepository drivers;
   private final RoleRepository roles;
   private final RolePermissionRepository rolePermissions;
+  private final DependentSeeder dependentSeeder;
   private final PasswordEncoder passwordEncoder;
 
   @Value("${vanep.seed.enabled:false}")
@@ -61,12 +63,14 @@ public class DataSeeder implements ApplicationRunner {
       DriverRepository drivers,
       RoleRepository roles,
       RolePermissionRepository rolePermissions,
+      DependentSeeder dependentSeeder,
       PasswordEncoder passwordEncoder) {
     this.users = users;
     this.clients = clients;
     this.drivers = drivers;
     this.roles = roles;
     this.rolePermissions = rolePermissions;
+    this.dependentSeeder = dependentSeeder;
     this.passwordEncoder = passwordEncoder;
   }
 
@@ -81,6 +85,7 @@ public class DataSeeder implements ApplicationRunner {
     seedAdmin();
     seedClients();
     seedDrivers();
+    dependentSeeder.seed();
     if (seedOnly) {
       log.info("Seed-only: data seeded; the application will shut down.");
     }
