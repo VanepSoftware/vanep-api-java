@@ -42,37 +42,63 @@ public class AuthorizationServerConfig {
       @Value("${vanep.oauth.client.redirect-uris}") List<String> redirectUris,
       @Value("${vanep.oauth.client.post-logout-redirect-uris:}")
           List<String> postLogoutRedirectUris,
+      @Value("${vanep.oauth.mobile-client.id:vanep-mobile}") String mobileClientId,
+      @Value("${vanep.oauth.mobile-client.redirect-uris:}") List<String> mobileRedirectUris,
       @Value("${vanep.oauth.access-token-ttl-minutes:15}") long accessTokenTtlMinutes,
       @Value("${vanep.oauth.refresh-token-ttl-days:90}") long refreshTokenTtlDays) {
 
-    RegisteredClient.Builder builder =
-        RegisteredClient.withId(UUID.nameUUIDFromBytes(clientId.getBytes()).toString())
-            .clientId(clientId)
-            .clientAuthenticationMethod(ClientAuthenticationMethod.NONE)
-            .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
-            .authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
-            .scope("openid")
-            .scope("profile")
-            .scope("read")
-            .scope("write")
-            .clientSettings(
-                ClientSettings.builder()
-                    .requireProofKey(true)
-                    .requireAuthorizationConsent(false)
-                    .build())
-            .tokenSettings(
-                TokenSettings.builder()
-                    .accessTokenTimeToLive(Duration.ofMinutes(accessTokenTtlMinutes))
-                    .refreshTokenTimeToLive(Duration.ofDays(refreshTokenTtlDays))
-                    .reuseRefreshTokens(false)
-                    .build());
+    ClientSettings publicClientSettings =
+        ClientSettings.builder().requireProofKey(true).requireAuthorizationConsent(false).build();
+    TokenSettings tokenSettings =
+        TokenSettings.builder()
+            .accessTokenTimeToLive(Duration.ofMinutes(accessTokenTtlMinutes))
+            .refreshTokenTimeToLive(Duration.ofDays(refreshTokenTtlDays))
+            .reuseRefreshTokens(false)
+            .build();
 
+    RegisteredClient.Builder webBuilder =
+        buildPublicClient(clientId, publicClientSettings, tokenSettings);
+    applyRedirectUris(webBuilder, redirectUris);
+    applyPostLogoutRedirectUris(webBuilder, postLogoutRedirectUris);
+    RegisteredClient webClient = webBuilder.build();
+
+    // Cliente público do app mobile: mesmo fluxo Authorization Code + PKCE, mas com
+    // redirect custom-scheme (ex.: com.vanep.vanep_mobile://oauth2redirect) capturado no WebView.
+    RegisteredClient.Builder mobileBuilder =
+        buildPublicClient(mobileClientId, publicClientSettings, tokenSettings);
+    applyRedirectUris(mobileBuilder, mobileRedirectUris);
+    RegisteredClient mobileClient = mobileBuilder.build();
+
+    return new InMemoryRegisteredClientRepository(webClient, mobileClient);
+  }
+
+  private static RegisteredClient.Builder buildPublicClient(
+      String clientId, ClientSettings clientSettings, TokenSettings tokenSettings) {
+    return RegisteredClient.withId(UUID.nameUUIDFromBytes(clientId.getBytes()).toString())
+        .clientId(clientId)
+        .clientAuthenticationMethod(ClientAuthenticationMethod.NONE)
+        .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+        .authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
+        .scope("openid")
+        .scope("profile")
+        .scope("read")
+        .scope("write")
+        .clientSettings(clientSettings)
+        .tokenSettings(tokenSettings);
+  }
+
+  private static RegisteredClient.Builder applyRedirectUris(
+      RegisteredClient.Builder builder, List<String> redirectUris) {
     redirectUris.stream().filter(uri -> !uri.isBlank()).forEach(builder::redirectUri);
+    return builder;
+  }
+
+  private static RegisteredClient.Builder applyPostLogoutRedirectUris(
+      RegisteredClient.Builder builder, List<String> postLogoutRedirectUris) {
     postLogoutRedirectUris.stream()
         .filter(uri -> !uri.isBlank())
         .forEach(builder::postLogoutRedirectUri);
-
-    return new InMemoryRegisteredClientRepository(builder.build());
+    return builder;
   }
 
   @Bean
