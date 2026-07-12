@@ -1,20 +1,20 @@
 ## 0. Preparation
 
-- [ ] 0.1 Create branch from `main` for this change (e.g. `feat/assistant-api`)
-- [ ] 0.2 Review `proposal.md`, `design.md`, and specs under `specs/`
+- [x] 0.1 Create branch from `main` for this change (e.g. `feat/assistant-api`)
+- [x] 0.2 Review `proposal.md`, `design.md`, and specs under `specs/`
 
 ## 1. Phase 1 — Schema + domain (PR1)
 
 > Depends on: nothing. Deliver migration + enums + models + repositories + clean.sql.
 > Order per phase: test → migration → model → repository.
 
-- [ ] 1.1 Write failing repository/integration stubs or schema smoke for `assistant` and `driver_link_code`
-- [ ] 1.2 Create Flyway `V11__create_assistant_tables.sql` (`assistant`; `driver_link_code` with 24h TTL semantics; **no** `assistant_invite`)
-- [ ] 1.3 Add enums: `AssistantStatus` (`PENDING` reserved unused OK), `VerificationStatus`, `DriverLinkCodeStatus`
-- [ ] 1.4 Add `DriverLinkCodeModel` + repository under `br.com.vanep.driver` (atomic consume update)
-- [ ] 1.5 Add `AssistantModel` + `AssistantRepository` (`@SoftDelete`; token `@PrePersist`)
-- [ ] 1.6 Update `src/test/resources/db/clean.sql`
-- [ ] 1.7 `./mvnw verify`; open PR1 → `main`
+- [x] 1.1 Write failing repository/integration stubs or schema smoke for `assistant` and `driver_link_code`
+- [x] 1.2 Create Flyway `V11__create_assistant_tables.sql` (`assistant`; `driver_link_code` with 24h TTL semantics; **no** `assistant_invite`)
+- [x] 1.3 Add enums: `AssistantStatus` (`PENDING` reserved unused OK), `VerificationStatus`, `DriverLinkCodeStatus`
+- [x] 1.4 Add `DriverLinkCodeModel` + repository under `br.com.vanep.driver` (atomic consume update)
+- [x] 1.5 Add `AssistantModel` + `AssistantRepository` (`@SoftDelete`; token `@PrePersist`)
+- [x] 1.6 Update `src/test/resources/db/clean.sql`
+- [x] 1.7 `./mvnw verify`; open PR1 → `main`
 
 ## 2. Phase 2 — Auth + signup (PR2)
 
