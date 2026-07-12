@@ -1,11 +1,11 @@
 ## ADDED Requirements
 
 ### Requirement: Driver generates and cancels open link codes
-The system SHALL allow a driver to create a six-character alphanumeric open link code (excluding `0`, `O`, `1`, `I`) via `POST /api/driver-link-codes`, cancelling any previous `ACTIVE` code for that driver, with TTL **48 hours**, returning plaintext `code` once. Each code MUST be single-use. `DELETE /api/driver-link-codes/current` SHALL cancel the current `ACTIVE` code. Persistence and types for `driver_link_code` MUST live in the `driver` feature package (`br.com.vanep.driver`).
+The system SHALL allow a driver to create a six-character alphanumeric open link code (excluding `0`, `O`, `1`, `I`) via `POST /api/driver-link-codes`, cancelling any previous `ACTIVE` code for that driver, with TTL **24 hours**, returning plaintext `code` once. Each code MUST be single-use. `DELETE /api/driver-link-codes/current` SHALL cancel the current `ACTIVE` code. Persistence and types for `driver_link_code` MUST live in the `driver` feature package (`br.com.vanep.driver`).
 
 #### Scenario: Generate code invalidates previous ACTIVE
 - **WHEN** driver generates a new link code while another is ACTIVE
-- **THEN** the previous code status becomes `CANCELLED` and the new code is `ACTIVE` with `expires_at` approximately 48 hours ahead
+- **THEN** the previous code status becomes `CANCELLED` and the new code is `ACTIVE` with `expires_at` approximately 24 hours ahead
 
 #### Scenario: Cancel current code
 - **WHEN** driver deletes `/api/driver-link-codes/current`

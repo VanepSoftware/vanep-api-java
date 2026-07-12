@@ -2,7 +2,7 @@
 
 A vanep-api-java (Java 25, Spring Boot 4, JPA/Flyway, OAuth2) já possui `CLIENT` e `DRIVER`. Não existe `UserType.ASSISTANT` nem vínculo motorista–assistente.
 
-O MVP usa **um único artefato** — `driver_link_code` (código aberto, TTL **48h**, uso único) — consumível em dois contextos: signup Thymeleaf (conta nova) e `POST /api/driver-link-codes/consume` (conta existente).
+O MVP usa **um único artefato** — `driver_link_code` (código aberto, TTL **24h**, uso único) — consumível em dois contextos: signup Thymeleaf (conta nova) e `POST /api/driver-link-codes/consume` (conta existente).
 
 Constraints: `constitution.md`. Espelhar `ClientModel`, `RegistrationService`, `ClientSecurityService`, `SecureTokens`.
 
@@ -10,7 +10,7 @@ Constraints: `constitution.md`. Espelhar `ClientModel`, `RegistrationService`, `
 
 **Goals:**
 
-- Schema `assistant` + `driver_link_code` (V11, TTL 48h)
+- Schema `assistant` + `driver_link_code` (V11, TTL 24h)
 - Auth ASSISTANT + JWT `assistant_status`
 - Signup com `linkCode` opcional visível → `UNLINKED` ou `ACTIVE`; OAuth → `UNLINKED` + `/consume` depois
 - Generate/cancel/consume; pause/resume/revoke; listagem e `/me`
@@ -37,7 +37,7 @@ Constraints: `constitution.md`. Espelhar `ClientModel`, `RegistrationService`, `
 ### 2. Código aberto unificado (sem Porta A)
 
 ```
-driver_link_code (TTL 48h, single-use)
+driver_link_code (TTL 24h, single-use)
         │
         ├─ Signup (linkCode opcional) → user + assistant ACTIVE
         └─ POST /consume (JWT)        → assistant UNLINKED → ACTIVE
@@ -47,9 +47,9 @@ driver_link_code (TTL 48h, single-use)
 - **Rationale:** Porta A (e-mail endereçado + PENDING + deep link) ainda é non-goal; unificar no open code evita dois sistemas.
 - **Trade-off consciente:** código não amarra a um e-mail — quem tiver o código vincula uma vez.
 
-### 2b. TTL 48h (não 30 min)
+### 2b. TTL 24h (não 30 min)
 
-- **Decision:** `expires_at = now() + 48 hours`. Sem pretendência de “cola presencial de 30 min”.
+- **Decision:** `expires_at = now() + 24 hours`. Sem pretendência de “cola presencial de 30 min”.
 - **Rationale:** janela para compartilhar e cadastrar depois; 30 min quebrava o assíncrono.
 - **Note:** uso continua **único** (não multi-consume); “reutilizável” só no sentido de dois contextos e janela longa.
 
@@ -102,7 +102,7 @@ Elegibilidade `/consume`: `UNLINKED`. `ACTIVE`/`INACTIVE` → 409.
 -- activated_at, timestamps, soft delete; partial unique token/user_id WHERE deleted_at IS NULL
 
 -- driver_link_code: driver_id, code_hash unique, status ACTIVE|CONSUMED|EXPIRED|CANCELLED,
--- expires_at (48h), consumed_*, created_at; index driver_id
+-- expires_at (24h), consumed_*, created_at; index driver_id
 ```
 
 Gerar: cancela ACTIVE anterior do driver (1 ACTIVE por driver).
@@ -139,7 +139,7 @@ Gerar: cancela ACTIVE anterior do driver (1 ACTIVE por driver).
 
 ## Risks / Trade-offs
 
-- **[Risk]** Código aberto com TTL 48h → forward/WhatsApp → **Mitigation:** single-use, 1 ACTIVE/driver, rate limit, erro genérico
+- **[Risk]** Código aberto com TTL 24h → forward/WhatsApp → **Mitigation:** single-use, 1 ACTIVE/driver, rate limit, erro genérico
 - **[Risk]** Guessing no signup público → **Mitigation:** rate limit forte + alfabeto restrito
 - **[Risk]** Race consume → UPDATE condicional
 - **[Trade-off]** OAuth não vincula no complete — precisa `/consume` depois
@@ -152,4 +152,4 @@ Gerar: cancela ACTIVE anterior do driver (1 ACTIVE por driver).
 
 ## Open Questions
 
-- _(nenhuma)_ — TTL fixo **48h**; deep link/Mail = future
+- _(nenhuma)_ — TTL fixo **24h**; deep link/Mail = future

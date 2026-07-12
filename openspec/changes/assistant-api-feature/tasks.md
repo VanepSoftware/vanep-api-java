@@ -9,7 +9,7 @@
 > Order per phase: test → migration → model → repository.
 
 - [ ] 1.1 Write failing repository/integration stubs or schema smoke for `assistant` and `driver_link_code`
-- [ ] 1.2 Create Flyway `V11__create_assistant_tables.sql` (`assistant`; `driver_link_code` with 48h TTL semantics; **no** `assistant_invite`)
+- [ ] 1.2 Create Flyway `V11__create_assistant_tables.sql` (`assistant`; `driver_link_code` with 24h TTL semantics; **no** `assistant_invite`)
 - [ ] 1.3 Add enums: `AssistantStatus` (`PENDING` reserved unused OK), `VerificationStatus`, `DriverLinkCodeStatus`
 - [ ] 1.4 Add `DriverLinkCodeModel` + repository under `br.com.vanep.driver` (atomic consume update)
 - [ ] 1.5 Add `AssistantModel` + `AssistantRepository` (`@SoftDelete`; token `@PrePersist`)
@@ -33,7 +33,7 @@
 
 > Depends on: Phase 2. Capability: `assistant-linking`.
 
-- [ ] 3.1 Tests first: generate (48h expiry), cancel, consume, duplicate across signup/API, pause/resume/revoke
+- [ ] 3.1 Tests first: generate (24h expiry), cancel, consume, duplicate across signup/API, pause/resume/revoke
 - [ ] 3.2 `AssistantLinkService`: generate/cancel/consume (reuse same atomic path as signup), pause, resume, revoke
 - [ ] 3.3 DTOs + controllers: list + pause/resume/revoke; `driver-link-codes` generate/cancel/consume
 - [ ] 3.4 `AssistantSecurityService` + `@PreAuthorize` / SecurityConfig

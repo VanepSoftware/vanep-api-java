@@ -1,6 +1,6 @@
 ## Why
 
-Motoristas precisam vincular assistentes de bordo para operação diária, mas a API ainda não tem o tipo de usuário ASSISTANT nem um fluxo de vínculo. O MVP entrega auth/cadastro, um único mecanismo de código aberto (`driver_link_code`, TTL 48h) consumível no signup ou pós-login, e gestão do vínculo — sem convite por e-mail endereçado.
+Motoristas precisam vincular assistentes de bordo para operação diária, mas a API ainda não tem o tipo de usuário ASSISTANT nem um fluxo de vínculo. O MVP entrega auth/cadastro, um único mecanismo de código aberto (`driver_link_code`, TTL 24h) consumível no signup ou pós-login, e gestão do vínculo — sem convite por e-mail endereçado.
 
 ## What Changes
 
@@ -27,7 +27,7 @@ Motoristas precisam vincular assistentes de bordo para operação diária, mas a
 ### New Capabilities
 
 - `assistant-auth-signup`: Auth ASSISTANT + signup Thymeleaf (opcional `linkCode` → ACTIVE) e OAuth complete (`UNLINKED`)
-- `assistant-linking`: Código aberto unificado (`driver_link_code`, TTL 48h, single-use) em signup e `/consume`, pause/resume/revoke, listagem
+- `assistant-linking`: Código aberto unificado (`driver_link_code`, TTL 24h, single-use) em signup e `/consume`, pause/resume/revoke, listagem
 - `assistant-profile`: CRUD `/api/assistants/me` + listagem do motorista + ownership
 
 ### Modified Capabilities
@@ -36,7 +36,7 @@ Motoristas precisam vincular assistentes de bordo para operação diária, mas a
 
 ## Impact
 
-- **Database**: V11 (`assistant`, `driver_link_code` TTL 48h); `clean.sql`
+- **Database**: V11 (`assistant`, `driver_link_code` TTL 24h); `clean.sql`
 - **Auth / web**: signup com `linkCode` opcional; OAuth sem código; rate limit em rotas públicas de signup
 - **API**: `/api/assistants/**`, `/api/driver-link-codes/**`
 - **Messages / tests**: MessageSource + JaCoCo
