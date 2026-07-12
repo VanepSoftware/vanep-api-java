@@ -4,12 +4,15 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import br.com.vanep.assistant.enums.AssistantStatus;
 import br.com.vanep.assistant.model.AssistantModel;
 import br.com.vanep.assistant.repository.AssistantRepository;
+import br.com.vanep.client.model.ClientModel;
+import br.com.vanep.client.repository.ClientRepository;
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.user.UserRepository;
@@ -22,6 +25,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.MediaType;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor;
 import org.springframework.test.context.ActiveProfiles;
@@ -39,6 +43,7 @@ class AssistantControllerTest {
   @Autowired private UserRepository users;
   @Autowired private DriverRepository drivers;
   @Autowired private AssistantRepository assistants;
+  @Autowired private ClientRepository clients;
 
   private MockMvc mockMvc;
   private String driverEmail;
@@ -146,6 +151,98 @@ class AssistantControllerTest {
                     .claim("roles", List.of("ROLE_ASSISTANT"))
                     .subject(assistantEmail))
         .authorities(new SimpleGrantedAuthority("ROLE_ASSISTANT"));
+  }
+
+  private JwtRequestPostProcessor clientJwt() {
+    UserModel clientUser = new UserModel();
+    clientUser.setType(UserType.CLIENT);
+    clientUser.setName("Client");
+    clientUser.setEmail("client@vanep.com");
+    clientUser.setDocument("55555555555");
+    clientUser.setVerified(true);
+    clientUser.setTermsAcceptedAt(Instant.now());
+    UserModel saved = users.save(clientUser);
+    ClientModel client = new ClientModel();
+    client.setUser(saved);
+    clients.save(client);
+
+    return jwt()
+        .jwt(
+            t ->
+                t.claim("uid", saved.getToken())
+                    .claim("roles", List.of("ROLE_CLIENT"))
+                    .subject(saved.getEmail()))
+        .authorities(new SimpleGrantedAuthority("ROLE_CLIENT"));
+  }
+
+  @Test
+  void getMeReturnsProfile() throws Exception {
+    mockMvc
+        .perform(get("/api/assistants/me").with(assistantJwt()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.token").value(assistantToken))
+        .andExpect(jsonPath("$.status").value("ACTIVE"))
+        .andExpect(jsonPath("$.name").value("Assistant"));
+  }
+
+  @Test
+  void updateMeUpdatesPhoto() throws Exception {
+    mockMvc
+        .perform(
+            put("/api/assistants/me")
+                .with(assistantJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"photo\":\"https://cdn.example/photo.jpg\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.photo").value("https://cdn.example/photo.jpg"));
+
+    AssistantModel updated = assistants.findByToken(assistantToken).orElseThrow();
+    org.assertj.core.api.Assertions.assertThat(updated.getPhoto())
+        .isEqualTo("https://cdn.example/photo.jpg");
+  }
+
+  @Test
+  void getMeForbidsDriver() throws Exception {
+    mockMvc.perform(get("/api/assistants/me").with(driverJwt())).andExpect(status().isForbidden());
+  }
+
+  @Test
+  void getMeForbidsClient() throws Exception {
+    mockMvc.perform(get("/api/assistants/me").with(clientJwt())).andExpect(status().isForbidden());
+  }
+
+  @Test
+  void updateMeForbidsDriver() throws Exception {
+    mockMvc
+        .perform(
+            put("/api/assistants/me")
+                .with(driverJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"photo\":\"https://cdn.example/photo.jpg\"}"))
+        .andExpect(status().isForbidden());
+  }
+
+  @Test
+  void getMeRequiresAuthentication() throws Exception {
+    mockMvc.perform(get("/api/assistants/me")).andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  void listReturnsEmptyWhenNoAssistants() throws Exception {
+    assistants.delete(assistant);
+
+    mockMvc
+        .perform(get("/api/assistants").with(driverJwt()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$").isArray())
+        .andExpect(jsonPath("$.length()").value(0));
+  }
+
+  @Test
+  void getByTokenIsNotMapped() throws Exception {
+    mockMvc
+        .perform(get("/api/assistants/" + assistantToken).with(driverJwt()))
+        .andExpect(status().isNotFound());
   }
 
   @Test

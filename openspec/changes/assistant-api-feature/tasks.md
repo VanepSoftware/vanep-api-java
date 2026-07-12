@@ -45,13 +45,13 @@
 
 > Depends on: Phase 3. Capability: `assistant-profile`.
 
-- [ ] 4.1 Tests: `GET/PUT /api/assistants/me`, ownership, driver list
-- [ ] 4.2 Profile DTOs/mapper/service; complete list endpoint if needed
-- [ ] 4.3 E2E: signup+linkCode; OAuth then `/consume`; rate-limit smoke where practical
-- [ ] 4.4 `./mvnw spotless:check` + `./mvnw verify` (JaCoCo); open PR4 → `main`
+- [x] 4.1 Tests: `GET/PUT /api/assistants/me`, ownership, driver list
+- [x] 4.2 Profile DTOs/mapper/service; complete list endpoint if needed
+- [x] 4.3 E2E: signup+linkCode; OAuth then `/consume`; rate-limit smoke where practical
+- [x] 4.4 `./mvnw spotless:check` + `./mvnw verify` (JaCoCo); open PR4 → `main`
 
 ## 5. Wrap-up
 
-- [ ] 5.1 Confirm specs scenarios covered
+- [x] 5.1 Confirm specs scenarios covered
 - [ ] 5.2 Archive after merge
-- [ ] 5.3 Future (out of this change): deep link/hidden, MailService, Porta A / PENDING / email-addressed invite
+- [x] 5.3 Future (out of this change): deep link/hidden, MailService, Porta A / PENDING / email-addressed invite
