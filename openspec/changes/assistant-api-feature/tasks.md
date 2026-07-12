@@ -33,13 +33,13 @@
 
 > Depends on: Phase 2. Capability: `assistant-linking`.
 
-- [ ] 3.1 Tests first: generate (24h expiry), cancel, consume, duplicate across signup/API, pause/resume/revoke
-- [ ] 3.2 `AssistantLinkService`: generate/cancel/consume (reuse same atomic path as signup), pause, resume, revoke
-- [ ] 3.3 DTOs + controllers: list + pause/resume/revoke; `driver-link-codes` generate/cancel/consume
-- [ ] 3.4 `AssistantSecurityService` + `@PreAuthorize` / SecurityConfig
-- [ ] 3.5 Strong rate limit on `POST /api/driver-link-codes/consume`
-- [ ] 3.6 MessageSource keys for linking errors
-- [ ] 3.7 `./mvnw spotless:check` + `./mvnw verify`; open PR3 → `main`
+- [x] 3.1 Tests first: generate (24h expiry), cancel, consume, duplicate across signup/API, pause/resume/revoke
+- [x] 3.2 `AssistantLinkService`: generate/cancel/consume (reuse same atomic path as signup), pause, resume, revoke
+- [x] 3.3 DTOs + controllers: list + pause/resume/revoke; `driver-link-codes` generate/cancel/consume
+- [x] 3.4 `AssistantSecurityService` + `@PreAuthorize` / SecurityConfig
+- [x] 3.5 Strong rate limit on `POST /api/driver-link-codes/consume`
+- [x] 3.6 MessageSource keys for linking errors
+- [x] 3.7 `./mvnw spotless:check` + `./mvnw verify`; open PR3 → `main`
 
 ## 4. Phase 4 — Profile + hardening (PR4)
 

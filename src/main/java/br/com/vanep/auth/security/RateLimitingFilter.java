@@ -24,7 +24,8 @@ public class RateLimitingFilter extends OncePerRequestFilter {
           "/forgot-password",
           "/reset-password",
           "/verify-email/resend",
-          "/oauth2/token");
+          "/oauth2/token",
+          "/api/driver-link-codes/consume");
 
   private final RateLimiter rateLimiter;
 

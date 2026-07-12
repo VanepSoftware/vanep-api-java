@@ -20,6 +20,7 @@ class RateLimitingFilterTest {
     assertThat(filter.shouldNotFilter(request("GET", "/login"))).isTrue();
     assertThat(filter.shouldNotFilter(request("POST", "/api/anything"))).isTrue();
     assertThat(filter.shouldNotFilter(request("POST", "/login"))).isFalse();
+    assertThat(filter.shouldNotFilter(request("POST", "/api/driver-link-codes/consume"))).isFalse();
   }
 
   @Test
