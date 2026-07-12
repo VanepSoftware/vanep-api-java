@@ -7,7 +7,13 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import br.com.vanep.assistant.enums.AssistantStatus;
+import br.com.vanep.assistant.model.AssistantModel;
+import br.com.vanep.assistant.repository.AssistantRepository;
 import br.com.vanep.auth.web.SignupForm;
+import br.com.vanep.role.RoleName;
+import br.com.vanep.role.model.RoleModel;
+import br.com.vanep.role.repository.RoleRepository;
 import br.com.vanep.user.AuthProvider;
 import br.com.vanep.user.OAuthAccountRepository;
 import br.com.vanep.user.UserRepository;
@@ -15,9 +21,10 @@ import br.com.vanep.user.UserType;
 import br.com.vanep.user.model.OAuthAccountModel;
 import br.com.vanep.user.model.UserModel;
 import java.util.Optional;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
@@ -27,7 +34,15 @@ class OAuthAccountServiceTest {
 
   @Mock private UserRepository users;
   @Mock private OAuthAccountRepository oauthAccounts;
-  @InjectMocks private OAuthAccountService service;
+  @Mock private RoleRepository roles;
+  @Mock private AssistantRepository assistants;
+
+  private OAuthAccountService service;
+
+  @BeforeEach
+  void setUp() {
+    service = new OAuthAccountService(users, oauthAccounts, roles, assistants);
+  }
 
   @Test
   void resolveReturnsRegisteredWhenAccountExists() {
@@ -57,7 +72,6 @@ class OAuthAccountServiceTest {
     account.setUser(deleted);
     when(oauthAccounts.findByProviderAndProviderUid(AuthProvider.GOOGLE, "sub-x"))
         .thenReturn(Optional.of(account));
-    // @SoftDelete: usuário desativado não é retornado por findById.
     when(users.findById(99L)).thenReturn(Optional.empty());
 
     assertThatThrownBy(
@@ -133,5 +147,34 @@ class OAuthAccountServiceTest {
     assertThat(created.getTermsAcceptedAt()).isNotNull();
     verify(users).save(any(UserModel.class));
     verify(oauthAccounts).save(any(OAuthAccountModel.class));
+    verify(assistants, never()).save(any());
+  }
+
+  @Test
+  void completeRegistrationCreatesUnlinkedAssistantProfile() {
+    RoleModel assistantRole = new RoleModel();
+    assistantRole.setId(5L);
+    assistantRole.setRoleName(RoleName.ASSISTANT);
+    when(roles.findByRoleName(RoleName.ASSISTANT)).thenReturn(Optional.of(assistantRole));
+    when(users.save(any(UserModel.class))).thenAnswer(inv -> inv.getArgument(0));
+    when(oauthAccounts.save(any(OAuthAccountModel.class))).thenAnswer(inv -> inv.getArgument(0));
+    when(assistants.save(any(AssistantModel.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    SignupForm form = new SignupForm();
+    form.setType(UserType.ASSISTANT);
+    form.setDocument("88888888888");
+    form.setAcceptTerms(true);
+
+    UserModel created =
+        service.completeRegistration(
+            AuthProvider.GOOGLE, "sub-asst", "asst@vanep.com", "Assistant A", form);
+
+    assertThat(created.getType()).isEqualTo(UserType.ASSISTANT);
+    assertThat(created.getRoleId()).isEqualTo(5L);
+
+    ArgumentCaptor<AssistantModel> assistantCaptor = ArgumentCaptor.forClass(AssistantModel.class);
+    verify(assistants).save(assistantCaptor.capture());
+    assertThat(assistantCaptor.getValue().getStatus()).isEqualTo(AssistantStatus.UNLINKED);
+    assertThat(assistantCaptor.getValue().getUser()).isSameAs(created);
   }
 }

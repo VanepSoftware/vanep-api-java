@@ -1,11 +1,19 @@
 package br.com.vanep.auth.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import br.com.vanep.assistant.enums.AssistantStatus;
+import br.com.vanep.assistant.model.AssistantModel;
+import br.com.vanep.assistant.repository.AssistantRepository;
+import br.com.vanep.assistant.service.DriverLinkCodeConsumer;
+import br.com.vanep.assistant.service.InvalidDriverLinkCodeException;
 import br.com.vanep.auth.verification.EmailVerificationService;
 import br.com.vanep.client.model.ClientModel;
 import br.com.vanep.client.repository.ClientRepository;
@@ -33,9 +41,11 @@ class RegistrationServiceTest {
   @Mock private UserRepository users;
   @Mock private ClientRepository clients;
   @Mock private DriverRepository drivers;
+  @Mock private AssistantRepository assistants;
   @Mock private RoleRepository roles;
   @Mock private PasswordEncoder passwordEncoder;
   @Mock private EmailVerificationService emailVerification;
+  @Mock private DriverLinkCodeConsumer linkCodeConsumer;
 
   private RoleModel roleTaggedAs(RoleName roleName, long id) {
     RoleModel role = new RoleModel();
@@ -49,7 +59,14 @@ class RegistrationServiceTest {
     when(users.save(any(UserModel.class))).thenAnswer(inv -> inv.getArgument(0));
     when(passwordEncoder.encode(anyString())).thenReturn("hashed");
     return new RegistrationService(
-        users, clients, drivers, roles, passwordEncoder, emailVerification);
+        users,
+        clients,
+        drivers,
+        assistants,
+        roles,
+        passwordEncoder,
+        emailVerification,
+        linkCodeConsumer);
   }
 
   @Test
@@ -101,5 +118,94 @@ class RegistrationServiceTest {
     assertThat(driver.getValue().getApprovalStatus()).isEqualTo(DriverApprovalStatus.PENDING);
     assertThat(driver.getValue().getBasePrice()).isEqualByComparingTo("120.00");
     assertThat(driver.getValue().getCity()).isEqualTo("Taguatinga");
+  }
+
+  @Test
+  void registerAssistantWithoutLinkCodeCreatesUnlinkedProfile() {
+    RegistrationService service = service();
+    when(roles.findByRoleName(RoleName.ASSISTANT))
+        .thenReturn(Optional.of(roleTaggedAs(RoleName.ASSISTANT, 4L)));
+    when(assistants.save(any(AssistantModel.class))).thenAnswer(inv -> inv.getArgument(0));
+    AssistantSignupForm form = new AssistantSignupForm();
+    form.setName("Carla");
+    form.setEmail("carla@vanep.com");
+    form.setPassword("secret1");
+    form.setDocument("55555555555");
+    form.setAcceptTerms(true);
+
+    UserModel user = service.registerAssistant(form);
+
+    assertThat(user.getType()).isEqualTo(UserType.ASSISTANT);
+    assertThat(user.getRoleId()).isEqualTo(4L);
+
+    ArgumentCaptor<AssistantModel> assistant = ArgumentCaptor.forClass(AssistantModel.class);
+    verify(assistants).save(assistant.capture());
+    assertThat(assistant.getValue().getStatus()).isEqualTo(AssistantStatus.UNLINKED);
+    assertThat(assistant.getValue().getDriver()).isNull();
+    verify(linkCodeConsumer, never()).consumeAndActivate(any(), anyString());
+  }
+
+  @Test
+  void registerAssistantWithValidLinkCodeConsumesAndActivates() {
+    RegistrationService service = service();
+    when(roles.findByRoleName(RoleName.ASSISTANT))
+        .thenReturn(Optional.of(roleTaggedAs(RoleName.ASSISTANT, 4L)));
+    when(assistants.save(any(AssistantModel.class))).thenAnswer(inv -> inv.getArgument(0));
+    when(linkCodeConsumer.isActiveCode("ABC234")).thenReturn(true);
+    DriverModel driver = new DriverModel();
+    driver.setId(10L);
+    when(linkCodeConsumer.consumeAndActivate(any(AssistantModel.class), eq("ABC234")))
+        .thenAnswer(
+            inv -> {
+              AssistantModel assistant = inv.getArgument(0);
+              assistant.setDriver(driver);
+              assistant.setStatus(AssistantStatus.ACTIVE);
+              return driver;
+            });
+
+    AssistantSignupForm form = new AssistantSignupForm();
+    form.setName("Diana");
+    form.setEmail("diana@vanep.com");
+    form.setPassword("secret1");
+    form.setDocument("66666666666");
+    form.setLinkCode("ABC234");
+    form.setAcceptTerms(true);
+
+    UserModel user = service.registerAssistant(form);
+
+    assertThat(user.getType()).isEqualTo(UserType.ASSISTANT);
+    verify(linkCodeConsumer).isActiveCode("ABC234");
+    verify(linkCodeConsumer).consumeAndActivate(any(AssistantModel.class), eq("ABC234"));
+  }
+
+  @Test
+  void registerAssistantRejectsInvalidLinkCodeBeforeCreatingUser() {
+    when(linkCodeConsumer.isActiveCode("BADCODE")).thenReturn(false);
+    when(linkCodeConsumer.messageForInvalidCode()).thenReturn("Código inválido");
+    RegistrationService service =
+        new RegistrationService(
+            users,
+            clients,
+            drivers,
+            assistants,
+            roles,
+            passwordEncoder,
+            emailVerification,
+            linkCodeConsumer);
+
+    AssistantSignupForm form = new AssistantSignupForm();
+    form.setName("Elena");
+    form.setEmail("elena@vanep.com");
+    form.setPassword("secret1");
+    form.setDocument("77777777777");
+    form.setLinkCode("BADCODE");
+    form.setAcceptTerms(true);
+
+    assertThatThrownBy(() -> service.registerAssistant(form))
+        .isInstanceOf(InvalidDriverLinkCodeException.class)
+        .hasMessage("Código inválido");
+
+    verify(users, never()).save(any());
+    verify(assistants, never()).save(any());
   }
 }

@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Completar cadastro — Vanep</title>
+    <title>Cadastro de assistente — Vanep</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -16,26 +16,29 @@
     <main class="login-shell">
       <div class="login-card">
         <h1 class="brand">Vanep</h1>
-        <p class="subtitle">Complete seu cadastro</p>
+        <p class="subtitle">Cadastro de assistente</p>
 
-        <p class="subtitle" th:if="${email}" th:text="${email}">seu@email.com</p>
-
-        <form method="post" th:action="@{/signup/complete}" th:object="${signupForm}">
+        <form method="post" th:action="@{/signup/assistant}" th:object="${assistantSignupForm}">
           <div class="field">
-            <label>Você é</label>
-            <label class="remember">
-              <input type="radio" th:field="*{type}" value="CLIENT" />
-              <span>Cliente (responsável)</span>
-            </label>
-            <label class="remember">
-              <input type="radio" th:field="*{type}" value="DRIVER" />
-              <span>Motorista</span>
-            </label>
-            <label class="remember">
-              <input type="radio" th:field="*{type}" value="ASSISTANT" />
-              <span>Assistente</span>
-            </label>
-            <div class="form-error" th:if="${#fields.hasErrors('type')}" th:errors="*{type}"></div>
+            <label for="name">Nome</label>
+            <input id="name" type="text" th:field="*{name}" />
+            <div class="form-error" th:if="${#fields.hasErrors('name')}" th:errors="*{name}"></div>
+          </div>
+
+          <div class="field">
+            <label for="email">E-mail</label>
+            <input id="email" type="email" th:field="*{email}" placeholder="seu@email.com" />
+            <div class="form-error" th:if="${#fields.hasErrors('email')}" th:errors="*{email}"></div>
+          </div>
+
+          <div class="field">
+            <label for="password">Senha</label>
+            <input id="password" type="password" th:field="*{password}" placeholder="••••••••" />
+            <div
+              class="form-error"
+              th:if="${#fields.hasErrors('password')}"
+              th:errors="*{password}"
+            ></div>
           </div>
 
           <div class="field">
@@ -45,6 +48,23 @@
               class="form-error"
               th:if="${#fields.hasErrors('document')}"
               th:errors="*{document}"
+            ></div>
+          </div>
+
+          <div class="field">
+            <label for="linkCode">Código de vínculo (opcional)</label>
+            <input
+              id="linkCode"
+              type="text"
+              th:field="*{linkCode}"
+              placeholder="Código do motorista"
+              maxlength="6"
+              autocomplete="off"
+            />
+            <div
+              class="form-error"
+              th:if="${#fields.hasErrors('linkCode')}"
+              th:errors="*{linkCode}"
             ></div>
           </div>
 
@@ -78,7 +98,8 @@
             th:errors="*{acceptTerms}"
           ></div>
 
-          <button type="submit" class="btn-submit">Concluir cadastro</button>
+          <button type="submit" class="btn-submit">Criar conta</button>
+          <a class="forgot" th:href="@{/login}">Já tenho conta — entrar</a>
         </form>
       </div>
     </main>

@@ -1,9 +1,15 @@
 package br.com.vanep.auth.oauth;
 
+import br.com.vanep.assistant.enums.AssistantStatus;
+import br.com.vanep.assistant.model.AssistantModel;
+import br.com.vanep.assistant.repository.AssistantRepository;
 import br.com.vanep.auth.web.SignupForm;
+import br.com.vanep.role.RoleName;
+import br.com.vanep.role.repository.RoleRepository;
 import br.com.vanep.user.AuthProvider;
 import br.com.vanep.user.OAuthAccountRepository;
 import br.com.vanep.user.UserRepository;
+import br.com.vanep.user.UserType;
 import br.com.vanep.user.model.OAuthAccountModel;
 import br.com.vanep.user.model.UserModel;
 import java.time.Instant;
@@ -18,10 +24,18 @@ public class OAuthAccountService {
 
   private final UserRepository users;
   private final OAuthAccountRepository oauthAccounts;
+  private final RoleRepository roles;
+  private final AssistantRepository assistants;
 
-  public OAuthAccountService(UserRepository users, OAuthAccountRepository oauthAccounts) {
+  public OAuthAccountService(
+      UserRepository users,
+      OAuthAccountRepository oauthAccounts,
+      RoleRepository roles,
+      AssistantRepository assistants) {
     this.users = users;
     this.oauthAccounts = oauthAccounts;
+    this.roles = roles;
+    this.assistants = assistants;
   }
 
   @Transactional
@@ -58,6 +72,9 @@ public class OAuthAccountService {
       AuthProvider provider, String providerUid, String email, String name, SignupForm form) {
     UserModel user = new UserModel();
     user.setType(form.getType());
+    if (form.getType() == UserType.ASSISTANT) {
+      roles.findByRoleName(RoleName.ASSISTANT).ifPresent(role -> user.setRoleId(role.getId()));
+    }
     user.setName(name != null && !name.isBlank() ? name : form.getName());
     user.setEmail(email);
     user.setDocument(form.getDocument());
@@ -69,6 +86,14 @@ public class OAuthAccountService {
     users.save(user);
 
     link(user, provider, providerUid, email);
+
+    if (form.getType() == UserType.ASSISTANT) {
+      AssistantModel assistant = new AssistantModel();
+      assistant.setUser(user);
+      assistant.setStatus(AssistantStatus.UNLINKED);
+      assistants.save(assistant);
+    }
+
     return user;
   }
 

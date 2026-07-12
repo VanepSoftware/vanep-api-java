@@ -33,6 +33,8 @@ public class DataSeeder implements ApplicationRunner {
   private static final Logger log = LoggerFactory.getLogger(DataSeeder.class);
   private static final String ADMIN_BUNDLE_NAME = "ADMIN";
   private static final String CLIENT_BUNDLE_NAME = "CLIENT";
+  private static final String ASSISTANT_BUNDLE_NAME = "ASSISTANT";
+  private static final String DRIVER_BUNDLE_NAME = "DRIVER";
 
   private final UserRepository users;
   private final ClientRepository clients;
@@ -82,6 +84,8 @@ public class DataSeeder implements ApplicationRunner {
     seedRoles();
     seedAdminPermissions();
     seedClientPermissions();
+    seedAssistantPermissions();
+    seedDriverPermissions();
     seedAdmin();
     seedClients();
     seedDrivers();
@@ -97,7 +101,8 @@ public class DataSeeder implements ApplicationRunner {
         List.of(
             new RoleSeed("admin", "Full system access", RoleName.ADMIN),
             new RoleSeed("client", "Standard client access", RoleName.CLIENT),
-            new RoleSeed("driver", "Driver access", RoleName.DRIVER));
+            new RoleSeed("driver", "Driver access", RoleName.DRIVER),
+            new RoleSeed("assistant", "Assistant access", RoleName.ASSISTANT));
 
     for (RoleSeed seed : seeds) {
       if (roles.findByRoleName(seed.roleName()).isPresent()) continue;
@@ -140,6 +145,49 @@ public class DataSeeder implements ApplicationRunner {
       clientRole.setRolePermission(bundle);
       roles.save(clientRole);
       log.info("Seed: CLIENT bundle created with dependents permissions.");
+    }
+  }
+
+  private void seedAssistantPermissions() {
+    RoleModel assistantRole =
+        roles
+            .findByRoleName(RoleName.ASSISTANT)
+            .orElseThrow(() -> new IllegalStateException("Seed: ASSISTANT role not found."));
+    if (assistantRole.getRolePermission() == null) {
+      RolePermissionModel bundle = new RolePermissionModel();
+      bundle.setName(ASSISTANT_BUNDLE_NAME);
+      bundle.setPermissions(
+          List.of(
+              PermissionEnum.SHOW_ASSISTANT.value(),
+              PermissionEnum.UPDATE_ASSISTANT.value(),
+              PermissionEnum.CONSUME_DRIVER_LINK_CODE.value()));
+      bundle = rolePermissions.save(bundle);
+      assistantRole.setRolePermission(bundle);
+      roles.save(assistantRole);
+      log.info("Seed: ASSISTANT bundle created with profile permissions.");
+    }
+  }
+
+  private void seedDriverPermissions() {
+    RoleModel driverRole =
+        roles
+            .findByRoleName(RoleName.DRIVER)
+            .orElseThrow(() -> new IllegalStateException("Seed: DRIVER role not found."));
+    if (driverRole.getRolePermission() == null) {
+      RolePermissionModel bundle = new RolePermissionModel();
+      bundle.setName(DRIVER_BUNDLE_NAME);
+      bundle.setPermissions(
+          List.of(
+              PermissionEnum.LIST_ASSISTANTS.value(),
+              PermissionEnum.PAUSE_ASSISTANT.value(),
+              PermissionEnum.RESUME_ASSISTANT.value(),
+              PermissionEnum.REVOKE_ASSISTANT.value(),
+              PermissionEnum.CREATE_DRIVER_LINK_CODE.value(),
+              PermissionEnum.CANCEL_DRIVER_LINK_CODE.value()));
+      bundle = rolePermissions.save(bundle);
+      driverRole.setRolePermission(bundle);
+      roles.save(driverRole);
+      log.info("Seed: DRIVER bundle created with assistant management permissions.");
     }
   }
 

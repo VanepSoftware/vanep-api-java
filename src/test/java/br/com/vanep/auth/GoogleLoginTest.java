@@ -8,9 +8,16 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import br.com.vanep.assistant.enums.AssistantStatus;
+import br.com.vanep.assistant.repository.AssistantRepository;
+import br.com.vanep.role.RoleName;
+import br.com.vanep.role.model.RoleModel;
+import br.com.vanep.role.repository.RoleRepository;
 import br.com.vanep.user.AuthProvider;
 import br.com.vanep.user.OAuthAccountRepository;
 import br.com.vanep.user.UserRepository;
+import br.com.vanep.user.UserType;
+import br.com.vanep.user.model.UserModel;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,6 +37,8 @@ class GoogleLoginTest {
   @Autowired private WebApplicationContext context;
   @Autowired private UserRepository users;
   @Autowired private OAuthAccountRepository oauthAccounts;
+  @Autowired private AssistantRepository assistants;
+  @Autowired private RoleRepository roles;
 
   private MockMvc mockMvc;
 
@@ -105,5 +114,40 @@ class GoogleLoginTest {
         .andExpect(content().string(org.hamcrest.Matchers.containsString("Complete seu cadastro")));
 
     assertThat(users.findByEmail("x@gmail.com")).isEmpty();
+  }
+
+  @Test
+  void signupCompleteCreatesUnlinkedAssistantWithoutConsumingLinkCode() throws Exception {
+    RoleModel assistantRole = new RoleModel();
+    assistantRole.setName("assistant");
+    assistantRole.setDescription("Assistant access");
+    assistantRole.setRoleName(RoleName.ASSISTANT);
+    assistantRole = roles.save(assistantRole);
+
+    mockMvc
+        .perform(
+            post("/signup/complete")
+                .with(
+                    oidcLogin()
+                        .idToken(
+                            t ->
+                                t.subject("g-asst")
+                                    .claim("email", "asst@gmail.com")
+                                    .claim("name", "Assistant")))
+                .with(csrf())
+                .param("type", "ASSISTANT")
+                .param("document", "98765432100")
+                .param("acceptTerms", "true"))
+        .andExpect(status().is3xxRedirection());
+
+    UserModel created = users.findByEmail("asst@gmail.com").orElseThrow();
+    assertThat(created.getType()).isEqualTo(UserType.ASSISTANT);
+    assertThat(created.getRoleId()).isEqualTo(assistantRole.getId());
+
+    var assistant = assistants.findByUserId(created.getId()).orElseThrow();
+    assertThat(assistant.getStatus()).isEqualTo(AssistantStatus.UNLINKED);
+    assertThat(assistant.getDriver()).isNull();
+    assertThat(oauthAccounts.findByProviderAndProviderUid(AuthProvider.GOOGLE, "g-asst"))
+        .isPresent();
   }
 }

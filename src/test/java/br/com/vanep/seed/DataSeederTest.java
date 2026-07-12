@@ -66,6 +66,15 @@ class DataSeederTest {
     return role;
   }
 
+  private void stubExistingRolesWithoutBundles() {
+    when(roles.findByRoleName(RoleName.CLIENT))
+        .thenReturn(Optional.of(roleTaggedAs(RoleName.CLIENT)));
+    when(roles.findByRoleName(RoleName.DRIVER))
+        .thenReturn(Optional.of(roleTaggedAs(RoleName.DRIVER)));
+    when(roles.findByRoleName(RoleName.ASSISTANT))
+        .thenReturn(Optional.of(roleTaggedAs(RoleName.ASSISTANT)));
+  }
+
   @Test
   void doesNothingWhenDisabled() {
     seeder.enabled = false;
@@ -83,10 +92,7 @@ class DataSeederTest {
     when(roles.save(any(RoleModel.class))).thenAnswer(invocation -> invocation.getArgument(0));
     when(users.existsByEmail(anyString())).thenReturn(true);
     when(users.findByTypeAndRoleIdIsNull(UserType.ADMIN)).thenReturn(List.of());
-    when(roles.findByRoleName(RoleName.CLIENT))
-        .thenReturn(Optional.of(roleTaggedAs(RoleName.CLIENT)));
-    when(roles.findByRoleName(RoleName.DRIVER))
-        .thenReturn(Optional.of(roleTaggedAs(RoleName.DRIVER)));
+    stubExistingRolesWithoutBundles();
 
     RoleModel adminRole = roleTaggedAs(RoleName.ADMIN);
     when(roles.findByRoleName(RoleName.ADMIN))
@@ -98,7 +104,7 @@ class DataSeederTest {
     seeder.run(new DefaultApplicationArguments());
 
     ArgumentCaptor<RolePermissionModel> captor = ArgumentCaptor.forClass(RolePermissionModel.class);
-    verify(rolePermissions, times(2)).save(captor.capture());
+    verify(rolePermissions, times(4)).save(captor.capture());
     RolePermissionModel adminBundle =
         captor.getAllValues().stream()
             .filter(bundle -> "ADMIN".equals(bundle.getName()))
@@ -119,6 +125,41 @@ class DataSeederTest {
     when(roles.findByRoleName(RoleName.CLIENT)).thenReturn(Optional.of(clientRole));
     when(roles.findByRoleName(RoleName.DRIVER))
         .thenReturn(Optional.of(roleTaggedAs(RoleName.DRIVER)));
+    when(roles.findByRoleName(RoleName.ASSISTANT))
+        .thenReturn(Optional.of(roleTaggedAs(RoleName.ASSISTANT)));
+    when(users.existsByEmail(anyString())).thenReturn(true);
+    when(users.findByTypeAndRoleIdIsNull(UserType.ADMIN)).thenReturn(List.of());
+    when(rolePermissions.save(any(RolePermissionModel.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+
+    seeder.run(new DefaultApplicationArguments());
+
+    ArgumentCaptor<RolePermissionModel> captor = ArgumentCaptor.forClass(RolePermissionModel.class);
+    verify(rolePermissions, times(3)).save(captor.capture());
+    RolePermissionModel clientBundle =
+        captor.getAllValues().stream()
+            .filter(bundle -> "CLIENT".equals(bundle.getName()))
+            .findFirst()
+            .orElseThrow();
+    assertThat(clientBundle.getPermissions())
+        .containsExactlyInAnyOrderElementsOf(PermissionEnum.crudFor("dependents"));
+    assertThat(clientRole.getRolePermission()).isEqualTo(clientBundle);
+  }
+
+  @Test
+  void createsAssistantBundleWithProfilePermissionsWhenMissing() {
+    seeder.enabled = true;
+    RoleModel adminRole = roleTaggedAs(RoleName.ADMIN);
+    adminRole.setRolePermission(new RolePermissionModel());
+    RoleModel clientRole = roleTaggedAs(RoleName.CLIENT);
+    clientRole.setRolePermission(new RolePermissionModel());
+    RoleModel driverRole = roleTaggedAs(RoleName.DRIVER);
+    driverRole.setRolePermission(new RolePermissionModel());
+    RoleModel assistantRole = roleTaggedAs(RoleName.ASSISTANT);
+    when(roles.findByRoleName(RoleName.ADMIN)).thenReturn(Optional.of(adminRole));
+    when(roles.findByRoleName(RoleName.CLIENT)).thenReturn(Optional.of(clientRole));
+    when(roles.findByRoleName(RoleName.DRIVER)).thenReturn(Optional.of(driverRole));
+    when(roles.findByRoleName(RoleName.ASSISTANT)).thenReturn(Optional.of(assistantRole));
     when(users.existsByEmail(anyString())).thenReturn(true);
     when(users.findByTypeAndRoleIdIsNull(UserType.ADMIN)).thenReturn(List.of());
     when(rolePermissions.save(any(RolePermissionModel.class)))
@@ -128,10 +169,13 @@ class DataSeederTest {
 
     ArgumentCaptor<RolePermissionModel> captor = ArgumentCaptor.forClass(RolePermissionModel.class);
     verify(rolePermissions).save(captor.capture());
-    assertThat(captor.getValue().getName()).isEqualTo("CLIENT");
+    assertThat(captor.getValue().getName()).isEqualTo("ASSISTANT");
     assertThat(captor.getValue().getPermissions())
-        .containsExactlyInAnyOrderElementsOf(PermissionEnum.crudFor("dependents"));
-    assertThat(clientRole.getRolePermission()).isEqualTo(captor.getValue());
+        .containsExactlyInAnyOrder(
+            PermissionEnum.SHOW_ASSISTANT.value(),
+            PermissionEnum.UPDATE_ASSISTANT.value(),
+            PermissionEnum.CONSUME_DRIVER_LINK_CODE.value());
+    assertThat(assistantRole.getRolePermission()).isEqualTo(captor.getValue());
   }
 
   @Test
@@ -141,10 +185,14 @@ class DataSeederTest {
     adminRole.setRolePermission(new RolePermissionModel());
     RoleModel clientRole = roleTaggedAs(RoleName.CLIENT);
     clientRole.setRolePermission(new RolePermissionModel());
+    RoleModel driverRole = roleTaggedAs(RoleName.DRIVER);
+    driverRole.setRolePermission(new RolePermissionModel());
+    RoleModel assistantRole = roleTaggedAs(RoleName.ASSISTANT);
+    assistantRole.setRolePermission(new RolePermissionModel());
     when(roles.findByRoleName(RoleName.ADMIN)).thenReturn(Optional.of(adminRole));
     when(roles.findByRoleName(RoleName.CLIENT)).thenReturn(Optional.of(clientRole));
-    when(roles.findByRoleName(RoleName.DRIVER))
-        .thenReturn(Optional.of(roleTaggedAs(RoleName.DRIVER)));
+    when(roles.findByRoleName(RoleName.DRIVER)).thenReturn(Optional.of(driverRole));
+    when(roles.findByRoleName(RoleName.ASSISTANT)).thenReturn(Optional.of(assistantRole));
     when(users.existsByEmail(anyString())).thenReturn(true);
     when(users.findByTypeAndRoleIdIsNull(UserType.ADMIN)).thenReturn(List.of());
 
@@ -160,11 +208,16 @@ class DataSeederTest {
     seeder.enabled = true;
     RoleModel adminRole = roleTaggedAs(RoleName.ADMIN);
     adminRole.setRolePermission(new RolePermissionModel());
+    RoleModel clientRole = roleTaggedAs(RoleName.CLIENT);
+    clientRole.setRolePermission(new RolePermissionModel());
+    RoleModel driverRole = roleTaggedAs(RoleName.DRIVER);
+    driverRole.setRolePermission(new RolePermissionModel());
+    RoleModel assistantRole = roleTaggedAs(RoleName.ASSISTANT);
+    assistantRole.setRolePermission(new RolePermissionModel());
     when(roles.findByRoleName(RoleName.ADMIN)).thenReturn(Optional.of(adminRole));
-    when(roles.findByRoleName(RoleName.CLIENT))
-        .thenReturn(Optional.of(roleTaggedAs(RoleName.CLIENT)));
-    when(roles.findByRoleName(RoleName.DRIVER))
-        .thenReturn(Optional.of(roleTaggedAs(RoleName.DRIVER)));
+    when(roles.findByRoleName(RoleName.CLIENT)).thenReturn(Optional.of(clientRole));
+    when(roles.findByRoleName(RoleName.DRIVER)).thenReturn(Optional.of(driverRole));
+    when(roles.findByRoleName(RoleName.ASSISTANT)).thenReturn(Optional.of(assistantRole));
     when(users.existsByEmail(anyString())).thenReturn(false);
     when(users.findByTypeAndRoleIdIsNull(UserType.ADMIN)).thenReturn(List.of());
     when(passwordEncoder.encode(anyString())).thenReturn("hashed");
@@ -179,11 +232,16 @@ class DataSeederTest {
     seeder.enabled = true;
     RoleModel adminRole = roleTaggedAs(RoleName.ADMIN);
     adminRole.setRolePermission(new RolePermissionModel());
+    RoleModel clientRole = roleTaggedAs(RoleName.CLIENT);
+    clientRole.setRolePermission(new RolePermissionModel());
     RoleModel driverRole = roleTaggedAs(RoleName.DRIVER);
+    driverRole.setRolePermission(new RolePermissionModel());
+    RoleModel assistantRole = roleTaggedAs(RoleName.ASSISTANT);
+    assistantRole.setRolePermission(new RolePermissionModel());
     when(roles.findByRoleName(RoleName.ADMIN)).thenReturn(Optional.of(adminRole));
-    when(roles.findByRoleName(RoleName.CLIENT))
-        .thenReturn(Optional.of(roleTaggedAs(RoleName.CLIENT)));
+    when(roles.findByRoleName(RoleName.CLIENT)).thenReturn(Optional.of(clientRole));
     when(roles.findByRoleName(RoleName.DRIVER)).thenReturn(Optional.of(driverRole));
+    when(roles.findByRoleName(RoleName.ASSISTANT)).thenReturn(Optional.of(assistantRole));
     when(users.existsByEmail(anyString())).thenReturn(false);
     when(users.findByTypeAndRoleIdIsNull(UserType.ADMIN)).thenReturn(List.of());
     when(passwordEncoder.encode(anyString())).thenReturn("hashed");

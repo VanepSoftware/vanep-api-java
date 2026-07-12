@@ -20,14 +20,14 @@
 
 > Depends on: Phase 1. Capability: `assistant-auth-signup`.
 
-- [ ] 2.1 Tests first: signup without code → `UNLINKED`; with valid code → `ACTIVE`; invalid code rejects; OAuth → `UNLINKED`; JWT claim
-- [ ] 2.2 Extend `UserType`, `RoleName`, `PermissionEnum` (no invite perms)
-- [ ] 2.3 Extend `DataSeeder` + `JwtTokenCustomizer` (`assistant_status`)
-- [ ] 2.4 Add `AssistantSignupForm` with optional visible `linkCode`; `registerAssistant` (+ shared atomic consume helper)
-- [ ] 2.5 Thymeleaf template with visible optional link-code field; routes; SecurityConfig
-- [ ] 2.6 OAuth `/signup/complete` ASSISTANT → `UNLINKED` only (no code)
-- [ ] 2.7 Strong rate limit on `POST /signup/assistant`; MessageSource keys
-- [ ] 2.8 `./mvnw spotless:check` + `./mvnw verify`; open PR2 → `main`
+- [x] 2.1 Tests first: signup without code → `UNLINKED`; with valid code → `ACTIVE`; invalid code rejects; OAuth → `UNLINKED`; JWT claim
+- [x] 2.2 Extend `UserType`, `RoleName`, `PermissionEnum` (no invite perms)
+- [x] 2.3 Extend `DataSeeder` + `JwtTokenCustomizer` (`assistant_status`)
+- [x] 2.4 Add `AssistantSignupForm` with optional visible `linkCode`; `registerAssistant` (+ shared atomic consume helper)
+- [x] 2.5 Thymeleaf template with visible optional link-code field; routes; SecurityConfig
+- [x] 2.6 OAuth `/signup/complete` ASSISTANT → `UNLINKED` only (no code)
+- [x] 2.7 Strong rate limit on `POST /signup/assistant`; MessageSource keys
+- [x] 2.8 `./mvnw spotless:check` + `./mvnw verify`; open PR2 → `main`
 
 ## 3. Phase 3 — Linking API (PR3)
 

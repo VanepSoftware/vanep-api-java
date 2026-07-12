@@ -1,5 +1,6 @@
 package br.com.vanep.auth.web;
 
+import br.com.vanep.assistant.service.InvalidDriverLinkCodeException;
 import br.com.vanep.user.UserRepository;
 import jakarta.validation.Valid;
 import org.springframework.stereotype.Controller;
@@ -62,6 +63,31 @@ public class RegistrationController {
       return "signup-driver";
     }
     registrationService.registerDriver(form);
+    return "redirect:/login?registered";
+  }
+
+  @GetMapping("/signup/assistant")
+  public String assistantForm(Model model) {
+    if (!model.containsAttribute("assistantSignupForm")) {
+      model.addAttribute("assistantSignupForm", new AssistantSignupForm());
+    }
+    return "signup-assistant";
+  }
+
+  @PostMapping("/signup/assistant")
+  public String registerAssistant(
+      @Valid @ModelAttribute("assistantSignupForm") AssistantSignupForm form,
+      BindingResult bindingResult) {
+    rejectDuplicates(form, bindingResult);
+    if (bindingResult.hasErrors()) {
+      return "signup-assistant";
+    }
+    try {
+      registrationService.registerAssistant(form);
+    } catch (InvalidDriverLinkCodeException ex) {
+      bindingResult.rejectValue("linkCode", "invalid", ex.getMessage());
+      return "signup-assistant";
+    }
     return "redirect:/login?registered";
   }
 

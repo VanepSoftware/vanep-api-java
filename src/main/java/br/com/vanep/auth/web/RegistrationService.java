@@ -1,5 +1,10 @@
 package br.com.vanep.auth.web;
 
+import br.com.vanep.assistant.enums.AssistantStatus;
+import br.com.vanep.assistant.model.AssistantModel;
+import br.com.vanep.assistant.repository.AssistantRepository;
+import br.com.vanep.assistant.service.DriverLinkCodeConsumer;
+import br.com.vanep.assistant.service.InvalidDriverLinkCodeException;
 import br.com.vanep.auth.verification.EmailVerificationService;
 import br.com.vanep.client.model.ClientModel;
 import br.com.vanep.client.repository.ClientRepository;
@@ -15,6 +20,7 @@ import java.time.Instant;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 @Service
 public class RegistrationService {
@@ -22,23 +28,29 @@ public class RegistrationService {
   private final UserRepository users;
   private final ClientRepository clients;
   private final DriverRepository drivers;
+  private final AssistantRepository assistants;
   private final RoleRepository roles;
   private final PasswordEncoder passwordEncoder;
   private final EmailVerificationService emailVerification;
+  private final DriverLinkCodeConsumer linkCodeConsumer;
 
   public RegistrationService(
       UserRepository users,
       ClientRepository clients,
       DriverRepository drivers,
+      AssistantRepository assistants,
       RoleRepository roles,
       PasswordEncoder passwordEncoder,
-      EmailVerificationService emailVerification) {
+      EmailVerificationService emailVerification,
+      DriverLinkCodeConsumer linkCodeConsumer) {
     this.users = users;
     this.clients = clients;
     this.drivers = drivers;
+    this.assistants = assistants;
     this.roles = roles;
     this.passwordEncoder = passwordEncoder;
     this.emailVerification = emailVerification;
+    this.linkCodeConsumer = linkCodeConsumer;
   }
 
   @Transactional
@@ -62,6 +74,27 @@ public class RegistrationService {
     driver.setBasePrice(form.getBasePrice());
     driver.setApprovalStatus(DriverApprovalStatus.PENDING);
     drivers.save(driver);
+    emailVerification.startVerification(user);
+    return user;
+  }
+
+  @Transactional
+  public UserModel registerAssistant(AssistantSignupForm form) {
+    if (StringUtils.hasText(form.getLinkCode())
+        && !linkCodeConsumer.isActiveCode(form.getLinkCode())) {
+      throw new InvalidDriverLinkCodeException(linkCodeConsumer.messageForInvalidCode());
+    }
+
+    UserModel user = createUser(UserType.ASSISTANT, RoleName.ASSISTANT, form);
+    AssistantModel assistant = new AssistantModel();
+    assistant.setUser(user);
+    assistant.setStatus(AssistantStatus.UNLINKED);
+    assistants.save(assistant);
+
+    if (StringUtils.hasText(form.getLinkCode())) {
+      linkCodeConsumer.consumeAndActivate(assistant, form.getLinkCode());
+    }
+
     emailVerification.startVerification(user);
     return user;
   }
