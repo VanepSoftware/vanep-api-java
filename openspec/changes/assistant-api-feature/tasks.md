@@ -33,13 +33,13 @@
 
 > Depends on: Phase 2. Capability: `assistant-linking` (API + mail; web accept in Phase 4).
 
-- [ ] 3.1 Tests first: invite by email (happy path); not found; wrong UserType 409; already PENDING/ACTIVE/INACTIVE 409; resend cancels previous PENDING same driver + new invite; cooldown 7d after REJECTED same pair; cancel by driver; pause/resume/revoke; lazy expiry treated as free slot on new invite
-- [ ] 3.2 `AssistantInviteService`: eligibility, create (+ Decision 5 resend), cancel, lazy expire helper, MailService send with template `email/assistant-invite`
-- [ ] 3.3 `AssistantLinkService` (or same service): pause, resume, revoke (ACTIVE/INACTIVE; revoke bilateral)
-- [ ] 3.4 DTOs + controllers: `POST /api/assistants/invites`, `DELETE /api/assistants/invites/{token}`, list + pause/resume/revoke
-- [ ] 3.5 `AssistantSecurityService` + `@PreAuthorize` / SecurityConfig
-- [ ] 3.6 Email template (motorista nome, link `{baseUrl}/assistant-invite/{raw}`, prazo 72h); MessageSource keys
-- [ ] 3.7 `./mvnw spotless:check` + `./mvnw verify`; open PR3 → `main`
+- [x] 3.1 Tests first: invite by email (happy path); not found; wrong UserType 409; already PENDING/ACTIVE/INACTIVE 409; resend cancels previous PENDING same driver + new invite; cooldown 7d after REJECTED same pair; cancel by driver; pause/resume/revoke; lazy expiry treated as free slot on new invite
+- [x] 3.2 `AssistantInviteService`: eligibility, create (+ Decision 5 resend), cancel, lazy expire helper, MailService send with template `email/assistant-invite`
+- [x] 3.3 `AssistantLinkService` (or same service): pause, resume, revoke (ACTIVE/INACTIVE; revoke bilateral)
+- [x] 3.4 DTOs + controllers: `POST /api/assistants/invites`, `DELETE /api/assistants/invites/{token}`, list + pause/resume/revoke
+- [x] 3.5 `AssistantSecurityService` + `@PreAuthorize` / SecurityConfig
+- [x] 3.6 Email template (motorista nome, link `{baseUrl}/assistant-invite/{raw}`, prazo 72h); MessageSource keys
+- [x] 3.7 `./mvnw spotless:check` + `./mvnw verify`; open PR3 → `main`
 
 ## 4. Phase 4 — Web accept/reject + profile (PR4)
 
