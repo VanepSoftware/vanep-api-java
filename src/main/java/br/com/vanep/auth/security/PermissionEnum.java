@@ -36,7 +36,12 @@ public enum PermissionEnum {
   DELETE_SCHOOL("delete_school"),
   RESTORE_SCHOOL("restore_school"),
   LIST_STATES("list_states"),
-  SHOW_STATE("show_state");
+  SHOW_STATE("show_state"),
+  LIST_CITIES("list_cities"),
+  SHOW_CITY("show_city"),
+  CREATE_CITY("create_city"),
+  UPDATE_CITY("update_city"),
+  DELETE_CITY("delete_city");
 
   private final String value;
 

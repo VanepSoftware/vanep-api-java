@@ -2,6 +2,7 @@ package br.com.vanep.seed;
 
 import br.com.vanep.auth.security.PermissionEnum;
 import br.com.vanep.auth.security.PermissionRegistry;
+import br.com.vanep.city.seed.CitySeeder;
 import br.com.vanep.client.model.ClientModel;
 import br.com.vanep.client.repository.ClientRepository;
 import br.com.vanep.dependent.seed.DependentSeeder;
@@ -44,6 +45,7 @@ public class DataSeeder implements ApplicationRunner {
   private final DependentSeeder dependentSeeder;
   private final SchoolSeeder schoolSeeder;
   private final StateSeeder stateSeeder;
+  private final CitySeeder citySeeder;
   private final PasswordEncoder passwordEncoder;
 
   @Value("${vanep.seed.enabled:false}")
@@ -70,6 +72,7 @@ public class DataSeeder implements ApplicationRunner {
       DependentSeeder dependentSeeder,
       SchoolSeeder schoolSeeder,
       StateSeeder stateSeeder,
+      CitySeeder citySeeder,
       PasswordEncoder passwordEncoder) {
     this.users = users;
     this.clients = clients;
@@ -79,6 +82,7 @@ public class DataSeeder implements ApplicationRunner {
     this.dependentSeeder = dependentSeeder;
     this.schoolSeeder = schoolSeeder;
     this.stateSeeder = stateSeeder;
+    this.citySeeder = citySeeder;
     this.passwordEncoder = passwordEncoder;
   }
 
@@ -96,6 +100,7 @@ public class DataSeeder implements ApplicationRunner {
     dependentSeeder.seed();
     schoolSeeder.seed();
     stateSeeder.seed();
+    citySeeder.seed();
     if (seedOnly) {
       log.info("Seed-only: data seeded; the application will shut down.");
     }
