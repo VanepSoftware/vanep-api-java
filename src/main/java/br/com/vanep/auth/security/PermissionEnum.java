@@ -28,7 +28,13 @@ public enum PermissionEnum {
   SHOW_DEPENDENT("show_dependent"),
   CREATE_DEPENDENT("create_dependent"),
   UPDATE_DEPENDENT("update_dependent"),
-  DELETE_DEPENDENT("delete_dependent");
+  DELETE_DEPENDENT("delete_dependent"),
+  LIST_DRIVERS("list_drivers"),
+  SHOW_DRIVER("show_driver"),
+  CREATE_DRIVER("create_driver"),
+  UPDATE_DRIVER("update_driver"),
+  DELETE_DRIVER("delete_driver"),
+  RESTORE_DRIVER("restore_driver");
 
   private final String value;
 
