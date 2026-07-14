@@ -34,7 +34,9 @@ public enum PermissionEnum {
   CREATE_SCHOOL("create_school"),
   UPDATE_SCHOOL("update_school"),
   DELETE_SCHOOL("delete_school"),
-  RESTORE_SCHOOL("restore_school");
+  RESTORE_SCHOOL("restore_school"),
+  LIST_STATES("list_states"),
+  SHOW_STATE("show_state");
 
   private final String value;
 
