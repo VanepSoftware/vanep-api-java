@@ -20,14 +20,14 @@
 
 > Depends on: Phase 1. Capability: `assistant-auth-signup`.
 
-- [ ] 2.1 Tests first: signup → always `UNLINKED` (no invite field); OAuth → `UNLINKED`; JWT claim `assistant_status`
-- [ ] 2.2 Extend `UserType`, `RoleName`, `PermissionEnum` (invite create/cancel for DRIVER; no link-code perms)
-- [ ] 2.3 Extend `DataSeeder` + `JwtTokenCustomizer` (`assistant_status`)
-- [ ] 2.4 Add `AssistantSignupForm` **identical** to client/driver pattern — **no** `linkCode` / invite field; `registerAssistant` → `UNLINKED`
-- [ ] 2.5 Thymeleaf signup template without invite fields; routes; SecurityConfig (public signup)
-- [ ] 2.6 OAuth `/signup/complete` ASSISTANT → `UNLINKED` only
-- [ ] 2.7 MessageSource keys for auth/signup; keep general public-route rate limit if already shared (not link-code guessing)
-- [ ] 2.8 `./mvnw spotless:check` + `./mvnw verify`; open PR2 → `main`
+- [x] 2.1 Tests first: signup → always `UNLINKED` (no invite field); OAuth → `UNLINKED`; JWT claim `assistant_status`
+- [x] 2.2 Extend `UserType`, `RoleName`, `PermissionEnum` (invite create/cancel for DRIVER; no link-code perms)
+- [x] 2.3 Extend `DataSeeder` + `JwtTokenCustomizer` (`assistant_status`)
+- [x] 2.4 Add `AssistantSignupForm` **identical** to client/driver pattern — **no** `linkCode` / invite field; `registerAssistant` → `UNLINKED`
+- [x] 2.5 Thymeleaf signup template without invite fields; routes; SecurityConfig (public signup)
+- [x] 2.6 OAuth `/signup/complete` ASSISTANT → `UNLINKED` only
+- [x] 2.7 MessageSource keys for auth/signup; keep general public-route rate limit if already shared (not link-code guessing)
+- [x] 2.8 `./mvnw spotless:check` + `./mvnw verify`; open PR2 → `main`
 
 ## 3. Phase 3 — Invite API + link lifecycle (PR3)
 

@@ -28,7 +28,15 @@ public enum PermissionEnum {
   SHOW_DEPENDENT("show_dependent"),
   CREATE_DEPENDENT("create_dependent"),
   UPDATE_DEPENDENT("update_dependent"),
-  DELETE_DEPENDENT("delete_dependent");
+  DELETE_DEPENDENT("delete_dependent"),
+  LIST_ASSISTANTS("list_assistants"),
+  SHOW_ASSISTANT("show_assistant"),
+  UPDATE_ASSISTANT("update_assistant"),
+  PAUSE_ASSISTANT("pause_assistant"),
+  RESUME_ASSISTANT("resume_assistant"),
+  REVOKE_ASSISTANT("revoke_assistant"),
+  CREATE_ASSISTANT_INVITE("create_assistant_invite"),
+  CANCEL_ASSISTANT_INVITE("cancel_assistant_invite");
 
   private final String value;
 
