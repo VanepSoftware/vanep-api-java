@@ -43,7 +43,7 @@ public class RoleModel {
   @Column(columnDefinition = "text")
   private String description;
 
-  @OneToOne(fetch = FetchType.LAZY)
+  @OneToOne(fetch = FetchType.EAGER)
   @JoinColumn(name = "role_permissions_id", unique = true)
   private RolePermissionModel rolePermission;
 
