@@ -10,7 +10,8 @@ public interface AssistantInviteRepository extends JpaRepository<AssistantInvite
 
   Optional<AssistantInviteModel> findByToken(String token);
 
-  Optional<AssistantInviteModel> findByLinkTokenHash(String linkTokenHash);
+  Optional<AssistantInviteModel> findByAssistantIdAndStatus(
+      Long assistantId, AssistantInviteStatus status);
 
   boolean existsByDriverIdAndAssistantIdAndStatusAndRespondedAtGreaterThanEqual(
       Long driverId, Long assistantId, AssistantInviteStatus status, Instant respondedAtSince);

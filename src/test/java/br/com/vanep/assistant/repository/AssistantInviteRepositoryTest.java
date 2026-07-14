@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import br.com.vanep.assistant.enums.AssistantInviteStatus;
 import br.com.vanep.assistant.model.AssistantInviteModel;
 import br.com.vanep.assistant.model.AssistantModel;
-import br.com.vanep.auth.token.SecureTokens;
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.user.UserRepository;
@@ -31,21 +30,31 @@ class AssistantInviteRepositoryTest {
   @Autowired private UserRepository users;
 
   @Test
-  void saveAssignsPublicTokenAndFindsByTokenHash() {
+  void saveAssignsPublicTokenAndFindsByToken() {
     DriverModel driver = createDriver("driver@vanep.com", "12345678909");
     AssistantModel assistant = createAssistant("assistant@vanep.com", "98765432100");
-    String rawSecret = SecureTokens.generate();
-    AssistantInviteModel invite = buildInvite(driver, assistant, rawSecret);
+    AssistantInviteModel invite = buildInvite(driver, assistant);
 
     AssistantInviteModel saved = inviteRepository.save(invite);
 
     assertThat(saved.getToken()).isNotBlank().hasSize(25);
     assertThat(saved.getStatus()).isEqualTo(AssistantInviteStatus.PENDING);
     AssistantInviteModel byToken = inviteRepository.findByToken(saved.getToken()).orElseThrow();
-    AssistantInviteModel byHash =
-        inviteRepository.findByLinkTokenHash(SecureTokens.hash(rawSecret)).orElseThrow();
     assertThat(byToken.getId()).isEqualTo(saved.getId());
-    assertThat(byHash.getId()).isEqualTo(saved.getId());
+  }
+
+  @Test
+  void findsPendingInviteByAssistantId() {
+    DriverModel driver = createDriver("driver5@vanep.com", "44455566677");
+    AssistantModel assistant = createAssistant("assistant5@vanep.com", "88899900011");
+    AssistantInviteModel invite = buildInvite(driver, assistant);
+    inviteRepository.save(invite);
+
+    AssistantInviteModel found =
+        inviteRepository
+            .findByAssistantIdAndStatus(assistant.getId(), AssistantInviteStatus.PENDING)
+            .orElseThrow();
+    assertThat(found.getToken()).isEqualTo(invite.getToken());
   }
 
   @Test
@@ -54,7 +63,7 @@ class AssistantInviteRepositoryTest {
     AssistantModel assistant = createAssistant("assistant2@vanep.com", "55566677788");
     Instant threeDaysAgo = Instant.now().minus(3, ChronoUnit.DAYS);
 
-    AssistantInviteModel rejected = buildInvite(driver, assistant, SecureTokens.generate());
+    AssistantInviteModel rejected = buildInvite(driver, assistant);
     rejected.setStatus(AssistantInviteStatus.REJECTED);
     rejected.setRespondedAt(threeDaysAgo);
     inviteRepository.save(rejected);
@@ -72,7 +81,7 @@ class AssistantInviteRepositoryTest {
     AssistantModel assistant = createAssistant("assistant3@vanep.com", "66677788899");
     Instant tenDaysAgo = Instant.now().minus(10, ChronoUnit.DAYS);
 
-    AssistantInviteModel rejected = buildInvite(driver, assistant, SecureTokens.generate());
+    AssistantInviteModel rejected = buildInvite(driver, assistant);
     rejected.setStatus(AssistantInviteStatus.REJECTED);
     rejected.setRespondedAt(tenDaysAgo);
     inviteRepository.save(rejected);
@@ -88,7 +97,7 @@ class AssistantInviteRepositoryTest {
   void softDeletedInviteIsAbsentFromDefaultQueries() {
     DriverModel driver = createDriver("driver4@vanep.com", "33344455566");
     AssistantModel assistant = createAssistant("assistant4@vanep.com", "77788899900");
-    AssistantInviteModel invite = buildInvite(driver, assistant, SecureTokens.generate());
+    AssistantInviteModel invite = buildInvite(driver, assistant);
     AssistantInviteModel saved = inviteRepository.save(invite);
 
     inviteRepository.delete(saved);
@@ -128,12 +137,10 @@ class AssistantInviteRepositoryTest {
     return assistantRepository.save(assistant);
   }
 
-  private AssistantInviteModel buildInvite(
-      DriverModel driver, AssistantModel assistant, String rawSecret) {
+  private AssistantInviteModel buildInvite(DriverModel driver, AssistantModel assistant) {
     AssistantInviteModel invite = new AssistantInviteModel();
     invite.setDriver(driver);
     invite.setAssistant(assistant);
-    invite.setLinkTokenHash(SecureTokens.hash(rawSecret));
     invite.setExpiresAt(Instant.now().plus(72, ChronoUnit.HOURS));
     return invite;
   }
