@@ -3,6 +3,7 @@ package br.com.vanep.assistant.controller;
 import br.com.vanep.assistant.dto.AssistantInviteCreateRequestDTO;
 import br.com.vanep.assistant.dto.AssistantInviteResponseDTO;
 import br.com.vanep.assistant.dto.AssistantListItemResponseDTO;
+import br.com.vanep.assistant.dto.AssistantPendingInviteDTO;
 import br.com.vanep.assistant.dto.AssistantProfileResponseDTO;
 import br.com.vanep.assistant.dto.AssistantProfileUpdateRequestDTO;
 import br.com.vanep.assistant.service.AssistantInviteService;
@@ -53,6 +54,26 @@ public class AssistantController {
       @AuthenticationPrincipal Jwt jwt,
       @Valid @RequestBody AssistantProfileUpdateRequestDTO request) {
     return profileService.updateProfile(jwt.getSubject(), request);
+  }
+
+  @GetMapping("/me/invite")
+  @PreAuthorize("hasAuthority('show_assistant')")
+  public AssistantPendingInviteDTO getPendingInvite(@AuthenticationPrincipal Jwt jwt) {
+    return inviteService.getPendingInvite(jwt.getSubject());
+  }
+
+  @PostMapping("/me/invite/accept")
+  @ResponseStatus(HttpStatus.NO_CONTENT)
+  @PreAuthorize("hasAuthority('update_assistant')")
+  public void acceptPendingInvite(@AuthenticationPrincipal Jwt jwt) {
+    inviteService.acceptPendingInvite(jwt.getSubject());
+  }
+
+  @PostMapping("/me/invite/reject")
+  @ResponseStatus(HttpStatus.NO_CONTENT)
+  @PreAuthorize("hasAuthority('update_assistant')")
+  public void rejectPendingInvite(@AuthenticationPrincipal Jwt jwt) {
+    inviteService.rejectPendingInvite(jwt.getSubject());
   }
 
   @PostMapping("/me/revoke")

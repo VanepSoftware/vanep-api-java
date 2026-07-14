@@ -1,12 +1,10 @@
 package br.com.vanep.assistant.mapper;
 
 import br.com.vanep.assistant.dto.AssistantDriverSummaryDTO;
-import br.com.vanep.assistant.dto.AssistantInvitePageDTO;
 import br.com.vanep.assistant.dto.AssistantInviteResponseDTO;
 import br.com.vanep.assistant.dto.AssistantListItemResponseDTO;
 import br.com.vanep.assistant.dto.AssistantPendingInviteDTO;
 import br.com.vanep.assistant.dto.AssistantProfileResponseDTO;
-import br.com.vanep.assistant.enums.AssistantInviteViewState;
 import br.com.vanep.assistant.model.AssistantInviteModel;
 import br.com.vanep.assistant.model.AssistantModel;
 import br.com.vanep.driver.model.DriverModel;
@@ -54,21 +52,5 @@ public class AssistantMapper {
   public AssistantDriverSummaryDTO toDriverSummary(DriverModel driver) {
     return new AssistantDriverSummaryDTO(
         driver.getUser().getName(), driver.getPhoto(), driver.getCity(), driver.getRating());
-  }
-
-  public AssistantInvitePageDTO toInvitePage(
-      AssistantInviteViewState state, AssistantInviteModel invite) {
-    if (invite == null) {
-      return AssistantInvitePageDTO.ofState(state);
-    }
-    DriverModel driver = invite.getDriver();
-    String rating = driver.getRating() != null ? driver.getRating().toPlainString() : null;
-    return new AssistantInvitePageDTO(
-        state,
-        driver.getUser().getName(),
-        driver.getPhoto(),
-        driver.getCity(),
-        rating,
-        invite.getExpiresAt());
   }
 }

@@ -45,8 +45,8 @@
 
 > Depends on: Phase 3. Capabilities: `assistant-linking` (web) + `assistant-profile`.
 
-- [x] 4.1 Tests first: GET invite page valid/expired/invalid; accept/reject require matching logged-in assistant; wrong user rejected; accept → ACTIVE; reject → UNLINKED + REJECTED; unauthenticated redirected/prompted to login
-- [x] 4.2 Thymeleaf controller + templates: `GET /assistant-invite/{token}`, `POST .../accept`, `POST .../reject` (lazy expiry on read/action); SecurityConfig
+- [x] 4.1 Tests first: GET pending invite; accept/reject via REST autenticado; accept → ACTIVE; reject → UNLINKED + REJECTED
+- [x] 4.2 REST: `GET /api/assistants/me/invite`, `POST .../accept`, `POST .../reject` (lazy expiry on read/action)
 - [x] 4.3 Profile: `GET|PUT /api/assistants/me`, ownership; driver list DTO complete
 - [x] 4.4 E2E: signup UNLINKED → invite → Mailpit/link → accept; cancel; cooldown smoke where practical
 - [x] 4.5 `./mvnw spotless:check` + `./mvnw verify` (JaCoCo); open PR4 → `main`

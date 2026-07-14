@@ -1,10 +1,9 @@
 package br.com.vanep.assistant.service;
 
 import br.com.vanep.assistant.dto.AssistantInviteCreateRequestDTO;
-import br.com.vanep.assistant.dto.AssistantInvitePageDTO;
 import br.com.vanep.assistant.dto.AssistantInviteResponseDTO;
+import br.com.vanep.assistant.dto.AssistantPendingInviteDTO;
 import br.com.vanep.assistant.enums.AssistantInviteStatus;
-import br.com.vanep.assistant.enums.AssistantInviteViewState;
 import br.com.vanep.assistant.enums.AssistantStatus;
 import br.com.vanep.assistant.mapper.AssistantMapper;
 import br.com.vanep.assistant.model.AssistantInviteModel;
@@ -43,7 +42,6 @@ public class AssistantInviteService {
   private final AssistantMapper mapper;
   private final MessageSource messages;
   private final Duration inviteTtl;
-  private final String baseUrl;
 
   public AssistantInviteService(
       AssistantInviteRepository inviteRepository,
@@ -53,8 +51,7 @@ public class AssistantInviteService {
       MailService mail,
       AssistantMapper mapper,
       MessageSource messages,
-      @Value("${vanep.mail.assistant-invite-ttl-hours:72}") long inviteTtlHours,
-      @Value("${vanep.app.base-url:http://localhost:8080}") String baseUrl) {
+      @Value("${vanep.mail.assistant-invite-ttl-hours:72}") long inviteTtlHours) {
     this.inviteRepository = inviteRepository;
     this.assistantRepository = assistantRepository;
     this.driverRepository = driverRepository;
@@ -63,7 +60,6 @@ public class AssistantInviteService {
     this.mapper = mapper;
     this.messages = messages;
     this.inviteTtl = Duration.ofHours(inviteTtlHours);
-    this.baseUrl = baseUrl;
   }
 
   private String message(String key) {
@@ -135,7 +131,7 @@ public class AssistantInviteService {
     assistant.setStatus(AssistantStatus.PENDING);
     assistantRepository.save(assistant);
 
-    sendInviteEmail(assistant, driver, rawSecret);
+    sendInviteEmail(assistant, driver);
 
     return mapper.toInviteResponse(invite);
   }
@@ -166,6 +162,42 @@ public class AssistantInviteService {
   }
 
   @Transactional
+  public AssistantPendingInviteDTO getPendingInvite(String callerEmail) {
+    AssistantModel assistant = resolveAssistant(callerEmail);
+    return mapper.toPendingInvite(requireActionablePendingInvite(assistant));
+  }
+
+  @Transactional
+  public void acceptPendingInvite(String callerEmail) {
+    AssistantModel assistant = resolveAssistant(callerEmail);
+    AssistantInviteModel invite = requireActionablePendingInvite(assistant);
+
+    assistant.setStatus(AssistantStatus.ACTIVE);
+    assistant.setDriver(invite.getDriver());
+    assistant.setActivatedAt(Instant.now());
+    assistantRepository.save(assistant);
+
+    invite.setStatus(AssistantInviteStatus.ACCEPTED);
+    invite.setRespondedAt(Instant.now());
+    inviteRepository.save(invite);
+  }
+
+  @Transactional
+  public void rejectPendingInvite(String callerEmail) {
+    AssistantModel assistant = resolveAssistant(callerEmail);
+    AssistantInviteModel invite = requireActionablePendingInvite(assistant);
+
+    invite.setStatus(AssistantInviteStatus.REJECTED);
+    invite.setRespondedAt(Instant.now());
+    inviteRepository.save(invite);
+
+    if (assistant.getStatus() == AssistantStatus.PENDING) {
+      assistant.setStatus(AssistantStatus.UNLINKED);
+      assistantRepository.save(assistant);
+    }
+  }
+
+  @Transactional
   public void expireIfStale(AssistantInviteModel invite) {
     if (invite.getStatus() != AssistantInviteStatus.PENDING) {
       return;
@@ -190,95 +222,29 @@ public class AssistantInviteService {
         .ifPresent(this::expireIfStale);
   }
 
-  @Transactional
-  public AssistantInvitePageDTO resolveInvitePage(String rawSecret, String callerEmail) {
-    Optional<AssistantInviteModel> invite = findByRawSecret(rawSecret);
-    if (invite.isEmpty()) {
-      return AssistantInvitePageDTO.ofState(AssistantInviteViewState.INVALID);
+  private AssistantInviteModel requireActionablePendingInvite(AssistantModel assistant) {
+    if (assistant.getStatus() != AssistantStatus.PENDING) {
+      throw new ResponseStatusException(
+          HttpStatus.NOT_FOUND, message("assistant.invite.not_found"));
     }
 
-    AssistantInviteModel current = invite.get();
-    if (current.getStatus() == AssistantInviteStatus.EXPIRED) {
-      return mapper.toInvitePage(AssistantInviteViewState.EXPIRED, current);
-    }
-    if (current.getStatus() != AssistantInviteStatus.PENDING) {
-      return mapper.toInvitePage(AssistantInviteViewState.NOT_PENDING, current);
-    }
-
-    if (callerEmail == null || callerEmail.isBlank()) {
-      return mapper.toInvitePage(AssistantInviteViewState.LOGIN_REQUIRED, current);
-    }
-
-    if (!current.getAssistant().getUser().getEmail().equalsIgnoreCase(callerEmail)) {
-      return mapper.toInvitePage(AssistantInviteViewState.WRONG_USER, current);
-    }
-
-    return mapper.toInvitePage(AssistantInviteViewState.VALID, current);
-  }
-
-  @Transactional
-  public void acceptInvite(String rawSecret, String callerEmail) {
-    AssistantInviteModel invite = requirePendingInviteForAssistant(rawSecret, callerEmail);
-
-    AssistantModel assistant = invite.getAssistant();
-    assistant.setStatus(AssistantStatus.ACTIVE);
-    assistant.setDriver(invite.getDriver());
-    assistant.setActivatedAt(Instant.now());
-    assistantRepository.save(assistant);
-
-    invite.setStatus(AssistantInviteStatus.ACCEPTED);
-    invite.setRespondedAt(Instant.now());
-    inviteRepository.save(invite);
-  }
-
-  @Transactional
-  public void rejectInvite(String rawSecret, String callerEmail) {
-    AssistantInviteModel invite = requirePendingInviteForAssistant(rawSecret, callerEmail);
-
-    invite.setStatus(AssistantInviteStatus.REJECTED);
-    invite.setRespondedAt(Instant.now());
-    inviteRepository.save(invite);
-
-    AssistantModel assistant = invite.getAssistant();
-    if (assistant.getStatus() == AssistantStatus.PENDING) {
-      assistant.setStatus(AssistantStatus.UNLINKED);
-      assistantRepository.save(assistant);
-    }
-  }
-
-  private AssistantInviteModel requirePendingInviteForAssistant(
-      String rawSecret, String callerEmail) {
     AssistantInviteModel invite =
-        findByRawSecret(rawSecret)
+        inviteRepository
+            .findByAssistantIdAndStatus(assistant.getId(), AssistantInviteStatus.PENDING)
             .orElseThrow(
                 () ->
                     new ResponseStatusException(
                         HttpStatus.NOT_FOUND, message("assistant.invite.not_found")));
 
+    expireIfStale(invite);
     if (invite.getStatus() == AssistantInviteStatus.EXPIRED) {
-      throw new ResponseStatusException(HttpStatus.GONE, message("assistant.invite.page.expired"));
+      throw new ResponseStatusException(HttpStatus.GONE, message("assistant.invite.expired"));
     }
     if (invite.getStatus() != AssistantInviteStatus.PENDING) {
       throw new ResponseStatusException(
           HttpStatus.CONFLICT, message("assistant.invite.not_pending"));
     }
 
-    if (callerEmail == null
-        || !invite.getAssistant().getUser().getEmail().equalsIgnoreCase(callerEmail)) {
-      throw new ResponseStatusException(
-          HttpStatus.FORBIDDEN, message("assistant.invite.page.wrong_user"));
-    }
-
-    return invite;
-  }
-
-  private Optional<AssistantInviteModel> findByRawSecret(String rawSecret) {
-    if (rawSecret == null || rawSecret.isBlank()) {
-      return Optional.empty();
-    }
-    Optional<AssistantInviteModel> invite =
-        inviteRepository.findByLinkTokenHash(SecureTokens.hash(rawSecret));
-    invite.ifPresent(this::expireIfStale);
     return invite;
   }
 
@@ -301,8 +267,7 @@ public class AssistantInviteService {
     }
   }
 
-  private void sendInviteEmail(AssistantModel assistant, DriverModel driver, String rawSecret) {
-    String link = baseUrl + "/assistant-invite/" + rawSecret;
+  private void sendInviteEmail(AssistantModel assistant, DriverModel driver) {
     mail.send(
         assistant.getUser().getEmail(),
         message("assistant.invite.email.subject"),
@@ -312,10 +277,29 @@ public class AssistantInviteService {
             assistant.getUser().getName(),
             "driverName",
             driver.getUser().getName(),
-            "link",
-            link,
             "expiryHours",
             String.valueOf(inviteTtl.toHours())));
+  }
+
+  private AssistantModel resolveAssistant(String callerEmail) {
+    UserModel user =
+        userRepository
+            .findByEmail(callerEmail)
+            .orElseThrow(
+                () ->
+                    new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, message("user.account.not_found")));
+
+    if (user.getType() != UserType.ASSISTANT) {
+      throw new ResponseStatusException(HttpStatus.FORBIDDEN, message("assistant.link.forbidden"));
+    }
+
+    return assistantRepository
+        .findByUserId(user.getId())
+        .orElseThrow(
+            () ->
+                new ResponseStatusException(
+                    HttpStatus.NOT_FOUND, message("assistant.profile.not_found")));
   }
 
   private DriverModel resolveDriver(String callerEmail) {

@@ -4,13 +4,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import br.com.vanep.assistant.enums.AssistantInviteStatus;
@@ -30,13 +29,11 @@ import java.util.Locale;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.context.jdbc.Sql;
@@ -48,8 +45,6 @@ import org.springframework.web.context.WebApplicationContext;
 @ActiveProfiles("test")
 @Sql(scripts = "/db/clean.sql", executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
 class AssistantInviteFlowTest {
-
-  private static final String ASSISTANT_PASSWORD = "secret123";
 
   @Autowired private WebApplicationContext context;
   @Autowired private UserRepository users;
@@ -65,27 +60,15 @@ class AssistantInviteFlowTest {
   void setUp() {
     mockMvc =
         MockMvcBuilders.webAppContextSetup(context)
-            .apply(SecurityMockMvcConfigurers.springSecurity())
+            .apply(springSecurity())
             .defaultRequest(get("/").locale(Locale.forLanguageTag("pt-BR")))
             .build();
   }
 
   @Test
-  void signupInviteAcceptFlow() throws Exception {
-    mockMvc
-        .perform(
-            post("/signup/assistant")
-                .with(csrf())
-                .param("name", "Carla")
-                .param("email", "carla@vanep.com")
-                .param("password", ASSISTANT_PASSWORD)
-                .param("document", "55555555555")
-                .param("acceptTerms", "true"))
-        .andExpect(status().is3xxRedirection())
-        .andExpect(redirectedUrl("/login?registered"));
-
-    UserModel assistantUser = users.findByEmail("carla@vanep.com").orElseThrow();
-    AssistantModel assistant = assistants.findByUserId(assistantUser.getId()).orElseThrow();
+  void inviteAcceptFlowViaRestApi() throws Exception {
+    UserModel assistantUser = createAssistantUser("carla@vanep.com");
+    AssistantModel assistant = createAssistant(assistantUser);
     assertThat(assistant.getStatus()).isEqualTo(AssistantStatus.UNLINKED);
 
     UserModel driverUser = createDriverUser("driver@vanep.com", "João");
@@ -107,25 +90,16 @@ class AssistantInviteFlowTest {
             .findByAssistantIdAndStatus(assistant.getId(), AssistantInviteStatus.PENDING)
             .orElseThrow();
 
-    @SuppressWarnings("unchecked")
-    ArgumentCaptor<Map<String, Object>> mailVariables = ArgumentCaptor.forClass(Map.class);
-    verify(mail)
-        .send(eq("carla@vanep.com"), any(), eq("email/assistant-invite"), mailVariables.capture());
-    String link = (String) mailVariables.getValue().get("link");
-    String rawSecret = link.substring(link.lastIndexOf('/') + 1);
-
-    mockMvc.perform(get("/assistant-invite/" + rawSecret)).andExpect(status().isOk());
+    verify(mail).send(eq("carla@vanep.com"), any(), eq("email/assistant-invite"), any(Map.class));
 
     mockMvc
-        .perform(
-            post("/assistant-invite/" + rawSecret + "/accept")
-                .with(csrf())
-                .with(
-                    user(assistantUser.getEmail())
-                        .password(ASSISTANT_PASSWORD)
-                        .authorities(new SimpleGrantedAuthority("ROLE_ASSISTANT"))))
-        .andExpect(status().is3xxRedirection())
-        .andExpect(redirectedUrl("/login?invite-accepted"));
+        .perform(get("/api/assistants/me/invite").with(assistantJwt(assistantUser)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.driver.name").value("João"));
+
+    mockMvc
+        .perform(post("/api/assistants/me/invite/accept").with(assistantJwt(assistantUser)))
+        .andExpect(status().isNoContent());
 
     assistant = assistants.findById(assistant.getId()).orElseThrow();
     assertThat(assistant.getStatus()).isEqualTo(AssistantStatus.ACTIVE);
@@ -179,26 +153,9 @@ class AssistantInviteFlowTest {
                 .content("{\"email\":\"cooldown-flow@vanep.com\"}"))
         .andExpect(status().isCreated());
 
-    @SuppressWarnings("unchecked")
-    ArgumentCaptor<Map<String, Object>> mailVariables = ArgumentCaptor.forClass(Map.class);
-    verify(mail)
-        .send(
-            eq("cooldown-flow@vanep.com"),
-            any(),
-            eq("email/assistant-invite"),
-            mailVariables.capture());
-    String link = (String) mailVariables.getValue().get("link");
-    String rawSecret = link.substring(link.lastIndexOf('/') + 1);
-
     mockMvc
-        .perform(
-            post("/assistant-invite/" + rawSecret + "/reject")
-                .with(csrf())
-                .with(
-                    user(assistantUser.getEmail())
-                        .password(ASSISTANT_PASSWORD)
-                        .authorities(new SimpleGrantedAuthority("ROLE_ASSISTANT"))))
-        .andExpect(status().is3xxRedirection());
+        .perform(post("/api/assistants/me/invite/reject").with(assistantJwt(assistantUser)))
+        .andExpect(status().isNoContent());
 
     mockMvc
         .perform(
@@ -228,6 +185,22 @@ class AssistantInviteFlowTest {
             new SimpleGrantedAuthority("revoke_assistant"));
   }
 
+  private org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors
+          .JwtRequestPostProcessor
+      assistantJwt(UserModel assistantUser) {
+    return jwt()
+        .jwt(
+            t ->
+                t.claim("uid", assistantUser.getToken())
+                    .claim("roles", java.util.List.of("ROLE_ASSISTANT"))
+                    .subject(assistantUser.getEmail()))
+        .authorities(
+            new SimpleGrantedAuthority("ROLE_ASSISTANT"),
+            new SimpleGrantedAuthority("show_assistant"),
+            new SimpleGrantedAuthority("update_assistant"),
+            new SimpleGrantedAuthority("revoke_assistant"));
+  }
+
   private UserModel createDriverUser(String email, String name) {
     UserModel user = new UserModel();
     user.setType(UserType.DRIVER);
@@ -245,7 +218,7 @@ class AssistantInviteFlowTest {
     user.setName("Assistente");
     user.setEmail(email);
     user.setDocument(String.valueOf(System.nanoTime()).substring(0, 11));
-    user.setPassword(passwordEncoder.encode(ASSISTANT_PASSWORD));
+    user.setPassword(passwordEncoder.encode("secret123"));
     user.setVerified(true);
     return users.save(user);
   }

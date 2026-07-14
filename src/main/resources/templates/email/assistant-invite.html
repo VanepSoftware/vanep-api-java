@@ -12,24 +12,9 @@
     </p>
     <p>
       Este convite expira em
-      <span th:text="${expiryHours}">72</span> horas. Acesse o link abaixo para aceitar ou recusar:
+      <span th:text="${expiryHours}">72</span> horas. Abra o aplicativo Vanep para aceitar ou
+      recusar.
     </p>
-    <p>
-      <a
-        th:href="${link}"
-        style="
-          display: inline-block;
-          padding: 12px 20px;
-          background: #111;
-          color: #fff;
-          border-radius: 8px;
-          text-decoration: none;
-        "
-        >Ver convite</a
-      >
-    </p>
-    <p>Se o botão não funcionar, copie e cole este endereço no navegador:</p>
-    <p><a th:href="${link}" th:text="${link}">link</a></p>
     <p style="color: #666; font-size: 12px">
       Se você não esperava este convite, pode ignorar este e-mail.
     </p>
