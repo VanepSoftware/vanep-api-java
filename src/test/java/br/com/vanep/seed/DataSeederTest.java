@@ -21,6 +21,7 @@ import br.com.vanep.role.model.RoleModel;
 import br.com.vanep.role.repository.RoleRepository;
 import br.com.vanep.rolepermission.model.RolePermissionModel;
 import br.com.vanep.rolepermission.repository.RolePermissionRepository;
+import br.com.vanep.school.seed.SchoolSeeder;
 import br.com.vanep.user.UserRepository;
 import br.com.vanep.user.UserType;
 import br.com.vanep.user.model.UserModel;
@@ -44,6 +45,7 @@ class DataSeederTest {
   @Mock private RoleRepository roles;
   @Mock private RolePermissionRepository rolePermissions;
   @Mock private DependentSeeder dependentSeeder;
+  @Mock private SchoolSeeder schoolSeeder;
   @Mock private PasswordEncoder passwordEncoder;
 
   private DataSeeder seeder;
@@ -52,7 +54,14 @@ class DataSeederTest {
   void setUp() {
     seeder =
         new DataSeeder(
-            users, clients, drivers, roles, rolePermissions, dependentSeeder, passwordEncoder);
+            users,
+            clients,
+            drivers,
+            roles,
+            rolePermissions,
+            dependentSeeder,
+            schoolSeeder,
+            passwordEncoder);
     seeder.adminEmail = "admin@vanep.com.br";
     seeder.adminPassword = "password";
     seeder.adminDocument = "00000000000";
