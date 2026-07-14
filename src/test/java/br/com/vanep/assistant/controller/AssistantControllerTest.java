@@ -16,7 +16,6 @@ import br.com.vanep.assistant.model.AssistantInviteModel;
 import br.com.vanep.assistant.model.AssistantModel;
 import br.com.vanep.assistant.repository.AssistantInviteRepository;
 import br.com.vanep.assistant.repository.AssistantRepository;
-import br.com.vanep.auth.token.SecureTokens;
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.user.UserRepository;
@@ -146,8 +145,7 @@ class AssistantControllerTest {
         drivers
             .findByUserId(users.findByEmail(otherDriverEmail).orElseThrow().getId())
             .orElseThrow();
-    saveInvite(
-        otherDriver, assistant, SecureTokens.generate(), Instant.now().plus(72, ChronoUnit.HOURS));
+    saveInvite(otherDriver, assistant, Instant.now().plus(72, ChronoUnit.HOURS));
 
     mockMvc
         .perform(
@@ -162,8 +160,7 @@ class AssistantControllerTest {
   void resendCancelsPreviousPendingInviteFromSameDriver() throws Exception {
     AssistantModel assistant = createAssistant("resend@vanep.com", "55566677788");
     AssistantInviteModel previous =
-        saveInvite(
-            driver, assistant, SecureTokens.generate(), Instant.now().plus(72, ChronoUnit.HOURS));
+        saveInvite(driver, assistant, Instant.now().plus(72, ChronoUnit.HOURS));
     assistant.setStatus(AssistantStatus.PENDING);
     assistants.save(assistant);
 
@@ -188,8 +185,7 @@ class AssistantControllerTest {
   void createInviteReturnsConflictDuringRejectionCooldown() throws Exception {
     AssistantModel assistant = createAssistant("cooldown@vanep.com", "66677788899");
     AssistantInviteModel rejected =
-        saveInvite(
-            driver, assistant, SecureTokens.generate(), Instant.now().plus(72, ChronoUnit.HOURS));
+        saveInvite(driver, assistant, Instant.now().plus(72, ChronoUnit.HOURS));
     rejected.setStatus(AssistantInviteStatus.REJECTED);
     rejected.setRespondedAt(Instant.now().minus(2, ChronoUnit.DAYS));
     invites.save(rejected);
@@ -207,8 +203,7 @@ class AssistantControllerTest {
   void otherDriverMayInviteAfterRejectionDuringCooldown() throws Exception {
     AssistantModel assistant = createAssistant("otherinvite@vanep.com", "77788899900");
     AssistantInviteModel rejected =
-        saveInvite(
-            driver, assistant, SecureTokens.generate(), Instant.now().plus(72, ChronoUnit.HOURS));
+        saveInvite(driver, assistant, Instant.now().plus(72, ChronoUnit.HOURS));
     rejected.setStatus(AssistantInviteStatus.REJECTED);
     rejected.setRespondedAt(Instant.now().minus(2, ChronoUnit.DAYS));
     invites.save(rejected);
@@ -226,8 +221,7 @@ class AssistantControllerTest {
   void cancelInviteByOwnerDriver() throws Exception {
     AssistantModel assistant = createAssistant("cancel@vanep.com", "88899900011");
     AssistantInviteModel invite =
-        saveInvite(
-            driver, assistant, SecureTokens.generate(), Instant.now().plus(72, ChronoUnit.HOURS));
+        saveInvite(driver, assistant, Instant.now().plus(72, ChronoUnit.HOURS));
     assistant.setStatus(AssistantStatus.PENDING);
     assistants.save(assistant);
 
@@ -245,8 +239,7 @@ class AssistantControllerTest {
   void cancelInviteForbiddenForOtherDriver() throws Exception {
     AssistantModel assistant = createAssistant("forbidcancel@vanep.com", "99900011122");
     AssistantInviteModel invite =
-        saveInvite(
-            driver, assistant, SecureTokens.generate(), Instant.now().plus(72, ChronoUnit.HOURS));
+        saveInvite(driver, assistant, Instant.now().plus(72, ChronoUnit.HOURS));
 
     mockMvc
         .perform(delete("/api/assistants/invites/" + invite.getToken()).with(otherDriverJwt()))
@@ -257,8 +250,7 @@ class AssistantControllerTest {
   void lazyExpiryAllowsNewInvite() throws Exception {
     AssistantModel assistant = createAssistant("expired@vanep.com", "10111213141");
     AssistantInviteModel expired =
-        saveInvite(
-            driver, assistant, SecureTokens.generate(), Instant.now().minus(1, ChronoUnit.HOURS));
+        saveInvite(driver, assistant, Instant.now().minus(1, ChronoUnit.HOURS));
     assistant.setStatus(AssistantStatus.PENDING);
     assistants.save(assistant);
 
@@ -351,8 +343,7 @@ class AssistantControllerTest {
     AssistantModel assistant = createAssistant("pending-profile@vanep.com", "18192021222");
     assistant.setStatus(AssistantStatus.PENDING);
     assistants.save(assistant);
-    saveInvite(
-        driver, assistant, SecureTokens.generate(), Instant.now().plus(72, ChronoUnit.HOURS));
+    saveInvite(driver, assistant, Instant.now().plus(72, ChronoUnit.HOURS));
 
     mockMvc
         .perform(get("/api/assistants/me").with(assistantJwt(assistant.getUser())))
@@ -393,8 +384,7 @@ class AssistantControllerTest {
     AssistantModel assistant = createAssistant("invite-me@vanep.com", "20212223242");
     assistant.setStatus(AssistantStatus.PENDING);
     assistants.save(assistant);
-    saveInvite(
-        driver, assistant, SecureTokens.generate(), Instant.now().plus(72, ChronoUnit.HOURS));
+    saveInvite(driver, assistant, Instant.now().plus(72, ChronoUnit.HOURS));
 
     mockMvc
         .perform(get("/api/assistants/me/invite").with(assistantJwt(assistant.getUser())))
@@ -408,8 +398,7 @@ class AssistantControllerTest {
     assistant.setStatus(AssistantStatus.PENDING);
     assistants.save(assistant);
     AssistantInviteModel invite =
-        saveInvite(
-            driver, assistant, SecureTokens.generate(), Instant.now().plus(72, ChronoUnit.HOURS));
+        saveInvite(driver, assistant, Instant.now().plus(72, ChronoUnit.HOURS));
 
     mockMvc
         .perform(post("/api/assistants/me/invite/accept").with(assistantJwt(assistant.getUser())))
@@ -428,8 +417,7 @@ class AssistantControllerTest {
     assistant.setStatus(AssistantStatus.PENDING);
     assistants.save(assistant);
     AssistantInviteModel invite =
-        saveInvite(
-            driver, assistant, SecureTokens.generate(), Instant.now().plus(72, ChronoUnit.HOURS));
+        saveInvite(driver, assistant, Instant.now().plus(72, ChronoUnit.HOURS));
 
     mockMvc
         .perform(post("/api/assistants/me/invite/reject").with(assistantJwt(assistant.getUser())))
@@ -533,11 +521,10 @@ class AssistantControllerTest {
   }
 
   private AssistantInviteModel saveInvite(
-      DriverModel inviteDriver, AssistantModel assistant, String rawSecret, Instant expiresAt) {
+      DriverModel inviteDriver, AssistantModel assistant, Instant expiresAt) {
     AssistantInviteModel invite = new AssistantInviteModel();
     invite.setDriver(inviteDriver);
     invite.setAssistant(assistant);
-    invite.setLinkTokenHash(SecureTokens.hash(rawSecret));
     invite.setExpiresAt(expiresAt);
     return invites.save(invite);
   }

@@ -11,7 +11,6 @@ import br.com.vanep.assistant.model.AssistantModel;
 import br.com.vanep.assistant.repository.AssistantInviteRepository;
 import br.com.vanep.assistant.repository.AssistantRepository;
 import br.com.vanep.auth.mail.MailService;
-import br.com.vanep.auth.token.SecureTokens;
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.user.UserRepository;
@@ -120,11 +119,9 @@ public class AssistantInviteService {
       }
     }
 
-    String rawSecret = SecureTokens.generate();
     AssistantInviteModel invite = new AssistantInviteModel();
     invite.setDriver(driver);
     invite.setAssistant(assistant);
-    invite.setLinkTokenHash(SecureTokens.hash(rawSecret));
     invite.setExpiresAt(Instant.now().plus(inviteTtl));
     invite = inviteRepository.save(invite);
 
