@@ -33,13 +33,9 @@ public class AssistantInviteModel {
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;
 
-  /** Public opaque ref for API (e.g. cancel invite). Not the email URL secret. */
+  /** Public opaque ref for API (cancel invite, pending invite DTO). */
   @Column(nullable = false, unique = true, length = 32)
   private String token;
-
-  /** SHA-256 hash ({@code SecureTokens.hash}) of the raw token embedded in the email link. */
-  @Column(name = "link_token_hash", nullable = false, unique = true, length = 64)
-  private String linkTokenHash;
 
   @ManyToOne(fetch = FetchType.EAGER, optional = false)
   @JoinColumn(name = "driver_id", nullable = false)
