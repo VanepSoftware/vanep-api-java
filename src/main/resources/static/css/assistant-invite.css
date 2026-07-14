@@ -1,0 +1,153 @@
+/* Convite de assistente — depende das variáveis definidas em auth.css */
+
+.invite-card {
+  max-width: 440px;
+}
+
+.invite-header {
+  margin-bottom: 1.75rem;
+}
+
+.invite-header .subtitle {
+  margin-bottom: 0;
+}
+
+.driver-card {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+  padding: 1.25rem;
+  margin-bottom: 1.5rem;
+  background: var(--vanep-navy-subtle);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+}
+
+.driver-avatar {
+  flex-shrink: 0;
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--vanep-navy);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.driver-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.driver-details {
+  flex: 1;
+  min-width: 0;
+}
+
+.driver-name {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.3;
+  margin-bottom: 0.5rem;
+}
+
+.driver-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 0.75rem;
+}
+
+.meta-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.2rem 0.55rem;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.meta-chip-rating {
+  color: var(--vanep-navy);
+  border-color: rgb(26 45 74 / 0.15);
+}
+
+.invite-intro {
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.invite-expiry {
+  margin-top: 0.65rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.invite-expiry time {
+  margin-left: 0.25rem;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.alert-info {
+  background: var(--vanep-navy-subtle);
+  border: 1px solid rgb(26 45 74 / 0.12);
+  color: var(--vanep-navy);
+}
+
+.invite-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.invite-actions form {
+  margin: 0;
+}
+
+.btn-secondary {
+  display: block;
+  width: 100%;
+  padding: 0.8rem;
+  background: var(--card);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  text-align: center;
+  text-decoration: none;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.btn-secondary:hover {
+  background: var(--bg);
+  border-color: var(--muted);
+}
+
+.invite-footer-link {
+  margin-top: 1.5rem;
+}
+
+.invite-error-only {
+  text-align: center;
+  padding: 0.5rem 0 0.25rem;
+}
+
+.invite-error-only .alert {
+  text-align: left;
+}

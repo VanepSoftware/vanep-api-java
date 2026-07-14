@@ -1,8 +1,10 @@
 package br.com.vanep.assistant.service;
 
 import br.com.vanep.assistant.dto.AssistantInviteCreateRequestDTO;
+import br.com.vanep.assistant.dto.AssistantInvitePageDTO;
 import br.com.vanep.assistant.dto.AssistantInviteResponseDTO;
 import br.com.vanep.assistant.enums.AssistantInviteStatus;
+import br.com.vanep.assistant.enums.AssistantInviteViewState;
 import br.com.vanep.assistant.enums.AssistantStatus;
 import br.com.vanep.assistant.mapper.AssistantMapper;
 import br.com.vanep.assistant.model.AssistantInviteModel;
@@ -186,6 +188,98 @@ public class AssistantInviteService {
     inviteRepository
         .findByAssistantIdAndStatus(assistant.getId(), AssistantInviteStatus.PENDING)
         .ifPresent(this::expireIfStale);
+  }
+
+  @Transactional
+  public AssistantInvitePageDTO resolveInvitePage(String rawSecret, String callerEmail) {
+    Optional<AssistantInviteModel> invite = findByRawSecret(rawSecret);
+    if (invite.isEmpty()) {
+      return AssistantInvitePageDTO.ofState(AssistantInviteViewState.INVALID);
+    }
+
+    AssistantInviteModel current = invite.get();
+    if (current.getStatus() == AssistantInviteStatus.EXPIRED) {
+      return mapper.toInvitePage(AssistantInviteViewState.EXPIRED, current);
+    }
+    if (current.getStatus() != AssistantInviteStatus.PENDING) {
+      return mapper.toInvitePage(AssistantInviteViewState.NOT_PENDING, current);
+    }
+
+    if (callerEmail == null || callerEmail.isBlank()) {
+      return mapper.toInvitePage(AssistantInviteViewState.LOGIN_REQUIRED, current);
+    }
+
+    if (!current.getAssistant().getUser().getEmail().equalsIgnoreCase(callerEmail)) {
+      return mapper.toInvitePage(AssistantInviteViewState.WRONG_USER, current);
+    }
+
+    return mapper.toInvitePage(AssistantInviteViewState.VALID, current);
+  }
+
+  @Transactional
+  public void acceptInvite(String rawSecret, String callerEmail) {
+    AssistantInviteModel invite = requirePendingInviteForAssistant(rawSecret, callerEmail);
+
+    AssistantModel assistant = invite.getAssistant();
+    assistant.setStatus(AssistantStatus.ACTIVE);
+    assistant.setDriver(invite.getDriver());
+    assistant.setActivatedAt(Instant.now());
+    assistantRepository.save(assistant);
+
+    invite.setStatus(AssistantInviteStatus.ACCEPTED);
+    invite.setRespondedAt(Instant.now());
+    inviteRepository.save(invite);
+  }
+
+  @Transactional
+  public void rejectInvite(String rawSecret, String callerEmail) {
+    AssistantInviteModel invite = requirePendingInviteForAssistant(rawSecret, callerEmail);
+
+    invite.setStatus(AssistantInviteStatus.REJECTED);
+    invite.setRespondedAt(Instant.now());
+    inviteRepository.save(invite);
+
+    AssistantModel assistant = invite.getAssistant();
+    if (assistant.getStatus() == AssistantStatus.PENDING) {
+      assistant.setStatus(AssistantStatus.UNLINKED);
+      assistantRepository.save(assistant);
+    }
+  }
+
+  private AssistantInviteModel requirePendingInviteForAssistant(
+      String rawSecret, String callerEmail) {
+    AssistantInviteModel invite =
+        findByRawSecret(rawSecret)
+            .orElseThrow(
+                () ->
+                    new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, message("assistant.invite.not_found")));
+
+    if (invite.getStatus() == AssistantInviteStatus.EXPIRED) {
+      throw new ResponseStatusException(HttpStatus.GONE, message("assistant.invite.page.expired"));
+    }
+    if (invite.getStatus() != AssistantInviteStatus.PENDING) {
+      throw new ResponseStatusException(
+          HttpStatus.CONFLICT, message("assistant.invite.not_pending"));
+    }
+
+    if (callerEmail == null
+        || !invite.getAssistant().getUser().getEmail().equalsIgnoreCase(callerEmail)) {
+      throw new ResponseStatusException(
+          HttpStatus.FORBIDDEN, message("assistant.invite.page.wrong_user"));
+    }
+
+    return invite;
+  }
+
+  private Optional<AssistantInviteModel> findByRawSecret(String rawSecret) {
+    if (rawSecret == null || rawSecret.isBlank()) {
+      return Optional.empty();
+    }
+    Optional<AssistantInviteModel> invite =
+        inviteRepository.findByLinkTokenHash(SecureTokens.hash(rawSecret));
+    invite.ifPresent(this::expireIfStale);
+    return invite;
   }
 
   private boolean isWithinRejectionCooldown(Long driverId, Long assistantId) {

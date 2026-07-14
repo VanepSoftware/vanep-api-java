@@ -6,6 +6,7 @@ import static org.springframework.security.test.web.servlet.setup.SecurityMockMv
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -329,6 +330,78 @@ class AssistantControllerTest {
         .andExpect(jsonPath("$.length()").value(2));
   }
 
+  @Test
+  void getMeReturnsProfileForAssistant() throws Exception {
+    AssistantModel assistant = createAssistant("profile@vanep.com", "17181920212");
+    assistant.setPhoto("https://cdn.example/photo.jpg");
+    assistants.save(assistant);
+
+    mockMvc
+        .perform(get("/api/assistants/me").with(assistantJwt(assistant.getUser())))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.token").value(assistant.getToken()))
+        .andExpect(jsonPath("$.name").value("Assistant"))
+        .andExpect(jsonPath("$.email").value("profile@vanep.com"))
+        .andExpect(jsonPath("$.photo").value("https://cdn.example/photo.jpg"))
+        .andExpect(jsonPath("$.status").value("UNLINKED"));
+  }
+
+  @Test
+  void getMeIncludesPendingInviteWhenAssistantIsPending() throws Exception {
+    AssistantModel assistant = createAssistant("pending-profile@vanep.com", "18192021222");
+    assistant.setStatus(AssistantStatus.PENDING);
+    assistants.save(assistant);
+    saveInvite(
+        driver, assistant, SecureTokens.generate(), Instant.now().plus(72, ChronoUnit.HOURS));
+
+    mockMvc
+        .perform(get("/api/assistants/me").with(assistantJwt(assistant.getUser())))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("PENDING"))
+        .andExpect(jsonPath("$.pendingInvite.driver.name").value("Main Driver"));
+  }
+
+  @Test
+  void putMeUpdatesPhoto() throws Exception {
+    AssistantModel assistant = createAssistant("update@vanep.com", "19202122232");
+
+    mockMvc
+        .perform(
+            put("/api/assistants/me")
+                .with(assistantJwt(assistant.getUser()))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"photo\":\"https://cdn.example/new.jpg\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.photo").value("https://cdn.example/new.jpg"));
+
+    assertThat(assistants.findById(assistant.getId()).orElseThrow().getPhoto())
+        .isEqualTo("https://cdn.example/new.jpg");
+  }
+
+  @Test
+  void getMeForbiddenForDriver() throws Exception {
+    mockMvc.perform(get("/api/assistants/me").with(driverJwt())).andExpect(status().isForbidden());
+  }
+
+  @Test
+  void getMeUnauthorizedWithoutJwt() throws Exception {
+    mockMvc.perform(get("/api/assistants/me")).andExpect(status().isUnauthorized());
+  }
+
+  private JwtRequestPostProcessor assistantJwt(UserModel assistantUser) {
+    return jwt()
+        .jwt(
+            t ->
+                t.claim("uid", assistantUser.getToken())
+                    .claim("roles", List.of("ROLE_ASSISTANT"))
+                    .subject(assistantUser.getEmail()))
+        .authorities(
+            new SimpleGrantedAuthority("ROLE_ASSISTANT"),
+            new SimpleGrantedAuthority("show_assistant"),
+            new SimpleGrantedAuthority("update_assistant"),
+            new SimpleGrantedAuthority("revoke_assistant"));
+  }
+
   private JwtRequestPostProcessor driverJwt() {
     return jwt()
         .jwt(
@@ -360,18 +433,6 @@ class AssistantControllerTest {
             new SimpleGrantedAuthority("list_assistants"),
             new SimpleGrantedAuthority("pause_assistant"),
             new SimpleGrantedAuthority("resume_assistant"),
-            new SimpleGrantedAuthority("revoke_assistant"));
-  }
-
-  private JwtRequestPostProcessor assistantJwt(UserModel assistantUser) {
-    return jwt()
-        .jwt(
-            t ->
-                t.claim("uid", assistantUser.getToken())
-                    .claim("roles", List.of("ROLE_ASSISTANT"))
-                    .subject(assistantUser.getEmail()))
-        .authorities(
-            new SimpleGrantedAuthority("ROLE_ASSISTANT"),
             new SimpleGrantedAuthority("revoke_assistant"));
   }
 

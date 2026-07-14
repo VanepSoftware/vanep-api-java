@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -116,6 +117,8 @@ public class SecurityConfig {
                         "/verify-email/resend",
                         "/forgot-password",
                         "/reset-password")
+                    .permitAll()
+                    .requestMatchers(HttpMethod.GET, "/assistant-invite/**")
                     .permitAll()
                     .requestMatchers("/auth/sso-logout")
                     .permitAll()

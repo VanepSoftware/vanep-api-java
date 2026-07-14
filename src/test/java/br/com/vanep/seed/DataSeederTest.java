@@ -133,7 +133,7 @@ class DataSeederTest {
     ArgumentCaptor<RolePermissionModel> captor = ArgumentCaptor.forClass(RolePermissionModel.class);
     verify(rolePermissions, times(3)).save(captor.capture());
     assertThat(captor.getAllValues())
-        .extracting(RolePermissionModel::getName)
+        .extracting(bundle -> bundle.getName())
         .containsExactlyInAnyOrder("CLIENT", "ASSISTANT", "DRIVER");
   }
 
