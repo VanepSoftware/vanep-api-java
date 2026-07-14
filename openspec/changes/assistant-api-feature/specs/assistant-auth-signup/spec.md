@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: User type and role ASSISTANT exist
-The system SHALL support `UserType.ASSISTANT` and `RoleName.ASSISTANT` with a seeded permission bundle for own profile and linking actions only (no checklist/chat/route permissions, no email-invite permissions).
+The system SHALL support `UserType.ASSISTANT` and `RoleName.ASSISTANT` with a seeded permission bundle for own profile and revoke-own-link only (no checklist/chat/route permissions). The DRIVER role SHALL include permissions to list, pause, resume, revoke assistants and to create/cancel assistant invites (no driver-link-code permissions).
 
 #### Scenario: Seed creates ASSISTANT role
 - **WHEN** the application starts with DataSeeder enabled
@@ -9,7 +9,7 @@ The system SHALL support `UserType.ASSISTANT` and `RoleName.ASSISTANT` with a se
 
 #### Scenario: DRIVER receives assistant-management permissions
 - **WHEN** DataSeeder runs
-- **THEN** role `DRIVER` includes permissions to list, pause, resume, revoke assistants and manage driver link codes (not email invite)
+- **THEN** role `DRIVER` includes permissions to list, pause, resume, revoke assistants and manage email invites (`create`/`cancel`), and MUST NOT include driver-link-code permissions
 
 ---
 
@@ -26,24 +26,16 @@ The system SHALL add claim `assistant_status` to access tokens when the authenti
 
 ---
 
-### Requirement: Thymeleaf signup creates ASSISTANT with optional link code
-The system SHALL expose `GET` and `POST /signup/assistant` using `AssistantSignupForm` with optional visible `linkCode` (same `driver_link_code` artifact as the authenticated consume API — not an email invite). Without `linkCode`, the assistant MUST be created as `UNLINKED`. With a valid ACTIVE non-expired code, the system MUST consume it atomically and create the assistant as `ACTIVE` linked to that driver with `activated_at` set. The signup form MUST present `linkCode` as a visible optional field (not a hidden-only deep-link field in this MVP). Strong rate limiting MUST apply to signup attempts.
+### Requirement: Thymeleaf signup creates UNLINKED ASSISTANT without invite fields
+The system SHALL expose `GET` and `POST /signup/assistant` using `AssistantSignupForm` with the same fields pattern as client/driver signup. The form MUST NOT include `linkCode`, invite token, or any linking-related field. Successful signup MUST create the assistant as `UNLINKED` with `driver_id` null. Linking MUST only happen later via email invite after the account exists.
 
-#### Scenario: Signup without link code
-- **WHEN** a visitor submits valid `/signup/assistant` without `linkCode`
+#### Scenario: Signup without any invite field
+- **WHEN** a visitor submits valid `/signup/assistant`
 - **THEN** the system creates the user and an `assistant` with status `UNLINKED` and no `driver_id`
 
-#### Scenario: Signup with valid link code
-- **WHEN** a visitor submits valid `/signup/assistant` with a valid ACTIVE non-expired `linkCode`
-- **THEN** the code becomes `CONSUMED`, the assistant is created `ACTIVE` with that `driver_id` and `activated_at` set
-
-#### Scenario: Signup with invalid or expired link code
-- **WHEN** a visitor submits `/signup/assistant` with an invalid, cancelled, consumed, or expired `linkCode`
-- **THEN** the system rejects registration with a localized generic invalid/expired code error and does not create the user/assistant as a successful linked signup
-
-#### Scenario: Signup rate limited
-- **WHEN** a client exceeds the configured signup rate limit for `/signup/assistant`
-- **THEN** the system rejects further attempts until the window resets
+#### Scenario: Signup form has no link or invite input
+- **WHEN** the signup assistant template is rendered
+- **THEN** there is no visible or hidden field for link code or invite
 
 #### Scenario: Unauthenticated access to signup routes
 - **WHEN** an unauthenticated client requests `/signup/assistant`
@@ -52,12 +44,12 @@ The system SHALL expose `GET` and `POST /signup/assistant` using `AssistantSignu
 ---
 
 ### Requirement: OAuth signup complete creates UNLINKED ASSISTANT
-The system SHALL allow selecting `ASSISTANT` on OAuth `/signup/complete` and create the `assistant` profile as `UNLINKED` without accepting a link code in that flow. Linking after OAuth MUST use the authenticated `POST /api/driver-link-codes/consume` endpoint.
+The system SHALL allow selecting `ASSISTANT` on OAuth `/signup/complete` and create the `assistant` profile as `UNLINKED` without accepting any invite or link code in that flow. Linking after OAuth MUST use the email invite flow initiated by a driver.
 
 #### Scenario: OAuth complete as ASSISTANT
 - **WHEN** an OAuth user completes signup choosing `ASSISTANT`
 - **THEN** the system sets user type ASSISTANT, assigns role ASSISTANT, and creates an `assistant` row with status `UNLINKED`
 
-#### Scenario: OAuth does not consume link code at complete
+#### Scenario: OAuth does not bind an invite at complete
 - **WHEN** an OAuth user completes signup as ASSISTANT
-- **THEN** no `driver_link_code` is consumed during `/signup/complete`
+- **THEN** no `assistant_invite` is created or accepted during `/signup/complete`

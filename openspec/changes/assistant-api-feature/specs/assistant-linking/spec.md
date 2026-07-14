@@ -1,44 +1,86 @@
 ## ADDED Requirements
 
-### Requirement: Driver generates and cancels open link codes
-The system SHALL allow a driver to create a six-character alphanumeric open link code (excluding `0`, `O`, `1`, `I`) via `POST /api/driver-link-codes`, cancelling any previous `ACTIVE` code for that driver, with TTL **24 hours**, returning plaintext `code` once. Each code MUST be single-use. `DELETE /api/driver-link-codes/current` SHALL cancel the current `ACTIVE` code. Persistence and types for `driver_link_code` MUST live in the `driver` feature package (`br.com.vanep.driver`).
+### Requirement: Driver invites an existing UNLINKED assistant by email
+The system SHALL allow an authenticated DRIVER to create an addressed invite via `POST /api/assistants/invites` with `{ "email" }`. The system MUST look up `user.email` (unique): only an existing `UserType.ASSISTANT` whose `assistant.status` is `UNLINKED` and who is outside the post-rejection cooldown MAY be invited. On success the system MUST create `assistant_invite` (`PENDING`, `expires_at` ≈ now+72h, `token_hash` of a one-time secret), set `assistant.status` to `PENDING` leaving `driver_id` null, and send a real email via MailService (Mailpit in MVP) containing a link `{baseUrl}/assistant-invite/{rawSecret}` plus driver name and expiry. Persistence and types for invites MUST live in `br.com.vanep.assistant`. The system MUST NOT provide `driver_link_code` or `/api/driver-link-codes/**`.
 
-#### Scenario: Generate code invalidates previous ACTIVE
-- **WHEN** driver generates a new link code while another is ACTIVE
-- **THEN** the previous code status becomes `CANCELLED` and the new code is `ACTIVE` with `expires_at` approximately 24 hours ahead
+#### Scenario: Successful invite
+- **WHEN** a DRIVER posts an email of an existing UNLINKED ASSISTANT outside cooldown
+- **THEN** an `assistant_invite` is created `PENDING`, the assistant becomes `PENDING` with `driver_id` null, and MailService sends the invite email with the raw secret link
 
-#### Scenario: Cancel current code
-- **WHEN** driver deletes `/api/driver-link-codes/current`
-- **THEN** the ACTIVE code for that driver becomes `CANCELLED`
+#### Scenario: Email not found
+- **WHEN** a DRIVER posts an email with no matching user
+- **THEN** the system returns a clear localized error and creates no invite and no user
+
+#### Scenario: Email belongs to non-ASSISTANT
+- **WHEN** a DRIVER posts an email of a CLIENT or DRIVER user
+- **THEN** the system returns `409 Conflict`
+
+#### Scenario: Assistant already PENDING, ACTIVE, or INACTIVE
+- **WHEN** a DRIVER posts an email of an ASSISTANT not in `UNLINKED`
+- **THEN** the system returns `409 Conflict`
+
+#### Scenario: Resend while PENDING from same driver
+- **WHEN** a DRIVER invites the same email while their previous invite to that assistant is still `PENDING`
+- **THEN** the previous invite becomes `CANCELLED`, a new invite is created (new secret/`token_hash`, new `expires_at`), `assistant.status` remains `PENDING`, and a new email is sent
+
+#### Scenario: Cooldown after rejection by same driver
+- **WHEN** a DRIVER invites an assistant who `REJECTED` that same driver's invite within the last 7 days
+- **THEN** the system returns `409 Conflict` with a message that they cannot re-invite yet
+
+#### Scenario: Other driver may invite after rejection
+- **WHEN** assistant is `UNLINKED` after rejecting driver A, and driver B invites within 7 days
+- **THEN** the invite for driver B succeeds (cooldown is per driver–assistant pair)
 
 ---
 
-### Requirement: Assistant consumes driver link code atomically after login
-The system SHALL allow an eligible authenticated ASSISTANT (`UNLINKED`) to consume a code via `POST /api/driver-link-codes/consume` with `{ "code" }`. The same atomic consume rules MUST apply as in password signup (`UPDATE` where status is ACTIVE and not expired). A successful consume MUST set assistant to `ACTIVE` for that driver and set `activated_at`. Zero updated rows MUST yield a generic localized error for invalid or expired code. Duplicate consume MUST fail with the same generic error. Strong rate limiting MUST apply to consume attempts.
+### Requirement: Driver can cancel a PENDING invite
+The system SHALL allow the owning DRIVER to cancel via `DELETE /api/assistants/invites/{token}` where `{token}` is the invite's public opaque token. Success MUST set invite status to `CANCELLED` and revert the assistant to `UNLINKED` when still `PENDING` for that invite.
 
-#### Scenario: Successful consume when authenticated
-- **WHEN** an UNLINKED ASSISTANT with a valid Bearer token posts a valid ACTIVE non-expired code
-- **THEN** the code becomes `CONSUMED` and assistant becomes `ACTIVE` linked to that driver with `activated_at` set
+#### Scenario: Cancel pending invite
+- **WHEN** the owning DRIVER deletes their PENDING invite by public token
+- **THEN** the invite becomes `CANCELLED` and the assistant becomes `UNLINKED`
 
-#### Scenario: Consume requires authentication
-- **WHEN** an unauthenticated client calls `POST /api/driver-link-codes/consume`
-- **THEN** the system returns `401 Unauthorized`
+#### Scenario: Non-owner cannot cancel
+- **WHEN** another DRIVER attempts to delete the invite
+- **THEN** the system returns `403 Forbidden`
 
-#### Scenario: Invalid or expired code
-- **WHEN** assistant posts an unknown, cancelled, consumed, or expired code
-- **THEN** the system returns an error with a generic message (invalid or expired) without revealing which case
+---
 
-#### Scenario: Assistant not eligible
-- **WHEN** an assistant already `ACTIVE` or `INACTIVE` attempts consume
-- **THEN** the system returns `409 Conflict`
+### Requirement: Lazy expiry of PENDING invites
+The system SHALL treat `PENDING` invites with `expires_at` in the past as expired at every relevant entry point (invite page GET, accept/reject POST, and new-invite eligibility). Lazily marking MUST set invite to `EXPIRED` and revert assistant to `UNLINKED` when applicable. No scheduled expiry job is required in this MVP.
 
-#### Scenario: Rate limited consume
-- **WHEN** an assistant exceeds the configured consume rate limit
-- **THEN** the system rejects further attempts until the window resets
+#### Scenario: Expired invite on page view
+- **WHEN** a client opens `GET /assistant-invite/{token}` for a PENDING invite past `expires_at`
+- **THEN** the invite is marked `EXPIRED`, the assistant returns to `UNLINKED` if still PENDING, and the page shows an expired state
 
-#### Scenario: Same code cannot be used twice across contexts
-- **WHEN** a code was already consumed during signup
-- **THEN** a later authenticated `/consume` of that code fails with the generic invalid or expired error
+#### Scenario: Expired pending does not block a new invite
+- **WHEN** a DRIVER invites an email whose only blocking invite is PENDING but past `expires_at` and not yet marked
+- **THEN** the system expires that invite lazily and allows creating a new invite if the assistant is otherwise eligible
+
+---
+
+### Requirement: Web accept and reject require matching authenticated assistant
+The system SHALL expose Thymeleaf `GET /assistant-invite/{token}` (lookup by hashing the raw secret) showing driver info (name, photo, city, rating) and Accept/Reject actions when the invite is `PENDING` and not expired. Accept and reject MUST be form POSTs on the web surface only (`POST /assistant-invite/{token}/accept` and `/reject`) — no REST accept/reject in this MVP. Actions MUST require the logged-in user to be the invite's assistant (`assistant.user_id`); the email secret alone MUST NOT authorize the action. Accept MUST set assistant `ACTIVE` with `driver_id` and `activated_at`, and invite `ACCEPTED`. Reject MUST set invite `REJECTED` with `responded_at` and assistant `UNLINKED`.
+
+#### Scenario: Accept when logged in as the invited assistant
+- **WHEN** the invited ASSISTANT is authenticated and posts accept on a valid PENDING invite
+- **THEN** assistant becomes `ACTIVE` linked to that driver with `activated_at`, and the invite becomes `ACCEPTED`
+
+#### Scenario: Reject when logged in as the invited assistant
+- **WHEN** the invited ASSISTANT posts reject on a valid PENDING invite
+- **THEN** the invite becomes `REJECTED` and the assistant becomes `UNLINKED`
+
+#### Scenario: Unauthenticated user cannot complete accept
+- **WHEN** an unauthenticated client attempts accept
+- **THEN** the system requires login before processing (redirect or equivalent gate)
+
+#### Scenario: Wrong authenticated user cannot accept
+- **WHEN** a different authenticated user (another assistant, client, or driver) posts accept
+- **THEN** the system rejects the action without activating the link
+
+#### Scenario: No REST accept/reject in MVP
+- **WHEN** a client calls a hypothetical `/api/assistant-invites/{token}/accept`
+- **THEN** the system does not provide that REST accept/reject API in this change
 
 ---
 

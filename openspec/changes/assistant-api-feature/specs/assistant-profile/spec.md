@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: Assistant can read and update own profile
-The system SHALL expose `GET /api/assistants/me` and `PUT /api/assistants/me` for the authenticated ASSISTANT, returning and updating profile fields such as `photo` via request/response DTOs (never raw JPA models). Public identifier in responses MUST be `token`.
+The system SHALL expose `GET /api/assistants/me` and `PUT /api/assistants/me` for the authenticated ASSISTANT, returning and updating profile fields such as `photo` via request/response DTOs (never raw JPA models). Public identifier in responses MUST be `token`. When status is `PENDING`, the response SHOULD expose enough information for the assistant UI to show that a link invite is outstanding (without requiring a separate complex aggregation beyond the invite/driver summary already loaded for that state).
 
 #### Scenario: Get own profile
 - **WHEN** an authenticated ASSISTANT calls `GET /api/assistants/me`
@@ -22,7 +22,7 @@ The system SHALL expose `GET /api/assistants/me` and `PUT /api/assistants/me` fo
 ---
 
 ### Requirement: Driver can list linked assistants
-The system SHALL expose `GET /api/assistants` for the authenticated DRIVER, listing assistants associated with that driver (including ACTIVE and INACTIVE as applicable), shaped as response DTOs with public `token` identifiers and all fields needed for the driver UI (no separate detail fetch required in this MVP). The system MUST NOT expose `GET /api/assistants/{token}` in this change.
+The system SHALL expose `GET /api/assistants` for the authenticated DRIVER, listing assistants associated with that driver (including ACTIVE and INACTIVE as applicable), shaped as response DTOs with public `token` identifiers and all fields needed for the driver UI (no separate detail fetch required in this MVP). PENDING invites MAY appear in a separate invite list response or as part of invite endpoints, but the linked list focuses on assistants with `driver_id` set. The system MUST NOT expose `GET /api/assistants/{token}` in this change.
 
 #### Scenario: Driver lists own assistants
 - **WHEN** a DRIVER with linked assistants calls `GET /api/assistants`
@@ -43,7 +43,7 @@ The system SHALL expose `GET /api/assistants` for the authenticated DRIVER, list
 ---
 
 ### Requirement: Ownership enforced via AssistantSecurityService
-The system SHALL resolve the caller from JWT (`uid` / user id) and enforce ownership so a driver only acts on assistants linked to their driver row, and an assistant only acts on their own profile. Unauthorized cross-access MUST return `403`; missing tokens MUST return `404`.
+The system SHALL resolve the caller from JWT (`uid` / user id) and enforce ownership so a driver only acts on assistants linked to their driver row (and only cancels invites they own), and an assistant only acts on their own profile. Unauthorized cross-access MUST return `403`; missing tokens MUST return `404`.
 
 #### Scenario: Driver acts on foreign assistant token
 - **WHEN** a DRIVER calls pause/revoke on an assistant `{token}` belonging to another driver
