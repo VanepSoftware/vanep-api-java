@@ -10,7 +10,6 @@ import br.com.vanep.assistant.model.AssistantModel;
 import br.com.vanep.assistant.repository.AssistantInviteRepository;
 import br.com.vanep.assistant.repository.AssistantRepository;
 import br.com.vanep.auth.mail.MailService;
-import br.com.vanep.auth.token.SecureTokens;
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.user.UserRepository;
@@ -41,7 +40,6 @@ public class AssistantInviteService {
   private final AssistantMapper mapper;
   private final MessageSource messages;
   private final Duration inviteTtl;
-  private final String baseUrl;
 
   public AssistantInviteService(
       AssistantInviteRepository inviteRepository,
@@ -51,8 +49,7 @@ public class AssistantInviteService {
       MailService mail,
       AssistantMapper mapper,
       MessageSource messages,
-      @Value("${vanep.mail.assistant-invite-ttl-hours:72}") long inviteTtlHours,
-      @Value("${vanep.app.base-url:http://localhost:8080}") String baseUrl) {
+      @Value("${vanep.mail.assistant-invite-ttl-hours:72}") long inviteTtlHours) {
     this.inviteRepository = inviteRepository;
     this.assistantRepository = assistantRepository;
     this.driverRepository = driverRepository;
@@ -61,7 +58,6 @@ public class AssistantInviteService {
     this.mapper = mapper;
     this.messages = messages;
     this.inviteTtl = Duration.ofHours(inviteTtlHours);
-    this.baseUrl = baseUrl;
   }
 
   private String message(String key) {
@@ -122,18 +118,16 @@ public class AssistantInviteService {
       }
     }
 
-    String rawSecret = SecureTokens.generate();
     AssistantInviteModel invite = new AssistantInviteModel();
     invite.setDriver(driver);
     invite.setAssistant(assistant);
-    invite.setLinkTokenHash(SecureTokens.hash(rawSecret));
     invite.setExpiresAt(Instant.now().plus(inviteTtl));
     invite = inviteRepository.save(invite);
 
     assistant.setStatus(AssistantStatus.PENDING);
     assistantRepository.save(assistant);
 
-    sendInviteEmail(assistant, driver, rawSecret);
+    sendInviteEmail(assistant, driver);
 
     return mapper.toInviteResponse(invite);
   }
@@ -207,8 +201,7 @@ public class AssistantInviteService {
     }
   }
 
-  private void sendInviteEmail(AssistantModel assistant, DriverModel driver, String rawSecret) {
-    String link = baseUrl + "/assistant-invite/" + rawSecret;
+  private void sendInviteEmail(AssistantModel assistant, DriverModel driver) {
     mail.send(
         assistant.getUser().getEmail(),
         message("assistant.invite.email.subject"),
@@ -218,8 +211,6 @@ public class AssistantInviteService {
             assistant.getUser().getName(),
             "driverName",
             driver.getUser().getName(),
-            "link",
-            link,
             "expiryHours",
             String.valueOf(inviteTtl.toHours())));
   }

@@ -18,7 +18,4 @@ public interface AssistantInviteRepository extends JpaRepository<AssistantInvite
 
   Optional<AssistantInviteModel> findByDriverIdAndAssistantIdAndStatus(
       Long driverId, Long assistantId, AssistantInviteStatus status);
-
-  Optional<AssistantInviteModel> findByAssistantIdAndStatus(
-      Long assistantId, AssistantInviteStatus status);
 }

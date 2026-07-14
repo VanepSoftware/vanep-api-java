@@ -66,8 +66,7 @@ class AssistantInviteServiceTest {
             mail,
             mapper,
             messages,
-            72,
-            "http://localhost:8080");
+            72);
 
     lenient()
         .when(messages.getMessage(any(), any(), any()))
