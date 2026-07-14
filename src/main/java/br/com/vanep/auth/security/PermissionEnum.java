@@ -28,7 +28,13 @@ public enum PermissionEnum {
   SHOW_DEPENDENT("show_dependent"),
   CREATE_DEPENDENT("create_dependent"),
   UPDATE_DEPENDENT("update_dependent"),
-  DELETE_DEPENDENT("delete_dependent");
+  DELETE_DEPENDENT("delete_dependent"),
+  LIST_SCHOOLS("list_schools"),
+  SHOW_SCHOOL("show_school"),
+  CREATE_SCHOOL("create_school"),
+  UPDATE_SCHOOL("update_school"),
+  DELETE_SCHOOL("delete_school"),
+  RESTORE_SCHOOL("restore_school");
 
   private final String value;
 

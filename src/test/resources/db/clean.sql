@@ -12,3 +12,4 @@ delete from driver;
 delete from users;
 delete from roles;
 delete from role_permissions;
+delete from school;
