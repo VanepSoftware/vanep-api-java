@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: Driver invites an existing UNLINKED assistant by email
-The system SHALL allow an authenticated DRIVER to create an addressed invite via `POST /api/assistants/invites` with `{ "email" }`. The system MUST look up `user.email` (unique): only an existing `UserType.ASSISTANT` whose `assistant.status` is `UNLINKED` and who is outside the post-rejection cooldown MAY be invited. On success the system MUST create `assistant_invite` (`PENDING`, `expires_at` ≈ now+72h, `token_hash` of a one-time secret), set `assistant.status` to `PENDING` leaving `driver_id` null, and send a real email via MailService (Mailpit in MVP) containing a link `{baseUrl}/assistant-invite/{rawSecret}` plus driver name and expiry. Persistence and types for invites MUST live in `br.com.vanep.assistant`. The system MUST NOT provide `driver_link_code` or `/api/driver-link-codes/**`.
+The system SHALL allow an authenticated DRIVER to create an addressed invite via `POST /api/assistants/invites` with `{ "email" }`. The system MUST look up `user.email` (unique): only an existing `UserType.ASSISTANT` whose `assistant.status` is `UNLINKED` and who is outside the post-rejection cooldown MAY be invited. On success the system MUST create `assistant_invite` (`PENDING`, `expires_at` ≈ now+72h, `link_token_hash` of a one-time secret), set `assistant.status` to `PENDING` leaving `driver_id` null, and send a real email via MailService (Mailpit in MVP) containing a link `{baseUrl}/assistant-invite/{rawSecret}` plus driver name and expiry. Persistence and types for invites MUST live in `br.com.vanep.assistant`. The system MUST NOT provide `driver_link_code` or `/api/driver-link-codes/**`.
 
 #### Scenario: Successful invite
 - **WHEN** a DRIVER posts an email of an existing UNLINKED ASSISTANT outside cooldown
@@ -21,7 +21,7 @@ The system SHALL allow an authenticated DRIVER to create an addressed invite via
 
 #### Scenario: Resend while PENDING from same driver
 - **WHEN** a DRIVER invites the same email while their previous invite to that assistant is still `PENDING`
-- **THEN** the previous invite becomes `CANCELLED`, a new invite is created (new secret/`token_hash`, new `expires_at`), `assistant.status` remains `PENDING`, and a new email is sent
+- **THEN** the previous invite becomes `CANCELLED`, a new invite is created (new secret/`link_token_hash`, new `expires_at`), `assistant.status` remains `PENDING`, and a new email is sent
 
 #### Scenario: Cooldown after rejection by same driver
 - **WHEN** a DRIVER invites an assistant who `REJECTED` that same driver's invite within the last 7 days

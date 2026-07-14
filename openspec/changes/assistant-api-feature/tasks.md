@@ -1,20 +1,20 @@
 ## 0. Preparation
 
-- [ ] 0.1 Create branch from `main` for this change (e.g. `feat/assistant-api`)
-- [ ] 0.2 Review `proposal.md`, `design.md`, and specs under `specs/`
+- [x] 0.1 Create branch from `main` for this change (e.g. `feat/assistant-api`)
+- [x] 0.2 Review `proposal.md`, `design.md`, and specs under `specs/`
 
 ## 1. Phase 1 — Schema + domain (PR1)
 
 > Depends on: nothing. Deliver migration + enums + models + repositories + clean.sql.
 > Order per phase: test → migration → model → repository.
 
-- [ ] 1.1 Write failing repository/integration stubs or schema smoke for `assistant` and `assistant_invite`
-- [ ] 1.2 Create Flyway `V11__create_assistant_tables.sql` (`assistant`; `assistant_invite` with public `token`, `token_hash`, TTL 72h semantics, statuses PENDING|ACCEPTED|REJECTED|EXPIRED|CANCELLED; soft delete; **no** `driver_link_code`)
-- [ ] 1.3 Add enums: `AssistantStatus` (`UNLINKED`, `PENDING`, `ACTIVE`, `INACTIVE`), `VerificationStatus`, `AssistantInviteStatus`
-- [ ] 1.4 Add `AssistantInviteModel` + repository under `br.com.vanep.assistant` (find by `token_hash`, by public `token`, cooldown query REJECTED same pair within 7d)
-- [ ] 1.5 Add `AssistantModel` + `AssistantRepository` (`@SoftDelete`; token `@PrePersist`)
-- [ ] 1.6 Update `src/test/resources/db/clean.sql`
-- [ ] 1.7 `./mvnw verify`; open PR1 → `main`
+- [x] 1.1 Write failing repository/integration stubs or schema smoke for `assistant` and `assistant_invite`
+- [x] 1.2 Create Flyway `V11__create_assistant_tables.sql` (`assistant`; `assistant_invite` with public `token`, `link_token_hash`, TTL 72h semantics, statuses PENDING|ACCEPTED|REJECTED|EXPIRED|CANCELLED; soft delete; **no** `driver_link_code`)
+- [x] 1.3 Add enums: `AssistantStatus` (`UNLINKED`, `PENDING`, `ACTIVE`, `INACTIVE`), `VerificationStatus`, `AssistantInviteStatus`
+- [x] 1.4 Add `AssistantInviteModel` + repository under `br.com.vanep.assistant` (find by `link_token_hash`, by public `token`, cooldown query REJECTED same pair within 7d)
+- [x] 1.5 Add `AssistantModel` + `AssistantRepository` (`@SoftDelete`; token `@PrePersist`)
+- [x] 1.6 Update `src/test/resources/db/clean.sql`
+- [x] 1.7 `./mvnw verify`; open PR1 → `main`
 
 ## 2. Phase 2 — Auth + signup (PR2)
 

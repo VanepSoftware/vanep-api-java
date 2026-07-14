@@ -36,7 +36,7 @@ Motoristas precisam vincular assistentes de bordo para operação diária, mas a
 
 ## Impact
 
-- **Database**: V11 (`assistant`, `assistant_invite` com `token_hash`, TTL 72h); `clean.sql`
+- **Database**: V11 (`assistant`, `assistant_invite` com `link_token_hash`, TTL 72h); `clean.sql`
 - **Auth / web**: signup ASSISTANT sem convite; `GET|POST /assistant-invite/{token}` (Thymeleaf, exige login da conta correspondente)
 - **Mail**: template de convite + envio real via MailService (Mailpit no MVP)
 - **API**: `/api/assistants/**`, `/api/assistants/invites/**` — **sem** `/api/driver-link-codes/**`

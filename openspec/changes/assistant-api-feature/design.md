@@ -12,7 +12,7 @@ Constraints: `constitution.md`. Espelhar `ClientModel`, `RegistrationService`, `
 
 **Goals:**
 
-- Schema `assistant` + `assistant_invite` (V11; invite TTL **72h**; `token_hash`)
+- Schema `assistant` + `assistant_invite` (V11; invite TTL **72h**; `link_token_hash`)
 - Auth ASSISTANT + JWT `assistant_status`
 - Signup/OAuth ASSISTANT sempre `UNLINKED` — formulário **sem** campo de convite
 - Motorista convida por e-mail (lookup em `user`); e-mail real via MailService/Mailpit
@@ -53,9 +53,9 @@ Constraints: `constitution.md`. Espelhar `ClientModel`, `RegistrationService`, `
   - Existe, outro `UserType` → **409**
   - Não existe → erro claro (“nenhuma conta de assistente encontrada com esse e-mail”); **sem** criar conta nem efeito colateral
 
-### 3. `assistant_invite` endereçado + `token_hash`
+### 3. `assistant_invite` endereçado + `link_token_hash`
 
-- **Decision:** Convite nasce amarrado a `assistant_id` + `driver_id`. Secret do e-mail: plaintext só na URL; DB guarda `token_hash` via `SecureTokens` (igual verificação de e-mail). Coluna pública `token` (opaque) identifica o invite na API (ex.: cancelamento), distinta do secret do e-mail.
+- **Decision:** Convite nasce amarrado a `assistant_id` + `driver_id`. Secret do e-mail: plaintext só na URL; DB guarda `link_token_hash` via `SecureTokens` (igual verificação de e-mail). Coluna pública `token` (opaque) identifica o invite na API (ex.: cancelamento), distinta do token do link do e-mail.
 - **Rationale:** token não é adivinhável nem transferível para outra identidade; dump de banco não revela o link.
 - **Autorização no aceite:** posse do secret **não basta** — aceitar/recusar exige usuário autenticado e `assistant_invite.assistant.user_id == usuário logado`. O secret só localiza o convite.
 
@@ -74,7 +74,7 @@ Cancelado      → assistant.status = UNLINKED
 
 ### 5. Reenvio = cancelar anterior + criar novo
 
-- **Decision:** Se o motorista convidar o mesmo e-mail com `PENDING` vigente **do mesmo driver**, cancela o invite anterior (`CANCELLED`), cria novo (`novo token_hash` / secret, novo `expires_at`); `assistant.status` permanece `PENDING`.
+- **Decision:** Se o motorista convidar o mesmo e-mail com `PENDING` vigente **do mesmo driver**, cancela o invite anterior (`CANCELLED`), cria novo (`novo link_token_hash` / secret, novo `expires_at`); `assistant.status` permanece `PENDING`.
 - **Rationale:** histórico limpo; sem ambiguidade de “resetar TTL no mesmo registro”; alinhado a “reenvio = novo evento”.
 - **Nota:** se o `PENDING` vigente for de **outro** driver, a elegibilidade (`assistant` já `PENDING`) já bloqueia com 409 — não há “reenvio” cruzado.
 
@@ -126,14 +126,14 @@ Cancelado      → assistant.status = UNLINKED
 
 -- assistant_invite:
 --   token (opaque público API, unique parcial soft-delete)
---   token_hash (unique — secret do e-mail)
+--   link_token_hash (unique — hash do token do link do e-mail)
 --   driver_id NOT NULL
 --   assistant_id NOT NULL  -- conta ASSISTANT já existente; UNLINKED no momento do convite
 --   status: PENDING | ACCEPTED | REJECTED | EXPIRED | CANCELLED (default PENDING)
 --   expires_at (72h)
 --   responded_at nullable
 --   created_at, soft delete
--- indexes: driver_id, assistant_id, token_hash
+-- indexes: driver_id, assistant_id, link_token_hash
 ```
 
 **Removido:** qualquer tabela/model/enum `driver_link_code` / `DriverLinkCodeStatus`.
@@ -215,4 +215,4 @@ Cancelado      → assistant.status = UNLINKED
 
 ## Open Questions
 
-- _(nenhuma)_ — decisões fechadas: PENDING no assistant; reenvio = cancel+create; expiração lazy; cancel manual sim; `token_hash`; accept só web; um PENDING global + cooldown 7d pós-REJECTED
+- _(nenhuma)_ — decisões fechadas: PENDING no assistant; reenvio = cancel+create; expiração lazy; cancel manual sim; `link_token_hash`; accept só web; um PENDING global + cooldown 7d pós-REJECTED

@@ -1,7 +1,9 @@
-package br.com.vanep.role.model;
+package br.com.vanep.assistant.model;
 
-import br.com.vanep.role.RoleName;
-import br.com.vanep.rolepermission.model.RolePermissionModel;
+import br.com.vanep.assistant.enums.AssistantStatus;
+import br.com.vanep.assistant.enums.VerificationStatus;
+import br.com.vanep.driver.model.DriverModel;
+import br.com.vanep.user.model.UserModel;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -11,6 +13,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
@@ -24,11 +27,11 @@ import org.hibernate.annotations.SoftDeleteType;
 import org.hibernate.annotations.UpdateTimestamp;
 
 @Entity
-@Table(name = "roles")
+@Table(name = "assistant")
 @SoftDelete(columnName = "deleted_at", strategy = SoftDeleteType.TIMESTAMP)
 @Getter
 @Setter
-public class RoleModel {
+public class AssistantModel {
 
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -37,19 +40,26 @@ public class RoleModel {
   @Column(nullable = false, unique = true, length = 32)
   private String token;
 
-  @Column(nullable = false, unique = true, length = 64)
-  private String name;
+  @OneToOne(fetch = FetchType.EAGER, optional = false)
+  @JoinColumn(name = "user_id", nullable = false, unique = true)
+  private UserModel user;
 
-  @Column(columnDefinition = "text")
-  private String description;
-
-  @OneToOne(fetch = FetchType.EAGER)
-  @JoinColumn(name = "role_permissions_id", unique = true)
-  private RolePermissionModel rolePermission;
+  @ManyToOne(fetch = FetchType.EAGER)
+  @JoinColumn(name = "driver_id")
+  private DriverModel driver;
 
   @Enumerated(EnumType.STRING)
-  @Column(name = "role_name", unique = true, length = 16)
-  private RoleName roleName;
+  @Column(nullable = false, length = 16)
+  private AssistantStatus status = AssistantStatus.UNLINKED;
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = "verification_status", nullable = false, length = 16)
+  private VerificationStatus verificationStatus = VerificationStatus.PENDING;
+
+  @Column private String photo;
+
+  @Column(name = "activated_at")
+  private Instant activatedAt;
 
   @CreationTimestamp
   @Column(name = "created_at", nullable = false, updatable = false)
