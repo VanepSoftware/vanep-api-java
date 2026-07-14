@@ -29,6 +29,7 @@ import java.util.Locale;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentMatchers;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
@@ -90,7 +91,12 @@ class AssistantInviteFlowTest {
             .findByAssistantIdAndStatus(assistant.getId(), AssistantInviteStatus.PENDING)
             .orElseThrow();
 
-    verify(mail).send(eq("carla@vanep.com"), any(), eq("email/assistant-invite"), any(Map.class));
+    verify(mail)
+        .send(
+            eq("carla@vanep.com"),
+            any(),
+            eq("email/assistant-invite"),
+            ArgumentMatchers.<Map<String, Object>>any());
 
     mockMvc
         .perform(get("/api/assistants/me/invite").with(assistantJwt(assistantUser)))
