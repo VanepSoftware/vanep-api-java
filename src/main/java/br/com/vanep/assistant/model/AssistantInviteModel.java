@@ -33,7 +33,6 @@ public class AssistantInviteModel {
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;
 
-  /** Public opaque ref for API (cancel invite, pending invite DTO). */
   @Column(nullable = false, unique = true, length = 32)
   private String token;
 
