@@ -3,6 +3,7 @@ package br.com.vanep.client.controller;
 import br.com.vanep.client.dto.ClientResponseDTO;
 import br.com.vanep.client.dto.ClientUpdateRequestDTO;
 import br.com.vanep.client.service.ClientService;
+import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
@@ -39,10 +40,15 @@ public class ClientController {
     return service.findByToken(token);
   }
 
+  // ALTERADO (painel admin #11):
+  // - autorização: antes era só o dono (@clientSecurity.isOwner). Adicionado
+  //   "update_client OR isOwner" para o admin poder editar clientes pelo painel,
+  //   sem tirar a edição do próprio perfil pelo dono.
+  // - @Valid: passa a validar o corpo (e-mail, tamanho do nome, faixa da nota).
   @PutMapping("/{token}")
-  @PreAuthorize("@clientSecurity.isOwner(#token, authentication)")
+  @PreAuthorize("hasAuthority('update_client') or @clientSecurity.isOwner(#token, authentication)")
   public ClientResponseDTO update(
-      @PathVariable String token, @RequestBody ClientUpdateRequestDTO request) {
+      @PathVariable String token, @RequestBody @Valid ClientUpdateRequestDTO request) {
     return service.update(token, request);
   }
 
