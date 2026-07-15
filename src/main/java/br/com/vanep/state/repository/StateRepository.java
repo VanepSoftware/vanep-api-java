@@ -8,5 +8,7 @@ public interface StateRepository extends JpaRepository<StateModel, Long> {
 
   Optional<StateModel> findByToken(String token);
 
+  Optional<StateModel> findByUf(String uf);
+
   boolean existsByUf(String uf);
 }
