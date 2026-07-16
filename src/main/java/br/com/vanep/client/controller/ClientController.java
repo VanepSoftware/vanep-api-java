@@ -40,11 +40,6 @@ public class ClientController {
     return service.findByToken(token);
   }
 
-  // ALTERADO (painel admin #11):
-  // - autorização: antes era só o dono (@clientSecurity.isOwner). Adicionado
-  //   "update_client OR isOwner" para o admin poder editar clientes pelo painel,
-  //   sem tirar a edição do próprio perfil pelo dono.
-  // - @Valid: passa a validar o corpo (e-mail, tamanho do nome, faixa da nota).
   @PutMapping("/{token}")
   @PreAuthorize("hasAuthority('update_client') or @clientSecurity.isOwner(#token, authentication)")
   public ClientResponseDTO update(

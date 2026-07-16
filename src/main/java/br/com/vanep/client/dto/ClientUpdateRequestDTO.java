@@ -6,9 +6,6 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 
-// ALTERADO (painel admin #11): antes o record só tinha (photo, addressToken).
-// Foram adicionados name, email, rating e active para o admin editar todos os
-// campos do cliente pelo painel (menos CPF e senha). Cada campo ganhou validação.
 public record ClientUpdateRequestDTO(
     @Size(max = 255, message = "O nome deve ter no máximo 255 caracteres.") String name,
     @Email(message = "E-mail em formato inválido.")
