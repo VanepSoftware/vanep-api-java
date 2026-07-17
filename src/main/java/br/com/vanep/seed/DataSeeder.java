@@ -210,7 +210,14 @@ public class DataSeeder implements ApplicationRunner {
                 "Fabio Teixeira",
                 "fabio.teixeira@seed.vanep.com.br",
                 "66666666666",
-                "11222333000181"));
+                "11222333000181"),
+            new DriverSeed(
+                "Gustavo Santos",
+                "gustavo.santos@seed.vanep.com.br",
+                "77777777777",
+                "22333444000192"),
+            new DriverSeed(
+                "Helena Costa", "helena.costa@seed.vanep.com.br", "88888888888", "33444555000103"));
 
     RoleModel driverRole = roles.findByRoleName(RoleName.DRIVER).orElseThrow();
     for (DriverSeed seed : seeds) {
