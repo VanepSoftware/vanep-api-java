@@ -34,7 +34,20 @@ public enum PermissionEnum {
   CREATE_DRIVER("create_driver"),
   UPDATE_DRIVER("update_driver"),
   DELETE_DRIVER("delete_driver"),
-  RESTORE_DRIVER("restore_driver");
+  RESTORE_DRIVER("restore_driver"),
+  LIST_SCHOOLS("list_schools"),
+  SHOW_SCHOOL("show_school"),
+  CREATE_SCHOOL("create_school"),
+  UPDATE_SCHOOL("update_school"),
+  DELETE_SCHOOL("delete_school"),
+  RESTORE_SCHOOL("restore_school"),
+  LIST_STATES("list_states"),
+  SHOW_STATE("show_state"),
+  LIST_CITIES("list_cities"),
+  SHOW_CITY("show_city"),
+  CREATE_CITY("create_city"),
+  UPDATE_CITY("update_city"),
+  DELETE_CITY("delete_city");
 
   private final String value;
 

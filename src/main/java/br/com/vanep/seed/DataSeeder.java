@@ -2,6 +2,7 @@ package br.com.vanep.seed;
 
 import br.com.vanep.auth.security.PermissionEnum;
 import br.com.vanep.auth.security.PermissionRegistry;
+import br.com.vanep.city.seed.CitySeeder;
 import br.com.vanep.client.model.ClientModel;
 import br.com.vanep.client.repository.ClientRepository;
 import br.com.vanep.dependent.seed.DependentSeeder;
@@ -13,6 +14,8 @@ import br.com.vanep.role.model.RoleModel;
 import br.com.vanep.role.repository.RoleRepository;
 import br.com.vanep.rolepermission.model.RolePermissionModel;
 import br.com.vanep.rolepermission.repository.RolePermissionRepository;
+import br.com.vanep.school.seed.SchoolSeeder;
+import br.com.vanep.state.seed.StateSeeder;
 import br.com.vanep.user.UserRepository;
 import br.com.vanep.user.UserType;
 import br.com.vanep.user.model.UserModel;
@@ -40,6 +43,9 @@ public class DataSeeder implements ApplicationRunner {
   private final RoleRepository roles;
   private final RolePermissionRepository rolePermissions;
   private final DependentSeeder dependentSeeder;
+  private final SchoolSeeder schoolSeeder;
+  private final StateSeeder stateSeeder;
+  private final CitySeeder citySeeder;
   private final PasswordEncoder passwordEncoder;
 
   @Value("${vanep.seed.enabled:false}")
@@ -64,6 +70,9 @@ public class DataSeeder implements ApplicationRunner {
       RoleRepository roles,
       RolePermissionRepository rolePermissions,
       DependentSeeder dependentSeeder,
+      SchoolSeeder schoolSeeder,
+      StateSeeder stateSeeder,
+      CitySeeder citySeeder,
       PasswordEncoder passwordEncoder) {
     this.users = users;
     this.clients = clients;
@@ -71,6 +80,9 @@ public class DataSeeder implements ApplicationRunner {
     this.roles = roles;
     this.rolePermissions = rolePermissions;
     this.dependentSeeder = dependentSeeder;
+    this.schoolSeeder = schoolSeeder;
+    this.stateSeeder = stateSeeder;
+    this.citySeeder = citySeeder;
     this.passwordEncoder = passwordEncoder;
   }
 
@@ -86,6 +98,9 @@ public class DataSeeder implements ApplicationRunner {
     seedClients();
     seedDrivers();
     dependentSeeder.seed();
+    schoolSeeder.seed();
+    stateSeeder.seed();
+    citySeeder.seed();
     if (seedOnly) {
       log.info("Seed-only: data seeded; the application will shut down.");
     }

@@ -1,17 +1,14 @@
-package br.com.vanep.role.model;
+package br.com.vanep.city.model;
 
-import br.com.vanep.role.RoleName;
-import br.com.vanep.rolepermission.model.RolePermissionModel;
+import br.com.vanep.state.model.StateModel;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
-import jakarta.persistence.OneToOne;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import java.time.Instant;
@@ -24,11 +21,11 @@ import org.hibernate.annotations.SoftDeleteType;
 import org.hibernate.annotations.UpdateTimestamp;
 
 @Entity
-@Table(name = "roles")
+@Table(name = "city")
 @SoftDelete(columnName = "deleted_at", strategy = SoftDeleteType.TIMESTAMP)
 @Getter
 @Setter
-public class RoleModel {
+public class CityModel {
 
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -37,19 +34,15 @@ public class RoleModel {
   @Column(nullable = false, unique = true, length = 32)
   private String token;
 
-  @Column(nullable = false, unique = true, length = 64)
+  @ManyToOne(fetch = FetchType.EAGER, optional = false)
+  @JoinColumn(name = "state_id", nullable = false)
+  private StateModel state;
+
+  @Column(nullable = false, length = 128)
   private String name;
 
-  @Column(columnDefinition = "text")
-  private String description;
-
-  @OneToOne(fetch = FetchType.EAGER)
-  @JoinColumn(name = "role_permissions_id", unique = true)
-  private RolePermissionModel rolePermission;
-
-  @Enumerated(EnumType.STRING)
-  @Column(name = "role_name", unique = true, length = 16)
-  private RoleName roleName;
+  @Column(name = "is_active", nullable = false)
+  private boolean active = true;
 
   @CreationTimestamp
   @Column(name = "created_at", nullable = false, updatable = false)
