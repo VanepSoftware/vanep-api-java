@@ -1,11 +1,8 @@
-package br.com.vanep.assistant.model;
+package br.com.vanep.address.model;
 
-import br.com.vanep.assistant.enums.AssistantInviteStatus;
-import br.com.vanep.driver.model.DriverModel;
+import br.com.vanep.city.model.CityModel;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -21,13 +18,14 @@ import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.SoftDelete;
 import org.hibernate.annotations.SoftDeleteType;
+import org.hibernate.annotations.UpdateTimestamp;
 
 @Entity
-@Table(name = "assistant_invite")
+@Table(name = "address")
 @SoftDelete(columnName = "deleted_at", strategy = SoftDeleteType.TIMESTAMP)
 @Getter
 @Setter
-public class AssistantInviteModel {
+public class AddressModel {
 
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -37,26 +35,34 @@ public class AssistantInviteModel {
   private String token;
 
   @ManyToOne(fetch = FetchType.EAGER, optional = false)
-  @JoinColumn(name = "driver_id", nullable = false)
-  private DriverModel driver;
+  @JoinColumn(name = "city_id", nullable = false)
+  private CityModel city;
 
-  @ManyToOne(fetch = FetchType.EAGER, optional = false)
-  @JoinColumn(name = "assistant_id", nullable = false)
-  private AssistantModel assistant;
+  @Column(name = "zip_code", nullable = false, length = 8)
+  private String zipCode;
 
-  @Enumerated(EnumType.STRING)
-  @Column(nullable = false, length = 16)
-  private AssistantInviteStatus status = AssistantInviteStatus.PENDING;
+  @Column(nullable = false, length = 255)
+  private String street;
 
-  @Column(name = "expires_at", nullable = false)
-  private Instant expiresAt;
+  @Column(length = 16)
+  private String number;
 
-  @Column(name = "responded_at")
-  private Instant respondedAt;
+  @Column(length = 128)
+  private String complement;
+
+  @Column(length = 128)
+  private String district;
+
+  @Column(name = "is_active", nullable = false)
+  private boolean active = true;
 
   @CreationTimestamp
   @Column(name = "created_at", nullable = false, updatable = false)
   private Instant createdAt;
+
+  @UpdateTimestamp
+  @Column(name = "updated_at", nullable = false)
+  private Instant updatedAt;
 
   @PrePersist
   void onCreate() {
