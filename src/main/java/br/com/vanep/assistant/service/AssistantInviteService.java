@@ -2,6 +2,7 @@ package br.com.vanep.assistant.service;
 
 import br.com.vanep.assistant.dto.AssistantInviteCreateRequestDTO;
 import br.com.vanep.assistant.dto.AssistantInviteResponseDTO;
+import br.com.vanep.assistant.dto.AssistantPendingInviteDTO;
 import br.com.vanep.assistant.enums.AssistantInviteStatus;
 import br.com.vanep.assistant.enums.AssistantStatus;
 import br.com.vanep.assistant.mapper.AssistantMapper;
@@ -158,6 +159,42 @@ public class AssistantInviteService {
   }
 
   @Transactional
+  public AssistantPendingInviteDTO getPendingInvite(String callerEmail) {
+    AssistantModel assistant = resolveAssistant(callerEmail);
+    return mapper.toPendingInvite(requireActionablePendingInvite(assistant));
+  }
+
+  @Transactional
+  public void acceptPendingInvite(String callerEmail) {
+    AssistantModel assistant = resolveAssistant(callerEmail);
+    AssistantInviteModel invite = requireActionablePendingInvite(assistant);
+
+    assistant.setStatus(AssistantStatus.ACTIVE);
+    assistant.setDriver(invite.getDriver());
+    assistant.setActivatedAt(Instant.now());
+    assistantRepository.save(assistant);
+
+    invite.setStatus(AssistantInviteStatus.ACCEPTED);
+    invite.setRespondedAt(Instant.now());
+    inviteRepository.save(invite);
+  }
+
+  @Transactional
+  public void rejectPendingInvite(String callerEmail) {
+    AssistantModel assistant = resolveAssistant(callerEmail);
+    AssistantInviteModel invite = requireActionablePendingInvite(assistant);
+
+    invite.setStatus(AssistantInviteStatus.REJECTED);
+    invite.setRespondedAt(Instant.now());
+    inviteRepository.save(invite);
+
+    if (assistant.getStatus() == AssistantStatus.PENDING) {
+      assistant.setStatus(AssistantStatus.UNLINKED);
+      assistantRepository.save(assistant);
+    }
+  }
+
+  @Transactional
   public void expireIfStale(AssistantInviteModel invite) {
     if (invite.getStatus() != AssistantInviteStatus.PENDING) {
       return;
@@ -180,6 +217,32 @@ public class AssistantInviteService {
     inviteRepository
         .findByAssistantIdAndStatus(assistant.getId(), AssistantInviteStatus.PENDING)
         .ifPresent(this::expireIfStale);
+  }
+
+  private AssistantInviteModel requireActionablePendingInvite(AssistantModel assistant) {
+    if (assistant.getStatus() != AssistantStatus.PENDING) {
+      throw new ResponseStatusException(
+          HttpStatus.NOT_FOUND, message("assistant.invite.not_found"));
+    }
+
+    AssistantInviteModel invite =
+        inviteRepository
+            .findByAssistantIdAndStatus(assistant.getId(), AssistantInviteStatus.PENDING)
+            .orElseThrow(
+                () ->
+                    new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, message("assistant.invite.not_found")));
+
+    expireIfStale(invite);
+    if (invite.getStatus() == AssistantInviteStatus.EXPIRED) {
+      throw new ResponseStatusException(HttpStatus.GONE, message("assistant.invite.expired"));
+    }
+    if (invite.getStatus() != AssistantInviteStatus.PENDING) {
+      throw new ResponseStatusException(
+          HttpStatus.CONFLICT, message("assistant.invite.not_pending"));
+    }
+
+    return invite;
   }
 
   private boolean isWithinRejectionCooldown(Long driverId, Long assistantId) {
@@ -213,6 +276,27 @@ public class AssistantInviteService {
             driver.getUser().getName(),
             "expiryHours",
             String.valueOf(inviteTtl.toHours())));
+  }
+
+  private AssistantModel resolveAssistant(String callerEmail) {
+    UserModel user =
+        userRepository
+            .findByEmail(callerEmail)
+            .orElseThrow(
+                () ->
+                    new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, message("user.account.not_found")));
+
+    if (user.getType() != UserType.ASSISTANT) {
+      throw new ResponseStatusException(HttpStatus.FORBIDDEN, message("assistant.link.forbidden"));
+    }
+
+    return assistantRepository
+        .findByUserId(user.getId())
+        .orElseThrow(
+            () ->
+                new ResponseStatusException(
+                    HttpStatus.NOT_FOUND, message("assistant.profile.not_found")));
   }
 
   private DriverModel resolveDriver(String callerEmail) {

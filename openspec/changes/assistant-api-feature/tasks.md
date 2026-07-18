@@ -45,14 +45,14 @@
 
 > Depends on: Phase 3. Capabilities: `assistant-linking` (REST) + `assistant-profile`.
 
-- [ ] 4.1 Tests first: GET pending invite; accept/reject via REST autenticado; accept → ACTIVE; reject → UNLINKED + REJECTED
-- [ ] 4.2 REST: `GET /api/assistants/me/invite`, `POST .../accept`, `POST .../reject` (lazy expiry on read/action)
-- [ ] 4.3 Profile: `GET|PUT /api/assistants/me`, ownership; driver list DTO complete
-- [ ] 4.4 E2E: signup UNLINKED → invite → notificação → accept/reject via API; cancel; cooldown smoke where practical
-- [ ] 4.5 `./mvnw spotless:check` + `./mvnw verify` (JaCoCo); open PR4 → `main`
+- [x] 4.1 Tests first: GET pending invite; accept/reject via REST autenticado; accept → ACTIVE; reject → UNLINKED + REJECTED
+- [x] 4.2 REST: `GET /api/assistants/me/invite`, `POST .../accept`, `POST .../reject` (lazy expiry on read/action)
+- [x] 4.3 Profile: `GET|PUT /api/assistants/me`, ownership; driver list DTO complete
+- [x] 4.4 E2E: signup UNLINKED → invite → notificação → accept/reject via API; cancel; cooldown smoke where practical
+- [x] 4.5 `./mvnw spotless:check` + `./mvnw verify` (JaCoCo); open PR4 → `main`
 
 ## 5. Wrap-up
 
-- [ ] 5.1 Confirm specs scenarios covered
+- [x] 5.1 Confirm specs scenarios covered
 - [ ] 5.2 Archive after merge
 - [ ] 5.3 Future (out of this change): scheduled expiry job; SMS/push
