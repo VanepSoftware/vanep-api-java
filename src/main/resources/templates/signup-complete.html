@@ -31,6 +31,10 @@
               <input type="radio" th:field="*{type}" value="DRIVER" />
               <span>Motorista</span>
             </label>
+            <label class="remember">
+              <input type="radio" th:field="*{type}" value="ASSISTANT" />
+              <span>Assistente</span>
+            </label>
             <div class="form-error" th:if="${#fields.hasErrors('type')}" th:errors="*{type}"></div>
           </div>
 

@@ -14,7 +14,7 @@ import org.springframework.format.annotation.DateTimeFormat;
 @Setter
 public class SignupForm {
 
-  @NotNull(message = "Escolha cliente ou motorista.")
+  @NotNull(message = "{auth.signup.type.required}")
   private UserType type;
 
   private String name;

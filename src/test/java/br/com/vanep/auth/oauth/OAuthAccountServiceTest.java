@@ -7,7 +7,11 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import br.com.vanep.assistant.repository.AssistantRepository;
 import br.com.vanep.auth.web.SignupForm;
+import br.com.vanep.role.RoleName;
+import br.com.vanep.role.model.RoleModel;
+import br.com.vanep.role.repository.RoleRepository;
 import br.com.vanep.user.AuthProvider;
 import br.com.vanep.user.OAuthAccountRepository;
 import br.com.vanep.user.UserRepository;
@@ -27,7 +31,16 @@ class OAuthAccountServiceTest {
 
   @Mock private UserRepository users;
   @Mock private OAuthAccountRepository oauthAccounts;
+  @Mock private RoleRepository roles;
+  @Mock private AssistantRepository assistants;
   @InjectMocks private OAuthAccountService service;
+
+  private RoleModel roleTaggedAs(RoleName roleName) {
+    RoleModel role = new RoleModel();
+    role.setId(4L);
+    role.setRoleName(roleName);
+    return role;
+  }
 
   @Test
   void resolveReturnsRegisteredWhenAccountExists() {
@@ -115,6 +128,8 @@ class OAuthAccountServiceTest {
   void completeRegistrationCreatesUserAndLinksAccount() {
     when(users.save(any(UserModel.class))).thenAnswer(inv -> inv.getArgument(0));
     when(oauthAccounts.save(any(OAuthAccountModel.class))).thenAnswer(inv -> inv.getArgument(0));
+    when(roles.findByRoleName(RoleName.DRIVER))
+        .thenReturn(Optional.of(roleTaggedAs(RoleName.DRIVER)));
 
     SignupForm form = new SignupForm();
     form.setType(UserType.DRIVER);
@@ -133,5 +148,27 @@ class OAuthAccountServiceTest {
     assertThat(created.getTermsAcceptedAt()).isNotNull();
     verify(users).save(any(UserModel.class));
     verify(oauthAccounts).save(any(OAuthAccountModel.class));
+    verify(assistants, never()).save(any());
+  }
+
+  @Test
+  void completeRegistrationCreatesUnlinkedAssistantProfile() {
+    when(users.save(any(UserModel.class))).thenAnswer(inv -> inv.getArgument(0));
+    when(oauthAccounts.save(any(OAuthAccountModel.class))).thenAnswer(inv -> inv.getArgument(0));
+    when(roles.findByRoleName(RoleName.ASSISTANT))
+        .thenReturn(Optional.of(roleTaggedAs(RoleName.ASSISTANT)));
+
+    SignupForm form = new SignupForm();
+    form.setType(UserType.ASSISTANT);
+    form.setDocument("88888888888");
+    form.setAcceptTerms(true);
+
+    UserModel created =
+        service.completeRegistration(
+            AuthProvider.GOOGLE, "sub-5", "a@vanep.com", "Assistant A", form);
+
+    assertThat(created.getType()).isEqualTo(UserType.ASSISTANT);
+    assertThat(created.getRoleId()).isEqualTo(4L);
+    verify(assistants).save(any());
   }
 }

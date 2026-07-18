@@ -6,6 +6,9 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import br.com.vanep.assistant.enums.AssistantStatus;
+import br.com.vanep.assistant.model.AssistantModel;
+import br.com.vanep.assistant.repository.AssistantRepository;
 import br.com.vanep.auth.verification.EmailVerificationService;
 import br.com.vanep.client.model.ClientModel;
 import br.com.vanep.client.repository.ClientRepository;
@@ -33,6 +36,7 @@ class RegistrationServiceTest {
   @Mock private UserRepository users;
   @Mock private ClientRepository clients;
   @Mock private DriverRepository drivers;
+  @Mock private AssistantRepository assistants;
   @Mock private RoleRepository roles;
   @Mock private PasswordEncoder passwordEncoder;
   @Mock private EmailVerificationService emailVerification;
@@ -49,7 +53,7 @@ class RegistrationServiceTest {
     when(users.save(any(UserModel.class))).thenAnswer(inv -> inv.getArgument(0));
     when(passwordEncoder.encode(anyString())).thenReturn("hashed");
     return new RegistrationService(
-        users, clients, drivers, roles, passwordEncoder, emailVerification);
+        users, clients, drivers, assistants, roles, passwordEncoder, emailVerification);
   }
 
   @Test
@@ -101,5 +105,29 @@ class RegistrationServiceTest {
     assertThat(driver.getValue().getApprovalStatus()).isEqualTo(DriverApprovalStatus.PENDING);
     assertThat(driver.getValue().getBasePrice()).isEqualByComparingTo("120.00");
     assertThat(driver.getValue().getCity()).isEqualTo("Taguatinga");
+  }
+
+  @Test
+  void registerAssistantCreatesUserAndUnlinkedProfile() {
+    RegistrationService service = service();
+    when(roles.findByRoleName(RoleName.ASSISTANT))
+        .thenReturn(Optional.of(roleTaggedAs(RoleName.ASSISTANT, 4L)));
+    AssistantSignupForm form = new AssistantSignupForm();
+    form.setName("Carla");
+    form.setEmail("carla@vanep.com");
+    form.setPassword("secret1");
+    form.setDocument("55555555555");
+    form.setAcceptTerms(true);
+
+    UserModel user = service.registerAssistant(form);
+
+    assertThat(user.getType()).isEqualTo(UserType.ASSISTANT);
+    assertThat(user.getRoleId()).isEqualTo(4L);
+
+    ArgumentCaptor<AssistantModel> assistant = ArgumentCaptor.forClass(AssistantModel.class);
+    verify(assistants).save(assistant.capture());
+    assertThat(assistant.getValue().getUser()).isSameAs(user);
+    assertThat(assistant.getValue().getStatus()).isEqualTo(AssistantStatus.UNLINKED);
+    assertThat(assistant.getValue().getDriver()).isNull();
   }
 }

@@ -1,5 +1,7 @@
 package br.com.vanep.auth.web;
 
+import br.com.vanep.assistant.model.AssistantModel;
+import br.com.vanep.assistant.repository.AssistantRepository;
 import br.com.vanep.auth.verification.EmailVerificationService;
 import br.com.vanep.client.model.ClientModel;
 import br.com.vanep.client.repository.ClientRepository;
@@ -22,6 +24,7 @@ public class RegistrationService {
   private final UserRepository users;
   private final ClientRepository clients;
   private final DriverRepository drivers;
+  private final AssistantRepository assistants;
   private final RoleRepository roles;
   private final PasswordEncoder passwordEncoder;
   private final EmailVerificationService emailVerification;
@@ -30,12 +33,14 @@ public class RegistrationService {
       UserRepository users,
       ClientRepository clients,
       DriverRepository drivers,
+      AssistantRepository assistants,
       RoleRepository roles,
       PasswordEncoder passwordEncoder,
       EmailVerificationService emailVerification) {
     this.users = users;
     this.clients = clients;
     this.drivers = drivers;
+    this.assistants = assistants;
     this.roles = roles;
     this.passwordEncoder = passwordEncoder;
     this.emailVerification = emailVerification;
@@ -62,6 +67,16 @@ public class RegistrationService {
     driver.setBasePrice(form.getBasePrice());
     driver.setApprovalStatus(DriverApprovalStatus.PENDING);
     drivers.save(driver);
+    emailVerification.startVerification(user);
+    return user;
+  }
+
+  @Transactional
+  public UserModel registerAssistant(AssistantSignupForm form) {
+    UserModel user = createUser(UserType.ASSISTANT, RoleName.ASSISTANT, form);
+    AssistantModel assistant = new AssistantModel();
+    assistant.setUser(user);
+    assistants.save(assistant);
     emailVerification.startVerification(user);
     return user;
   }
