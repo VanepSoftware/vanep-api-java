@@ -15,4 +15,7 @@ public interface AssistantInviteRepository extends JpaRepository<AssistantInvite
 
   boolean existsByDriverIdAndAssistantIdAndStatusAndRespondedAtGreaterThanEqual(
       Long driverId, Long assistantId, AssistantInviteStatus status, Instant respondedAtSince);
+
+  Optional<AssistantInviteModel> findByDriverIdAndAssistantIdAndStatus(
+      Long driverId, Long assistantId, AssistantInviteStatus status);
 }

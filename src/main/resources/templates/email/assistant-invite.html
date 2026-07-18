@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+  <head>
+    <meta charset="utf-8" />
+  </head>
+  <body style="font-family: Arial, Helvetica, sans-serif; color: #111">
+    <h2>Convite para ser assistente</h2>
+    <p th:text="'Olá, ' + ${name} + '!'">Olá!</p>
+    <p>
+      <span th:text="${driverName}">Motorista</span> convidou você para ser assistente de bordo na
+      Vanep.
+    </p>
+    <p>
+      Este convite expira em
+      <span th:text="${expiryHours}">72</span> horas. Abra o aplicativo Vanep para aceitar ou
+      recusar.
+    </p>
+    <p style="color: #666; font-size: 12px">
+      Se você não esperava este convite, pode ignorar este e-mail.
+    </p>
+  </body>
+</html>
