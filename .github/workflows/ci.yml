@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   ci:
-    runs-on: [self-hosted, vanep]
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4

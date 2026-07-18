@@ -1,17 +1,10 @@
-package br.com.vanep.assistant.model;
+package br.com.vanep.state.model;
 
-import br.com.vanep.assistant.enums.AssistantInviteStatus;
-import br.com.vanep.driver.model.DriverModel;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import java.time.Instant;
@@ -21,13 +14,14 @@ import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.SoftDelete;
 import org.hibernate.annotations.SoftDeleteType;
+import org.hibernate.annotations.UpdateTimestamp;
 
 @Entity
-@Table(name = "assistant_invite")
+@Table(name = "state")
 @SoftDelete(columnName = "deleted_at", strategy = SoftDeleteType.TIMESTAMP)
 @Getter
 @Setter
-public class AssistantInviteModel {
+public class StateModel {
 
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -36,27 +30,22 @@ public class AssistantInviteModel {
   @Column(nullable = false, unique = true, length = 32)
   private String token;
 
-  @ManyToOne(fetch = FetchType.EAGER, optional = false)
-  @JoinColumn(name = "driver_id", nullable = false)
-  private DriverModel driver;
+  @Column(nullable = false, length = 64)
+  private String name;
 
-  @ManyToOne(fetch = FetchType.EAGER, optional = false)
-  @JoinColumn(name = "assistant_id", nullable = false)
-  private AssistantModel assistant;
+  @Column(nullable = false, length = 2)
+  private String uf;
 
-  @Enumerated(EnumType.STRING)
-  @Column(nullable = false, length = 16)
-  private AssistantInviteStatus status = AssistantInviteStatus.PENDING;
-
-  @Column(name = "expires_at", nullable = false)
-  private Instant expiresAt;
-
-  @Column(name = "responded_at")
-  private Instant respondedAt;
+  @Column(name = "is_active", nullable = false)
+  private boolean active = true;
 
   @CreationTimestamp
   @Column(name = "created_at", nullable = false, updatable = false)
   private Instant createdAt;
+
+  @UpdateTimestamp
+  @Column(name = "updated_at", nullable = false)
+  private Instant updatedAt;
 
   @PrePersist
   void onCreate() {
