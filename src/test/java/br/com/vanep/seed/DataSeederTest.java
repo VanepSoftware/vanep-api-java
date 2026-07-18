@@ -217,9 +217,10 @@ class DataSeederTest {
     seeder.run(new DefaultApplicationArguments());
 
     ArgumentCaptor<DriverModel> captor = ArgumentCaptor.forClass(DriverModel.class);
-    verify(drivers, times(1)).save(captor.capture());
-    assertThat(captor.getValue().getApprovalStatus()).isEqualTo(DriverApprovalStatus.APPROVED);
-    assertThat(captor.getValue().getUser().getRoleId()).isEqualTo(driverRole.getId());
+    verify(drivers, times(3)).save(captor.capture());
+    assertThat(captor.getAllValues().get(0).getApprovalStatus())
+        .isEqualTo(DriverApprovalStatus.APPROVED);
+    assertThat(captor.getAllValues().get(0).getUser().getRoleId()).isEqualTo(driverRole.getId());
   }
 
   @Test
