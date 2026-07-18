@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 
 import br.com.vanep.auth.security.PermissionEnum;
 import br.com.vanep.auth.security.PermissionRegistry;
+import br.com.vanep.city.seed.CitySeeder;
 import br.com.vanep.client.repository.ClientRepository;
 import br.com.vanep.dependent.seed.DependentSeeder;
 import br.com.vanep.driver.DriverApprovalStatus;
@@ -21,6 +22,8 @@ import br.com.vanep.role.model.RoleModel;
 import br.com.vanep.role.repository.RoleRepository;
 import br.com.vanep.rolepermission.model.RolePermissionModel;
 import br.com.vanep.rolepermission.repository.RolePermissionRepository;
+import br.com.vanep.school.seed.SchoolSeeder;
+import br.com.vanep.state.seed.StateSeeder;
 import br.com.vanep.user.UserRepository;
 import br.com.vanep.user.UserType;
 import br.com.vanep.user.model.UserModel;
@@ -44,6 +47,9 @@ class DataSeederTest {
   @Mock private RoleRepository roles;
   @Mock private RolePermissionRepository rolePermissions;
   @Mock private DependentSeeder dependentSeeder;
+  @Mock private SchoolSeeder schoolSeeder;
+  @Mock private StateSeeder stateSeeder;
+  @Mock private CitySeeder citySeeder;
   @Mock private PasswordEncoder passwordEncoder;
 
   private DataSeeder seeder;
@@ -52,7 +58,16 @@ class DataSeederTest {
   void setUp() {
     seeder =
         new DataSeeder(
-            users, clients, drivers, roles, rolePermissions, dependentSeeder, passwordEncoder);
+            users,
+            clients,
+            drivers,
+            roles,
+            rolePermissions,
+            dependentSeeder,
+            schoolSeeder,
+            stateSeeder,
+            citySeeder,
+            passwordEncoder);
     seeder.adminEmail = "admin@vanep.com.br";
     seeder.adminPassword = "password";
     seeder.adminDocument = "00000000000";
