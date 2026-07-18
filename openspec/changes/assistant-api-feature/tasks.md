@@ -9,7 +9,7 @@
 > Order per phase: test → migration → model → repository.
 
 - [x] 1.1 Write failing repository/integration stubs or schema smoke for `assistant` and `assistant_invite`
-- [x] 1.2 Create Flyway `V11__create_assistant_tables.sql` (`assistant`; `assistant_invite` with public `token`, TTL 72h semantics, statuses PENDING|ACCEPTED|REJECTED|EXPIRED|CANCELLED; soft delete; **no** `driver_link_code`; **no** `link_token_hash`)
+- [x] 1.2 Create Flyway `V15__create_assistant_tables.sql` (`assistant`; `assistant_invite` with public `token`, TTL 72h semantics, statuses PENDING|ACCEPTED|REJECTED|EXPIRED|CANCELLED; soft delete; **no** `driver_link_code`; **no** `link_token_hash`)
 - [x] 1.3 Add enums: `AssistantStatus` (`UNLINKED`, `PENDING`, `ACTIVE`, `INACTIVE`), `VerificationStatus`, `AssistantInviteStatus`
 - [x] 1.4 Add `AssistantInviteModel` + repository under `br.com.vanep.assistant` (find by public `token`, by `assistant_id` + status, cooldown query REJECTED same pair within 7d)
 - [x] 1.5 Add `AssistantModel` + `AssistantRepository` (`@SoftDelete`; token `@PrePersist`)
