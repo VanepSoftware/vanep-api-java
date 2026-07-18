@@ -47,7 +47,15 @@ public enum PermissionEnum {
   SHOW_CITY("show_city"),
   CREATE_CITY("create_city"),
   UPDATE_CITY("update_city"),
-  DELETE_CITY("delete_city");
+  DELETE_CITY("delete_city"),
+  LIST_ASSISTANTS("list_assistants"),
+  SHOW_ASSISTANT("show_assistant"),
+  UPDATE_ASSISTANT("update_assistant"),
+  PAUSE_ASSISTANT("pause_assistant"),
+  RESUME_ASSISTANT("resume_assistant"),
+  REVOKE_ASSISTANT("revoke_assistant"),
+  CREATE_ASSISTANT_INVITE("create_assistant_invite"),
+  CANCEL_ASSISTANT_INVITE("cancel_assistant_invite");
 
   private final String value;
 

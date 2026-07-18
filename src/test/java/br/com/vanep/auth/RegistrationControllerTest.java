@@ -8,11 +8,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import br.com.vanep.assistant.enums.AssistantStatus;
+import br.com.vanep.assistant.repository.AssistantRepository;
 import br.com.vanep.client.repository.ClientRepository;
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.user.UserRepository;
 import br.com.vanep.user.UserType;
 import br.com.vanep.user.model.UserModel;
+import java.util.Locale;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,6 +37,7 @@ class RegistrationControllerTest {
   @Autowired private UserRepository users;
   @Autowired private ClientRepository clients;
   @Autowired private DriverRepository drivers;
+  @Autowired private AssistantRepository assistants;
   @Autowired private PasswordEncoder passwordEncoder;
 
   private MockMvc mockMvc;
@@ -43,6 +47,7 @@ class RegistrationControllerTest {
     mockMvc =
         MockMvcBuilders.webAppContextSetup(context)
             .apply(SecurityMockMvcConfigurers.springSecurity())
+            .defaultRequest(get("/").locale(Locale.forLanguageTag("pt-BR")))
             .build();
   }
 
@@ -54,6 +59,17 @@ class RegistrationControllerTest {
         .perform(get("/signup/driver"))
         .andExpect(status().isOk())
         .andExpect(content().string(org.hamcrest.Matchers.containsString("Cadastro de motorista")));
+    mockMvc
+        .perform(get("/signup/assistant"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(org.hamcrest.Matchers.containsString("Cadastro de assistente")))
+        .andExpect(
+            content()
+                .string(
+                    org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("linkCode"))))
+        .andExpect(
+            content()
+                .string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("invite"))));
   }
 
   @Test
@@ -94,6 +110,28 @@ class RegistrationControllerTest {
     UserModel user = users.findByEmail("bruno@vanep.com").orElseThrow();
     assertThat(user.getType()).isEqualTo(UserType.DRIVER);
     assertThat(drivers.count()).isEqualTo(1);
+  }
+
+  @Test
+  void registersAssistantAsUnlinkedAndRedirects() throws Exception {
+    mockMvc
+        .perform(
+            post("/signup/assistant")
+                .with(csrf())
+                .param("name", "Carla")
+                .param("email", "carla@vanep.com")
+                .param("password", "secret1")
+                .param("document", "55555555555")
+                .param("acceptTerms", "true"))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrl("/login?registered"));
+
+    UserModel user = users.findByEmail("carla@vanep.com").orElseThrow();
+    assertThat(user.getType()).isEqualTo(UserType.ASSISTANT);
+    assertThat(assistants.count()).isEqualTo(1);
+    assertThat(assistants.findByUserId(user.getId()).orElseThrow().getStatus())
+        .isEqualTo(AssistantStatus.UNLINKED);
+    assertThat(assistants.findByUserId(user.getId()).orElseThrow().getDriver()).isNull();
   }
 
   @Test
