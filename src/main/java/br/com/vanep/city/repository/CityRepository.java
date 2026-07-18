@@ -11,6 +11,8 @@ public interface CityRepository extends JpaRepository<CityModel, Long> {
 
   Optional<CityModel> findByToken(String token);
 
+  Optional<CityModel> findFirstByNameIgnoreCase(String name);
+
   boolean existsByNameIgnoreCaseAndStateId(String name, Long stateId);
 
   @Modifying
