@@ -41,7 +41,6 @@ public class StateModel {
   @Column(nullable = false, length = 64)
   private String name;
 
-
   @Column(nullable = false, length = 2)
   private String uf;
 

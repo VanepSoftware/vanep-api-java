@@ -115,7 +115,6 @@ public class DataSeeder implements ApplicationRunner {
     }
   }
 
-
   private void seedRoles() {
     record RoleSeed(String name, String description, RoleName roleName) {}
     List<RoleSeed> seeds =

@@ -46,13 +46,12 @@ class StateControllerTest {
     country.setCurrency("BRL");
     country = countries.save(country);
 
-
     StateModel state = new StateModel();
     state.setName("São Paulo");
     state.setUf("SP");
     state.setCountry(country);
     state = states.save(state);
-    
+
     stateToken = state.getToken();
   }
 

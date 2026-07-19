@@ -54,7 +54,6 @@ class CityControllerTest {
     country.setCurrency("BRL");
     country = countries.save(country);
 
-
     StateModel state = new StateModel();
     state.setName("São Paulo");
     state.setUf("SP");

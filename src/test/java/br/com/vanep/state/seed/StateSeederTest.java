@@ -34,7 +34,6 @@ class StateSeederTest {
     when(countries.findByName("Brasil")).thenReturn(Optional.of(new CountryModel()));
   }
 
-
   @Test
   void createsAll27BrazilianStatesWhenMissing() {
     when(states.existsByUf(anyString())).thenReturn(false);

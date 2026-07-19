@@ -57,7 +57,8 @@ public class StateSeeder {
     CountryModel country =
         countryRepository
             .findByName("Brasil")
-            .orElseThrow(() -> new IllegalStateException("Seed: default country (Brasil) not found."));
+            .orElseThrow(
+                () -> new IllegalStateException("Seed: default country (Brasil) not found."));
 
     for (Map.Entry<String, String> entry : BRAZILIAN_STATES.entrySet()) {
       if (states.existsByUf(entry.getKey())) {
@@ -75,4 +76,3 @@ public class StateSeeder {
     }
   }
 }
-
