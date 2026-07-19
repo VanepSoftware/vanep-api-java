@@ -8,8 +8,11 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import br.com.vanep.country.model.CountryModel;
+import br.com.vanep.country.repository.CountryRepository;
 import br.com.vanep.state.model.StateModel;
 import br.com.vanep.state.repository.StateRepository;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -21,13 +24,16 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class StateSeederTest {
 
   @Mock private StateRepository states;
+  @Mock private CountryRepository countries;
 
   private StateSeeder seeder;
 
   @BeforeEach
   void setUp() {
-    seeder = new StateSeeder(states);
+    seeder = new StateSeeder(states, countries);
+    when(countries.findByName("Brasil")).thenReturn(Optional.of(new CountryModel()));
   }
+
 
   @Test
   void createsAll27BrazilianStatesWhenMissing() {

@@ -16,3 +16,4 @@ delete from school;
 delete from address;
 delete from city;
 delete from state;
+delete from country;

@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import br.com.vanep.address.model.AddressModel;
 import br.com.vanep.city.model.CityModel;
 import br.com.vanep.city.repository.CityRepository;
+import br.com.vanep.country.model.CountryModel;
+import br.com.vanep.country.repository.CountryRepository;
 import br.com.vanep.state.model.StateModel;
 import br.com.vanep.state.repository.StateRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -23,14 +25,23 @@ class AddressRepositoryTest {
   @Autowired private AddressRepository repository;
   @Autowired private CityRepository cities;
   @Autowired private StateRepository states;
+  @Autowired private CountryRepository countries;
 
   private CityModel city;
 
   @BeforeEach
   void setUp() {
+    CountryModel country = new CountryModel();
+    country.setName("Brasil");
+    country.setIsoCode("BR");
+    country.setPhoneCode("+55");
+    country.setCurrency("BRL");
+    country = countries.save(country);
+
     StateModel state = new StateModel();
     state.setName("São Paulo");
     state.setUf("SP");
+    state.setCountry(country);
     state = states.save(state);
 
     CityModel newCity = new CityModel();

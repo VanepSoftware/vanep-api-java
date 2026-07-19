@@ -41,7 +41,13 @@ public enum PermissionEnum {
   SHOW_CITY("show_city"),
   CREATE_CITY("create_city"),
   UPDATE_CITY("update_city"),
-  DELETE_CITY("delete_city");
+  DELETE_CITY("delete_city"),
+  LIST_COUNTRIES("list_countries"),
+  SHOW_COUNTRY("show_country"),
+  CREATE_COUNTRY("create_country"),
+  UPDATE_COUNTRY("update_country"),
+  DELETE_COUNTRY("delete_country"),
+  RESTORE_COUNTRY("restore_country");
 
   private final String value;
 

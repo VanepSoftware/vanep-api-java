@@ -1,14 +1,10 @@
-package br.com.vanep.state.model;
+package br.com.vanep.country.model;
 
-import br.com.vanep.country.model.CountryModel;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import java.time.Instant;
@@ -21,11 +17,11 @@ import org.hibernate.annotations.SoftDeleteType;
 import org.hibernate.annotations.UpdateTimestamp;
 
 @Entity
-@Table(name = "state")
+@Table(name = "country")
 @SoftDelete(columnName = "deleted_at", strategy = SoftDeleteType.TIMESTAMP)
 @Getter
 @Setter
-public class StateModel {
+public class CountryModel {
 
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -34,16 +30,20 @@ public class StateModel {
   @Column(nullable = false, unique = true, length = 32)
   private String token;
 
-  @ManyToOne(fetch = FetchType.EAGER, optional = false)
-  @JoinColumn(name = "country_id", nullable = false)
-  private CountryModel country;
-
-  @Column(nullable = false, length = 64)
+  @Column(nullable = false, unique = true, length = 128)
   private String name;
 
+  @Column(name = "iso_code", nullable = false, unique = true, length = 2)
+  private String isoCode;
 
-  @Column(nullable = false, length = 2)
-  private String uf;
+  @Column(name = "phone_code", nullable = false, length = 16)
+  private String phoneCode;
+
+  @Column(nullable = false, length = 3)
+  private String currency;
+
+  @Column(length = 16)
+  private String locale;
 
   @Column(name = "is_active", nullable = false)
   private boolean active = true;

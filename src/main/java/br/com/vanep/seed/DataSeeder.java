@@ -5,6 +5,7 @@ import br.com.vanep.auth.security.PermissionRegistry;
 import br.com.vanep.city.seed.CitySeeder;
 import br.com.vanep.client.model.ClientModel;
 import br.com.vanep.client.repository.ClientRepository;
+import br.com.vanep.country.seed.CountrySeeder;
 import br.com.vanep.dependent.seed.DependentSeeder;
 import br.com.vanep.driver.DriverApprovalStatus;
 import br.com.vanep.driver.DriverRepository;
@@ -44,6 +45,7 @@ public class DataSeeder implements ApplicationRunner {
   private final RolePermissionRepository rolePermissions;
   private final DependentSeeder dependentSeeder;
   private final SchoolSeeder schoolSeeder;
+  private final CountrySeeder countrySeeder;
   private final StateSeeder stateSeeder;
   private final CitySeeder citySeeder;
   private final PasswordEncoder passwordEncoder;
@@ -71,6 +73,7 @@ public class DataSeeder implements ApplicationRunner {
       RolePermissionRepository rolePermissions,
       DependentSeeder dependentSeeder,
       SchoolSeeder schoolSeeder,
+      CountrySeeder countrySeeder,
       StateSeeder stateSeeder,
       CitySeeder citySeeder,
       PasswordEncoder passwordEncoder) {
@@ -81,6 +84,7 @@ public class DataSeeder implements ApplicationRunner {
     this.rolePermissions = rolePermissions;
     this.dependentSeeder = dependentSeeder;
     this.schoolSeeder = schoolSeeder;
+    this.countrySeeder = countrySeeder;
     this.stateSeeder = stateSeeder;
     this.citySeeder = citySeeder;
     this.passwordEncoder = passwordEncoder;
@@ -99,12 +103,14 @@ public class DataSeeder implements ApplicationRunner {
     seedDrivers();
     dependentSeeder.seed();
     schoolSeeder.seed();
+    countrySeeder.seed();
     stateSeeder.seed();
     citySeeder.seed();
     if (seedOnly) {
       log.info("Seed-only: data seeded; the application will shut down.");
     }
   }
+
 
   private void seedRoles() {
     record RoleSeed(String name, String description, RoleName roleName) {}
