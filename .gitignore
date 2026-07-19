@@ -44,3 +44,6 @@ out/
 
 ### Agent tooling ###
 
+
+# Local dev OAuth signing key (generated, never commit)
+.dev/

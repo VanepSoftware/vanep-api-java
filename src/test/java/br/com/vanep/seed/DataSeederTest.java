@@ -81,6 +81,13 @@ class DataSeederTest {
     return role;
   }
 
+  private RolePermissionModel completeAdminBundle() {
+    RolePermissionModel bundle = new RolePermissionModel();
+    bundle.setName("ADMIN");
+    bundle.setPermissions(List.copyOf(PermissionRegistry.all()));
+    return bundle;
+  }
+
   @Test
   void doesNothingWhenDisabled() {
     seeder.enabled = false;
@@ -130,7 +137,7 @@ class DataSeederTest {
   void createsClientBundleWithDependentPermissionsWhenMissing() {
     seeder.enabled = true;
     RoleModel adminRole = roleTaggedAs(RoleName.ADMIN);
-    adminRole.setRolePermission(new RolePermissionModel());
+    adminRole.setRolePermission(completeAdminBundle());
     RoleModel clientRole = roleTaggedAs(RoleName.CLIENT);
     RoleModel driverRole = roleTaggedAs(RoleName.DRIVER);
     RoleModel assistantRole = roleTaggedAs(RoleName.ASSISTANT);
@@ -156,7 +163,7 @@ class DataSeederTest {
   void seedingIsIdempotentWhenAdminBundleAndRolesAlreadyExist() {
     seeder.enabled = true;
     RoleModel adminRole = roleTaggedAs(RoleName.ADMIN);
-    adminRole.setRolePermission(new RolePermissionModel());
+    adminRole.setRolePermission(completeAdminBundle());
     RoleModel clientRole = roleTaggedAs(RoleName.CLIENT);
     clientRole.setRolePermission(new RolePermissionModel());
     RoleModel driverRole = roleTaggedAs(RoleName.DRIVER);
@@ -227,7 +234,7 @@ class DataSeederTest {
   void createsAssistantBundleWithProfilePermissionsWhenMissing() {
     seeder.enabled = true;
     RoleModel adminRole = roleTaggedAs(RoleName.ADMIN);
-    adminRole.setRolePermission(new RolePermissionModel());
+    adminRole.setRolePermission(completeAdminBundle());
     RoleModel clientRole = roleTaggedAs(RoleName.CLIENT);
     clientRole.setRolePermission(new RolePermissionModel());
     RoleModel driverRole = roleTaggedAs(RoleName.DRIVER);
@@ -259,7 +266,7 @@ class DataSeederTest {
   void createsDriverBundleWithAssistantManagementPermissionsWhenMissing() {
     seeder.enabled = true;
     RoleModel adminRole = roleTaggedAs(RoleName.ADMIN);
-    adminRole.setRolePermission(new RolePermissionModel());
+    adminRole.setRolePermission(completeAdminBundle());
     RoleModel clientRole = roleTaggedAs(RoleName.CLIENT);
     clientRole.setRolePermission(new RolePermissionModel());
     RoleModel assistantRole = roleTaggedAs(RoleName.ASSISTANT);
