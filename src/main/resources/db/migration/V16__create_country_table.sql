@@ -22,14 +22,7 @@ create unique index country_token_active_key on country (token) where deleted_at
 create unique index country_name_active_key on country (name) where deleted_at is null;
 create unique index country_iso_code_active_key on country (iso_code) where deleted_at is null;
 
-insert into country (token, name, iso_code, phone_code, currency, locale) 
-values ('brasil', 'Brasil', 'BR', '+55', 'BRL', 'pt-BR');
-
-alter table state add column country_id bigint;
-
-update state set country_id = (select id from country where name = 'Brasil');
-
-alter table state alter column country_id set not null;
+alter table state add column country_id bigint not null;
 
 alter table state add constraint fk_state_country foreign key (country_id) references country (id);
 

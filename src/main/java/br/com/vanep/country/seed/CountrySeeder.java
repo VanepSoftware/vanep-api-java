@@ -23,7 +23,6 @@ public class CountrySeeder {
         .orElseGet(
             () -> {
               CountryModel country = new CountryModel();
-              country.setToken("brasil");
               country.setName("Brasil");
               country.setIsoCode("BR");
               country.setPhoneCode("+55");
