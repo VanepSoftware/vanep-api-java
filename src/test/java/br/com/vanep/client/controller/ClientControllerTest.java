@@ -74,6 +74,13 @@ class ClientControllerTest {
             new SimpleGrantedAuthority("delete_client"));
   }
 
+  private JwtRequestPostProcessor adminWithUpdateJwt() {
+    return jwt()
+        .jwt(t -> t.claim("uid", "admin-uid").claim("roles", List.of("ROLE_ADMIN")))
+        .authorities(
+            new SimpleGrantedAuthority("ROLE_ADMIN"), new SimpleGrantedAuthority("update_client"));
+  }
+
   private JwtRequestPostProcessor ownerJwt() {
     return jwt()
         .jwt(t -> t.claim("uid", ownerUid).claim("roles", List.of("ROLE_CLIENT")))
@@ -188,7 +195,7 @@ class ClientControllerTest {
   }
 
   @Test
-  void updateReturns403ForAdmin() throws Exception {
+  void updateReturns403ForAdminWithoutUpdatePermission() throws Exception {
     mockMvc
         .perform(
             put("/api/clients/" + clientToken)
@@ -196,6 +203,19 @@ class ClientControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{}"))
         .andExpect(status().isForbidden());
+  }
+
+  @Test
+  void updateReturns200ForAdminWithUpdatePermission() throws Exception {
+    mockMvc
+        .perform(
+            put("/api/clients/" + clientToken)
+                .with(adminWithUpdateJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"Nome Editado\",\"photo\":\"https://example.com/p.jpg\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.token").value(clientToken))
+        .andExpect(jsonPath("$.name").value("Nome Editado"));
   }
 
   @Test

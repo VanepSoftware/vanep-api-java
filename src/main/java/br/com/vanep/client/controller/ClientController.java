@@ -3,6 +3,7 @@ package br.com.vanep.client.controller;
 import br.com.vanep.client.dto.ClientResponseDTO;
 import br.com.vanep.client.dto.ClientUpdateRequestDTO;
 import br.com.vanep.client.service.ClientService;
+import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
@@ -40,9 +41,9 @@ public class ClientController {
   }
 
   @PutMapping("/{token}")
-  @PreAuthorize("@clientSecurity.isOwner(#token, authentication)")
+  @PreAuthorize("hasAuthority('update_client') or @clientSecurity.isOwner(#token, authentication)")
   public ClientResponseDTO update(
-      @PathVariable String token, @RequestBody ClientUpdateRequestDTO request) {
+      @PathVariable String token, @RequestBody @Valid ClientUpdateRequestDTO request) {
     return service.update(token, request);
   }
 
