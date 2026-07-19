@@ -1,9 +1,14 @@
 package br.com.vanep.auth.oauth;
 
+import br.com.vanep.assistant.model.AssistantModel;
+import br.com.vanep.assistant.repository.AssistantRepository;
 import br.com.vanep.auth.web.SignupForm;
+import br.com.vanep.role.RoleName;
+import br.com.vanep.role.repository.RoleRepository;
 import br.com.vanep.user.AuthProvider;
 import br.com.vanep.user.OAuthAccountRepository;
 import br.com.vanep.user.UserRepository;
+import br.com.vanep.user.UserType;
 import br.com.vanep.user.model.OAuthAccountModel;
 import br.com.vanep.user.model.UserModel;
 import java.time.Instant;
@@ -18,10 +23,18 @@ public class OAuthAccountService {
 
   private final UserRepository users;
   private final OAuthAccountRepository oauthAccounts;
+  private final RoleRepository roles;
+  private final AssistantRepository assistants;
 
-  public OAuthAccountService(UserRepository users, OAuthAccountRepository oauthAccounts) {
+  public OAuthAccountService(
+      UserRepository users,
+      OAuthAccountRepository oauthAccounts,
+      RoleRepository roles,
+      AssistantRepository assistants) {
     this.users = users;
     this.oauthAccounts = oauthAccounts;
+    this.roles = roles;
+    this.assistants = assistants;
   }
 
   @Transactional
@@ -58,6 +71,9 @@ public class OAuthAccountService {
       AuthProvider provider, String providerUid, String email, String name, SignupForm form) {
     UserModel user = new UserModel();
     user.setType(form.getType());
+    roles
+        .findByRoleName(roleForType(form.getType()))
+        .ifPresent(role -> user.setRoleId(role.getId()));
     user.setName(name != null && !name.isBlank() ? name : form.getName());
     user.setEmail(email);
     user.setDocument(form.getDocument());
@@ -68,8 +84,23 @@ public class OAuthAccountService {
     user.setTermsAcceptedAt(Instant.now());
     users.save(user);
 
+    if (form.getType() == UserType.ASSISTANT) {
+      AssistantModel assistant = new AssistantModel();
+      assistant.setUser(user);
+      assistants.save(assistant);
+    }
+
     link(user, provider, providerUid, email);
     return user;
+  }
+
+  private static RoleName roleForType(UserType type) {
+    return switch (type) {
+      case CLIENT -> RoleName.CLIENT;
+      case DRIVER -> RoleName.DRIVER;
+      case ASSISTANT -> RoleName.ASSISTANT;
+      case ADMIN -> RoleName.ADMIN;
+    };
   }
 
   private OAuthAccountModel link(

@@ -5,6 +5,8 @@
 delete from oauth_account;
 delete from password_reset_token;
 delete from email_verification_token;
+delete from assistant_invite;
+delete from assistant;
 delete from dependent;
 delete from client;
 delete from vehicle;
