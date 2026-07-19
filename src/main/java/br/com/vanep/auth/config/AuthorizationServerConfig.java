@@ -5,6 +5,7 @@ import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jose.jwk.source.ImmutableJWKSet;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
@@ -102,7 +103,7 @@ public class AuthorizationServerConfig {
   }
 
   @Bean
-  @Profile("docker | prod")
+  @Profile("docker | prod | local")
   public OAuth2AuthorizationService authorizationService(
       JdbcTemplate jdbcTemplate, RegisteredClientRepository registeredClientRepository) {
     return new JdbcOAuth2AuthorizationService(jdbcTemplate, registeredClientRepository);
@@ -113,20 +114,21 @@ public class AuthorizationServerConfig {
       @Value("${vanep.oauth.jwk.private-key:}") String privateKeyPem,
       @Value("${vanep.oauth.jwk.public-key:}") String publicKeyPem,
       @Value("${vanep.oauth.jwk.key-id:vanep-rsa-key}") String keyId,
+      @Value("${vanep.oauth.jwk.dev-key-path:.dev/oauth-jwk.json}") String devKeyPath,
       Environment environment) {
     RSAKey rsaKey;
     if (!privateKeyPem.isBlank() && !publicKeyPem.isBlank()) {
       rsaKey = RsaKeys.fromPem(privateKeyPem, publicKeyPem, keyId);
       log.info("JWK RSA carregada da configuração (kid={}).", keyId);
+    } else if (List.of(environment.getActiveProfiles()).contains("prod")) {
+      throw new IllegalStateException(
+          "Em produção configure vanep.oauth.jwk.private-key e vanep.oauth.jwk.public-key (PEM).");
     } else {
-      if (List.of(environment.getActiveProfiles()).contains("prod")) {
-        throw new IllegalStateException(
-            "Em produção configure vanep.oauth.jwk.private-key e vanep.oauth.jwk.public-key (PEM).");
-      }
-      log.warn(
-          "JWK RSA efêmera gerada em memória (apenas dev): tokens não sobrevivem a restart nem "
-              + "funcionam em múltiplas instâncias. Configure vanep.oauth.jwk.* em produção.");
-      rsaKey = RsaKeys.generate(keyId);
+      // Dev: persiste a chave em disco para que os tokens sobrevivam a restart.
+      // Configure vanep.oauth.jwk.* (PEM) em produção / múltiplas instâncias.
+      rsaKey = RsaKeys.loadOrCreate(keyId, Path.of(devKeyPath));
+      log.info(
+          "JWK RSA de desenvolvimento persistida em {} (kid={}).", devKeyPath, rsaKey.getKeyID());
     }
     return new ImmutableJWKSet<>(new JWKSet(rsaKey));
   }
