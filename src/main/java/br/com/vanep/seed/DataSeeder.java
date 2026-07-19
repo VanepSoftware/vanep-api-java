@@ -22,6 +22,7 @@ import br.com.vanep.user.model.UserModel;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -135,14 +136,20 @@ public class DataSeeder implements ApplicationRunner {
         roles
             .findByRoleName(RoleName.ADMIN)
             .orElseThrow(() -> new IllegalStateException("Seed: ADMIN role not found."));
-    if (adminRole.getRolePermission() == null) {
-      RolePermissionModel bundle = new RolePermissionModel();
-      bundle.setName(ADMIN_BUNDLE_NAME);
-      bundle.setPermissions(List.copyOf(PermissionRegistry.all()));
+    RolePermissionModel bundle = adminRole.getRolePermission();
+    Set<String> allPermissions = PermissionRegistry.all();
+    boolean alreadyComplete =
+        bundle != null && Set.copyOf(bundle.getPermissions()).equals(allPermissions);
+    if (!alreadyComplete) {
+      if (bundle == null) {
+        bundle = new RolePermissionModel();
+        bundle.setName(ADMIN_BUNDLE_NAME);
+      }
+      bundle.setPermissions(List.copyOf(allPermissions));
       bundle = rolePermissions.save(bundle);
       adminRole.setRolePermission(bundle);
       roles.save(adminRole);
-      log.info("Seed: ADMIN bundle created with all permissions.");
+      log.info("Seed: ADMIN bundle synced with all permissions.");
     }
     backfillAdminRoleId(adminRole);
   }
