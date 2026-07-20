@@ -7,7 +7,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
-import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.test.context.ActiveProfiles;
 
@@ -19,16 +18,20 @@ class MobileOAuthClientTest {
 
   @Test
   void registersPublicMobileClientWithCustomSchemeRedirectAndPkce() {
-    RegisteredClient mobile = registeredClients.findByClientId("vanep-mobile");
-
-    assertThat(mobile).isNotNull();
-    assertThat(mobile.getClientAuthenticationMethods())
-        .containsExactly(ClientAuthenticationMethod.NONE);
-    assertThat(mobile.getClientSettings().isRequireProofKey()).isTrue();
-    assertThat(mobile.getRedirectUris()).contains("com.vanep.vanepmobile://oauth2redirect");
-    assertThat(mobile.getAuthorizationGrantTypes())
-        .contains(AuthorizationGrantType.AUTHORIZATION_CODE, AuthorizationGrantType.REFRESH_TOKEN);
-    assertThat(mobile.getScopes()).contains("read", "write");
+    assertThat(registeredClients.findByClientId("vanep-mobile"))
+        .isNotNull()
+        .satisfies(
+            mobile -> {
+              assertThat(mobile.getClientAuthenticationMethods())
+                  .containsExactly(ClientAuthenticationMethod.NONE);
+              assertThat(mobile.getClientSettings().isRequireProofKey()).isTrue();
+              assertThat(mobile.getRedirectUris())
+                  .contains("com.vanep.vanepmobile://oauth2redirect");
+              assertThat(mobile.getAuthorizationGrantTypes())
+                  .contains(
+                      AuthorizationGrantType.AUTHORIZATION_CODE, AuthorizationGrantType.REFRESH_TOKEN);
+              assertThat(mobile.getScopes()).contains("read", "write");
+            });
   }
 
   @Test

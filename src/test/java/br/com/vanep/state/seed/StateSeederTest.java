@@ -38,7 +38,7 @@ class StateSeederTest {
     ArgumentCaptor<StateModel> captor = ArgumentCaptor.forClass(StateModel.class);
     verify(states, times(27)).save(captor.capture());
     assertThat(captor.getAllValues())
-        .extracting(StateModel::getUf)
+        .extracting(state -> state.getUf())
         .doesNotHaveDuplicates()
         .contains("SP", "RJ", "MG", "DF", "AC", "TO");
   }

@@ -53,7 +53,7 @@ class AddressSeederTest {
     ArgumentCaptor<AddressModel> captor = ArgumentCaptor.forClass(AddressModel.class);
     verify(addresses, times(2)).save(captor.capture());
     assertThat(captor.getAllValues())
-        .extracting(AddressModel::getStreet)
+        .extracting(address -> address.getStreet())
         .containsExactly("Avenida Paulista", "Rua Barão de Jaguara");
   }
 
