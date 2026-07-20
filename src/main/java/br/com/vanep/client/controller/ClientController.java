@@ -34,13 +34,13 @@ public class ClientController {
   }
 
   @GetMapping("/{token}")
-  @PreAuthorize("hasAuthority('show_client') or @clientSecurity.isOwner(#token, authentication)")
+  @PreAuthorize("hasAuthority('show_client') or @sec.isClientOwner(#token, authentication)")
   public ClientResponseDTO get(@PathVariable String token) {
     return service.findByToken(token);
   }
 
   @PutMapping("/{token}")
-  @PreAuthorize("@clientSecurity.isOwner(#token, authentication)")
+  @PreAuthorize("@sec.isClientOwner(#token, authentication)")
   public ClientResponseDTO update(
       @PathVariable String token, @RequestBody ClientUpdateRequestDTO request) {
     return service.update(token, request);

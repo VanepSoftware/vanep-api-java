@@ -52,7 +52,7 @@ class CitySeederTest {
     ArgumentCaptor<CityModel> captor = ArgumentCaptor.forClass(CityModel.class);
     verify(cities, times(3)).save(captor.capture());
     assertThat(captor.getAllValues())
-        .extracting(CityModel::getName)
+        .extracting(city -> city.getName())
         .containsExactly("São Paulo", "Campinas", "Rio de Janeiro");
   }
 

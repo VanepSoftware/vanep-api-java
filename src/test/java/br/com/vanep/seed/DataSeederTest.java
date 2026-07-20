@@ -9,6 +9,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import br.com.vanep.address.seed.AddressSeeder;
 import br.com.vanep.auth.security.PermissionEnum;
 import br.com.vanep.auth.security.PermissionRegistry;
 import br.com.vanep.city.seed.CitySeeder;
@@ -52,6 +53,7 @@ class DataSeederTest {
   @Mock private CountrySeeder countrySeeder;
   @Mock private StateSeeder stateSeeder;
   @Mock private CitySeeder citySeeder;
+  @Mock private AddressSeeder addressSeeder;
   @Mock private PasswordEncoder passwordEncoder;
 
   private DataSeeder seeder;
@@ -70,6 +72,7 @@ class DataSeederTest {
             countrySeeder,
             stateSeeder,
             citySeeder,
+            addressSeeder,
             passwordEncoder);
 
     seeder.adminEmail = "admin@vanep.com.br";
