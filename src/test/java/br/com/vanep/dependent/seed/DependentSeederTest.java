@@ -63,7 +63,9 @@ class DependentSeederTest {
     verify(dependents, times(2)).save(captor.capture());
     assertThat(captor.getAllValues()).allMatch(dependent -> dependent.getClientId().equals(100L));
     assertThat(
-            captor.getAllValues().stream().filter(dependent -> dependent.isDefaultDependent()).count())
+            captor.getAllValues().stream()
+                .filter(dependent -> dependent.isDefaultDependent())
+                .count())
         .isEqualTo(1);
   }
 

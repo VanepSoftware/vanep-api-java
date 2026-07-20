@@ -29,7 +29,8 @@ class MobileOAuthClientTest {
                   .contains("com.vanep.vanepmobile://oauth2redirect");
               assertThat(mobile.getAuthorizationGrantTypes())
                   .contains(
-                      AuthorizationGrantType.AUTHORIZATION_CODE, AuthorizationGrantType.REFRESH_TOKEN);
+                      AuthorizationGrantType.AUTHORIZATION_CODE,
+                      AuthorizationGrantType.REFRESH_TOKEN);
               assertThat(mobile.getScopes()).contains("read", "write");
             });
   }
