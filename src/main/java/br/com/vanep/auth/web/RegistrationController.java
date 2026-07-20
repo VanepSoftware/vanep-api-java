@@ -2,6 +2,8 @@ package br.com.vanep.auth.web;
 
 import br.com.vanep.user.UserRepository;
 import jakarta.validation.Valid;
+import org.springframework.context.MessageSource;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
@@ -14,10 +16,13 @@ public class RegistrationController {
 
   private final RegistrationService registrationService;
   private final UserRepository users;
+  private final MessageSource messages;
 
-  public RegistrationController(RegistrationService registrationService, UserRepository users) {
+  public RegistrationController(
+      RegistrationService registrationService, UserRepository users, MessageSource messages) {
     this.registrationService = registrationService;
     this.users = users;
+    this.messages = messages;
   }
 
   @GetMapping("/signup")
@@ -65,12 +70,40 @@ public class RegistrationController {
     return "redirect:/login?registered";
   }
 
+  @GetMapping("/signup/assistant")
+  public String assistantForm(Model model) {
+    if (!model.containsAttribute("assistantSignupForm")) {
+      model.addAttribute("assistantSignupForm", new AssistantSignupForm());
+    }
+    return "signup-assistant";
+  }
+
+  @PostMapping("/signup/assistant")
+  public String registerAssistant(
+      @Valid @ModelAttribute("assistantSignupForm") AssistantSignupForm form,
+      BindingResult bindingResult) {
+    rejectDuplicates(form, bindingResult);
+    if (bindingResult.hasErrors()) {
+      return "signup-assistant";
+    }
+    registrationService.registerAssistant(form);
+    return "redirect:/login?registered";
+  }
+
   private void rejectDuplicates(AccountSignupForm form, BindingResult bindingResult) {
     if (form.getEmail() != null && users.existsByEmail(form.getEmail())) {
-      bindingResult.rejectValue("email", "duplicate", "Já existe uma conta com este e-mail.");
+      bindingResult.rejectValue(
+          "email",
+          "duplicate",
+          messages.getMessage(
+              "auth.signup.email.duplicate", null, LocaleContextHolder.getLocale()));
     }
     if (form.getDocument() != null && users.existsByDocument(form.getDocument())) {
-      bindingResult.rejectValue("document", "duplicate", "Já existe uma conta com este documento.");
+      bindingResult.rejectValue(
+          "document",
+          "duplicate",
+          messages.getMessage(
+              "auth.signup.document.duplicate", null, LocaleContextHolder.getLocale()));
     }
   }
 }

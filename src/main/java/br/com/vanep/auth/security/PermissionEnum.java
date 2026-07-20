@@ -29,6 +29,12 @@ public enum PermissionEnum {
   CREATE_DEPENDENT("create_dependent"),
   UPDATE_DEPENDENT("update_dependent"),
   DELETE_DEPENDENT("delete_dependent"),
+  LIST_DRIVERS("list_drivers"),
+  SHOW_DRIVER("show_driver"),
+  CREATE_DRIVER("create_driver"),
+  UPDATE_DRIVER("update_driver"),
+  DELETE_DRIVER("delete_driver"),
+  RESTORE_DRIVER("restore_driver"),
   LIST_SCHOOLS("list_schools"),
   SHOW_SCHOOL("show_school"),
   CREATE_SCHOOL("create_school"),
@@ -41,12 +47,20 @@ public enum PermissionEnum {
   SHOW_CITY("show_city"),
   CREATE_CITY("create_city"),
   UPDATE_CITY("update_city"),
-  DELETE_CITY("delete_city"),
   LIST_ADDRESSES("list_addresses"),
   SHOW_ADDRESS("show_address"),
   CREATE_ADDRESS("create_address"),
   UPDATE_ADDRESS("update_address"),
-  DELETE_ADDRESS("delete_address");
+  DELETE_ADDRESS("delete_address"),
+  DELETE_CITY("delete_city"),
+  LIST_ASSISTANTS("list_assistants"),
+  SHOW_ASSISTANT("show_assistant"),
+  UPDATE_ASSISTANT("update_assistant"),
+  PAUSE_ASSISTANT("pause_assistant"),
+  RESUME_ASSISTANT("resume_assistant"),
+  REVOKE_ASSISTANT("revoke_assistant"),
+  CREATE_ASSISTANT_INVITE("create_assistant_invite"),
+  CANCEL_ASSISTANT_INVITE("cancel_assistant_invite");
 
   private final String value;
 

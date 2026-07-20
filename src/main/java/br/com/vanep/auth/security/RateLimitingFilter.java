@@ -20,6 +20,7 @@ public class RateLimitingFilter extends OncePerRequestFilter {
           "/login",
           "/signup/client",
           "/signup/driver",
+          "/signup/assistant",
           "/forgot-password",
           "/reset-password",
           "/verify-email/resend",
