@@ -38,7 +38,7 @@ class SchoolSeederTest {
     ArgumentCaptor<SchoolModel> captor = ArgumentCaptor.forClass(SchoolModel.class);
     verify(schools, times(2)).save(captor.capture());
     assertThat(captor.getAllValues())
-        .extracting(SchoolModel::getName)
+        .extracting(school -> school.getName())
         .containsExactly("Escola Municipal Monteiro Lobato", "Colégio Santa Clara");
   }
 
