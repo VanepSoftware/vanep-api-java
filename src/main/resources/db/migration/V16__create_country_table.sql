@@ -1,30 +1,30 @@
-create table country (
-    id          bigint generated always as identity primary key,
-    token       varchar(32)  not null,
-    name        varchar(128) not null,
-    iso_code    varchar(2)   not null,
-    phone_code  varchar(16)  not null,
-    currency    varchar(3)   not null,
-    locale      varchar(16),
-    is_active   boolean      not null default true,
-    created_at  timestamptz  not null default now(),
-    updated_at  timestamptz  not null default now(),
-    deleted_at  timestamptz
+CREATE TABLE country (
+    id          BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    token       VARCHAR(32)  NOT NULL,
+    name        VARCHAR(128) NOT NULL,
+    iso_code    VARCHAR(2)   NOT NULL,
+    phone_code  VARCHAR(16)  NOT NULL,
+    currency    VARCHAR(3)   NOT NULL,
+    locale      VARCHAR(16),
+    is_active   BOOLEAN      NOT NULL DEFAULT TRUE,
+    created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    deleted_at  TIMESTAMPTZ
 );
 
-comment on table country is 'Países atendidos. Define moeda, DDI e locale. Raiz da hierarquia geográfica.';
-comment on column country.iso_code is 'ISO 3166-1 alpha-2: BR, US, PT';
-comment on column country.phone_code is 'DDI, ex: +55';
-comment on column country.currency is 'ISO 4217: BRL, USD, EUR';
-comment on column country.locale is 'ex: pt-BR — formata datas/documentos/moeda';
+COMMENT ON TABLE country IS 'Países atendidos. Define moeda, DDI e locale. Raiz da hierarquia geográfica.';
+COMMENT ON COLUMN country.iso_code IS 'ISO 3166-1 alpha-2: BR, US, PT';
+COMMENT ON COLUMN country.phone_code IS 'DDI, ex: +55';
+COMMENT ON COLUMN country.currency IS 'ISO 4217: BRL, USD, EUR';
+COMMENT ON COLUMN country.locale IS 'ex: pt-BR — formata datas/documentos/moeda';
 
-create unique index country_token_active_key on country (token) where deleted_at is null;
-create unique index country_name_active_key on country (name) where deleted_at is null;
-create unique index country_iso_code_active_key on country (iso_code) where deleted_at is null;
+CREATE UNIQUE INDEX country_token_active_key ON country (token) WHERE deleted_at IS NULL;
+CREATE UNIQUE INDEX country_name_active_key ON country (name) WHERE deleted_at IS NULL;
+CREATE UNIQUE INDEX country_iso_code_active_key ON country (iso_code) WHERE deleted_at IS NULL;
 
-alter table state add column country_id bigint not null;
+ALTER TABLE state ADD COLUMN country_id BIGINT NOT NULL;
 
-alter table state add constraint fk_state_country foreign key (country_id) references country (id);
+ALTER TABLE state ADD CONSTRAINT fk_state_country FOREIGN KEY (country_id) REFERENCES country (id);
 
-drop index if exists state_uf_active_key;
-create unique index state_country_uf_active_key on state (country_id, uf) where deleted_at is null;
+DROP INDEX IF EXISTS state_uf_active_key;
+CREATE UNIQUE INDEX state_country_uf_active_key ON state (country_id, uf) WHERE deleted_at IS NULL;
