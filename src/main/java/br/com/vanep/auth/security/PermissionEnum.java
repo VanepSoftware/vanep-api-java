@@ -60,7 +60,13 @@ public enum PermissionEnum {
   RESUME_ASSISTANT("resume_assistant"),
   REVOKE_ASSISTANT("revoke_assistant"),
   CREATE_ASSISTANT_INVITE("create_assistant_invite"),
-  CANCEL_ASSISTANT_INVITE("cancel_assistant_invite");
+  CANCEL_ASSISTANT_INVITE("cancel_assistant_invite"),
+  LIST_COUNTRIES("list_countries"),
+  SHOW_COUNTRY("show_country"),
+  CREATE_COUNTRY("create_country"),
+  UPDATE_COUNTRY("update_country"),
+  DELETE_COUNTRY("delete_country"),
+  RESTORE_COUNTRY("restore_country");
 
   private final String value;
 

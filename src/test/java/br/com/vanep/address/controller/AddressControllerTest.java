@@ -13,6 +13,8 @@ import br.com.vanep.address.model.AddressModel;
 import br.com.vanep.address.repository.AddressRepository;
 import br.com.vanep.city.model.CityModel;
 import br.com.vanep.city.repository.CityRepository;
+import br.com.vanep.country.model.CountryModel;
+import br.com.vanep.country.repository.CountryRepository;
 import br.com.vanep.state.model.StateModel;
 import br.com.vanep.state.repository.StateRepository;
 import java.util.List;
@@ -38,6 +40,7 @@ class AddressControllerTest {
   @Autowired private AddressRepository addresses;
   @Autowired private CityRepository cities;
   @Autowired private StateRepository states;
+  @Autowired private CountryRepository countries;
 
   private MockMvc mockMvc;
   private String addressToken;
@@ -47,9 +50,18 @@ class AddressControllerTest {
   void setUp() {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
 
+    CountryModel country = new CountryModel();
+    country.setName("Brasil");
+    country.setIsoCode("BR");
+    country.setPhoneCode("+55");
+    country.setCurrency("BRL");
+    country.setLocale("pt-BR");
+    country = countries.save(country);
+
     StateModel state = new StateModel();
     state.setName("São Paulo");
     state.setUf("SP");
+    state.setCountry(country);
     state = states.save(state);
 
     CityModel city = new CityModel();

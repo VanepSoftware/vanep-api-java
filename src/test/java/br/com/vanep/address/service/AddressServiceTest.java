@@ -14,6 +14,7 @@ import br.com.vanep.address.model.AddressModel;
 import br.com.vanep.address.repository.AddressRepository;
 import br.com.vanep.city.model.CityModel;
 import br.com.vanep.city.repository.CityRepository;
+import br.com.vanep.country.model.CountryModel;
 import br.com.vanep.state.model.StateModel;
 import java.util.List;
 import java.util.Optional;
@@ -43,10 +44,16 @@ class AddressServiceTest {
   }
 
   private CityModel city() {
+    CountryModel country = new CountryModel();
+    country.setId(100L);
+    country.setToken("country-br");
+    country.setName("Brasil");
+
     StateModel state = new StateModel();
     state.setId(1L);
     state.setToken("state-sp");
     state.setUf("SP");
+    state.setCountry(country);
 
     CityModel city = new CityModel();
     city.setId(10L);

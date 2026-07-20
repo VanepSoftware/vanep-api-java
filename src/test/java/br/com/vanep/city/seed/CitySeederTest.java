@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 
 import br.com.vanep.city.model.CityModel;
 import br.com.vanep.city.repository.CityRepository;
+import br.com.vanep.country.model.CountryModel;
 import br.com.vanep.state.model.StateModel;
 import br.com.vanep.state.repository.StateRepository;
 import java.util.Optional;
@@ -35,9 +36,14 @@ class CitySeederTest {
   }
 
   private StateModel stateWithId(Long id, String uf) {
+    CountryModel country = new CountryModel();
+    country.setId(100L);
+    country.setName("Brasil");
+
     StateModel state = new StateModel();
     state.setId(id);
     state.setUf(uf);
+    state.setCountry(country);
     return state;
   }
 

@@ -14,6 +14,7 @@ import br.com.vanep.auth.security.PermissionEnum;
 import br.com.vanep.auth.security.PermissionRegistry;
 import br.com.vanep.city.seed.CitySeeder;
 import br.com.vanep.client.repository.ClientRepository;
+import br.com.vanep.country.seed.CountrySeeder;
 import br.com.vanep.dependent.seed.DependentSeeder;
 import br.com.vanep.driver.DriverApprovalStatus;
 import br.com.vanep.driver.DriverRepository;
@@ -49,6 +50,7 @@ class DataSeederTest {
   @Mock private RolePermissionRepository rolePermissions;
   @Mock private DependentSeeder dependentSeeder;
   @Mock private SchoolSeeder schoolSeeder;
+  @Mock private CountrySeeder countrySeeder;
   @Mock private StateSeeder stateSeeder;
   @Mock private CitySeeder citySeeder;
   @Mock private AddressSeeder addressSeeder;
@@ -67,10 +69,12 @@ class DataSeederTest {
             rolePermissions,
             dependentSeeder,
             schoolSeeder,
+            countrySeeder,
             stateSeeder,
             citySeeder,
             addressSeeder,
             passwordEncoder);
+
     seeder.adminEmail = "admin@vanep.com.br";
     seeder.adminPassword = "password";
     seeder.adminDocument = "00000000000";
