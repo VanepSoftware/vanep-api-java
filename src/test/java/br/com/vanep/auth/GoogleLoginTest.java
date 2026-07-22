@@ -85,14 +85,14 @@ class GoogleLoginTest {
                                     .claim("name", "Buyer")))
                 .with(csrf())
                 .param("type", "CLIENT")
-                .param("document", "12345678901")
+                .param("document", "39053344705")
                 .param("phone", "11999990000")
                 .param("acceptTerms", "true"))
         .andExpect(status().is3xxRedirection());
 
     var created = users.findByEmail("buyer@gmail.com");
     assertThat(created).isPresent();
-    assertThat(created.get().getDocument()).isEqualTo("12345678901");
+    assertThat(created.get().getDocument()).isEqualTo("39053344705");
     assertThat(oauthAccounts.findByProviderAndProviderUid(AuthProvider.GOOGLE, "g-2")).isPresent();
   }
 
@@ -125,7 +125,7 @@ class GoogleLoginTest {
                                     .claim("name", "Assistant")))
                 .with(csrf())
                 .param("type", "ASSISTANT")
-                .param("document", "98765432100")
+                .param("document", "52998224725")
                 .param("acceptTerms", "true"))
         .andExpect(status().is3xxRedirection());
 

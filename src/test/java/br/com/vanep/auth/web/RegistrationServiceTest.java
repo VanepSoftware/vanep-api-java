@@ -65,7 +65,7 @@ class RegistrationServiceTest {
     form.setName("Ana");
     form.setEmail("ana@vanep.com");
     form.setPassword("secret1");
-    form.setDocument("11111111111");
+    form.setDocument("39053344705");
     form.setAcceptTerms(true);
 
     UserModel user = service.registerClient(form);
@@ -89,7 +89,7 @@ class RegistrationServiceTest {
     form.setName("Bruno");
     form.setEmail("bruno@vanep.com");
     form.setPassword("secret1");
-    form.setDocument("22222222222");
+    form.setDocument("52998224725");
     form.setCity("Taguatinga");
     form.setBasePrice(new BigDecimal("120.00"));
     form.setExperienceYears(5);
@@ -116,7 +116,7 @@ class RegistrationServiceTest {
     form.setName("Carla");
     form.setEmail("carla@vanep.com");
     form.setPassword("secret1");
-    form.setDocument("55555555555");
+    form.setDocument("11144477735");
     form.setAcceptTerms(true);
 
     UserModel user = service.registerAssistant(form);

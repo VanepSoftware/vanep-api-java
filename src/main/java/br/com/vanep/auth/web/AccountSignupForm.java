@@ -1,5 +1,6 @@
 package br.com.vanep.auth.web;
 
+import br.com.vanep.auth.validation.Cpf;
 import br.com.vanep.user.Gender;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Email;
@@ -26,6 +27,7 @@ public class AccountSignupForm {
   private String password;
 
   @NotBlank(message = "Informe seu documento (CPF).")
+  @Cpf
   private String document;
 
   private String phone;
