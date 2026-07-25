@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -15,6 +16,7 @@ import br.com.vanep.driver.mapper.DriverMapper;
 import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.user.UserType;
 import br.com.vanep.user.model.UserModel;
+import br.com.vanep.user.service.UserService;
 import java.math.BigDecimal;
 import java.time.LocalTime;
 import java.util.List;
@@ -34,17 +36,22 @@ class DriverServiceTest {
 
   @Mock private DriverRepository repository;
   @Mock private DriverMapper mapper;
+  @Mock private UserService userService;
   @Mock private MessageSource messages;
 
   private DriverService service;
 
   @BeforeEach
   void setUp() {
-    service = new DriverService(repository, mapper, messages);
+    service = new DriverService(repository, mapper, userService, messages);
+    lenient()
+        .when(messages.getMessage(anyString(), any(), any()))
+        .thenAnswer(inv -> inv.getArgument(0));
   }
 
   private DriverModel driverWithToken(String token) {
     UserModel user = new UserModel();
+    user.setId(1L);
     user.setType(UserType.DRIVER);
     user.setName("Test Driver");
     user.setEmail("driver@vanep.com");
