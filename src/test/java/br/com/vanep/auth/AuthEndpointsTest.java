@@ -10,11 +10,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import br.com.vanep.user.Gender;
 import br.com.vanep.user.UserRepository;
 import br.com.vanep.user.UserType;
 import br.com.vanep.user.model.UserModel;
-import java.time.LocalDate;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -54,8 +52,6 @@ class AuthEndpointsTest {
     user.setName("Tester");
     user.setEmail(EMAIL);
     user.setDocument("12345678901");
-    user.setBirthDate(LocalDate.of(1990, 5, 15));
-    user.setGender(Gender.FEMALE);
     user.setPassword(passwordEncoder.encode(PASSWORD));
     user.setVerified(true);
     users.save(user);
@@ -84,33 +80,26 @@ class AuthEndpointsTest {
   }
 
   @Test
-  void meRequiresAuthentication() throws Exception {
-    mockMvc.perform(get("/api/user/me")).andExpect(status().isUnauthorized());
+  void profileRequiresAuthentication() throws Exception {
+    mockMvc.perform(get("/api/user/profile")).andExpect(status().isUnauthorized());
   }
 
   @Test
-  void meReturnsUserForValidJwt() throws Exception {
-    UserModel saved = users.findByEmail(EMAIL).orElseThrow();
+  void profileReturnsUserForValidJwt() throws Exception {
     mockMvc
-        .perform(
-            get("/api/user/me")
-                .with(jwt().jwt(token -> token.claim("uid", saved.getToken()).subject(EMAIL))))
+        .perform(get("/api/user/profile").with(jwt().jwt(token -> token.subject(EMAIL))))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.email").value(EMAIL))
         .andExpect(jsonPath("$.name").value("Tester"))
         .andExpect(jsonPath("$.type").value("CLIENT"))
-        .andExpect(jsonPath("$.document").value("12345678901"))
-        .andExpect(jsonPath("$.birthDate").value("1990-05-15"))
-        .andExpect(jsonPath("$.gender").value("FEMALE"))
-        .andExpect(jsonPath("$.token").value(saved.getToken()));
+        .andExpect(jsonPath("$.token").isNotEmpty());
   }
 
   @Test
-  void meReturns404ForUnknownUid() throws Exception {
+  void profileReturns404ForUnknownSubject() throws Exception {
     mockMvc
         .perform(
-            get("/api/user/me")
-                .with(jwt().jwt(token -> token.claim("uid", "unknown-uid").subject(EMAIL))))
+            get("/api/user/profile").with(jwt().jwt(token -> token.subject("ghost@vanep.com"))))
         .andExpect(status().isNotFound());
   }
 

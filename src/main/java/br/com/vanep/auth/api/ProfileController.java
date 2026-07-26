@@ -1,27 +1,35 @@
 package br.com.vanep.auth.api;
 
-import br.com.vanep.auth.security.SecurityHelper;
-import br.com.vanep.user.dto.UserMeResponseDTO;
-import br.com.vanep.user.service.UserService;
-import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.Authentication;
+import br.com.vanep.user.UserRepository;
+import br.com.vanep.user.model.UserModel;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 @RestController
-@RequestMapping("/api/user")
 public class ProfileController {
 
-  private final UserService userService;
+  private final UserRepository users;
 
-  public ProfileController(UserService userService) {
-    this.userService = userService;
+  public ProfileController(UserRepository users) {
+    this.users = users;
   }
 
-  @GetMapping("/me")
-  @PreAuthorize("isAuthenticated()")
-  public UserMeResponseDTO me(Authentication authentication) {
-    return userService.getMe(SecurityHelper.requireCallerUid(authentication));
+  @GetMapping("/api/user/profile")
+  public ProfileResponse profile(@AuthenticationPrincipal Jwt jwt) {
+    String email = jwt.getSubject();
+    UserModel user =
+        users
+            .findByEmail(email)
+            .orElseThrow(
+                () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Conta não encontrada."));
+
+    return new ProfileResponse(
+        user.getToken(), user.getName(), user.getEmail(), user.getType().name());
   }
+
+  public record ProfileResponse(String token, String name, String email, String type) {}
 }
