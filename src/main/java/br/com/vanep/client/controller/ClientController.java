@@ -1,13 +1,17 @@
 package br.com.vanep.client.controller;
 
+import br.com.vanep.auth.security.SecurityHelper;
+import br.com.vanep.client.dto.ClientMeSummaryResponseDTO;
 import br.com.vanep.client.dto.ClientResponseDTO;
 import br.com.vanep.client.dto.ClientUpdateRequestDTO;
 import br.com.vanep.client.service.ClientService;
+import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -27,6 +31,12 @@ public class ClientController {
     this.service = service;
   }
 
+  @GetMapping("/me")
+  @PreAuthorize("isAuthenticated()")
+  public ClientMeSummaryResponseDTO getMe(Authentication authentication) {
+    return service.getMyProfile(SecurityHelper.requireCallerUid(authentication));
+  }
+
   @GetMapping
   @PreAuthorize("hasAuthority('list_clients')")
   public Page<ClientResponseDTO> list(@PageableDefault(size = 20) Pageable pageable) {
@@ -42,7 +52,7 @@ public class ClientController {
   @PutMapping("/{token}")
   @PreAuthorize("@sec.isClientOwner(#token, authentication)")
   public ClientResponseDTO update(
-      @PathVariable String token, @RequestBody ClientUpdateRequestDTO request) {
+      @PathVariable String token, @Valid @RequestBody ClientUpdateRequestDTO request) {
     return service.update(token, request);
   }
 

@@ -47,6 +47,17 @@ public class AddressService {
     return mapper.toResponse(requireByToken(token));
   }
 
+  public Long resolveAddressId(String addressToken) {
+    return requireByToken(addressToken).getId();
+  }
+
+  public String resolveAddressToken(Long addressId) {
+    if (addressId == null) {
+      return null;
+    }
+    return addressRepository.findById(addressId).map(address -> address.getToken()).orElse(null);
+  }
+
   @Transactional
   public AddressResponseDTO create(AddressRequestDTO request) {
     AddressModel address = new AddressModel();

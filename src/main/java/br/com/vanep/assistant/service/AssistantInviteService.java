@@ -16,6 +16,7 @@ import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.user.UserRepository;
 import br.com.vanep.user.UserType;
 import br.com.vanep.user.model.UserModel;
+import br.com.vanep.user.service.UserService;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
@@ -37,6 +38,7 @@ public class AssistantInviteService {
   private final AssistantRepository assistantRepository;
   private final DriverRepository driverRepository;
   private final UserRepository userRepository;
+  private final UserService userService;
   private final MailService mail;
   private final AssistantMapper mapper;
   private final MessageSource messages;
@@ -47,6 +49,7 @@ public class AssistantInviteService {
       AssistantRepository assistantRepository,
       DriverRepository driverRepository,
       UserRepository userRepository,
+      UserService userService,
       MailService mail,
       AssistantMapper mapper,
       MessageSource messages,
@@ -55,6 +58,7 @@ public class AssistantInviteService {
     this.assistantRepository = assistantRepository;
     this.driverRepository = driverRepository;
     this.userRepository = userRepository;
+    this.userService = userService;
     this.mail = mail;
     this.mapper = mapper;
     this.messages = messages;
@@ -159,14 +163,14 @@ public class AssistantInviteService {
   }
 
   @Transactional
-  public AssistantPendingInviteDTO getPendingInvite(String callerEmail) {
-    AssistantModel assistant = resolveAssistant(callerEmail);
+  public AssistantPendingInviteDTO getPendingInvite(String callerUid) {
+    AssistantModel assistant = resolveAssistant(callerUid);
     return mapper.toPendingInvite(requireActionablePendingInvite(assistant));
   }
 
   @Transactional
-  public void acceptPendingInvite(String callerEmail) {
-    AssistantModel assistant = resolveAssistant(callerEmail);
+  public void acceptPendingInvite(String callerUid) {
+    AssistantModel assistant = resolveAssistant(callerUid);
     AssistantInviteModel invite = requireActionablePendingInvite(assistant);
 
     assistant.setStatus(AssistantStatus.ACTIVE);
@@ -180,8 +184,8 @@ public class AssistantInviteService {
   }
 
   @Transactional
-  public void rejectPendingInvite(String callerEmail) {
-    AssistantModel assistant = resolveAssistant(callerEmail);
+  public void rejectPendingInvite(String callerUid) {
+    AssistantModel assistant = resolveAssistant(callerUid);
     AssistantInviteModel invite = requireActionablePendingInvite(assistant);
 
     invite.setStatus(AssistantInviteStatus.REJECTED);
@@ -278,19 +282,8 @@ public class AssistantInviteService {
             String.valueOf(inviteTtl.toHours())));
   }
 
-  private AssistantModel resolveAssistant(String callerEmail) {
-    UserModel user =
-        userRepository
-            .findByEmail(callerEmail)
-            .orElseThrow(
-                () ->
-                    new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, message("user.account.not_found")));
-
-    if (user.getType() != UserType.ASSISTANT) {
-      throw new ResponseStatusException(HttpStatus.FORBIDDEN, message("assistant.link.forbidden"));
-    }
-
+  private AssistantModel resolveAssistant(String callerUid) {
+    UserModel user = userService.requireByTokenAndType(callerUid, UserType.ASSISTANT);
     return assistantRepository
         .findByUserId(user.getId())
         .orElseThrow(
