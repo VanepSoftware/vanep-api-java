@@ -73,7 +73,7 @@ class DataSeederTest {
             passwordEncoder);
     seeder.adminEmail = "admin@vanep.com.br";
     seeder.adminPassword = "password";
-    seeder.adminDocument = "00000000000";
+    seeder.adminDocument = "56789012303";
   }
 
   private RoleModel roleTaggedAs(RoleName roleName) {

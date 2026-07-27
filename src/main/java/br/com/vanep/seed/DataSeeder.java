@@ -65,7 +65,7 @@ public class DataSeeder implements ApplicationRunner {
   @Value("${vanep.seed.admin.password:password}")
   String adminPassword;
 
-  @Value("${vanep.seed.admin.document:00000000000}")
+  @Value("${vanep.seed.admin.document:56789012303}")
   String adminDocument;
 
   public DataSeeder(
@@ -251,11 +251,11 @@ public class DataSeeder implements ApplicationRunner {
     record ClientSeed(String name, String email, String document) {}
     List<ClientSeed> seeds =
         List.of(
-            new ClientSeed("Ana Souza", "ana.souza@seed.vanep.com.br", "11111111111"),
-            new ClientSeed("Bruno Lima", "bruno.lima@seed.vanep.com.br", "22222222222"),
-            new ClientSeed("Carla Nunes", "carla.nunes@seed.vanep.com.br", "33333333333"),
-            new ClientSeed("Diego Alves", "diego.alves@seed.vanep.com.br", "44444444444"),
-            new ClientSeed("Elena Rocha", "elena.rocha@seed.vanep.com.br", "55555555555"));
+            new ClientSeed("Ana Souza", "ana.souza@seed.vanep.com.br", "39053344705"),
+            new ClientSeed("Bruno Lima", "bruno.lima@seed.vanep.com.br", "52998224725"),
+            new ClientSeed("Carla Nunes", "carla.nunes@seed.vanep.com.br", "11144477735"),
+            new ClientSeed("Diego Alves", "diego.alves@seed.vanep.com.br", "12345678909"),
+            new ClientSeed("Elena Rocha", "elena.rocha@seed.vanep.com.br", "86288366757"));
 
     RoleModel clientRole = roles.findByRoleName(RoleName.CLIENT).orElseThrow();
     for (ClientSeed seed : seeds) {
@@ -284,15 +284,15 @@ public class DataSeeder implements ApplicationRunner {
             new DriverSeed(
                 "Fabio Teixeira",
                 "fabio.teixeira@seed.vanep.com.br",
-                "66666666666",
+                "23456789092",
                 "11222333000181"),
             new DriverSeed(
                 "Gustavo Santos",
                 "gustavo.santos@seed.vanep.com.br",
-                "77777777777",
+                "34567890175",
                 "22333444000192"),
             new DriverSeed(
-                "Helena Costa", "helena.costa@seed.vanep.com.br", "88888888888", "33444555000103"));
+                "Helena Costa", "helena.costa@seed.vanep.com.br", "45678901249", "33444555000103"));
 
     RoleModel driverRole = roles.findByRoleName(RoleName.DRIVER).orElseThrow();
     for (DriverSeed seed : seeds) {
