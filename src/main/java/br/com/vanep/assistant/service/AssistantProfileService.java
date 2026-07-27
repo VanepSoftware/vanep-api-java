@@ -1,16 +1,15 @@
 package br.com.vanep.assistant.service;
 
-import br.com.vanep.assistant.dto.AssistantProfileResponseDTO;
-import br.com.vanep.assistant.dto.AssistantProfileUpdateRequestDTO;
+import br.com.vanep.assistant.dto.AssistantMeSummaryResponseDTO;
 import br.com.vanep.assistant.enums.AssistantInviteStatus;
 import br.com.vanep.assistant.enums.AssistantStatus;
 import br.com.vanep.assistant.mapper.AssistantMapper;
 import br.com.vanep.assistant.model.AssistantModel;
 import br.com.vanep.assistant.repository.AssistantInviteRepository;
 import br.com.vanep.assistant.repository.AssistantRepository;
-import br.com.vanep.user.UserRepository;
 import br.com.vanep.user.UserType;
 import br.com.vanep.user.model.UserModel;
+import br.com.vanep.user.service.UserService;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.HttpStatus;
@@ -23,19 +22,19 @@ public class AssistantProfileService {
 
   private final AssistantRepository assistantRepository;
   private final AssistantInviteRepository inviteRepository;
-  private final UserRepository userRepository;
+  private final UserService userService;
   private final AssistantMapper mapper;
   private final MessageSource messages;
 
   public AssistantProfileService(
       AssistantRepository assistantRepository,
       AssistantInviteRepository inviteRepository,
-      UserRepository userRepository,
+      UserService userService,
       AssistantMapper mapper,
       MessageSource messages) {
     this.assistantRepository = assistantRepository;
     this.inviteRepository = inviteRepository;
-    this.userRepository = userRepository;
+    this.userService = userService;
     this.mapper = mapper;
     this.messages = messages;
   }
@@ -45,35 +44,16 @@ public class AssistantProfileService {
   }
 
   @Transactional(readOnly = true)
-  public AssistantProfileResponseDTO getProfile(String callerEmail) {
-    AssistantModel assistant = requireAssistant(callerEmail);
-    return mapper.toProfile(assistant, resolvePendingInvite(assistant));
+  public AssistantMeSummaryResponseDTO getProfile(String callerUid) {
+    UserModel user = userService.requireByTokenAndType(callerUid, UserType.ASSISTANT);
+    AssistantModel assistant = requireByUserId(user.getId());
+    return mapper.toMeSummary(
+        assistant, userService.toMeResponse(user), resolvePendingInvite(assistant));
   }
 
-  @Transactional
-  public AssistantProfileResponseDTO updateProfile(
-      String callerEmail, AssistantProfileUpdateRequestDTO request) {
-    AssistantModel assistant = requireAssistant(callerEmail);
-    assistant.setPhoto(request.photo());
-    assistant = assistantRepository.save(assistant);
-    return mapper.toProfile(assistant, resolvePendingInvite(assistant));
-  }
-
-  private AssistantModel requireAssistant(String callerEmail) {
-    UserModel user =
-        userRepository
-            .findByEmail(callerEmail)
-            .orElseThrow(
-                () ->
-                    new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, message("user.account.not_found")));
-
-    if (user.getType() != UserType.ASSISTANT) {
-      throw new ResponseStatusException(HttpStatus.FORBIDDEN, message("assistant.link.forbidden"));
-    }
-
+  private AssistantModel requireByUserId(Long userId) {
     return assistantRepository
-        .findByUserId(user.getId())
+        .findByUserId(userId)
         .orElseThrow(
             () ->
                 new ResponseStatusException(
