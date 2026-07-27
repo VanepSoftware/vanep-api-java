@@ -10,6 +10,7 @@ import br.com.vanep.dependent.seed.DependentSeeder;
 import br.com.vanep.driver.DriverApprovalStatus;
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
+import br.com.vanep.driverrating.seed.DriverRatingSeeder;
 import br.com.vanep.role.RoleName;
 import br.com.vanep.role.model.RoleModel;
 import br.com.vanep.role.repository.RoleRepository;
@@ -51,6 +52,7 @@ public class DataSeeder implements ApplicationRunner {
   private final StateSeeder stateSeeder;
   private final CitySeeder citySeeder;
   private final AddressSeeder addressSeeder;
+  private final DriverRatingSeeder driverRatingSeeder;
   private final PasswordEncoder passwordEncoder;
 
   @Value("${vanep.seed.enabled:false}")
@@ -79,6 +81,7 @@ public class DataSeeder implements ApplicationRunner {
       StateSeeder stateSeeder,
       CitySeeder citySeeder,
       AddressSeeder addressSeeder,
+      DriverRatingSeeder driverRatingSeeder,
       PasswordEncoder passwordEncoder) {
     this.users = users;
     this.clients = clients;
@@ -90,6 +93,7 @@ public class DataSeeder implements ApplicationRunner {
     this.stateSeeder = stateSeeder;
     this.citySeeder = citySeeder;
     this.addressSeeder = addressSeeder;
+    this.driverRatingSeeder = driverRatingSeeder;
     this.passwordEncoder = passwordEncoder;
   }
 
@@ -111,6 +115,7 @@ public class DataSeeder implements ApplicationRunner {
     stateSeeder.seed();
     citySeeder.seed();
     addressSeeder.seed();
+    driverRatingSeeder.seed();
     if (seedOnly) {
       log.info("Seed-only: data seeded; the application will shut down.");
     }

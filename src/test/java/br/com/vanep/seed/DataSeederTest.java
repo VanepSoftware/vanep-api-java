@@ -18,6 +18,7 @@ import br.com.vanep.dependent.seed.DependentSeeder;
 import br.com.vanep.driver.DriverApprovalStatus;
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
+import br.com.vanep.driverrating.seed.DriverRatingSeeder;
 import br.com.vanep.role.RoleName;
 import br.com.vanep.role.model.RoleModel;
 import br.com.vanep.role.repository.RoleRepository;
@@ -47,11 +48,13 @@ class DataSeederTest {
   @Mock private DriverRepository drivers;
   @Mock private RoleRepository roles;
   @Mock private RolePermissionRepository rolePermissions;
+
   @Mock private DependentSeeder dependentSeeder;
   @Mock private SchoolSeeder schoolSeeder;
   @Mock private StateSeeder stateSeeder;
   @Mock private CitySeeder citySeeder;
   @Mock private AddressSeeder addressSeeder;
+  @Mock private DriverRatingSeeder driverRatingSeeder;
   @Mock private PasswordEncoder passwordEncoder;
 
   private DataSeeder seeder;
@@ -70,6 +73,7 @@ class DataSeederTest {
             stateSeeder,
             citySeeder,
             addressSeeder,
+            driverRatingSeeder,
             passwordEncoder);
     seeder.adminEmail = "admin@vanep.com.br";
     seeder.adminPassword = "password";
