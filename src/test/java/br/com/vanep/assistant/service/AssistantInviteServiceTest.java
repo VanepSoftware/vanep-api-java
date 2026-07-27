@@ -24,6 +24,7 @@ import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.user.UserRepository;
 import br.com.vanep.user.UserType;
 import br.com.vanep.user.model.UserModel;
+import br.com.vanep.user.service.UserService;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Optional;
@@ -44,6 +45,7 @@ class AssistantInviteServiceTest {
   @Mock private AssistantRepository assistantRepository;
   @Mock private DriverRepository driverRepository;
   @Mock private UserRepository userRepository;
+  @Mock private UserService userService;
   @Mock private MailService mail;
   @Mock private AssistantMapper mapper;
   @Mock private MessageSource messages;
@@ -63,10 +65,11 @@ class AssistantInviteServiceTest {
             assistantRepository,
             driverRepository,
             userRepository,
+            userService,
             mail,
             mapper,
             messages,
-            72);
+            72L);
 
     lenient()
         .when(messages.getMessage(any(), any(), any()))

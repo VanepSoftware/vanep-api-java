@@ -1,7 +1,9 @@
 package br.com.vanep.driver.mapper;
 
+import br.com.vanep.driver.dto.DriverMeSummaryResponseDTO;
 import br.com.vanep.driver.dto.DriverResponseDTO;
 import br.com.vanep.driver.model.DriverModel;
+import br.com.vanep.user.dto.UserMeResponseDTO;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -31,5 +33,17 @@ public class DriverMapper {
         driver.isAvailable(),
         driver.getCreatedAt(),
         driver.getUpdatedAt());
+  }
+
+  public DriverMeSummaryResponseDTO toMeSummary(DriverModel driver, UserMeResponseDTO user) {
+    return new DriverMeSummaryResponseDTO(
+        driver.getToken(),
+        driver.getPhoto(),
+        driver.getRating(),
+        driver.getCity(),
+        driver.getApprovalStatus(),
+        driver.isAvailable(),
+        driver.isActive(),
+        user);
   }
 }

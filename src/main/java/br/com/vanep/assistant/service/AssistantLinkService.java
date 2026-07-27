@@ -10,6 +10,7 @@ import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.user.UserRepository;
 import br.com.vanep.user.UserType;
 import br.com.vanep.user.model.UserModel;
+import br.com.vanep.user.service.UserService;
 import java.util.List;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
@@ -24,6 +25,7 @@ public class AssistantLinkService {
   private final AssistantRepository assistantRepository;
   private final DriverRepository driverRepository;
   private final UserRepository userRepository;
+  private final UserService userService;
   private final AssistantMapper mapper;
   private final MessageSource messages;
 
@@ -31,11 +33,13 @@ public class AssistantLinkService {
       AssistantRepository assistantRepository,
       DriverRepository driverRepository,
       UserRepository userRepository,
+      UserService userService,
       AssistantMapper mapper,
       MessageSource messages) {
     this.assistantRepository = assistantRepository;
     this.driverRepository = driverRepository;
     this.userRepository = userRepository;
+    this.userService = userService;
     this.mapper = mapper;
     this.messages = messages;
   }
@@ -87,18 +91,8 @@ public class AssistantLinkService {
   }
 
   @Transactional
-  public void revokeSelf(String callerEmail) {
-    UserModel user =
-        userRepository
-            .findByEmail(callerEmail)
-            .orElseThrow(
-                () ->
-                    new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, message("user.account.not_found")));
-
-    if (user.getType() != UserType.ASSISTANT) {
-      throw new ResponseStatusException(HttpStatus.FORBIDDEN, message("assistant.link.forbidden"));
-    }
+  public void revokeSelf(String callerUid) {
+    UserModel user = userService.requireByTokenAndType(callerUid, UserType.ASSISTANT);
 
     AssistantModel assistant =
         assistantRepository
