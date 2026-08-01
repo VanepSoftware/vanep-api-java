@@ -1,8 +1,8 @@
 ## 0. Preparation
 
-- [ ] 0.1 Create branch `feat/user-profile-edit` from `main`
-- [ ] 0.2 Review artifacts (`proposal.md`, `design.md`, `specs/user-profile-edit/spec.md`)
-- [ ] 0.3 Confirm next Flyway version number (after latest applied migration)
+- [x] 0.1 Create branch `feat/user-profile-edit` from `main`
+- [x] 0.2 Review artifacts (`proposal.md`, `design.md`, `specs/user-profile-edit/spec.md`)
+- [x] 0.3 Confirm next Flyway version number (after latest applied migration)
 
 ## 1. Phase 1 — Schema + JsonNullable (PR 1)
 
@@ -10,11 +10,11 @@
 > Depends on: — | Parallel with: —
 > Order: test (model/repo smoke if any) → migration → model → config
 
-- [ ] 1.1 Add `org.openapitools:jackson-databind-nullable` to `pom.xml` and register `JsonNullableModule` in Jackson config
-- [ ] 1.2 Add Flyway migration: `pending_email varchar(255)`, `last_phone_change_at`, `last_email_change_at` on `users` (no unique on `pending_email`)
-- [ ] 1.3 Map new columns on `UserModel`
-- [ ] 1.4 Add `vanep.profile.change-cooldown-days=${PROFILE_CHANGE_COOLDOWN_DAYS:30}` to `application.properties` / `.env.example`
-- [ ] 1.5 Run `make lint-fix` / `./mvnw spotless:check` and `./mvnw verify`
+- [x] 1.1 Add `org.openapitools:jackson-databind-nullable` to `pom.xml` and register `JsonNullableModule` in Jackson config
+- [x] 1.2 Add Flyway migration: `pending_email varchar(255)`, `last_phone_change_at`, `last_email_change_at` on `users` (no unique on `pending_email`)
+- [x] 1.3 Map new columns on `UserModel`
+- [x] 1.4 Add `vanep.profile.change-cooldown-days=${PROFILE_CHANGE_COOLDOWN_DAYS:30}` to `application.properties` / `.env.example`
+- [x] 1.5 Run `make lint-fix` / `./mvnw spotless:check` and `./mvnw verify`
 - [ ] 1.6 Open PR phase 1 (pt-BR, lint/test status)
 
 ## 2. Phase 2 — Policy + 409 advice (PR 2)

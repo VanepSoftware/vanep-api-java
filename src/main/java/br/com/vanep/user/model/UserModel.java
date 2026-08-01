@@ -51,6 +51,9 @@ public class UserModel {
   @Column(nullable = false, unique = true)
   private String email;
 
+  @Column(name = "pending_email")
+  private String pendingEmail;
+
   @Column(unique = true)
   private String username;
 
@@ -76,6 +79,12 @@ public class UserModel {
 
   @Column(name = "last_name_change_at")
   private Instant lastNameChangeAt;
+
+  @Column(name = "last_phone_change_at")
+  private Instant lastPhoneChangeAt;
+
+  @Column(name = "last_email_change_at")
+  private Instant lastEmailChangeAt;
 
   @Column(name = "last_login_at")
   private Instant lastLoginAt;
