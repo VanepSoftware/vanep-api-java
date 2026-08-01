@@ -15,7 +15,7 @@
 - [x] 1.3 Map new columns on `UserModel`
 - [x] 1.4 Add `vanep.profile.change-cooldown-days=${PROFILE_CHANGE_COOLDOWN_DAYS:30}` to `application.properties` / `.env.example`
 - [x] 1.5 Run `make lint-fix` / `./mvnw spotless:check` and `./mvnw verify`
-- [ ] 1.6 Open PR phase 1 (pt-BR, lint/test status)
+- [x] 1.6 Open PR phase 1 (pt-BR, lint/test status)
 
 ## 2. Phase 2 — Policy + 409 advice (PR 2)
 
