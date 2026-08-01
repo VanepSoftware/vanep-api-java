@@ -1,12 +1,16 @@
 package br.com.vanep.auth.web;
 
 import br.com.vanep.auth.oauth.OAuthAccountService;
+import br.com.vanep.auth.validation.CpfValidator;
 import br.com.vanep.user.AuthProvider;
+import br.com.vanep.user.UserRepository;
 import br.com.vanep.user.model.UserModel;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import java.util.List;
+import org.springframework.context.MessageSource;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -30,12 +34,17 @@ import org.springframework.web.bind.annotation.PostMapping;
 public class SignupController {
 
   private final OAuthAccountService accounts;
+  private final UserRepository users;
+  private final MessageSource messages;
   private final SecurityContextRepository securityContextRepository =
       new HttpSessionSecurityContextRepository();
   private final RequestCache requestCache = new HttpSessionRequestCache();
 
-  public SignupController(OAuthAccountService accounts) {
+  public SignupController(
+      OAuthAccountService accounts, UserRepository users, MessageSource messages) {
     this.accounts = accounts;
+    this.users = users;
+    this.messages = messages;
   }
 
   @GetMapping("/signup/complete")
@@ -63,11 +72,14 @@ public class SignupController {
     if (principal == null) {
       return "redirect:/login";
     }
+    rejectDuplicateDocument(form, bindingResult);
     if (bindingResult.hasErrors()) {
       model.addAttribute("email", principal.getEmail());
       model.addAttribute("name", principal.getFullName());
       return "signup-complete";
     }
+
+    form.setDocument(CpfValidator.normalize(form.getDocument()));
 
     UserModel user =
         accounts.completeRegistration(
@@ -81,6 +93,20 @@ public class SignupController {
 
     SavedRequest saved = requestCache.getRequest(request, response);
     return "redirect:" + (saved != null ? saved.getRedirectUrl() : "/");
+  }
+
+  private void rejectDuplicateDocument(SignupForm form, BindingResult bindingResult) {
+    if (bindingResult.hasFieldErrors("document")) {
+      return;
+    }
+    String document = CpfValidator.normalize(form.getDocument());
+    if (!document.isEmpty() && users.existsByDocument(document)) {
+      bindingResult.rejectValue(
+          "document",
+          "duplicate",
+          messages.getMessage(
+              "auth.signup.document.duplicate", null, LocaleContextHolder.getLocale()));
+    }
   }
 
   private void reauthenticate(

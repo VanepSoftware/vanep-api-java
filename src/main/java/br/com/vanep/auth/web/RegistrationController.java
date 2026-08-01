@@ -1,5 +1,6 @@
 package br.com.vanep.auth.web;
 
+import br.com.vanep.auth.validation.CpfValidator;
 import br.com.vanep.user.UserRepository;
 import jakarta.validation.Valid;
 import org.springframework.context.MessageSource;
@@ -46,6 +47,7 @@ public class RegistrationController {
     if (bindingResult.hasErrors()) {
       return "signup-client";
     }
+    normalizeDocument(form);
     registrationService.registerClient(form);
     return "redirect:/login?registered";
   }
@@ -66,6 +68,7 @@ public class RegistrationController {
     if (bindingResult.hasErrors()) {
       return "signup-driver";
     }
+    normalizeDocument(form);
     registrationService.registerDriver(form);
     return "redirect:/login?registered";
   }
@@ -86,6 +89,7 @@ public class RegistrationController {
     if (bindingResult.hasErrors()) {
       return "signup-assistant";
     }
+    normalizeDocument(form);
     registrationService.registerAssistant(form);
     return "redirect:/login?registered";
   }
@@ -98,12 +102,20 @@ public class RegistrationController {
           messages.getMessage(
               "auth.signup.email.duplicate", null, LocaleContextHolder.getLocale()));
     }
-    if (form.getDocument() != null && users.existsByDocument(form.getDocument())) {
+    if (bindingResult.hasFieldErrors("document")) {
+      return;
+    }
+    String document = CpfValidator.normalize(form.getDocument());
+    if (!document.isEmpty() && users.existsByDocument(document)) {
       bindingResult.rejectValue(
           "document",
           "duplicate",
           messages.getMessage(
               "auth.signup.document.duplicate", null, LocaleContextHolder.getLocale()));
     }
+  }
+
+  private void normalizeDocument(AccountSignupForm form) {
+    form.setDocument(CpfValidator.normalize(form.getDocument()));
   }
 }
