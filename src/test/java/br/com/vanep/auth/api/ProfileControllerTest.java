@@ -161,6 +161,50 @@ class ProfileControllerTest {
   }
 
   @Test
+  void getMeShowsActivePendingEmailAndCooldownHints() throws Exception {
+    UserModel user = users.findByToken(uid).orElseThrow();
+    Instant lastNameChange =
+        Instant.now().truncatedTo(ChronoUnit.SECONDS).minus(5, ChronoUnit.DAYS);
+    user.setPendingEmail("pending-active@vanep.com");
+    user.setLastNameChangeAt(lastNameChange);
+    users.save(user);
+
+    EmailVerificationTokenModel token = new EmailVerificationTokenModel();
+    token.setUserId(user.getId());
+    token.setTokenHash(SecureTokens.hash("open-token-for-me"));
+    token.setExpiresAt(Instant.now().plus(1, ChronoUnit.DAYS));
+    verificationTokens.save(token);
+
+    Instant expectedAvailableAt = lastNameChange.plus(30, ChronoUnit.DAYS);
+
+    mockMvc
+        .perform(get("/api/user/me").with(jwt().jwt(t -> t.claim("uid", uid).subject(EMAIL))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.pendingEmail").value("pending-active@vanep.com"))
+        .andExpect(jsonPath("$.nameChangeAvailableAt").value(expectedAvailableAt.toString()))
+        .andExpect(jsonPath("$.phoneChangeAvailableAt").doesNotExist())
+        .andExpect(jsonPath("$.emailChangeAvailableAt").doesNotExist());
+  }
+
+  @Test
+  void getMeHidesGhostPendingWhenTokenExpired() throws Exception {
+    UserModel user = users.findByToken(uid).orElseThrow();
+    user.setPendingEmail("ghost@vanep.com");
+    users.save(user);
+
+    EmailVerificationTokenModel token = new EmailVerificationTokenModel();
+    token.setUserId(user.getId());
+    token.setTokenHash(SecureTokens.hash("expired-token-for-me"));
+    token.setExpiresAt(Instant.now().minus(1, ChronoUnit.HOURS));
+    verificationTokens.save(token);
+
+    mockMvc
+        .perform(get("/api/user/me").with(jwt().jwt(t -> t.claim("uid", uid).subject(EMAIL))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.pendingEmail").doesNotExist());
+  }
+
+  @Test
   void emailChangeRequiresAuthentication() throws Exception {
     mockMvc
         .perform(

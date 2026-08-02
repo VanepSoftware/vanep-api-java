@@ -169,7 +169,18 @@ class ClientServiceTest {
     UserModel user = client.getUser();
     var userMe =
         new br.com.vanep.user.dto.UserMeResponseDTO(
-            "owner-uid", "Test User", null, "test@vanep.com", "12345678901", null, null, "CLIENT");
+            "owner-uid",
+            "Test User",
+            null,
+            "test@vanep.com",
+            "12345678901",
+            null,
+            null,
+            "CLIENT",
+            null,
+            null,
+            null,
+            null);
     var summary =
         new br.com.vanep.client.dto.ClientMeSummaryResponseDTO(
             "client-tok", null, null, true, userMe);

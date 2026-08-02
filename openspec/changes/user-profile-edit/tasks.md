@@ -70,9 +70,9 @@
 > Depends on: Phases 3 and 4 | Parallel with: —
 > Order: test → DTO → mapper/service → controller assertions
 
-- [ ] 5.1 Extend `UserMeResponseDTO` with `pendingEmail`, `nameChangeAvailableAt`, `phoneChangeAvailableAt`, `emailChangeAvailableAt`
-- [ ] 5.2 Implement `activePendingEmail` / `resolvePendingEmailForMe` (coluna + token aberto não expirado); document that **only** GET `/me` uses it
-- [ ] 5.3 Update `UserService.toMeResponse` / `getMe` to use the helper + compute available-at from last_* + cooldown config
-- [ ] 5.4 Unit + MockMvc tests: active pending shown; ghost pending (expired/no open token) → `pendingEmail` null; cooldown hints
-- [ ] 5.5 Update README snippet for `/api/user/me` if it documents the response shape
-- [ ] 5.6 `make lint` + `./mvnw verify`; open PR phase 5
+- [x] 5.1 Extend `UserMeResponseDTO` with `pendingEmail`, `nameChangeAvailableAt`, `phoneChangeAvailableAt`, `emailChangeAvailableAt`
+- [x] 5.2 Implement `activePendingEmail` / `resolvePendingEmailForMe` (coluna + token aberto não expirado); document that **only** GET `/me` uses it
+- [x] 5.3 Update `UserService.toMeResponse` / `getMe` to use the helper + compute available-at from last_* + cooldown config
+- [x] 5.4 Unit + MockMvc tests: active pending shown; ghost pending (expired/no open token) → `pendingEmail` null; cooldown hints
+- [x] 5.5 Update README snippet for `/api/user/me` if it documents the response shape
+- [x] 5.6 `make lint` + `./mvnw verify`; open PR phase 5

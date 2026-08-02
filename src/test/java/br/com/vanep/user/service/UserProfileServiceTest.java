@@ -63,7 +63,11 @@ class UserProfileServiceTest {
                   u.getDocument(),
                   u.getBirthDate(),
                   u.getGender(),
-                  u.getType().name());
+                  u.getType().name(),
+                  null,
+                  null,
+                  null,
+                  null);
             });
   }
 

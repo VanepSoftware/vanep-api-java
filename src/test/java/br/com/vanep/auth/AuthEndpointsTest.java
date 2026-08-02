@@ -102,7 +102,11 @@ class AuthEndpointsTest {
         .andExpect(jsonPath("$.document").value("12345678901"))
         .andExpect(jsonPath("$.birthDate").value("1990-05-15"))
         .andExpect(jsonPath("$.gender").value("FEMALE"))
-        .andExpect(jsonPath("$.token").value(saved.getToken()));
+        .andExpect(jsonPath("$.token").value(saved.getToken()))
+        .andExpect(jsonPath("$.pendingEmail").doesNotExist())
+        .andExpect(jsonPath("$.nameChangeAvailableAt").doesNotExist())
+        .andExpect(jsonPath("$.phoneChangeAvailableAt").doesNotExist())
+        .andExpect(jsonPath("$.emailChangeAvailableAt").doesNotExist());
   }
 
   @Test
