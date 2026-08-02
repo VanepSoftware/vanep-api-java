@@ -15,6 +15,8 @@ import br.com.vanep.user.UserType;
 import br.com.vanep.user.dto.UserEmailChangeRequestDTO;
 import br.com.vanep.user.dto.UserMeResponseDTO;
 import br.com.vanep.user.dto.UserProfileUpdateRequestDTO;
+import br.com.vanep.user.enums.ProfileErrorCode;
+import br.com.vanep.user.exception.ProfileBadRequestException;
 import br.com.vanep.user.exception.ProfileCooldownException;
 import br.com.vanep.user.exception.ProfileEmailDuplicateException;
 import br.com.vanep.user.model.UserModel;
@@ -31,7 +33,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.openapitools.jackson.nullable.JsonNullable;
 import org.springframework.context.MessageSource;
 import org.springframework.http.HttpStatus;
-import org.springframework.web.server.ResponseStatusException;
 
 @ExtendWith(MockitoExtension.class)
 class UserProfileServiceTest {
@@ -101,12 +102,13 @@ class UserProfileServiceTest {
             JsonNullable.of(null), JsonNullable.undefined(), JsonNullable.undefined());
 
     assertThatThrownBy(() -> service.patchMe("uid-1", request))
-        .isInstanceOf(ResponseStatusException.class)
+        .isInstanceOf(ProfileBadRequestException.class)
         .satisfies(
             ex -> {
-              ResponseStatusException rse = (ResponseStatusException) ex;
-              assertThat(rse.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-              assertThat(rse.getReason()).isEqualTo("user.profile.field.null");
+              ProfileBadRequestException error = (ProfileBadRequestException) ex;
+              assertThat(error.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+              assertThat(error.getCode()).isEqualTo(ProfileErrorCode.FIELD_NULL);
+              assertThat(error.getField()).isEqualTo("name");
             });
     verify(users, never()).save(any());
   }
@@ -121,12 +123,13 @@ class UserProfileServiceTest {
             JsonNullable.undefined(), JsonNullable.of(null), JsonNullable.undefined());
 
     assertThatThrownBy(() -> service.patchMe("uid-1", request))
-        .isInstanceOf(ResponseStatusException.class)
+        .isInstanceOf(ProfileBadRequestException.class)
         .satisfies(
             ex -> {
-              ResponseStatusException rse = (ResponseStatusException) ex;
-              assertThat(rse.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-              assertThat(rse.getReason()).isEqualTo("user.profile.field.null");
+              ProfileBadRequestException error = (ProfileBadRequestException) ex;
+              assertThat(error.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+              assertThat(error.getCode()).isEqualTo(ProfileErrorCode.FIELD_NULL);
+              assertThat(error.getField()).isEqualTo("phone");
             });
   }
 
@@ -140,12 +143,13 @@ class UserProfileServiceTest {
             JsonNullable.undefined(), JsonNullable.undefined(), JsonNullable.of(null));
 
     assertThatThrownBy(() -> service.patchMe("uid-1", request))
-        .isInstanceOf(ResponseStatusException.class)
+        .isInstanceOf(ProfileBadRequestException.class)
         .satisfies(
             ex -> {
-              ResponseStatusException rse = (ResponseStatusException) ex;
-              assertThat(rse.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-              assertThat(rse.getReason()).isEqualTo("user.profile.field.null");
+              ProfileBadRequestException error = (ProfileBadRequestException) ex;
+              assertThat(error.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+              assertThat(error.getCode()).isEqualTo(ProfileErrorCode.FIELD_NULL);
+              assertThat(error.getField()).isEqualTo("gender");
             });
   }
 
@@ -159,12 +163,13 @@ class UserProfileServiceTest {
             JsonNullable.undefined(), JsonNullable.of(""), JsonNullable.undefined());
 
     assertThatThrownBy(() -> service.patchMe("uid-1", request))
-        .isInstanceOf(ResponseStatusException.class)
+        .isInstanceOf(ProfileBadRequestException.class)
         .satisfies(
             ex -> {
-              ResponseStatusException rse = (ResponseStatusException) ex;
-              assertThat(rse.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-              assertThat(rse.getReason()).isEqualTo("user.profile.phone.blank");
+              ProfileBadRequestException error = (ProfileBadRequestException) ex;
+              assertThat(error.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+              assertThat(error.getCode()).isEqualTo(ProfileErrorCode.PHONE_BLANK);
+              assertThat(error.getField()).isEqualTo("phone");
             });
     assertThat(user.getPhone()).isEqualTo("11999999999");
     verify(users, never()).save(any());
@@ -186,7 +191,7 @@ class UserProfileServiceTest {
         .satisfies(
             ex -> {
               ProfileCooldownException pce = (ProfileCooldownException) ex;
-              assertThat(pce.getCode()).isEqualTo("cooldown");
+              assertThat(pce.getCode()).isEqualTo(ProfileErrorCode.COOLDOWN);
               assertThat(pce.getField()).isEqualTo("name");
               assertThat(pce.getRetryAfter()).isEqualTo(lastChange.plus(30, ChronoUnit.DAYS));
               assertThat(pce.getMessage()).isEqualTo("user.profile.name.cooldown");
@@ -310,7 +315,7 @@ class UserProfileServiceTest {
         .satisfies(
             ex -> {
               ProfileEmailDuplicateException pe = (ProfileEmailDuplicateException) ex;
-              assertThat(pe.getCode()).isEqualTo("email_duplicate");
+              assertThat(pe.getCode()).isEqualTo(ProfileErrorCode.EMAIL_DUPLICATE);
               assertThat(pe.getField()).isEqualTo("email");
               assertThat(pe.getRetryAfter()).isNull();
               assertThat(pe.getMessage()).isEqualTo("auth.signup.email.duplicate");
@@ -328,12 +333,13 @@ class UserProfileServiceTest {
             () ->
                 service.requestEmailChange(
                     "uid-1", new UserEmailChangeRequestDTO("test@vanep.com")))
-        .isInstanceOf(ResponseStatusException.class)
+        .isInstanceOf(ProfileBadRequestException.class)
         .satisfies(
             ex -> {
-              ResponseStatusException rse = (ResponseStatusException) ex;
-              assertThat(rse.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-              assertThat(rse.getReason()).isEqualTo("user.profile.email.same");
+              ProfileBadRequestException error = (ProfileBadRequestException) ex;
+              assertThat(error.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+              assertThat(error.getCode()).isEqualTo(ProfileErrorCode.EMAIL_SAME);
+              assertThat(error.getField()).isEqualTo("email");
             });
     verify(users, never()).existsByEmail(any());
     verify(emailVerification, never()).startVerification(any());
@@ -354,7 +360,7 @@ class UserProfileServiceTest {
         .satisfies(
             ex -> {
               ProfileCooldownException pce = (ProfileCooldownException) ex;
-              assertThat(pce.getCode()).isEqualTo("cooldown");
+              assertThat(pce.getCode()).isEqualTo(ProfileErrorCode.COOLDOWN);
               assertThat(pce.getField()).isEqualTo("email");
               assertThat(pce.getRetryAfter()).isEqualTo(lastChange.plus(30, ChronoUnit.DAYS));
               assertThat(pce.getMessage()).isEqualTo("user.profile.email.cooldown");

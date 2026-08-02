@@ -6,6 +6,7 @@ import br.com.vanep.user.UserRepository;
 import br.com.vanep.user.dto.UserEmailChangeRequestDTO;
 import br.com.vanep.user.dto.UserMeResponseDTO;
 import br.com.vanep.user.dto.UserProfileUpdateRequestDTO;
+import br.com.vanep.user.exception.ProfileBadRequestException;
 import br.com.vanep.user.exception.ProfileCooldownException;
 import br.com.vanep.user.exception.ProfileEmailDuplicateException;
 import br.com.vanep.user.model.UserModel;
@@ -15,10 +16,8 @@ import java.util.Objects;
 import org.openapitools.jackson.nullable.JsonNullable;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class UserProfileService {
@@ -67,7 +66,7 @@ public class UserProfileService {
     String newEmail = request.email();
 
     if (Objects.equals(newEmail, user.getEmail())) {
-      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, message("user.profile.email.same"));
+      throw ProfileBadRequestException.emailSame(message("user.profile.email.same"));
     }
     if (users.existsByEmail(newEmail)) {
       throw new ProfileEmailDuplicateException(message("auth.signup.email.duplicate"));
@@ -86,7 +85,7 @@ public class UserProfileService {
       return false;
     }
     String name = nameField.get();
-    rejectIfNull(name);
+    rejectIfNull(name, "name");
     if (Objects.equals(name, user.getName())) {
       return false;
     }
@@ -101,10 +100,9 @@ public class UserProfileService {
       return false;
     }
     String phone = phoneField.get();
-    rejectIfNull(phone);
+    rejectIfNull(phone, "phone");
     if (phone.isBlank()) {
-      throw new ResponseStatusException(
-          HttpStatus.BAD_REQUEST, message("user.profile.phone.blank"));
+      throw ProfileBadRequestException.phoneBlank(message("user.profile.phone.blank"));
     }
     if (Objects.equals(phone, user.getPhone())) {
       return false;
@@ -120,7 +118,7 @@ public class UserProfileService {
       return false;
     }
     Gender gender = genderField.get();
-    rejectIfNull(gender);
+    rejectIfNull(gender, "gender");
     if (Objects.equals(gender, user.getGender())) {
       return false;
     }
@@ -128,9 +126,9 @@ public class UserProfileService {
     return true;
   }
 
-  void rejectIfNull(Object value) {
+  void rejectIfNull(Object value, String field) {
     if (value == null) {
-      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, message("user.profile.field.null"));
+      throw ProfileBadRequestException.fieldNull(message("user.profile.field.null"), field);
     }
   }
 

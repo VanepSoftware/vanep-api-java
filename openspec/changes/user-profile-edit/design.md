@@ -13,7 +13,7 @@ Stakeholders: app Flutter (tela de perfil), API Vanep. Constraints: constituiç�
 - Permitir edição autenticada de `name`, `phone`, `gender` via `PATCH /api/user/me`.
 - Permitir troca de e-mail via `POST /api/user/me/email-change` + confirmação no fluxo de verify existente (E2: `pending_email`).
 - Enforçar cooldown de 30 dias (configurável) em name/phone/email, contado na mudança efetiva.
-- Expor `409` com **um body JSON único** da feature (`code`, `message`, `field`, `retryAfter` opcional) para cooldown e e-mail duplicado.
+- Expor erros de perfil com **um body JSON único** (`code`, `message`, `field`, `retryAfter` opcional) para cooldown/duplicata (**409**) e validação (**400**); `code` em lowercase snake_case.
 - Manter `document` e `birthDate` imutáveis; password/username fora.
 
 **Non-Goals:**
@@ -135,11 +135,11 @@ Problema: token não carrega o e-mail alvo. Sequência A→B sem invalidar deixa
 
 Binding token↔email pretendido = follow-up estrutural; invalidação é mitigação suficiente nesta change.
 
-### D5 — 409 estruturado (contrato único da feature)
+### D5 — Envelope estruturado de erro (contrato único 400 + 409)
 
-Hoje o projeto usa `ResponseStatusException` (só `reason` string). Na feature de perfil, **todos** os `409` de API usam o mesmo envelope — o Flutter **não** distingue causas pela ausência de campos.
+Hoje o projeto usa `ResponseStatusException` (só `reason` string). Na feature de perfil, **todos** os erros de API do fluxo (409 e 400) usam o **mesmo envelope** — o Flutter discrimina por `code` (lowercase snake_case), nunca pela ausência de campos nem pela string `message` como SoT de UI (ARB local).
 
-DTO de resposta (nome sugerido: `ProfileConflictResponseDTO`):
+DTO: `ProfileErrorResponseDTO`:
 
 ```json
 {
@@ -150,22 +150,28 @@ DTO de resposta (nome sugerido: `ProfileConflictResponseDTO`):
 }
 ```
 
-| `code` | Quando | `field` | `retryAfter` |
-|--------|--------|---------|--------------|
-| `cooldown` | mudança bloqueada pelo cooldown | `name` \| `phone` \| `email` | ISO-8601 obrigatório |
-| `email_duplicate` | e-mail já é `users.email` de outra conta (POST email-change ou confirm via API) | `email` | omitido ou `null` |
+| HTTP | `code` | Quando | `field` | `retryAfter` |
+|------|--------|--------|---------|--------------|
+| 409 | `cooldown` | mudança bloqueada pelo cooldown | `name` \| `phone` \| `email` | ISO-8601 obrigatório |
+| 409 | `email_duplicate` | e-mail já é `users.email` de outra conta | `email` | omitido ou `null` |
+| 400 | `field_null` | null explícito no PATCH | name/phone/gender | omitido |
+| 400 | `phone_blank` | phone `""` | `phone` | omitido |
+| 400 | `email_same` | novo e-mail == atual | `email` | omitido |
+| 400 | `email_invalid` | formato inválido | `email` | omitido |
+| 400 | `email_required` | e-mail ausente/blank no POST | `email` | omitido |
 
-- Exceções tipadas (ex.: `ProfileCooldownException`, `ProfileEmailDuplicateException`) ou uma `ProfileConflictException(code, field, retryAfter, message)`.
-- `@RestControllerAdvice` **decidido** (não opcional) mapeia essas exceções → HTTP 409 + DTO acima.
-- Mensagem de duplicata continua resolvida por `auth.signup.email.duplicate` (copy genérico); só o **envelope HTTP** muda vs signup Thymeleaf.
-- Fluxo **web** `/verify-email` (redirect/template): não precisa do JSON; trata duplicata no confirm com erro explícito na UI (query/flash) — ver risco na tabela.
+- Enum Java `ProfileErrorCode` com `value()` em snake_case minúsculo (convenção fechada — sem SCREAMING_SNAKE no JSON).
+- Base `ProfileErrorException` + 409 (`ProfileCooldownException`, `ProfileEmailDuplicateException`) + 400 (`ProfileBadRequestException` factories).
+- `@RestControllerAdvice` (`ProfileErrorAdvice`) mapeia `ProfileErrorException` → status da exceção + DTO acima.
+- Mensagem de duplicata continua resolvida por `auth.signup.email.duplicate`; envelope = este contrato.
+- Fluxo **web** `/verify-email`: não precisa do JSON; trata duplicata no confirm com erro explícito na UI.
 
-**Alternativa rejeitada (A):** dois shapes de 409 no mesmo endpoint (cooldown estruturado vs `ResponseStatusException` string) — frágil para o Flutter.
+**Alternativa rejeitada (A):** dois shapes no mesmo endpoint, ou 400 sem `code` / 409 com `code` — frágil para o Flutter e impede ARB via `code`.
 
 ### D6 — Pacotes e camadas
 
 - HTTP: estender `ProfileController` (`br.com.vanep.auth.api`) — já é `/api/user`.
-- Domínio: `br.com.vanep.user` — `UserProfileUpdateRequestDTO`, `UserEmailChangeRequestDTO`, `ProfileConflictResponseDTO`, `UserProfileChangePolicy`, `UserProfileService` (+ `UserService` para require/getMe).
+- Domínio: `br.com.vanep.user` — `UserProfileUpdateRequestDTO`, `UserEmailChangeRequestDTO`, `ProfileErrorResponseDTO`, `ProfileErrorCode`, `UserProfileChangePolicy`, `UserProfileService` (+ `UserService` para require/getMe).
 - Verify: estender `EmailVerificationService` + `EmailVerificationTokenRepository`; ajustar `EmailVerificationController` / template web para erro de duplicata no confirm.
 - Mensagens: keys novas + reuso `auth.signup.email.duplicate` (message only; envelope = D5).
 
@@ -201,7 +207,7 @@ Não há operação de limpar phone.
                     ┌───────────▼─────────────┐
                     │ 2 Policy + Exceptions   │
                     │   + MessageSource keys  │
-                    │   + Advice 409          │
+                    │   + Error advice        │
                     └───────────┬─────────────┘
                                 │
               ┌─────────────────┴─────────────────┐
@@ -223,7 +229,7 @@ Não há operação de limpar phone.
 | Phase | Contents | Depends on | Parallel with |
 |-------|----------|------------|---------------|
 | 1 | Flyway (`pending_email`, `last_phone_change_at`, `last_email_change_at`); mapear em `UserModel`; dep `jackson-databind-nullable` + module; property cooldown | — | — |
-| 2 | `UserProfileChangePolicy`; exceções de conflito + advice + `ProfileConflictResponseDTO` (`code`, `message`, `field`, `retryAfter?`); MessageSource keys + testes | 1 | — |
+| 2 | `UserProfileChangePolicy`; `ProfileErrorCode` + exceções 409/400 + `ProfileErrorAdvice` + `ProfileErrorResponseDTO`; MessageSource keys + testes | 1 | — |
 | 3 | `UserProfileUpdateRequestDTO`; `UserProfileService.patchMe`; `PATCH /api/user/me`; testes unit + MockMvc | 2 | 4 |
 | 4 | `UserEmailChangeRequestDTO`; `POST .../email-change`; invalidate open tokens; evolve verify (mail → pending; confirm promove); testes incl. A→B + link antigo morto | 2 | 3 |
 | 5 | Estender `UserMeResponseDTO` + `activePendingEmail` no GET + `*ChangeAvailableAt`; testes (pending fantasma / token expirado → null) | 3, 4 | — |
@@ -262,7 +268,7 @@ Ordem canônica por fase (constituição 41): test → migration (só fase 1) �
 
 1. **Cancelar pending** — sem `DELETE`; POST substitui; após TTL o GET mascara (D9).
 2. **Duplicata de e-mail** — API `409` com envelope D5 (`code=email_duplicate`) + message key `auth.signup.email.duplicate`; web verify com erro explícito (não silencioso).
-3. **Contrato 409** — um shape só (`code` discrimina cooldown vs duplicate); rejeitado dois formatos no mesmo endpoint.
+3. **Contrato de erro** — um shape só para 400 e 409 (`code` lowercase snake_case discrimina); rejeitado dois formatos / 400 sem code.
 4. **Pending no GET** — só via `activePendingEmail` (coluna + token vivo); helper **somente** no GET (D9).
 5. **Tokens anteriores** — invalidação obrigatória na Fase 4 (D10), não follow-up.
 6. **Issue GitHub** — linkar no PR quando existir (`Closes #N`).
