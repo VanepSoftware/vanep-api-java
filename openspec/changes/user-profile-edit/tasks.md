@@ -23,13 +23,13 @@
 > Depends on: Phase 1 | Parallel with: —
 > Order: test → policy → exception/advice → messages
 
-- [ ] 2.1 Unit tests for `UserProfileChangePolicy` (within window → retryAfter; elapsed → allow; null last → allow)
-- [ ] 2.2 Implement `UserProfileChangePolicy` reading cooldown days from config (no servlet/JPA)
-- [ ] 2.3 Add `ProfileConflictResponseDTO` (`message`, `code`, `field`, `retryAfter` nullable) + typed conflict exceptions (`cooldown` / `email_duplicate`)
-- [ ] 2.4 Add `@RestControllerAdvice` mapping those exceptions → HTTP 409 with the shared DTO (decidido — não opcional)
-- [ ] 2.5 Add MessageSource keys (EN + `messages_pt_BR.properties`): cooldown per field, `user.profile.phone.blank`, `user.profile.email.same`, `user.profile.field.null` (or equivalent); reuse `auth.signup.email.duplicate` for duplicate **message** text
-- [ ] 2.6 Slice/unit tests: cooldown 409 has `code=cooldown` + ISO `retryAfter`; duplicate 409 has `code=email_duplicate` and null/omitted `retryAfter` (same shape)
-- [ ] 2.7 `make lint` + `./mvnw verify`; open PR phase 2
+- [x] 2.1 Unit tests for `UserProfileChangePolicy` (within window → retryAfter; elapsed → allow; null last → allow)
+- [x] 2.2 Implement `UserProfileChangePolicy` reading cooldown days from config (no servlet/JPA)
+- [x] 2.3 Add `ProfileConflictResponseDTO` (`message`, `code`, `field`, `retryAfter` nullable) + typed conflict exceptions (`cooldown` / `email_duplicate`)
+- [x] 2.4 Add `@RestControllerAdvice` mapping those exceptions → HTTP 409 with the shared DTO (decidido — não opcional)
+- [x] 2.5 Add MessageSource keys (EN + `messages_pt_BR.properties`): cooldown per field, `user.profile.phone.blank`, `user.profile.email.same`, `user.profile.field.null` (or equivalent); reuse `auth.signup.email.duplicate` for duplicate **message** text
+- [x] 2.6 Slice/unit tests: cooldown 409 has `code=cooldown` + ISO `retryAfter`; duplicate 409 has `code=email_duplicate` and null/omitted `retryAfter` (same shape)
+- [x] 2.7 `make lint` + `./mvnw verify`; open PR phase 2
 
 ## 3. Phase 3 — PATCH /api/user/me (PR 3)
 
