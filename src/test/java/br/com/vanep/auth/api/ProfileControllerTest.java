@@ -127,7 +127,11 @@ class ProfileControllerTest {
                 .with(jwt().jwt(token -> token.claim("uid", uid).subject(EMAIL)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"phone\":\"\"}"))
-        .andExpect(status().isBadRequest());
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("phone_blank"))
+        .andExpect(jsonPath("$.field").value("phone"))
+        .andExpect(jsonPath("$.message").value(notNullValue()))
+        .andExpect(jsonPath("$.retryAfter").doesNotExist());
 
     UserModel reloaded = users.findByToken(uid).orElseThrow();
     assertThat(reloaded.getPhone()).isEqualTo("11999999999");
@@ -227,7 +231,39 @@ class ProfileControllerTest {
                 .with(jwt().jwt(token -> token.claim("uid", uid).subject(EMAIL)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"email\":\"" + EMAIL + "\"}"))
-        .andExpect(status().isBadRequest());
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("email_same"))
+        .andExpect(jsonPath("$.field").value("email"))
+        .andExpect(jsonPath("$.message").value(notNullValue()))
+        .andExpect(jsonPath("$.retryAfter").doesNotExist());
+  }
+
+  @Test
+  void emailChangeBlankReturns400StructuredBody() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/user/me/email-change")
+                .with(jwt().jwt(token -> token.claim("uid", uid).subject(EMAIL)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"email\":\"\"}"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("email_required"))
+        .andExpect(jsonPath("$.field").value("email"))
+        .andExpect(jsonPath("$.retryAfter").doesNotExist());
+  }
+
+  @Test
+  void emailChangeInvalidReturns400StructuredBody() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/user/me/email-change")
+                .with(jwt().jwt(token -> token.claim("uid", uid).subject(EMAIL)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"email\":\"not-an-email\"}"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("email_invalid"))
+        .andExpect(jsonPath("$.field").value("email"))
+        .andExpect(jsonPath("$.retryAfter").doesNotExist());
   }
 
   @Test

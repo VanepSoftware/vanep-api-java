@@ -1,11 +1,13 @@
 package br.com.vanep.user.exception;
 
-public class ProfileEmailDuplicateException extends ProfileConflictException {
+import br.com.vanep.user.enums.ProfileErrorCode;
+import org.springframework.http.HttpStatus;
 
-  public static final String CODE = "email_duplicate";
+public class ProfileEmailDuplicateException extends ProfileErrorException {
+
   public static final String FIELD = "email";
 
   public ProfileEmailDuplicateException(String message) {
-    super(message, CODE, FIELD, null);
+    super(message, HttpStatus.CONFLICT, ProfileErrorCode.EMAIL_DUPLICATE, FIELD, null);
   }
 }
