@@ -18,6 +18,7 @@ import br.com.vanep.dependent.seed.DependentSeeder;
 import br.com.vanep.driver.DriverApprovalStatus;
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
+import br.com.vanep.drivercnh.seed.DriverCnhSeeder;
 import br.com.vanep.role.RoleName;
 import br.com.vanep.role.model.RoleModel;
 import br.com.vanep.role.repository.RoleRepository;
@@ -48,6 +49,7 @@ class DataSeederTest {
   @Mock private RoleRepository roles;
   @Mock private RolePermissionRepository rolePermissions;
   @Mock private DependentSeeder dependentSeeder;
+  @Mock private DriverCnhSeeder driverCnhSeeder;
   @Mock private SchoolSeeder schoolSeeder;
   @Mock private StateSeeder stateSeeder;
   @Mock private CitySeeder citySeeder;
@@ -66,6 +68,7 @@ class DataSeederTest {
             roles,
             rolePermissions,
             dependentSeeder,
+            driverCnhSeeder,
             schoolSeeder,
             stateSeeder,
             citySeeder,

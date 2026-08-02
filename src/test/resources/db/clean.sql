@@ -10,6 +10,7 @@ delete from assistant;
 delete from dependent;
 delete from client;
 delete from vehicle;
+delete from driver_cnh;
 delete from driver;
 delete from users;
 delete from roles;

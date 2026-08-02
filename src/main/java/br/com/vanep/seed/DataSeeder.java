@@ -10,6 +10,7 @@ import br.com.vanep.dependent.seed.DependentSeeder;
 import br.com.vanep.driver.DriverApprovalStatus;
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
+import br.com.vanep.drivercnh.seed.DriverCnhSeeder;
 import br.com.vanep.role.RoleName;
 import br.com.vanep.role.model.RoleModel;
 import br.com.vanep.role.repository.RoleRepository;
@@ -47,6 +48,7 @@ public class DataSeeder implements ApplicationRunner {
   private final RoleRepository roles;
   private final RolePermissionRepository rolePermissions;
   private final DependentSeeder dependentSeeder;
+  private final DriverCnhSeeder driverCnhSeeder;
   private final SchoolSeeder schoolSeeder;
   private final StateSeeder stateSeeder;
   private final CitySeeder citySeeder;
@@ -75,6 +77,7 @@ public class DataSeeder implements ApplicationRunner {
       RoleRepository roles,
       RolePermissionRepository rolePermissions,
       DependentSeeder dependentSeeder,
+      DriverCnhSeeder driverCnhSeeder,
       SchoolSeeder schoolSeeder,
       StateSeeder stateSeeder,
       CitySeeder citySeeder,
@@ -86,6 +89,7 @@ public class DataSeeder implements ApplicationRunner {
     this.roles = roles;
     this.rolePermissions = rolePermissions;
     this.dependentSeeder = dependentSeeder;
+    this.driverCnhSeeder = driverCnhSeeder;
     this.schoolSeeder = schoolSeeder;
     this.stateSeeder = stateSeeder;
     this.citySeeder = citySeeder;
@@ -107,6 +111,7 @@ public class DataSeeder implements ApplicationRunner {
     seedClients();
     seedDrivers();
     dependentSeeder.seed();
+    driverCnhSeeder.seed();
     schoolSeeder.seed();
     stateSeeder.seed();
     citySeeder.seed();
