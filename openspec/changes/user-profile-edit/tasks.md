@@ -51,18 +51,18 @@
 > Depends on: Phase 2 | Parallel with: Phase 3
 > Order: test → DTO → service → verification evolve → controller
 
-- [ ] 4.1 Unit tests: start email-change sets pending, does not touch `email`/`last_email_change_at`; duplicate primary → 409 body `code=email_duplicate` + key `auth.signup.email.duplicate`; same email → 400; cooldown on last_email → 409 `code=cooldown`; replace pending **without** “already in progress” block
-- [ ] 4.2 Unit tests: issuing a new challenge consumes all prior open tokens; submitting old token_A after replace to B fails; token_B confirms B
-- [ ] 4.3 Unit tests: verify with pending promotes email + sets `last_email_change_at` + clears pending; race/duplicate on confirm; classic verify without pending unchanged
-- [ ] 4.4 Create `UserEmailChangeRequestDTO` (`@Email`, `@NotBlank`)
-- [ ] 4.5 Add repository method to consume open tokens by `user_id` (`consumed_at IS NULL`)
-- [ ] 4.6 Evolve `EmailVerificationService.startVerification`: invalidate open tokens, then create new token; send link to `pending_email` when set
-- [ ] 4.7 Implement `requestEmailChange` in `UserProfileService` (early `existsByEmail`, cooldown check, set pending, call verification — **does not** use `activePendingEmail` to reject)
-- [ ] 4.8 Evolve `verify`: promote pending with unique handling (by token hash only)
-- [ ] 4.9 Add `POST /api/user/me/email-change` on `ProfileController`
-- [ ] 4.10 Adjust web verify error path for duplicate-on-confirm (query/flash) so deep links are not silent failures
-- [ ] 4.11 MockMvc / integration tests for POST + verify + A→B old-link scenarios
-- [ ] 4.12 `make lint` + `./mvnw verify`; open PR phase 4
+- [x] 4.1 Unit tests: start email-change sets pending, does not touch `email`/`last_email_change_at`; duplicate primary → 409 body `code=email_duplicate` + key `auth.signup.email.duplicate`; same email → 400; cooldown on last_email → 409 `code=cooldown`; replace pending **without** “already in progress” block
+- [x] 4.2 Unit tests: issuing a new challenge consumes all prior open tokens; submitting old token_A after replace to B fails; token_B confirms B
+- [x] 4.3 Unit tests: verify with pending promotes email + sets `last_email_change_at` + clears pending; race/duplicate on confirm; classic verify without pending unchanged
+- [x] 4.4 Create `UserEmailChangeRequestDTO` (`@Email`, `@NotBlank`)
+- [x] 4.5 Add repository method to consume open tokens by `user_id` (`consumed_at IS NULL`)
+- [x] 4.6 Evolve `EmailVerificationService.startVerification`: invalidate open tokens, then create new token; send link to `pending_email` when set
+- [x] 4.7 Implement `requestEmailChange` in `UserProfileService` (early `existsByEmail`, cooldown check, set pending, call verification — **does not** use `activePendingEmail` to reject)
+- [x] 4.8 Evolve `verify`: promote pending with unique handling (by token hash only)
+- [x] 4.9 Add `POST /api/user/me/email-change` on `ProfileController`
+- [x] 4.10 Adjust web verify error path for duplicate-on-confirm (query/flash) so deep links are not silent failures
+- [x] 4.11 MockMvc / integration tests for POST + verify + A→B old-link scenarios
+- [x] 4.12 `make lint` + `./mvnw verify`; open PR phase 4
 
 ## 5. Phase 5 — Enrich GET /me (PR 5)
 
