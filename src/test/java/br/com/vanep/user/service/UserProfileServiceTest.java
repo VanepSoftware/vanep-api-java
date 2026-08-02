@@ -1,0 +1,285 @@
+package br.com.vanep.user.service;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import br.com.vanep.user.Gender;
+import br.com.vanep.user.UserRepository;
+import br.com.vanep.user.UserType;
+import br.com.vanep.user.dto.UserMeResponseDTO;
+import br.com.vanep.user.dto.UserProfileUpdateRequestDTO;
+import br.com.vanep.user.exception.ProfileCooldownException;
+import br.com.vanep.user.model.UserModel;
+import br.com.vanep.user.policy.UserProfileChangePolicy;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.openapitools.jackson.nullable.JsonNullable;
+import org.springframework.context.MessageSource;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
+
+@ExtendWith(MockitoExtension.class)
+class UserProfileServiceTest {
+
+  @Mock private UserService userService;
+  @Mock private UserRepository users;
+  @Mock private MessageSource messages;
+
+  private UserProfileChangePolicy policy;
+  private UserProfileService service;
+
+  @BeforeEach
+  void setUp() {
+    policy = new UserProfileChangePolicy(30);
+    service = new UserProfileService(userService, users, policy, messages);
+    lenient().when(messages.getMessage(any(), any(), any())).thenAnswer(inv -> inv.getArgument(0));
+    lenient().when(users.save(any(UserModel.class))).thenAnswer(inv -> inv.getArgument(0));
+    lenient()
+        .when(userService.toMeResponse(any(UserModel.class)))
+        .thenAnswer(
+            inv -> {
+              UserModel u = inv.getArgument(0);
+              return new UserMeResponseDTO(
+                  u.getToken(),
+                  u.getName(),
+                  u.getPhone(),
+                  u.getEmail(),
+                  u.getDocument(),
+                  u.getBirthDate(),
+                  u.getGender(),
+                  u.getType().name());
+            });
+  }
+
+  @Test
+  void absentFieldsAreNoOp() {
+    UserModel user = sampleUser();
+    Instant previousNameChange = Instant.parse("2026-01-01T00:00:00Z");
+    user.setLastNameChangeAt(previousNameChange);
+    when(userService.requireByToken("uid-1")).thenReturn(user);
+
+    UserProfileUpdateRequestDTO request =
+        new UserProfileUpdateRequestDTO(
+            JsonNullable.undefined(), JsonNullable.undefined(), JsonNullable.undefined());
+
+    UserMeResponseDTO result = service.patchMe("uid-1", request);
+
+    assertThat(result.name()).isEqualTo("Test User");
+    assertThat(result.phone()).isEqualTo("11999999999");
+    assertThat(result.gender()).isEqualTo(Gender.MALE);
+    assertThat(user.getLastNameChangeAt()).isEqualTo(previousNameChange);
+    verify(users, never()).save(any());
+  }
+
+  @Test
+  void explicitNullNameReturns400() {
+    UserModel user = sampleUser();
+    when(userService.requireByToken("uid-1")).thenReturn(user);
+
+    UserProfileUpdateRequestDTO request =
+        new UserProfileUpdateRequestDTO(
+            JsonNullable.of(null), JsonNullable.undefined(), JsonNullable.undefined());
+
+    assertThatThrownBy(() -> service.patchMe("uid-1", request))
+        .isInstanceOf(ResponseStatusException.class)
+        .satisfies(
+            ex -> {
+              ResponseStatusException rse = (ResponseStatusException) ex;
+              assertThat(rse.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+              assertThat(rse.getReason()).isEqualTo("user.profile.field.null");
+            });
+    verify(users, never()).save(any());
+  }
+
+  @Test
+  void explicitNullPhoneReturns400() {
+    UserModel user = sampleUser();
+    when(userService.requireByToken("uid-1")).thenReturn(user);
+
+    UserProfileUpdateRequestDTO request =
+        new UserProfileUpdateRequestDTO(
+            JsonNullable.undefined(), JsonNullable.of(null), JsonNullable.undefined());
+
+    assertThatThrownBy(() -> service.patchMe("uid-1", request))
+        .isInstanceOf(ResponseStatusException.class)
+        .satisfies(
+            ex -> {
+              ResponseStatusException rse = (ResponseStatusException) ex;
+              assertThat(rse.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+              assertThat(rse.getReason()).isEqualTo("user.profile.field.null");
+            });
+  }
+
+  @Test
+  void explicitNullGenderReturns400() {
+    UserModel user = sampleUser();
+    when(userService.requireByToken("uid-1")).thenReturn(user);
+
+    UserProfileUpdateRequestDTO request =
+        new UserProfileUpdateRequestDTO(
+            JsonNullable.undefined(), JsonNullable.undefined(), JsonNullable.of(null));
+
+    assertThatThrownBy(() -> service.patchMe("uid-1", request))
+        .isInstanceOf(ResponseStatusException.class)
+        .satisfies(
+            ex -> {
+              ResponseStatusException rse = (ResponseStatusException) ex;
+              assertThat(rse.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+              assertThat(rse.getReason()).isEqualTo("user.profile.field.null");
+            });
+  }
+
+  @Test
+  void blankPhoneReturns400() {
+    UserModel user = sampleUser();
+    when(userService.requireByToken("uid-1")).thenReturn(user);
+
+    UserProfileUpdateRequestDTO request =
+        new UserProfileUpdateRequestDTO(
+            JsonNullable.undefined(), JsonNullable.of(""), JsonNullable.undefined());
+
+    assertThatThrownBy(() -> service.patchMe("uid-1", request))
+        .isInstanceOf(ResponseStatusException.class)
+        .satisfies(
+            ex -> {
+              ResponseStatusException rse = (ResponseStatusException) ex;
+              assertThat(rse.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+              assertThat(rse.getReason()).isEqualTo("user.profile.phone.blank");
+            });
+    assertThat(user.getPhone()).isEqualTo("11999999999");
+    verify(users, never()).save(any());
+  }
+
+  @Test
+  void nameCooldownReturns409() {
+    UserModel user = sampleUser();
+    Instant lastChange = Instant.now().minus(5, ChronoUnit.DAYS);
+    user.setLastNameChangeAt(lastChange);
+    when(userService.requireByToken("uid-1")).thenReturn(user);
+
+    UserProfileUpdateRequestDTO request =
+        new UserProfileUpdateRequestDTO(
+            JsonNullable.of("New Name"), JsonNullable.undefined(), JsonNullable.undefined());
+
+    assertThatThrownBy(() -> service.patchMe("uid-1", request))
+        .isInstanceOf(ProfileCooldownException.class)
+        .satisfies(
+            ex -> {
+              ProfileCooldownException pce = (ProfileCooldownException) ex;
+              assertThat(pce.getCode()).isEqualTo("cooldown");
+              assertThat(pce.getField()).isEqualTo("name");
+              assertThat(pce.getRetryAfter()).isEqualTo(lastChange.plus(30, ChronoUnit.DAYS));
+              assertThat(pce.getMessage()).isEqualTo("user.profile.name.cooldown");
+            });
+    assertThat(user.getName()).isEqualTo("Test User");
+    verify(users, never()).save(any());
+  }
+
+  @Test
+  void genderAlwaysOkRegardlessOfCooldowns() {
+    UserModel user = sampleUser();
+    user.setLastNameChangeAt(Instant.now().minus(1, ChronoUnit.DAYS));
+    user.setLastPhoneChangeAt(Instant.now().minus(1, ChronoUnit.DAYS));
+    when(userService.requireByToken("uid-1")).thenReturn(user);
+
+    UserProfileUpdateRequestDTO request =
+        new UserProfileUpdateRequestDTO(
+            JsonNullable.undefined(), JsonNullable.undefined(), JsonNullable.of(Gender.FEMALE));
+
+    UserMeResponseDTO result = service.patchMe("uid-1", request);
+
+    assertThat(result.gender()).isEqualTo(Gender.FEMALE);
+    ArgumentCaptor<UserModel> captor = ArgumentCaptor.forClass(UserModel.class);
+    verify(users).save(captor.capture());
+    assertThat(captor.getValue().getGender()).isEqualTo(Gender.FEMALE);
+  }
+
+  @Test
+  void sameNameDoesNotBumpCooldown() {
+    UserModel user = sampleUser();
+    Instant previousNameChange = Instant.parse("2026-01-01T00:00:00Z");
+    user.setLastNameChangeAt(previousNameChange);
+    when(userService.requireByToken("uid-1")).thenReturn(user);
+
+    UserProfileUpdateRequestDTO request =
+        new UserProfileUpdateRequestDTO(
+            JsonNullable.of("Test User"), JsonNullable.undefined(), JsonNullable.undefined());
+
+    UserMeResponseDTO result = service.patchMe("uid-1", request);
+
+    assertThat(result.name()).isEqualTo("Test User");
+    assertThat(user.getLastNameChangeAt()).isEqualTo(previousNameChange);
+    verify(users, never()).save(any());
+  }
+
+  @Test
+  void successfulNameAndPhoneUpdatePersistsAndBumpsCooldown() {
+    UserModel user = sampleUser();
+    LocalDate birthDate = LocalDate.of(1990, 5, 15);
+    String document = "12345678901";
+    user.setBirthDate(birthDate);
+    user.setDocument(document);
+    when(userService.requireByToken("uid-1")).thenReturn(user);
+
+    UserProfileUpdateRequestDTO request =
+        new UserProfileUpdateRequestDTO(
+            JsonNullable.of("Updated Name"),
+            JsonNullable.of("11888888888"),
+            JsonNullable.of(Gender.OTHER));
+
+    UserMeResponseDTO result = service.patchMe("uid-1", request);
+
+    assertThat(result.name()).isEqualTo("Updated Name");
+    assertThat(result.phone()).isEqualTo("11888888888");
+    assertThat(result.gender()).isEqualTo(Gender.OTHER);
+    assertThat(result.document()).isEqualTo(document);
+    assertThat(result.birthDate()).isEqualTo(birthDate);
+    assertThat(user.getDocument()).isEqualTo(document);
+    assertThat(user.getBirthDate()).isEqualTo(birthDate);
+    assertThat(user.getLastNameChangeAt()).isNotNull();
+    assertThat(user.getLastPhoneChangeAt()).isNotNull();
+    verify(users).save(user);
+  }
+
+  @Test
+  void phoneUpdateAllowedWhileNameCooldownActive() {
+    UserModel user = sampleUser();
+    user.setLastNameChangeAt(Instant.now().minus(5, ChronoUnit.DAYS));
+    when(userService.requireByToken("uid-1")).thenReturn(user);
+
+    UserProfileUpdateRequestDTO request =
+        new UserProfileUpdateRequestDTO(
+            JsonNullable.undefined(), JsonNullable.of("11777777777"), JsonNullable.undefined());
+
+    UserMeResponseDTO result = service.patchMe("uid-1", request);
+
+    assertThat(result.phone()).isEqualTo("11777777777");
+    assertThat(user.getLastPhoneChangeAt()).isNotNull();
+    verify(users).save(user);
+  }
+
+  private static UserModel sampleUser() {
+    UserModel user = new UserModel();
+    user.setToken("uid-1");
+    user.setType(UserType.CLIENT);
+    user.setName("Test User");
+    user.setEmail("test@vanep.com");
+    user.setDocument("12345678901");
+    user.setPhone("11999999999");
+    user.setBirthDate(LocalDate.of(1990, 5, 15));
+    user.setGender(Gender.MALE);
+    return user;
+  }
+}
