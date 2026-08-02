@@ -11,6 +11,7 @@ import br.com.vanep.driver.DriverApprovalStatus;
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.drivercnh.seed.DriverCnhSeeder;
+import br.com.vanep.driverrating.seed.DriverRatingSeeder;
 import br.com.vanep.role.RoleName;
 import br.com.vanep.role.model.RoleModel;
 import br.com.vanep.role.repository.RoleRepository;
@@ -53,6 +54,7 @@ public class DataSeeder implements ApplicationRunner {
   private final StateSeeder stateSeeder;
   private final CitySeeder citySeeder;
   private final AddressSeeder addressSeeder;
+  private final DriverRatingSeeder driverRatingSeeder;
   private final PasswordEncoder passwordEncoder;
 
   @Value("${vanep.seed.enabled:false}")
@@ -67,7 +69,7 @@ public class DataSeeder implements ApplicationRunner {
   @Value("${vanep.seed.admin.password:password}")
   String adminPassword;
 
-  @Value("${vanep.seed.admin.document:00000000000}")
+  @Value("${vanep.seed.admin.document:56789012303}")
   String adminDocument;
 
   public DataSeeder(
@@ -82,6 +84,7 @@ public class DataSeeder implements ApplicationRunner {
       StateSeeder stateSeeder,
       CitySeeder citySeeder,
       AddressSeeder addressSeeder,
+      DriverRatingSeeder driverRatingSeeder,
       PasswordEncoder passwordEncoder) {
     this.users = users;
     this.clients = clients;
@@ -94,6 +97,7 @@ public class DataSeeder implements ApplicationRunner {
     this.stateSeeder = stateSeeder;
     this.citySeeder = citySeeder;
     this.addressSeeder = addressSeeder;
+    this.driverRatingSeeder = driverRatingSeeder;
     this.passwordEncoder = passwordEncoder;
   }
 
@@ -116,6 +120,7 @@ public class DataSeeder implements ApplicationRunner {
     stateSeeder.seed();
     citySeeder.seed();
     addressSeeder.seed();
+    driverRatingSeeder.seed();
     if (seedOnly) {
       log.info("Seed-only: data seeded; the application will shut down.");
     }
@@ -256,11 +261,11 @@ public class DataSeeder implements ApplicationRunner {
     record ClientSeed(String name, String email, String document) {}
     List<ClientSeed> seeds =
         List.of(
-            new ClientSeed("Ana Souza", "ana.souza@seed.vanep.com.br", "11111111111"),
-            new ClientSeed("Bruno Lima", "bruno.lima@seed.vanep.com.br", "22222222222"),
-            new ClientSeed("Carla Nunes", "carla.nunes@seed.vanep.com.br", "33333333333"),
-            new ClientSeed("Diego Alves", "diego.alves@seed.vanep.com.br", "44444444444"),
-            new ClientSeed("Elena Rocha", "elena.rocha@seed.vanep.com.br", "55555555555"));
+            new ClientSeed("Ana Souza", "ana.souza@seed.vanep.com.br", "39053344705"),
+            new ClientSeed("Bruno Lima", "bruno.lima@seed.vanep.com.br", "52998224725"),
+            new ClientSeed("Carla Nunes", "carla.nunes@seed.vanep.com.br", "11144477735"),
+            new ClientSeed("Diego Alves", "diego.alves@seed.vanep.com.br", "12345678909"),
+            new ClientSeed("Elena Rocha", "elena.rocha@seed.vanep.com.br", "86288366757"));
 
     RoleModel clientRole = roles.findByRoleName(RoleName.CLIENT).orElseThrow();
     for (ClientSeed seed : seeds) {
@@ -289,15 +294,15 @@ public class DataSeeder implements ApplicationRunner {
             new DriverSeed(
                 "Fabio Teixeira",
                 "fabio.teixeira@seed.vanep.com.br",
-                "66666666666",
+                "23456789092",
                 "11222333000181"),
             new DriverSeed(
                 "Gustavo Santos",
                 "gustavo.santos@seed.vanep.com.br",
-                "77777777777",
+                "34567890175",
                 "22333444000192"),
             new DriverSeed(
-                "Helena Costa", "helena.costa@seed.vanep.com.br", "88888888888", "33444555000103"));
+                "Helena Costa", "helena.costa@seed.vanep.com.br", "45678901249", "33444555000103"));
 
     RoleModel driverRole = roles.findByRoleName(RoleName.DRIVER).orElseThrow();
     for (DriverSeed seed : seeds) {

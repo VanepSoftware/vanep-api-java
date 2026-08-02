@@ -33,6 +33,12 @@ import org.springframework.web.context.WebApplicationContext;
 @Sql(scripts = "/db/clean.sql", executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
 class RegistrationControllerTest {
 
+  private static final String VALID_CPF_ANA = "39053344705";
+  private static final String VALID_CPF_BRUNO = "52998224725";
+  private static final String VALID_CPF_CARLA = "11144477735";
+  private static final String VALID_CPF_OTHER = "12345678909";
+  private static final String VALID_CPF_EXISTING = "86288366757";
+
   @Autowired private WebApplicationContext context;
   @Autowired private UserRepository users;
   @Autowired private ClientRepository clients;
@@ -81,13 +87,14 @@ class RegistrationControllerTest {
                 .param("name", "Ana")
                 .param("email", "ana@vanep.com")
                 .param("password", "secret1")
-                .param("document", "11111111111")
+                .param("document", "390.533.447-05")
                 .param("acceptTerms", "true"))
         .andExpect(status().is3xxRedirection())
         .andExpect(redirectedUrl("/login?registered"));
 
     UserModel user = users.findByEmail("ana@vanep.com").orElseThrow();
     assertThat(user.getType()).isEqualTo(UserType.CLIENT);
+    assertThat(user.getDocument()).isEqualTo(VALID_CPF_ANA);
     assertThat(clients.count()).isEqualTo(1);
   }
 
@@ -100,7 +107,7 @@ class RegistrationControllerTest {
                 .param("name", "Bruno")
                 .param("email", "bruno@vanep.com")
                 .param("password", "secret1")
-                .param("document", "22222222222")
+                .param("document", VALID_CPF_BRUNO)
                 .param("city", "Taguatinga")
                 .param("basePrice", "120.00")
                 .param("acceptTerms", "true"))
@@ -121,7 +128,7 @@ class RegistrationControllerTest {
                 .param("name", "Carla")
                 .param("email", "carla@vanep.com")
                 .param("password", "secret1")
-                .param("document", "55555555555")
+                .param("document", VALID_CPF_CARLA)
                 .param("acceptTerms", "true"))
         .andExpect(status().is3xxRedirection())
         .andExpect(redirectedUrl("/login?registered"));
@@ -135,12 +142,68 @@ class RegistrationControllerTest {
   }
 
   @Test
+  void rejectsInvalidCpfWithClearMessage() throws Exception {
+    mockMvc
+        .perform(
+            post("/signup/client")
+                .with(csrf())
+                .param("name", "Ana")
+                .param("email", "ana@vanep.com")
+                .param("password", "secret1")
+                .param("document", "11111111111")
+                .param("acceptTerms", "true"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(org.hamcrest.Matchers.containsString("CPF inválido")))
+        .andExpect(
+            content()
+                .string(
+                    org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString(
+                            "Já existe uma conta com este documento"))));
+
+    assertThat(users.count()).isZero();
+  }
+
+  @Test
+  void rejectsDuplicateValidCpf() throws Exception {
+    UserModel existing = new UserModel();
+    existing.setType(UserType.CLIENT);
+    existing.setName("Existing");
+    existing.setEmail("existing@vanep.com");
+    existing.setDocument(VALID_CPF_EXISTING);
+    existing.setPassword(passwordEncoder.encode("secret1"));
+    users.save(existing);
+
+    mockMvc
+        .perform(
+            post("/signup/client")
+                .with(csrf())
+                .param("name", "Other")
+                .param("email", "other@vanep.com")
+                .param("password", "secret1")
+                .param("document", VALID_CPF_EXISTING)
+                .param("acceptTerms", "true"))
+        .andExpect(status().isOk())
+        .andExpect(
+            content()
+                .string(
+                    org.hamcrest.Matchers.containsString("Já existe uma conta com este documento")))
+        .andExpect(
+            content()
+                .string(
+                    org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString("CPF inválido"))));
+
+    assertThat(users.count()).isEqualTo(1);
+  }
+
+  @Test
   void rejectsDuplicateEmail() throws Exception {
     UserModel existing = new UserModel();
     existing.setType(UserType.CLIENT);
     existing.setName("Existing");
     existing.setEmail("dup@vanep.com");
-    existing.setDocument("33333333333");
+    existing.setDocument(VALID_CPF_EXISTING);
     existing.setPassword(passwordEncoder.encode("secret1"));
     users.save(existing);
 
@@ -151,7 +214,7 @@ class RegistrationControllerTest {
                 .param("name", "Other")
                 .param("email", "dup@vanep.com")
                 .param("password", "secret1")
-                .param("document", "44444444444")
+                .param("document", VALID_CPF_OTHER)
                 .param("acceptTerms", "true"))
         .andExpect(status().isOk())
         .andExpect(content().string(org.hamcrest.Matchers.containsString("este e-mail")));

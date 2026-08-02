@@ -66,7 +66,13 @@ public enum PermissionEnum {
   RESUME_ASSISTANT("resume_assistant"),
   REVOKE_ASSISTANT("revoke_assistant"),
   CREATE_ASSISTANT_INVITE("create_assistant_invite"),
-  CANCEL_ASSISTANT_INVITE("cancel_assistant_invite");
+  CANCEL_ASSISTANT_INVITE("cancel_assistant_invite"),
+  LIST_DRIVER_RATINGS("list_driver_ratings"),
+  SHOW_DRIVER_RATING("show_driver_rating"),
+  CREATE_DRIVER_RATING("create_driver_rating"),
+  UPDATE_DRIVER_RATING("update_driver_rating"),
+  DELETE_DRIVER_RATING("delete_driver_rating"),
+  RESTORE_DRIVER_RATING("restore_driver_rating");
 
   private final String value;
 

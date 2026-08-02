@@ -3,23 +3,23 @@ package br.com.vanep.assistant.controller;
 import br.com.vanep.assistant.dto.AssistantInviteCreateRequestDTO;
 import br.com.vanep.assistant.dto.AssistantInviteResponseDTO;
 import br.com.vanep.assistant.dto.AssistantListItemResponseDTO;
+import br.com.vanep.assistant.dto.AssistantMeSummaryResponseDTO;
 import br.com.vanep.assistant.dto.AssistantPendingInviteDTO;
-import br.com.vanep.assistant.dto.AssistantProfileResponseDTO;
-import br.com.vanep.assistant.dto.AssistantProfileUpdateRequestDTO;
 import br.com.vanep.assistant.service.AssistantInviteService;
 import br.com.vanep.assistant.service.AssistantLinkService;
 import br.com.vanep.assistant.service.AssistantProfileService;
+import br.com.vanep.auth.security.SecurityHelper;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -43,44 +43,36 @@ public class AssistantController {
   }
 
   @GetMapping("/me")
-  @PreAuthorize("hasAuthority('show_assistant')")
-  public AssistantProfileResponseDTO getMe(@AuthenticationPrincipal Jwt jwt) {
-    return profileService.getProfile(jwt.getSubject());
-  }
-
-  @PutMapping("/me")
-  @PreAuthorize("hasAuthority('update_assistant')")
-  public AssistantProfileResponseDTO updateMe(
-      @AuthenticationPrincipal Jwt jwt,
-      @Valid @RequestBody AssistantProfileUpdateRequestDTO request) {
-    return profileService.updateProfile(jwt.getSubject(), request);
+  @PreAuthorize("isAuthenticated()")
+  public AssistantMeSummaryResponseDTO getMe(Authentication authentication) {
+    return profileService.getProfile(SecurityHelper.requireCallerUid(authentication));
   }
 
   @GetMapping("/me/invite")
-  @PreAuthorize("hasAuthority('show_assistant')")
-  public AssistantPendingInviteDTO getPendingInvite(@AuthenticationPrincipal Jwt jwt) {
-    return inviteService.getPendingInvite(jwt.getSubject());
+  @PreAuthorize("isAuthenticated()")
+  public AssistantPendingInviteDTO getPendingInvite(Authentication authentication) {
+    return inviteService.getPendingInvite(SecurityHelper.requireCallerUid(authentication));
   }
 
   @PostMapping("/me/invite/accept")
   @ResponseStatus(HttpStatus.NO_CONTENT)
-  @PreAuthorize("hasAuthority('update_assistant')")
-  public void acceptPendingInvite(@AuthenticationPrincipal Jwt jwt) {
-    inviteService.acceptPendingInvite(jwt.getSubject());
+  @PreAuthorize("isAuthenticated()")
+  public void acceptPendingInvite(Authentication authentication) {
+    inviteService.acceptPendingInvite(SecurityHelper.requireCallerUid(authentication));
   }
 
   @PostMapping("/me/invite/reject")
   @ResponseStatus(HttpStatus.NO_CONTENT)
-  @PreAuthorize("hasAuthority('update_assistant')")
-  public void rejectPendingInvite(@AuthenticationPrincipal Jwt jwt) {
-    inviteService.rejectPendingInvite(jwt.getSubject());
+  @PreAuthorize("isAuthenticated()")
+  public void rejectPendingInvite(Authentication authentication) {
+    inviteService.rejectPendingInvite(SecurityHelper.requireCallerUid(authentication));
   }
 
   @PostMapping("/me/revoke")
   @ResponseStatus(HttpStatus.NO_CONTENT)
-  @PreAuthorize("hasAuthority('revoke_assistant')")
-  public void revokeSelf(@AuthenticationPrincipal Jwt jwt) {
-    linkService.revokeSelf(jwt.getSubject());
+  @PreAuthorize("isAuthenticated()")
+  public void revokeSelf(Authentication authentication) {
+    linkService.revokeSelf(SecurityHelper.requireCallerUid(authentication));
   }
 
   @PostMapping("/invites")

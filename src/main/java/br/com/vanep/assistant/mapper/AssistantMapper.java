@@ -3,11 +3,12 @@ package br.com.vanep.assistant.mapper;
 import br.com.vanep.assistant.dto.AssistantDriverSummaryDTO;
 import br.com.vanep.assistant.dto.AssistantInviteResponseDTO;
 import br.com.vanep.assistant.dto.AssistantListItemResponseDTO;
+import br.com.vanep.assistant.dto.AssistantMeSummaryResponseDTO;
 import br.com.vanep.assistant.dto.AssistantPendingInviteDTO;
-import br.com.vanep.assistant.dto.AssistantProfileResponseDTO;
 import br.com.vanep.assistant.model.AssistantInviteModel;
 import br.com.vanep.assistant.model.AssistantModel;
 import br.com.vanep.driver.model.DriverModel;
+import br.com.vanep.user.dto.UserMeResponseDTO;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -32,16 +33,10 @@ public class AssistantMapper {
         assistant.getActivatedAt());
   }
 
-  public AssistantProfileResponseDTO toProfile(
-      AssistantModel assistant, AssistantPendingInviteDTO pendingInvite) {
-    return new AssistantProfileResponseDTO(
-        assistant.getToken(),
-        assistant.getUser().getName(),
-        assistant.getUser().getEmail(),
-        assistant.getPhoto(),
-        assistant.getStatus(),
-        assistant.getActivatedAt(),
-        pendingInvite);
+  public AssistantMeSummaryResponseDTO toMeSummary(
+      AssistantModel assistant, UserMeResponseDTO user, AssistantPendingInviteDTO pendingInvite) {
+    return new AssistantMeSummaryResponseDTO(
+        assistant.getToken(), assistant.getPhoto(), assistant.getStatus(), pendingInvite, user);
   }
 
   public AssistantPendingInviteDTO toPendingInvite(AssistantInviteModel invite) {
