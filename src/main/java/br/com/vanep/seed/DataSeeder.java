@@ -220,11 +220,13 @@ public class DataSeeder implements ApplicationRunner {
               PermissionEnum.RESUME_ASSISTANT.value(),
               PermissionEnum.REVOKE_ASSISTANT.value(),
               PermissionEnum.CREATE_ASSISTANT_INVITE.value(),
-              PermissionEnum.CANCEL_ASSISTANT_INVITE.value()));
+              PermissionEnum.CANCEL_ASSISTANT_INVITE.value(),
+              PermissionEnum.CREATE_DRIVER_CNH.value(),
+              PermissionEnum.LIST_DRIVER_CNHS.value()));
       bundle = rolePermissions.save(bundle);
       driverRole.setRolePermission(bundle);
       roles.save(driverRole);
-      log.info("Seed: DRIVER bundle created with assistant management permissions.");
+      log.info("Seed: DRIVER bundle created with assistant and CNH permissions.");
     }
   }
 

@@ -303,7 +303,9 @@ class DataSeederTest {
             PermissionEnum.RESUME_ASSISTANT.value(),
             PermissionEnum.REVOKE_ASSISTANT.value(),
             PermissionEnum.CREATE_ASSISTANT_INVITE.value(),
-            PermissionEnum.CANCEL_ASSISTANT_INVITE.value());
+            PermissionEnum.CANCEL_ASSISTANT_INVITE.value(),
+            PermissionEnum.CREATE_DRIVER_CNH.value(),
+            PermissionEnum.LIST_DRIVER_CNHS.value());
     assertThat(driverRole.getRolePermission()).isEqualTo(captor.getValue());
   }
 }
