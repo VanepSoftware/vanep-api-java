@@ -17,18 +17,18 @@
 - [x] 1.5 Run `make lint-fix` / `./mvnw spotless:check` and `./mvnw verify`
 - [x] 1.6 Open PR phase 1 (pt-BR, lint/test status)
 
-## 2. Phase 2 — Policy + 409 advice (PR 2)
+## 2. Phase 2 — Policy + structured profile errors (PR 2)
 
-> Goal: pure cooldown policy; **unified** structured 409 body (`code`, `message`, `field`, `retryAfter?`) for cooldown and email_duplicate; MessageSource keys.
+> Goal: pure cooldown policy; **unified** error envelope (`message`, `code`, `field`, `retryAfter?`) for **409 and 400** of this feature; all `code` values lowercase snake_case; MessageSource keys.
 > Depends on: Phase 1 | Parallel with: —
 > Order: test → policy → exception/advice → messages
 
 - [x] 2.1 Unit tests for `UserProfileChangePolicy` (within window → retryAfter; elapsed → allow; null last → allow)
 - [x] 2.2 Implement `UserProfileChangePolicy` reading cooldown days from config (no servlet/JPA)
-- [x] 2.3 Add `ProfileConflictResponseDTO` (`message`, `code`, `field`, `retryAfter` nullable) + typed conflict exceptions (`cooldown` / `email_duplicate`)
-- [x] 2.4 Add `@RestControllerAdvice` mapping those exceptions → HTTP 409 with the shared DTO (decidido — não opcional)
-- [x] 2.5 Add MessageSource keys (EN + `messages_pt_BR.properties`): cooldown per field, `user.profile.phone.blank`, `user.profile.email.same`, `user.profile.field.null` (or equivalent); reuse `auth.signup.email.duplicate` for duplicate **message** text
-- [x] 2.6 Slice/unit tests: cooldown 409 has `code=cooldown` + ISO `retryAfter`; duplicate 409 has `code=email_duplicate` and null/omitted `retryAfter` (same shape)
+- [x] 2.3 Add `ProfileErrorResponseDTO` + `ProfileErrorCode` (lowercase snake_case) + typed exceptions: 409 `cooldown` / `email_duplicate`; 400 `field_null` / `phone_blank` / `email_same` / `email_invalid` / `email_required`
+- [x] 2.4 Add `@RestControllerAdvice` (`ProfileErrorAdvice`) mapping `ProfileErrorException` → HTTP status from the exception + shared DTO (decidido — não opcional)
+- [x] 2.5 Add MessageSource keys (EN + `messages_pt_BR.properties`): cooldown per field, `user.profile.phone.blank`, `user.profile.email.same`, `user.profile.email.required`, `user.profile.email.invalid`, `user.profile.field.null`; reuse `auth.signup.email.duplicate` for duplicate **message** text
+- [x] 2.6 Slice/unit tests: 409 cooldown (`code=cooldown` + ISO `retryAfter`); 409 duplicate (`code=email_duplicate`); each 400 code above with same shape and null/omitted `retryAfter`
 - [x] 2.7 `make lint` + `./mvnw verify`; open PR phase 2
 
 ## 3. Phase 3 — PATCH /api/user/me (PR 3)
@@ -37,11 +37,11 @@
 > Depends on: Phase 2 | Parallel with: Phase 4
 > Order: test → request DTO → service → controller
 
-- [x] 3.1 Failing unit tests for `UserProfileService.patchMe` (absent no-op, null→400, blank phone→400, name cooldown→409, gender always ok, same value no cooldown bump)
+- [x] 3.1 Failing unit tests for `UserProfileService.patchMe` (absent no-op, null→400 `field_null`, blank phone→400 `phone_blank`, name cooldown→409, gender always ok, same value no cooldown bump)
 - [x] 3.2 Create `UserProfileUpdateRequestDTO` with `JsonNullable` fields
-- [x] 3.3 Implement `UserProfileService.patchMe` (load via `UserService.requireByToken`, apply policy, persist `last_name_change_at` / `last_phone_change_at` only when value changes)
+- [x] 3.3 Implement `UserProfileService.patchMe` (load via `UserService.requireByToken`, apply policy, persist `last_name_change_at` / `last_phone_change_at` only when value changes; throw `ProfileBadRequestException` / `ProfileCooldownException` — never bare `ResponseStatusException` for these)
 - [x] 3.4 Add `PATCH /api/user/me` on `ProfileController` with `@Valid` + `isAuthenticated()`
-- [x] 3.5 MockMvc slice tests: 401, 200 happy path, 400 blank phone, 409 name cooldown with body shape (`code=cooldown`, `retryAfter` ISO)
+- [x] 3.5 MockMvc slice tests: 401, 200 happy path, 400 blank phone (`code=phone_blank`), 409 name cooldown (`code=cooldown`, `retryAfter` ISO)
 - [x] 3.6 Ensure `document` / `birthDate` untouched in assertions
 - [x] 3.7 `make lint` + `./mvnw verify`; open PR phase 3
 
@@ -51,13 +51,13 @@
 > Depends on: Phase 2 | Parallel with: Phase 3
 > Order: test → DTO → service → verification evolve → controller
 
-- [ ] 4.1 Unit tests: start email-change sets pending, does not touch `email`/`last_email_change_at`; duplicate primary → 409 body `code=email_duplicate` + key `auth.signup.email.duplicate`; same email → 400; cooldown on last_email → 409 `code=cooldown`; replace pending **without** “already in progress” block
+- [ ] 4.1 Unit tests: start email-change sets pending, does not touch `email`/`last_email_change_at`; duplicate primary → 409 body `code=email_duplicate` + key `auth.signup.email.duplicate`; same email → 400 `code=email_same`; cooldown on last_email → 409 `code=cooldown`; replace pending **without** “already in progress” block
 - [ ] 4.2 Unit tests: issuing a new challenge consumes all prior open tokens; submitting old token_A after replace to B fails; token_B confirms B
 - [ ] 4.3 Unit tests: verify with pending promotes email + sets `last_email_change_at` + clears pending; race/duplicate on confirm; classic verify without pending unchanged
-- [ ] 4.4 Create `UserEmailChangeRequestDTO` (`@Email`, `@NotBlank`)
+- [ ] 4.4 Create `UserEmailChangeRequestDTO` (`@Email`, `@NotBlank`) — map validation failures to structured `email_invalid` / `email_required` (same envelope)
 - [ ] 4.5 Add repository method to consume open tokens by `user_id` (`consumed_at IS NULL`)
 - [ ] 4.6 Evolve `EmailVerificationService.startVerification`: invalidate open tokens, then create new token; send link to `pending_email` when set
-- [ ] 4.7 Implement `requestEmailChange` in `UserProfileService` (early `existsByEmail`, cooldown check, set pending, call verification — **does not** use `activePendingEmail` to reject)
+- [ ] 4.7 Implement `requestEmailChange` in `UserProfileService` (early `existsByEmail`, cooldown check, set pending, call verification — **does not** use `activePendingEmail` to reject; use `ProfileBadRequestException.emailSame` / conflict exceptions)
 - [ ] 4.8 Evolve `verify`: promote pending with unique handling (by token hash only)
 - [ ] 4.9 Add `POST /api/user/me/email-change` on `ProfileController`
 - [ ] 4.10 Adjust web verify error path for duplicate-on-confirm (query/flash) so deep links are not silent failures

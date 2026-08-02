@@ -71,9 +71,23 @@ The system SHALL enforce a cooldown of `vanep.profile.change-cooldown-days` (def
 
 ---
 
-### Requirement: Structured profile conflict responses
+### Requirement: Structured profile error responses
 
-API endpoints in this capability that return `409 Conflict` (cooldown on `PATCH` / `POST .../email-change`, and email duplicate on `POST .../email-change` or API-facing confirm when applicable) MUST use one shared JSON body shape: `message` (localized string), `code` (`cooldown` \| `email_duplicate`), `field` (string), and `retryAfter` (ISO-8601 instant, required for `cooldown`, null or omitted for `email_duplicate`). The system MUST NOT return a bare `ResponseStatusException` reason-only body for these conflicts. Clients MUST discriminate causes using `code`, not by probing for missing properties.
+API endpoints in this capability that return profile-edit errors MUST use one shared JSON body shape for both `409 Conflict` and `400 Bad Request`: `message` (localized string, fallback/log only for clients), `code` (lowercase snake_case string), `field` (string), and `retryAfter` (ISO-8601 instant, required for `cooldown`, null or omitted otherwise).
+
+Allowed `code` values:
+
+| HTTP | `code` | `field` | `retryAfter` |
+|------|--------|---------|--------------|
+| 409 | `cooldown` | `name` \| `phone` \| `email` | required |
+| 409 | `email_duplicate` | `email` | omitted/null |
+| 400 | `field_null` | name/phone/gender (as applicable) | omitted/null |
+| 400 | `phone_blank` | `phone` | omitted/null |
+| 400 | `email_same` | `email` | omitted/null |
+| 400 | `email_invalid` | `email` | omitted/null |
+| 400 | `email_required` | `email` | omitted/null |
+
+The system MUST NOT return a bare `ResponseStatusException` reason-only body for these profile-edit errors. Clients MUST discriminate causes using `code` (and `field` when needed), not by probing for missing properties or by treating server `message` as the source of truth for UI copy.
 
 #### Scenario: Cooldown and duplicate share the same JSON shape
 
@@ -81,6 +95,13 @@ API endpoints in this capability that return `409 Conflict` (cooldown on `PATCH`
 - **THEN** both bodies include `message`, `code`, and `field`
 - **AND** only the cooldown body includes a non-null `retryAfter`
 - **AND** the `code` values differ (`cooldown` vs `email_duplicate`)
+
+#### Scenario: Validation errors use the same envelope with 400
+
+- **WHEN** the client receives a profile-edit `400` for explicit null, blank phone, same email, invalid email, or required email
+- **THEN** the body includes `message`, `code`, and `field`
+- **AND** `code` is one of `field_null`, `phone_blank`, `email_same`, `email_invalid`, `email_required`
+- **AND** `retryAfter` is null or omitted
 
 ---
 
