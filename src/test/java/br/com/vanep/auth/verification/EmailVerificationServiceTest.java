@@ -15,6 +15,7 @@ import br.com.vanep.auth.mail.MailService;
 import br.com.vanep.auth.token.SecureTokens;
 import br.com.vanep.auth.verification.model.EmailVerificationTokenModel;
 import br.com.vanep.user.UserRepository;
+import br.com.vanep.user.enums.ProfileErrorCode;
 import br.com.vanep.user.exception.ProfileEmailDuplicateException;
 import br.com.vanep.user.model.UserModel;
 import java.time.Instant;
@@ -146,7 +147,7 @@ class EmailVerificationServiceTest {
         .satisfies(
             ex -> {
               ProfileEmailDuplicateException pe = (ProfileEmailDuplicateException) ex;
-              assertThat(pe.getCode()).isEqualTo("email_duplicate");
+              assertThat(pe.getCode()).isEqualTo(ProfileErrorCode.EMAIL_DUPLICATE);
               assertThat(pe.getField()).isEqualTo("email");
               assertThat(pe.getRetryAfter()).isNull();
               assertThat(pe.getMessage()).isEqualTo("auth.signup.email.duplicate");

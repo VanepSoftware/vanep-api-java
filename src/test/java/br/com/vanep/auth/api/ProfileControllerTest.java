@@ -233,7 +233,7 @@ class ProfileControllerTest {
     assertThat(reloaded.getEmail()).isEqualTo(EMAIL);
     assertThat(reloaded.getLastEmailChangeAt()).isNull();
 
-    ArgumentCaptor<Map<String, Object>> vars = ArgumentCaptor.forClass(Map.class);
+    ArgumentCaptor<Map<String, Object>> vars = ArgumentCaptor.captor();
     verify(mail).send(eq("new@vanep.com"), anyString(), eq("email/email-change"), vars.capture());
     assertThat(vars.getValue().get("link").toString()).contains("/verify-email?token=");
   }
@@ -389,7 +389,6 @@ class ProfileControllerTest {
     assertThat(reloaded.getPendingEmail()).isEqualTo("dup-confirm@vanep.com");
   }
 
-  @SuppressWarnings("unchecked")
   private String requestEmailChangeAndCaptureToken(String newEmail) throws Exception {
     mockMvc
         .perform(
@@ -399,7 +398,7 @@ class ProfileControllerTest {
                 .content("{\"email\":\"" + newEmail + "\"}"))
         .andExpect(status().isNoContent());
 
-    ArgumentCaptor<Map<String, Object>> vars = ArgumentCaptor.forClass(Map.class);
+    ArgumentCaptor<Map<String, Object>> vars = ArgumentCaptor.captor();
     verify(mail, Mockito.atLeastOnce())
         .send(eq(newEmail), anyString(), eq("email/email-change"), vars.capture());
     String link = vars.getValue().get("link").toString();
