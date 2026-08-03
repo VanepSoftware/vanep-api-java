@@ -108,6 +108,39 @@ class ProfileErrorAdviceTest {
         .andExpect(jsonPath("$.retryAfter").doesNotExist());
   }
 
+  @Test
+  void nameTooLongReturns400StructuredBody() throws Exception {
+    mockMvc
+        .perform(get("/__test/profile-error/name-too-long").accept(MediaType.APPLICATION_JSON))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.message").value("name too long"))
+        .andExpect(jsonPath("$.code").value("name_too_long"))
+        .andExpect(jsonPath("$.field").value("name"))
+        .andExpect(jsonPath("$.retryAfter").doesNotExist());
+  }
+
+  @Test
+  void phoneTooLongReturns400StructuredBody() throws Exception {
+    mockMvc
+        .perform(get("/__test/profile-error/phone-too-long").accept(MediaType.APPLICATION_JSON))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.message").value("phone too long"))
+        .andExpect(jsonPath("$.code").value("phone_too_long"))
+        .andExpect(jsonPath("$.field").value("phone"))
+        .andExpect(jsonPath("$.retryAfter").doesNotExist());
+  }
+
+  @Test
+  void emailTooLongReturns400StructuredBody() throws Exception {
+    mockMvc
+        .perform(get("/__test/profile-error/email-too-long").accept(MediaType.APPLICATION_JSON))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.message").value("email too long"))
+        .andExpect(jsonPath("$.code").value("email_too_long"))
+        .andExpect(jsonPath("$.field").value("email"))
+        .andExpect(jsonPath("$.retryAfter").doesNotExist());
+  }
+
   @RestController
   @RequestMapping("/__test/profile-error")
   static class ProfileErrorFixtureController {
@@ -145,6 +178,21 @@ class ProfileErrorAdviceTest {
     @GetMapping("/email-required")
     void throwEmailRequired() {
       throw ProfileBadRequestException.emailRequired("email required");
+    }
+
+    @GetMapping("/name-too-long")
+    void throwNameTooLong() {
+      throw ProfileBadRequestException.nameTooLong("name too long");
+    }
+
+    @GetMapping("/phone-too-long")
+    void throwPhoneTooLong() {
+      throw ProfileBadRequestException.phoneTooLong("phone too long");
+    }
+
+    @GetMapping("/email-too-long")
+    void throwEmailTooLong() {
+      throw ProfileBadRequestException.emailTooLong("email too long");
     }
   }
 }

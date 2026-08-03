@@ -29,4 +29,16 @@ public class ProfileBadRequestException extends ProfileErrorException {
   public static ProfileBadRequestException emailRequired(String message) {
     return new ProfileBadRequestException(message, ProfileErrorCode.EMAIL_REQUIRED, "email");
   }
+
+  public static ProfileBadRequestException nameTooLong(String message) {
+    return new ProfileBadRequestException(message, ProfileErrorCode.NAME_TOO_LONG, "name");
+  }
+
+  public static ProfileBadRequestException phoneTooLong(String message) {
+    return new ProfileBadRequestException(message, ProfileErrorCode.PHONE_TOO_LONG, "phone");
+  }
+
+  public static ProfileBadRequestException emailTooLong(String message) {
+    return new ProfileBadRequestException(message, ProfileErrorCode.EMAIL_TOO_LONG, "email");
+  }
 }

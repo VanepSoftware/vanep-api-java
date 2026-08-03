@@ -59,6 +59,14 @@ public class ProfileErrorAdvice extends ResponseEntityExceptionHandler {
     }
     boolean required =
         Arrays.stream(fieldError.getCodes()).anyMatch(c -> c != null && c.startsWith("NotBlank"));
-    return required ? ProfileErrorCode.EMAIL_REQUIRED : ProfileErrorCode.EMAIL_INVALID;
+    if (required) {
+      return ProfileErrorCode.EMAIL_REQUIRED;
+    }
+    boolean tooLong =
+        Arrays.stream(fieldError.getCodes()).anyMatch(c -> c != null && c.startsWith("Size"));
+    if (tooLong) {
+      return ProfileErrorCode.EMAIL_TOO_LONG;
+    }
+    return ProfileErrorCode.EMAIL_INVALID;
   }
 }

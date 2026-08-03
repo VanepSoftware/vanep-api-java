@@ -19,6 +19,7 @@ import br.com.vanep.auth.token.SecureTokens;
 import br.com.vanep.auth.verification.EmailVerificationTokenRepository;
 import br.com.vanep.auth.verification.model.EmailVerificationTokenModel;
 import br.com.vanep.user.Gender;
+import br.com.vanep.user.UserProfileFieldLimits;
 import br.com.vanep.user.UserRepository;
 import br.com.vanep.user.UserType;
 import br.com.vanep.user.model.UserModel;
@@ -279,6 +280,51 @@ class ProfileControllerTest {
         .andExpect(jsonPath("$.code").value("email_same"))
         .andExpect(jsonPath("$.field").value("email"))
         .andExpect(jsonPath("$.message").value(notNullValue()))
+        .andExpect(jsonPath("$.retryAfter").doesNotExist());
+  }
+
+  @Test
+  void emailChangeTooLongReturns400StructuredBody() throws Exception {
+    String tooLong = "a".repeat(UserProfileFieldLimits.EMAIL_MAX) + "@x.co";
+    mockMvc
+        .perform(
+            post("/api/user/me/email-change")
+                .with(jwt().jwt(token -> token.claim("uid", uid).subject(EMAIL)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"email\":\"" + tooLong + "\"}"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("email_too_long"))
+        .andExpect(jsonPath("$.field").value("email"))
+        .andExpect(jsonPath("$.retryAfter").doesNotExist());
+  }
+
+  @Test
+  void patchMeNameTooLongReturns400() throws Exception {
+    String tooLong = "a".repeat(UserProfileFieldLimits.NAME_MAX + 1);
+    mockMvc
+        .perform(
+            patch("/api/user/me")
+                .with(jwt().jwt(token -> token.claim("uid", uid).subject(EMAIL)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"" + tooLong + "\"}"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("name_too_long"))
+        .andExpect(jsonPath("$.field").value("name"))
+        .andExpect(jsonPath("$.retryAfter").doesNotExist());
+  }
+
+  @Test
+  void patchMePhoneTooLongReturns400() throws Exception {
+    String tooLong = "1".repeat(UserProfileFieldLimits.PHONE_MAX + 1);
+    mockMvc
+        .perform(
+            patch("/api/user/me")
+                .with(jwt().jwt(token -> token.claim("uid", uid).subject(EMAIL)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"phone\":\"" + tooLong + "\"}"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("phone_too_long"))
+        .andExpect(jsonPath("$.field").value("phone"))
         .andExpect(jsonPath("$.retryAfter").doesNotExist());
   }
 
