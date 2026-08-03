@@ -5,6 +5,7 @@ import br.com.vanep.user.dto.UserEmailChangeRequestDTO;
 import br.com.vanep.user.enums.ProfileErrorCode;
 import br.com.vanep.user.exception.ProfileErrorException;
 import java.util.Arrays;
+import java.util.List;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -41,16 +42,50 @@ public class ProfileErrorAdvice extends ResponseEntityExceptionHandler {
       return super.handleMethodArgumentNotValid(ex, headers, status, request);
     }
 
-    FieldError fieldError = ex.getBindingResult().getFieldError("email");
-    ProfileErrorCode code = resolveEmailValidationCode(fieldError);
+    List<FieldError> emailErrors = ex.getBindingResult().getFieldErrors("email");
+    FieldError selected = selectEmailFieldError(emailErrors);
+    ProfileErrorCode code = resolveEmailValidationCode(selected);
     String message =
-        fieldError != null && fieldError.getDefaultMessage() != null
-            ? fieldError.getDefaultMessage()
+        selected != null && selected.getDefaultMessage() != null
+            ? selected.getDefaultMessage()
             : code.value();
 
     ProfileErrorResponseDTO body =
         new ProfileErrorResponseDTO(message, code.value(), "email", null);
     return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
+  }
+
+  /**
+   * Prefer NotBlank, then Size, then Email when several constraints fail (e.g. a very long string
+   * often fails both {@code @Email} and {@code @Size}).
+   */
+  static FieldError selectEmailFieldError(List<FieldError> emailErrors) {
+    if (emailErrors == null || emailErrors.isEmpty()) {
+      return null;
+    }
+    FieldError required = findByCodePrefix(emailErrors, "NotBlank");
+    if (required != null) {
+      return required;
+    }
+    FieldError tooLong = findByCodePrefix(emailErrors, "Size");
+    if (tooLong != null) {
+      return tooLong;
+    }
+    return emailErrors.getFirst();
+  }
+
+  private static FieldError findByCodePrefix(List<FieldError> errors, String prefix) {
+    for (FieldError error : errors) {
+      if (error.getCodes() == null) {
+        continue;
+      }
+      boolean match =
+          Arrays.stream(error.getCodes()).anyMatch(c -> c != null && c.startsWith(prefix));
+      if (match) {
+        return error;
+      }
+    }
+    return null;
   }
 
   private static ProfileErrorCode resolveEmailValidationCode(FieldError fieldError) {
