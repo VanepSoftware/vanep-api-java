@@ -72,7 +72,7 @@ public enum PermissionEnum {
   CREATE_COUNTRY("create_country"),
   UPDATE_COUNTRY("update_country"),
   DELETE_COUNTRY("delete_country"),
-  RESTORE_COUNTRY("restore_country");
+  RESTORE_COUNTRY("restore_country"),
   LIST_DRIVER_RATINGS("list_driver_ratings"),
   SHOW_DRIVER_RATING("show_driver_rating"),
   CREATE_DRIVER_RATING("create_driver_rating"),
