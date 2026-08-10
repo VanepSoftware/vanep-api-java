@@ -24,6 +24,12 @@ public enum PermissionEnum {
   UPDATE_VEHICLE("update_vehicle"),
   DELETE_VEHICLE("delete_vehicle"),
   RESTORE_VEHICLE("restore_vehicle"),
+  LIST_DRIVER_CNHS("list_driver_cnhs"),
+  SHOW_DRIVER_CNH("show_driver_cnh"),
+  CREATE_DRIVER_CNH("create_driver_cnh"),
+  UPDATE_DRIVER_CNH("update_driver_cnh"),
+  DELETE_DRIVER_CNH("delete_driver_cnh"),
+  RESTORE_DRIVER_CNH("restore_driver_cnh"),
   LIST_DEPENDENTS("list_dependents"),
   SHOW_DEPENDENT("show_dependent"),
   CREATE_DEPENDENT("create_dependent"),
@@ -67,6 +73,12 @@ public enum PermissionEnum {
   UPDATE_COUNTRY("update_country"),
   DELETE_COUNTRY("delete_country"),
   RESTORE_COUNTRY("restore_country");
+  LIST_DRIVER_RATINGS("list_driver_ratings"),
+  SHOW_DRIVER_RATING("show_driver_rating"),
+  CREATE_DRIVER_RATING("create_driver_rating"),
+  UPDATE_DRIVER_RATING("update_driver_rating"),
+  DELETE_DRIVER_RATING("delete_driver_rating"),
+  RESTORE_DRIVER_RATING("restore_driver_rating");
 
   private final String value;
 

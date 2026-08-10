@@ -6,7 +6,6 @@ import static org.springframework.security.test.web.servlet.setup.SecurityMockMv
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -323,7 +322,7 @@ class AssistantControllerTest {
   }
 
   @Test
-  void getMeReturnsProfileForAssistant() throws Exception {
+  void getMeReturnsSummaryForAssistant() throws Exception {
     AssistantModel assistant = createAssistant("profile@vanep.com", "17181920212");
     assistant.setPhoto("https://cdn.example/photo.jpg");
     assistants.save(assistant);
@@ -332,10 +331,13 @@ class AssistantControllerTest {
         .perform(get("/api/assistants/me").with(assistantJwt(assistant.getUser())))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.token").value(assistant.getToken()))
-        .andExpect(jsonPath("$.name").value("Assistant"))
-        .andExpect(jsonPath("$.email").value("profile@vanep.com"))
+        .andExpect(jsonPath("$.user.name").value("Assistant"))
+        .andExpect(jsonPath("$.user.email").value("profile@vanep.com"))
+        .andExpect(jsonPath("$.user.type").value("ASSISTANT"))
         .andExpect(jsonPath("$.photo").value("https://cdn.example/photo.jpg"))
-        .andExpect(jsonPath("$.status").value("UNLINKED"));
+        .andExpect(jsonPath("$.status").value("UNLINKED"))
+        .andExpect(jsonPath("$.activatedAt").doesNotExist())
+        .andExpect(jsonPath("$.email").doesNotExist());
   }
 
   @Test
@@ -350,23 +352,6 @@ class AssistantControllerTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.status").value("PENDING"))
         .andExpect(jsonPath("$.pendingInvite.driver.name").value("Main Driver"));
-  }
-
-  @Test
-  void putMeUpdatesPhoto() throws Exception {
-    AssistantModel assistant = createAssistant("update@vanep.com", "19202122232");
-
-    mockMvc
-        .perform(
-            put("/api/assistants/me")
-                .with(assistantJwt(assistant.getUser()))
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"photo\":\"https://cdn.example/new.jpg\"}"))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.photo").value("https://cdn.example/new.jpg"));
-
-    assertThat(assistants.findById(assistant.getId()).orElseThrow().getPhoto())
-        .isEqualTo("https://cdn.example/new.jpg");
   }
 
   @Test

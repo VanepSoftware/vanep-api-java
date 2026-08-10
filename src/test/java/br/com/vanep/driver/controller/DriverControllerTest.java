@@ -324,4 +324,42 @@ class DriverControllerTest {
         .perform(post("/api/drivers/" + driverToken + "/restore").with(adminJwt()))
         .andExpect(status().isConflict());
   }
+
+  @Test
+  void meRequiresAuthentication() throws Exception {
+    mockMvc.perform(get("/api/drivers/me")).andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  void meReturns200ForOwner() throws Exception {
+    mockMvc
+        .perform(get("/api/drivers/me").with(ownerJwt()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.token").value(driverToken))
+        .andExpect(jsonPath("$.user.email").value("driver@vanep.com"))
+        .andExpect(jsonPath("$.user.document").value("66666666666"))
+        .andExpect(jsonPath("$.user.type").value("DRIVER"))
+        .andExpect(jsonPath("$.bio").doesNotExist())
+        .andExpect(jsonPath("$.basePrice").doesNotExist());
+  }
+
+  @Test
+  void meReturns403ForClientUid() throws Exception {
+    UserModel clientUser = new UserModel();
+    clientUser.setType(UserType.CLIENT);
+    clientUser.setName("Client");
+    clientUser.setEmail("client-me@vanep.com");
+    clientUser.setDocument("11111111111");
+    clientUser.setVerified(true);
+    final String clientUid = users.save(clientUser).getToken();
+
+    mockMvc
+        .perform(
+            get("/api/drivers/me")
+                .with(
+                    jwt()
+                        .jwt(t -> t.claim("uid", clientUid).claim("roles", List.of("ROLE_CLIENT")))
+                        .authorities(new SimpleGrantedAuthority("ROLE_CLIENT"))))
+        .andExpect(status().isForbidden());
+  }
 }
