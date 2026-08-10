@@ -20,6 +20,7 @@ import br.com.vanep.driver.DriverApprovalStatus;
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.drivercnh.seed.DriverCnhSeeder;
+import br.com.vanep.driverdocument.seed.DriverDocumentSeeder;
 import br.com.vanep.driverrating.seed.DriverRatingSeeder;
 import br.com.vanep.role.RoleName;
 import br.com.vanep.role.model.RoleModel;
@@ -53,6 +54,7 @@ class DataSeederTest {
 
   @Mock private DependentSeeder dependentSeeder;
   @Mock private DriverCnhSeeder driverCnhSeeder;
+  @Mock private DriverDocumentSeeder driverDocumentSeeder;
   @Mock private SchoolSeeder schoolSeeder;
   @Mock private CountrySeeder countrySeeder;
   @Mock private StateSeeder stateSeeder;
@@ -74,6 +76,7 @@ class DataSeederTest {
             rolePermissions,
             dependentSeeder,
             driverCnhSeeder,
+            driverDocumentSeeder,
             schoolSeeder,
             countrySeeder,
             stateSeeder,
@@ -309,7 +312,9 @@ class DataSeederTest {
             PermissionEnum.CREATE_ASSISTANT_INVITE.value(),
             PermissionEnum.CANCEL_ASSISTANT_INVITE.value(),
             PermissionEnum.CREATE_DRIVER_CNH.value(),
-            PermissionEnum.LIST_DRIVER_CNHS.value());
+            PermissionEnum.LIST_DRIVER_CNHS.value(),
+            PermissionEnum.CREATE_DRIVER_DOCUMENT.value(),
+            PermissionEnum.LIST_DRIVER_DOCUMENTS.value());
     assertThat(driverRole.getRolePermission()).isEqualTo(captor.getValue());
   }
 }

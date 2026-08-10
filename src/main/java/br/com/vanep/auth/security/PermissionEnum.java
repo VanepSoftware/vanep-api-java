@@ -78,7 +78,13 @@ public enum PermissionEnum {
   CREATE_DRIVER_RATING("create_driver_rating"),
   UPDATE_DRIVER_RATING("update_driver_rating"),
   DELETE_DRIVER_RATING("delete_driver_rating"),
-  RESTORE_DRIVER_RATING("restore_driver_rating");
+  RESTORE_DRIVER_RATING("restore_driver_rating"),
+  LIST_DRIVER_DOCUMENTS("list_driver_documents"),
+  SHOW_DRIVER_DOCUMENT("show_driver_document"),
+  CREATE_DRIVER_DOCUMENT("create_driver_document"),
+  UPDATE_DRIVER_DOCUMENT("update_driver_document"),
+  DELETE_DRIVER_DOCUMENT("delete_driver_document"),
+  RESTORE_DRIVER_DOCUMENT("restore_driver_document");
 
   private final String value;
 
