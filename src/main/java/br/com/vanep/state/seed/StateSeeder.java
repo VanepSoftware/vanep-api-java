@@ -1,5 +1,7 @@
 package br.com.vanep.state.seed;
 
+import br.com.vanep.country.model.CountryModel;
+import br.com.vanep.country.repository.CountryRepository;
 import br.com.vanep.state.model.StateModel;
 import br.com.vanep.state.repository.StateRepository;
 import java.util.Map;
@@ -43,13 +45,21 @@ public class StateSeeder {
           Map.entry("TO", "Tocantins"));
 
   private final StateRepository states;
+  private final CountryRepository countryRepository;
 
-  public StateSeeder(StateRepository states) {
+  public StateSeeder(StateRepository states, CountryRepository countryRepository) {
     this.states = states;
+    this.countryRepository = countryRepository;
   }
 
   public void seed() {
     int created = 0;
+    CountryModel country =
+        countryRepository
+            .findByName("Brasil")
+            .orElseThrow(
+                () -> new IllegalStateException("Seed: default country (Brasil) not found."));
+
     for (Map.Entry<String, String> entry : BRAZILIAN_STATES.entrySet()) {
       if (states.existsByUf(entry.getKey())) {
         continue;
@@ -57,6 +67,7 @@ public class StateSeeder {
       StateModel state = new StateModel();
       state.setUf(entry.getKey());
       state.setName(entry.getValue());
+      state.setCountry(country);
       states.save(state);
       created++;
     }
