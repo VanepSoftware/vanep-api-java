@@ -1,11 +1,14 @@
 package br.com.vanep.user.service;
 
+import br.com.vanep.auth.verification.EmailVerificationService;
 import br.com.vanep.user.Gender;
 import br.com.vanep.user.UserRepository;
+import br.com.vanep.user.dto.UserEmailChangeRequestDTO;
 import br.com.vanep.user.dto.UserMeResponseDTO;
 import br.com.vanep.user.dto.UserProfileUpdateRequestDTO;
 import br.com.vanep.user.exception.ProfileBadRequestException;
 import br.com.vanep.user.exception.ProfileCooldownException;
+import br.com.vanep.user.exception.ProfileEmailDuplicateException;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.policy.UserProfileChangePolicy;
 import java.time.Instant;
@@ -14,6 +17,7 @@ import org.openapitools.jackson.nullable.JsonNullable;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class UserProfileService {
@@ -22,16 +26,19 @@ public class UserProfileService {
   private final UserRepository users;
   private final UserProfileChangePolicy policy;
   private final MessageSource messages;
+  private final EmailVerificationService emailVerification;
 
   public UserProfileService(
       UserService userService,
       UserRepository users,
       UserProfileChangePolicy policy,
-      MessageSource messages) {
+      MessageSource messages,
+      EmailVerificationService emailVerification) {
     this.userService = userService;
     this.users = users;
     this.policy = policy;
     this.messages = messages;
+    this.emailVerification = emailVerification;
   }
 
   private String message(String key) {
@@ -51,6 +58,26 @@ public class UserProfileService {
       users.save(user);
     }
     return userService.toMeResponse(user);
+  }
+
+  @Transactional
+  public void requestEmailChange(String uid, UserEmailChangeRequestDTO request) {
+    UserModel user = userService.requireByToken(uid);
+    String newEmail = request.email();
+
+    if (Objects.equals(newEmail, user.getEmail())) {
+      throw ProfileBadRequestException.emailSame(message("user.profile.email.same"));
+    }
+    if (users.existsByEmail(newEmail)) {
+      throw new ProfileEmailDuplicateException(message("auth.signup.email.duplicate"));
+    }
+
+    Instant now = Instant.now();
+    assertCooldown(user.getLastEmailChangeAt(), now, "email", "user.profile.email.cooldown");
+
+    user.setPendingEmail(newEmail);
+    users.save(user);
+    emailVerification.startVerification(user);
   }
 
   boolean applyName(UserModel user, JsonNullable<String> nameField, Instant now) {

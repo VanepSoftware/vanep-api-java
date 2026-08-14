@@ -8,14 +8,17 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import br.com.vanep.auth.verification.EmailVerificationService;
 import br.com.vanep.user.Gender;
 import br.com.vanep.user.UserRepository;
 import br.com.vanep.user.UserType;
+import br.com.vanep.user.dto.UserEmailChangeRequestDTO;
 import br.com.vanep.user.dto.UserMeResponseDTO;
 import br.com.vanep.user.dto.UserProfileUpdateRequestDTO;
 import br.com.vanep.user.enums.ProfileErrorCode;
 import br.com.vanep.user.exception.ProfileBadRequestException;
 import br.com.vanep.user.exception.ProfileCooldownException;
+import br.com.vanep.user.exception.ProfileEmailDuplicateException;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.policy.UserProfileChangePolicy;
 import java.time.Instant;
@@ -37,6 +40,7 @@ class UserProfileServiceTest {
   @Mock private UserService userService;
   @Mock private UserRepository users;
   @Mock private MessageSource messages;
+  @Mock private EmailVerificationService emailVerification;
 
   private UserProfileChangePolicy policy;
   private UserProfileService service;
@@ -44,7 +48,7 @@ class UserProfileServiceTest {
   @BeforeEach
   void setUp() {
     policy = new UserProfileChangePolicy(30);
-    service = new UserProfileService(userService, users, policy, messages);
+    service = new UserProfileService(userService, users, policy, messages, emailVerification);
     lenient().when(messages.getMessage(any(), any(), any())).thenAnswer(inv -> inv.getArgument(0));
     lenient().when(users.save(any(UserModel.class))).thenAnswer(inv -> inv.getArgument(0));
     lenient()
@@ -273,6 +277,106 @@ class UserProfileServiceTest {
     assertThat(result.phone()).isEqualTo("11777777777");
     assertThat(user.getLastPhoneChangeAt()).isNotNull();
     verify(users).save(user);
+  }
+
+  @Test
+  void requestEmailChangeSetsPendingWithoutTouchingEmailOrCooldown() {
+    UserModel user = sampleUser();
+    Instant previousEmailChange = Instant.parse("2025-01-01T00:00:00Z");
+    user.setLastEmailChangeAt(previousEmailChange);
+    user.setVerified(true);
+    when(userService.requireByToken("uid-1")).thenReturn(user);
+    when(users.existsByEmail("new@vanep.com")).thenReturn(false);
+
+    service.requestEmailChange("uid-1", new UserEmailChangeRequestDTO("new@vanep.com"));
+
+    assertThat(user.getPendingEmail()).isEqualTo("new@vanep.com");
+    assertThat(user.getEmail()).isEqualTo("test@vanep.com");
+    assertThat(user.getLastEmailChangeAt()).isEqualTo(previousEmailChange);
+    verify(users).save(user);
+    verify(emailVerification).startVerification(user);
+  }
+
+  @Test
+  void requestEmailChangeDuplicatePrimaryReturns409() {
+    UserModel user = sampleUser();
+    when(userService.requireByToken("uid-1")).thenReturn(user);
+    when(users.existsByEmail("taken@vanep.com")).thenReturn(true);
+
+    assertThatThrownBy(
+            () ->
+                service.requestEmailChange(
+                    "uid-1", new UserEmailChangeRequestDTO("taken@vanep.com")))
+        .isInstanceOf(ProfileEmailDuplicateException.class)
+        .satisfies(
+            ex -> {
+              ProfileEmailDuplicateException pe = (ProfileEmailDuplicateException) ex;
+              assertThat(pe.getCode()).isEqualTo(ProfileErrorCode.EMAIL_DUPLICATE);
+              assertThat(pe.getField()).isEqualTo("email");
+              assertThat(pe.getRetryAfter()).isNull();
+              assertThat(pe.getMessage()).isEqualTo("auth.signup.email.duplicate");
+            });
+    assertThat(user.getPendingEmail()).isNull();
+    verify(emailVerification, never()).startVerification(any());
+  }
+
+  @Test
+  void requestEmailChangeSameAsCurrentReturns400() {
+    UserModel user = sampleUser();
+    when(userService.requireByToken("uid-1")).thenReturn(user);
+
+    assertThatThrownBy(
+            () ->
+                service.requestEmailChange(
+                    "uid-1", new UserEmailChangeRequestDTO("test@vanep.com")))
+        .isInstanceOf(ProfileBadRequestException.class)
+        .satisfies(
+            ex -> {
+              ProfileBadRequestException error = (ProfileBadRequestException) ex;
+              assertThat(error.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+              assertThat(error.getCode()).isEqualTo(ProfileErrorCode.EMAIL_SAME);
+              assertThat(error.getField()).isEqualTo("email");
+            });
+    verify(users, never()).existsByEmail(any());
+    verify(emailVerification, never()).startVerification(any());
+  }
+
+  @Test
+  void requestEmailChangeCooldownReturns409() {
+    UserModel user = sampleUser();
+    Instant lastChange = Instant.now().minus(5, ChronoUnit.DAYS);
+    user.setLastEmailChangeAt(lastChange);
+    when(userService.requireByToken("uid-1")).thenReturn(user);
+    when(users.existsByEmail("new@vanep.com")).thenReturn(false);
+
+    assertThatThrownBy(
+            () ->
+                service.requestEmailChange("uid-1", new UserEmailChangeRequestDTO("new@vanep.com")))
+        .isInstanceOf(ProfileCooldownException.class)
+        .satisfies(
+            ex -> {
+              ProfileCooldownException pce = (ProfileCooldownException) ex;
+              assertThat(pce.getCode()).isEqualTo(ProfileErrorCode.COOLDOWN);
+              assertThat(pce.getField()).isEqualTo("email");
+              assertThat(pce.getRetryAfter()).isEqualTo(lastChange.plus(30, ChronoUnit.DAYS));
+              assertThat(pce.getMessage()).isEqualTo("user.profile.email.cooldown");
+            });
+    assertThat(user.getPendingEmail()).isNull();
+    verify(emailVerification, never()).startVerification(any());
+  }
+
+  @Test
+  void requestEmailChangeReplacesPreviousPendingWithoutBlocking() {
+    UserModel user = sampleUser();
+    user.setPendingEmail("old-pending@vanep.com");
+    when(userService.requireByToken("uid-1")).thenReturn(user);
+    when(users.existsByEmail("newer@vanep.com")).thenReturn(false);
+
+    service.requestEmailChange("uid-1", new UserEmailChangeRequestDTO("newer@vanep.com"));
+
+    assertThat(user.getPendingEmail()).isEqualTo("newer@vanep.com");
+    assertThat(user.getEmail()).isEqualTo("test@vanep.com");
+    verify(emailVerification).startVerification(user);
   }
 
   private static UserModel sampleUser() {
