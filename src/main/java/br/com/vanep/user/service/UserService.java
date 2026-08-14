@@ -1,11 +1,11 @@
 package br.com.vanep.user.service;
 
 import br.com.vanep.auth.verification.EmailVerificationTokenRepository;
-import br.com.vanep.user.UserRepository;
-import br.com.vanep.user.UserType;
 import br.com.vanep.user.dto.UserMeResponseDTO;
+import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.policy.UserProfileChangePolicy;
+import br.com.vanep.user.repository.UserRepository;
 import java.time.Instant;
 import java.util.Optional;
 import org.springframework.context.MessageSource;

@@ -1,5 +1,6 @@
-package br.com.vanep.user;
+package br.com.vanep.user.repository;
 
+import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import java.util.List;
 import java.util.Optional;

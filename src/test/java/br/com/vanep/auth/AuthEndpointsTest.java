@@ -10,10 +10,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import br.com.vanep.user.Gender;
-import br.com.vanep.user.UserRepository;
-import br.com.vanep.user.UserType;
+import br.com.vanep.user.enums.Gender;
+import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
+import br.com.vanep.user.repository.UserRepository;
 import java.time.LocalDate;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

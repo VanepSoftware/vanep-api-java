@@ -8,12 +8,12 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 import br.com.vanep.auth.verification.EmailVerificationTokenRepository;
-import br.com.vanep.user.Gender;
-import br.com.vanep.user.UserRepository;
-import br.com.vanep.user.UserType;
 import br.com.vanep.user.dto.UserMeResponseDTO;
+import br.com.vanep.user.enums.Gender;
+import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.policy.UserProfileChangePolicy;
+import br.com.vanep.user.repository.UserRepository;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;

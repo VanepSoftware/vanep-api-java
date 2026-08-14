@@ -1,6 +1,6 @@
 package br.com.vanep.auth.security;
 
-import br.com.vanep.user.UserRepository;
+import br.com.vanep.user.repository.UserRepository;
 import java.time.Instant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

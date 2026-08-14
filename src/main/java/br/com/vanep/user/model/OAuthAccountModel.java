@@ -1,6 +1,6 @@
 package br.com.vanep.user.model;
 
-import br.com.vanep.user.AuthProvider;
+import br.com.vanep.user.enums.AuthProvider;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;

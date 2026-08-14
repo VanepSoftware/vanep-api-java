@@ -1,6 +1,6 @@
 package br.com.vanep.user.dto;
 
-import br.com.vanep.user.Gender;
+import br.com.vanep.user.enums.Gender;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import java.time.Instant;
 import java.time.LocalDate;

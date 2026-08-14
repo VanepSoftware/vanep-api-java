@@ -1,7 +1,7 @@
 package br.com.vanep.dependent.model;
 
 import br.com.vanep.dependent.enums.Shift;
-import br.com.vanep.user.Gender;
+import br.com.vanep.user.enums.Gender;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;

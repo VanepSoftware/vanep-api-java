@@ -1,9 +1,8 @@
-package br.com.vanep.user.controller;
+package br.com.vanep.user.exception;
 
 import br.com.vanep.user.dto.ProfileErrorResponseDTO;
 import br.com.vanep.user.dto.UserEmailChangeRequestDTO;
 import br.com.vanep.user.enums.ProfileErrorCode;
-import br.com.vanep.user.exception.ProfileErrorException;
 import java.util.Arrays;
 import java.util.List;
 import org.springframework.http.HttpHeaders;

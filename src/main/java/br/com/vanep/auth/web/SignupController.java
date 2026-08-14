@@ -2,9 +2,9 @@ package br.com.vanep.auth.web;
 
 import br.com.vanep.auth.oauth.OAuthAccountService;
 import br.com.vanep.auth.validation.CpfValidator;
-import br.com.vanep.user.AuthProvider;
-import br.com.vanep.user.UserRepository;
+import br.com.vanep.user.enums.AuthProvider;
 import br.com.vanep.user.model.UserModel;
+import br.com.vanep.user.repository.UserRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;

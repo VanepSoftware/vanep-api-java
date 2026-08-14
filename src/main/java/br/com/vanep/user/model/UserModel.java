@@ -1,7 +1,7 @@
 package br.com.vanep.user.model;
 
-import br.com.vanep.user.Gender;
-import br.com.vanep.user.UserType;
+import br.com.vanep.user.enums.Gender;
+import br.com.vanep.user.enums.UserType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;

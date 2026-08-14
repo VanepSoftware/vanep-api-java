@@ -1,5 +1,6 @@
-package br.com.vanep.user;
+package br.com.vanep.user.repository;
 
+import br.com.vanep.user.enums.AuthProvider;
 import br.com.vanep.user.model.OAuthAccountModel;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;

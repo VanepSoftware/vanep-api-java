@@ -1,6 +1,6 @@
 package br.com.vanep.user.dto;
 
-import br.com.vanep.user.Gender;
+import br.com.vanep.user.enums.Gender;
 import org.openapitools.jackson.nullable.JsonNullable;
 
 public record UserProfileUpdateRequestDTO(

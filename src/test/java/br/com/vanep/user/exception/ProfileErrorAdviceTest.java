@@ -1,12 +1,9 @@
-package br.com.vanep.user.controller;
+package br.com.vanep.user.exception;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import br.com.vanep.user.exception.ProfileBadRequestException;
-import br.com.vanep.user.exception.ProfileCooldownException;
-import br.com.vanep.user.exception.ProfileEmailDuplicateException;
 import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

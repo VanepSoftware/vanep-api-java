@@ -1,17 +1,17 @@
 package br.com.vanep.user.service;
 
 import br.com.vanep.auth.verification.EmailVerificationService;
-import br.com.vanep.user.Gender;
 import br.com.vanep.user.UserProfileFieldLimits;
-import br.com.vanep.user.UserRepository;
 import br.com.vanep.user.dto.UserEmailChangeRequestDTO;
 import br.com.vanep.user.dto.UserMeResponseDTO;
 import br.com.vanep.user.dto.UserProfileUpdateRequestDTO;
+import br.com.vanep.user.enums.Gender;
 import br.com.vanep.user.exception.ProfileBadRequestException;
 import br.com.vanep.user.exception.ProfileCooldownException;
 import br.com.vanep.user.exception.ProfileEmailDuplicateException;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.policy.UserProfileChangePolicy;
+import br.com.vanep.user.repository.UserRepository;
 import java.time.Instant;
 import java.util.Objects;
 import org.openapitools.jackson.nullable.JsonNullable;

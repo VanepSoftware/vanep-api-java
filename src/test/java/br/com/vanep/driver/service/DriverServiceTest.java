@@ -14,7 +14,7 @@ import br.com.vanep.driver.dto.DriverResponseDTO;
 import br.com.vanep.driver.dto.DriverUpdateRequestDTO;
 import br.com.vanep.driver.mapper.DriverMapper;
 import br.com.vanep.driver.model.DriverModel;
-import br.com.vanep.user.UserType;
+import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.service.UserService;
 import java.math.BigDecimal;
