@@ -2,6 +2,7 @@ package br.com.vanep.auth.security;
 
 import br.com.vanep.client.repository.ClientRepository;
 import br.com.vanep.driver.DriverRepository;
+import br.com.vanep.drivercnh.repository.DriverCnhRepository;
 import br.com.vanep.driverrating.repository.DriverRatingRepository;
 import br.com.vanep.vehicle.repository.VehicleRepository;
 import org.springframework.security.core.Authentication;
@@ -13,16 +14,19 @@ public class SecurityEvaluator {
   private final DriverRepository driverRepository;
   private final ClientRepository clientRepository;
   private final VehicleRepository vehicleRepository;
+  private final DriverCnhRepository cnhRepository;
   private final DriverRatingRepository driverRatingRepository;
 
   public SecurityEvaluator(
       DriverRepository driverRepository,
       ClientRepository clientRepository,
       VehicleRepository vehicleRepository,
+      DriverCnhRepository cnhRepository,
       DriverRatingRepository driverRatingRepository) {
     this.driverRepository = driverRepository;
     this.clientRepository = clientRepository;
     this.vehicleRepository = vehicleRepository;
+    this.cnhRepository = cnhRepository;
     this.driverRatingRepository = driverRatingRepository;
   }
 
@@ -52,6 +56,16 @@ public class SecurityEvaluator {
             uid ->
                 vehicleRepository
                     .findDriverUserTokenByVehicleToken(token)
+                    .map(driverUserToken -> driverUserToken.equals(uid)))
+        .orElse(false);
+  }
+
+  public boolean isCnhOwner(String token, Authentication authentication) {
+    return SecurityHelper.getCallerUid(authentication)
+        .flatMap(
+            uid ->
+                cnhRepository
+                    .findDriverUserTokenByCnhToken(token)
                     .map(driverUserToken -> driverUserToken.equals(uid)))
         .orElse(false);
   }
