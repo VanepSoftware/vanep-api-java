@@ -4,7 +4,7 @@ import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.drivercnh.model.DriverCnhModel;
 import br.com.vanep.drivercnh.repository.DriverCnhRepository;
-import br.com.vanep.user.UserRepository;
+import br.com.vanep.user.repository.UserRepository;
 import java.time.LocalDate;
 import java.util.Optional;
 import org.slf4j.Logger;
