@@ -23,13 +23,13 @@
 > Depends on: Phase 1 | Parallel with: —
 > Order: test → policy → exception/advice → messages
 
-- [ ] 2.1 Unit tests for `UserProfileChangePolicy` (within window → retryAfter; elapsed → allow; null last → allow)
-- [ ] 2.2 Implement `UserProfileChangePolicy` reading cooldown days from config (no servlet/JPA)
-- [ ] 2.3 Add `ProfileErrorResponseDTO` + `ProfileErrorCode` (lowercase snake_case) + typed exceptions: 409 `cooldown` / `email_duplicate`; 400 `field_null` / `phone_blank` / `email_same` / `email_invalid` / `email_required`
-- [ ] 2.4 Add `@RestControllerAdvice` (`ProfileErrorAdvice`) mapping `ProfileErrorException` → HTTP status from the exception + shared DTO (decidido — não opcional)
-- [ ] 2.5 Add MessageSource keys (EN + `messages_pt_BR.properties`): cooldown per field, `user.profile.phone.blank`, `user.profile.email.same`, `user.profile.email.required`, `user.profile.email.invalid`, `user.profile.field.null`; reuse `auth.signup.email.duplicate` for duplicate **message** text
-- [ ] 2.6 Slice/unit tests: 409 cooldown (`code=cooldown` + ISO `retryAfter`); 409 duplicate (`code=email_duplicate`); each 400 code above with same shape and null/omitted `retryAfter`
-- [ ] 2.7 `make lint` + `./mvnw verify`; open PR phase 2
+- [x] 2.1 Unit tests for `UserProfileChangePolicy` (within window → retryAfter; elapsed → allow; null last → allow)
+- [x] 2.2 Implement `UserProfileChangePolicy` reading cooldown days from config (no servlet/JPA)
+- [x] 2.3 Add `ProfileErrorResponseDTO` + `ProfileErrorCode` (lowercase snake_case) + typed exceptions: 409 `cooldown` / `email_duplicate`; 400 `field_null` / `phone_blank` / `email_same` / `email_invalid` / `email_required`
+- [x] 2.4 Add `@RestControllerAdvice` (`ProfileErrorAdvice`) mapping `ProfileErrorException` → HTTP status from the exception + shared DTO (decidido — não opcional)
+- [x] 2.5 Add MessageSource keys (EN + `messages_pt_BR.properties`): cooldown per field, `user.profile.phone.blank`, `user.profile.email.same`, `user.profile.email.required`, `user.profile.email.invalid`, `user.profile.field.null`; reuse `auth.signup.email.duplicate` for duplicate **message** text
+- [x] 2.6 Slice/unit tests: 409 cooldown (`code=cooldown` + ISO `retryAfter`); 409 duplicate (`code=email_duplicate`); each 400 code above with same shape and null/omitted `retryAfter`
+- [x] 2.7 `make lint` + `./mvnw verify`; open PR phase 2
 
 ## 3. Phase 3 — PATCH /api/user/me (PR 3)
 
