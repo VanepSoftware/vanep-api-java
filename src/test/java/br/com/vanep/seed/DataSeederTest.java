@@ -14,10 +14,12 @@ import br.com.vanep.auth.security.PermissionEnum;
 import br.com.vanep.auth.security.PermissionRegistry;
 import br.com.vanep.city.seed.CitySeeder;
 import br.com.vanep.client.repository.ClientRepository;
+import br.com.vanep.country.seed.CountrySeeder;
 import br.com.vanep.dependent.seed.DependentSeeder;
 import br.com.vanep.driver.DriverApprovalStatus;
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
+import br.com.vanep.drivercnh.seed.DriverCnhSeeder;
 import br.com.vanep.driverrating.seed.DriverRatingSeeder;
 import br.com.vanep.role.RoleName;
 import br.com.vanep.role.model.RoleModel;
@@ -50,7 +52,9 @@ class DataSeederTest {
   @Mock private RolePermissionRepository rolePermissions;
 
   @Mock private DependentSeeder dependentSeeder;
+  @Mock private DriverCnhSeeder driverCnhSeeder;
   @Mock private SchoolSeeder schoolSeeder;
+  @Mock private CountrySeeder countrySeeder;
   @Mock private StateSeeder stateSeeder;
   @Mock private CitySeeder citySeeder;
   @Mock private AddressSeeder addressSeeder;
@@ -69,12 +73,15 @@ class DataSeederTest {
             roles,
             rolePermissions,
             dependentSeeder,
+            driverCnhSeeder,
             schoolSeeder,
+            countrySeeder,
             stateSeeder,
             citySeeder,
             addressSeeder,
             driverRatingSeeder,
             passwordEncoder);
+
     seeder.adminEmail = "admin@vanep.com.br";
     seeder.adminPassword = "password";
     seeder.adminDocument = "56789012303";
@@ -300,7 +307,9 @@ class DataSeederTest {
             PermissionEnum.RESUME_ASSISTANT.value(),
             PermissionEnum.REVOKE_ASSISTANT.value(),
             PermissionEnum.CREATE_ASSISTANT_INVITE.value(),
-            PermissionEnum.CANCEL_ASSISTANT_INVITE.value());
+            PermissionEnum.CANCEL_ASSISTANT_INVITE.value(),
+            PermissionEnum.CREATE_DRIVER_CNH.value(),
+            PermissionEnum.LIST_DRIVER_CNHS.value());
     assertThat(driverRole.getRolePermission()).isEqualTo(captor.getValue());
   }
 }
