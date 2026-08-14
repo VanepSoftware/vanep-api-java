@@ -12,6 +12,7 @@ import br.com.vanep.city.dto.CityResponseDTO;
 import br.com.vanep.city.mapper.CityMapper;
 import br.com.vanep.city.model.CityModel;
 import br.com.vanep.city.repository.CityRepository;
+import br.com.vanep.country.model.CountryModel;
 import br.com.vanep.state.model.StateModel;
 import br.com.vanep.state.repository.StateRepository;
 import java.util.List;
@@ -42,11 +43,17 @@ class CityServiceTest {
   }
 
   private StateModel stateSp() {
+    CountryModel country = new CountryModel();
+    country.setId(100L);
+    country.setToken("country-br");
+    country.setName("Brasil");
+
     StateModel state = new StateModel();
     state.setId(1L);
     state.setToken("state-sp");
     state.setName("São Paulo");
     state.setUf("SP");
+    state.setCountry(country);
     return state;
   }
 
