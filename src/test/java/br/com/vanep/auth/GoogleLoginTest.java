@@ -10,10 +10,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import br.com.vanep.assistant.enums.AssistantStatus;
 import br.com.vanep.assistant.repository.AssistantRepository;
-import br.com.vanep.user.AuthProvider;
-import br.com.vanep.user.OAuthAccountRepository;
-import br.com.vanep.user.UserRepository;
-import br.com.vanep.user.UserType;
+import br.com.vanep.user.enums.AuthProvider;
+import br.com.vanep.user.enums.UserType;
+import br.com.vanep.user.repository.OAuthAccountRepository;
+import br.com.vanep.user.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;

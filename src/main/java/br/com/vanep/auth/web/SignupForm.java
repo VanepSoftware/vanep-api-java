@@ -1,8 +1,8 @@
 package br.com.vanep.auth.web;
 
 import br.com.vanep.auth.validation.Cpf;
-import br.com.vanep.user.Gender;
-import br.com.vanep.user.UserType;
+import br.com.vanep.user.enums.Gender;
+import br.com.vanep.user.enums.UserType;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;

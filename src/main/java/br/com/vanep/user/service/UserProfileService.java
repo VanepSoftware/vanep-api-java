@@ -1,16 +1,17 @@
 package br.com.vanep.user.service;
 
 import br.com.vanep.auth.verification.EmailVerificationService;
-import br.com.vanep.user.Gender;
-import br.com.vanep.user.UserRepository;
+import br.com.vanep.user.UserProfileFieldLimits;
 import br.com.vanep.user.dto.UserEmailChangeRequestDTO;
 import br.com.vanep.user.dto.UserMeResponseDTO;
 import br.com.vanep.user.dto.UserProfileUpdateRequestDTO;
+import br.com.vanep.user.enums.Gender;
 import br.com.vanep.user.exception.ProfileBadRequestException;
 import br.com.vanep.user.exception.ProfileCooldownException;
 import br.com.vanep.user.exception.ProfileEmailDuplicateException;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.policy.UserProfileChangePolicy;
+import br.com.vanep.user.repository.UserRepository;
 import java.time.Instant;
 import java.util.Objects;
 import org.openapitools.jackson.nullable.JsonNullable;
@@ -43,6 +44,10 @@ public class UserProfileService {
 
   private String message(String key) {
     return messages.getMessage(key, null, LocaleContextHolder.getLocale());
+  }
+
+  private String message(String key, Object... args) {
+    return messages.getMessage(key, args, LocaleContextHolder.getLocale());
   }
 
   public UserMeResponseDTO patchMe(String uid, UserProfileUpdateRequestDTO request) {
@@ -86,6 +91,10 @@ public class UserProfileService {
     }
     String name = nameField.get();
     rejectIfNull(name, "name");
+    if (name.length() > UserProfileFieldLimits.NAME_MAX) {
+      throw ProfileBadRequestException.nameTooLong(
+          message("user.profile.name.too_long", UserProfileFieldLimits.NAME_MAX));
+    }
     if (Objects.equals(name, user.getName())) {
       return false;
     }
@@ -103,6 +112,10 @@ public class UserProfileService {
     rejectIfNull(phone, "phone");
     if (phone.isBlank()) {
       throw ProfileBadRequestException.phoneBlank(message("user.profile.phone.blank"));
+    }
+    if (phone.length() > UserProfileFieldLimits.PHONE_MAX) {
+      throw ProfileBadRequestException.phoneTooLong(
+          message("user.profile.phone.too_long", UserProfileFieldLimits.PHONE_MAX));
     }
     if (Objects.equals(phone, user.getPhone())) {
       return false;

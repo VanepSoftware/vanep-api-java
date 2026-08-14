@@ -7,7 +7,7 @@ import br.com.vanep.assistant.mapper.AssistantMapper;
 import br.com.vanep.assistant.model.AssistantModel;
 import br.com.vanep.assistant.repository.AssistantInviteRepository;
 import br.com.vanep.assistant.repository.AssistantRepository;
-import br.com.vanep.user.UserType;
+import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.service.UserService;
 import org.springframework.context.MessageSource;

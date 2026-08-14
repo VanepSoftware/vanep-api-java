@@ -162,7 +162,7 @@ DTO: `ProfileErrorResponseDTO`:
 
 - Enum Java `ProfileErrorCode` com `value()` em snake_case minúsculo (convenção fechada — sem SCREAMING_SNAKE no JSON).
 - Base `ProfileErrorException` + 409 (`ProfileCooldownException`, `ProfileEmailDuplicateException`) + 400 (`ProfileBadRequestException` factories).
-- `@RestControllerAdvice` (`ProfileErrorAdvice`) mapeia `ProfileErrorException` → status da exceção + DTO acima.
+- `@RestControllerAdvice` (`ProfileErrorAdvice` em `br.com.vanep.user.exception`) mapeia `ProfileErrorException` → status da exceção + DTO acima.
 - Mensagem de duplicata continua resolvida por `auth.signup.email.duplicate`; envelope = este contrato.
 - Fluxo **web** `/verify-email`: não precisa do JSON; trata duplicata no confirm com erro explícito na UI.
 
@@ -171,7 +171,7 @@ DTO: `ProfileErrorResponseDTO`:
 ### D6 — Pacotes e camadas
 
 - HTTP: estender `ProfileController` (`br.com.vanep.auth.api`) — já é `/api/user`.
-- Domínio: `br.com.vanep.user` — `UserProfileUpdateRequestDTO`, `UserEmailChangeRequestDTO`, `ProfileErrorResponseDTO`, `ProfileErrorCode`, `UserProfileChangePolicy`, `UserProfileService` (+ `UserService` para require/getMe).
+- Domínio: `br.com.vanep.user` — `UserProfileUpdateRequestDTO`, `UserEmailChangeRequestDTO`, `ProfileErrorResponseDTO`, `ProfileErrorCode`, `ProfileErrorAdvice` (`exception`), `UserProfileChangePolicy`, `UserProfileService` (+ `UserService` para require/getMe).
 - Verify: estender `EmailVerificationService` + `EmailVerificationTokenRepository`; ajustar `EmailVerificationController` / template web para erro de duplicata no confirm.
 - Mensagens: keys novas + reuso `auth.signup.email.duplicate` (message only; envelope = D5).
 

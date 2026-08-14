@@ -1,7 +1,7 @@
 package br.com.vanep.auth.web;
 
 import br.com.vanep.auth.validation.CpfValidator;
-import br.com.vanep.user.UserRepository;
+import br.com.vanep.user.repository.UserRepository;
 import jakarta.validation.Valid;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;

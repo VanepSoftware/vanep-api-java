@@ -7,7 +7,7 @@ import br.com.vanep.client.dto.ClientUpdateRequestDTO;
 import br.com.vanep.client.mapper.ClientMapper;
 import br.com.vanep.client.model.ClientModel;
 import br.com.vanep.client.repository.ClientRepository;
-import br.com.vanep.user.UserType;
+import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.service.UserService;
 import org.springframework.context.MessageSource;

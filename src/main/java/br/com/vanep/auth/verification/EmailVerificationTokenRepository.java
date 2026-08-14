@@ -13,6 +13,8 @@ public interface EmailVerificationTokenRepository
 
   Optional<EmailVerificationTokenModel> findByTokenHash(String tokenHash);
 
+  boolean existsByUserIdAndConsumedAtIsNullAndExpiresAtAfter(Long userId, Instant now);
+
   @Modifying
   @Query(
       "update EmailVerificationTokenModel t set t.consumedAt = :now "

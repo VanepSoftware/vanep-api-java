@@ -1,7 +1,7 @@
 package br.com.vanep.dependent.dto;
 
 import br.com.vanep.dependent.enums.Shift;
-import br.com.vanep.user.Gender;
+import br.com.vanep.user.enums.Gender;
 import jakarta.validation.constraints.NotBlank;
 import java.time.LocalDate;
 import lombok.Getter;

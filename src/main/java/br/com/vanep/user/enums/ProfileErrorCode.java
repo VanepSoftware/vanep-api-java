@@ -11,7 +11,10 @@ public enum ProfileErrorCode {
   PHONE_BLANK("phone_blank"),
   EMAIL_SAME("email_same"),
   EMAIL_INVALID("email_invalid"),
-  EMAIL_REQUIRED("email_required");
+  EMAIL_REQUIRED("email_required"),
+  NAME_TOO_LONG("name_too_long"),
+  PHONE_TOO_LONG("phone_too_long"),
+  EMAIL_TOO_LONG("email_too_long");
 
   private final String value;
 

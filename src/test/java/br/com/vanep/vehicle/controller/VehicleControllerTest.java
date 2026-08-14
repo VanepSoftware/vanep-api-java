@@ -11,9 +11,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
-import br.com.vanep.user.UserRepository;
-import br.com.vanep.user.UserType;
+import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
+import br.com.vanep.user.repository.UserRepository;
 import br.com.vanep.vehicle.model.VehicleModel;
 import br.com.vanep.vehicle.repository.VehicleRepository;
 import java.math.BigDecimal;

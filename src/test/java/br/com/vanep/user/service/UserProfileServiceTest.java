@@ -9,18 +9,19 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import br.com.vanep.auth.verification.EmailVerificationService;
-import br.com.vanep.user.Gender;
-import br.com.vanep.user.UserRepository;
-import br.com.vanep.user.UserType;
+import br.com.vanep.user.UserProfileFieldLimits;
 import br.com.vanep.user.dto.UserEmailChangeRequestDTO;
 import br.com.vanep.user.dto.UserMeResponseDTO;
 import br.com.vanep.user.dto.UserProfileUpdateRequestDTO;
+import br.com.vanep.user.enums.Gender;
 import br.com.vanep.user.enums.ProfileErrorCode;
+import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.exception.ProfileBadRequestException;
 import br.com.vanep.user.exception.ProfileCooldownException;
 import br.com.vanep.user.exception.ProfileEmailDuplicateException;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.policy.UserProfileChangePolicy;
+import br.com.vanep.user.repository.UserRepository;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
@@ -64,7 +65,11 @@ class UserProfileServiceTest {
                   u.getDocument(),
                   u.getBirthDate(),
                   u.getGender(),
-                  u.getType().name());
+                  u.getType().name(),
+                  null,
+                  null,
+                  null,
+                  null);
             });
   }
 
@@ -168,6 +173,50 @@ class UserProfileServiceTest {
               assertThat(error.getField()).isEqualTo("phone");
             });
     assertThat(user.getPhone()).isEqualTo("11999999999");
+    verify(users, never()).save(any());
+  }
+
+  @Test
+  void nameTooLongReturns400() {
+    UserModel user = sampleUser();
+    when(userService.requireByToken("uid-1")).thenReturn(user);
+
+    String tooLong = "a".repeat(UserProfileFieldLimits.NAME_MAX + 1);
+    UserProfileUpdateRequestDTO request =
+        new UserProfileUpdateRequestDTO(
+            JsonNullable.of(tooLong), JsonNullable.undefined(), JsonNullable.undefined());
+
+    assertThatThrownBy(() -> service.patchMe("uid-1", request))
+        .isInstanceOf(ProfileBadRequestException.class)
+        .satisfies(
+            ex -> {
+              ProfileBadRequestException error = (ProfileBadRequestException) ex;
+              assertThat(error.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+              assertThat(error.getCode()).isEqualTo(ProfileErrorCode.NAME_TOO_LONG);
+              assertThat(error.getField()).isEqualTo("name");
+            });
+    verify(users, never()).save(any());
+  }
+
+  @Test
+  void phoneTooLongReturns400() {
+    UserModel user = sampleUser();
+    when(userService.requireByToken("uid-1")).thenReturn(user);
+
+    String tooLong = "1".repeat(UserProfileFieldLimits.PHONE_MAX + 1);
+    UserProfileUpdateRequestDTO request =
+        new UserProfileUpdateRequestDTO(
+            JsonNullable.undefined(), JsonNullable.of(tooLong), JsonNullable.undefined());
+
+    assertThatThrownBy(() -> service.patchMe("uid-1", request))
+        .isInstanceOf(ProfileBadRequestException.class)
+        .satisfies(
+            ex -> {
+              ProfileBadRequestException error = (ProfileBadRequestException) ex;
+              assertThat(error.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+              assertThat(error.getCode()).isEqualTo(ProfileErrorCode.PHONE_TOO_LONG);
+              assertThat(error.getField()).isEqualTo("phone");
+            });
     verify(users, never()).save(any());
   }
 

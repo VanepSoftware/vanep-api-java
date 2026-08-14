@@ -13,7 +13,7 @@ import br.com.vanep.client.dto.ClientUpdateRequestDTO;
 import br.com.vanep.client.mapper.ClientMapper;
 import br.com.vanep.client.model.ClientModel;
 import br.com.vanep.client.repository.ClientRepository;
-import br.com.vanep.user.UserType;
+import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.service.UserService;
 import java.util.List;
@@ -169,7 +169,18 @@ class ClientServiceTest {
     UserModel user = client.getUser();
     var userMe =
         new br.com.vanep.user.dto.UserMeResponseDTO(
-            "owner-uid", "Test User", null, "test@vanep.com", "12345678901", null, null, "CLIENT");
+            "owner-uid",
+            "Test User",
+            null,
+            "test@vanep.com",
+            "12345678901",
+            null,
+            null,
+            "CLIENT",
+            null,
+            null,
+            null,
+            null);
     var summary =
         new br.com.vanep.client.dto.ClientMeSummaryResponseDTO(
             "client-tok", null, null, true, userMe);

@@ -26,7 +26,7 @@
 - [x] 2.1 Unit tests for `UserProfileChangePolicy` (within window → retryAfter; elapsed → allow; null last → allow)
 - [x] 2.2 Implement `UserProfileChangePolicy` reading cooldown days from config (no servlet/JPA)
 - [x] 2.3 Add `ProfileErrorResponseDTO` + `ProfileErrorCode` (lowercase snake_case) + typed exceptions: 409 `cooldown` / `email_duplicate`; 400 `field_null` / `phone_blank` / `email_same` / `email_invalid` / `email_required`
-- [x] 2.4 Add `@RestControllerAdvice` (`ProfileErrorAdvice`) mapping `ProfileErrorException` → HTTP status from the exception + shared DTO (decidido — não opcional)
+- [x] 2.4 Add `@RestControllerAdvice` (`ProfileErrorAdvice` in `br.com.vanep.user.exception`) mapping `ProfileErrorException` → HTTP status from the exception + shared DTO (decidido — não opcional)
 - [x] 2.5 Add MessageSource keys (EN + `messages_pt_BR.properties`): cooldown per field, `user.profile.phone.blank`, `user.profile.email.same`, `user.profile.email.required`, `user.profile.email.invalid`, `user.profile.field.null`; reuse `auth.signup.email.duplicate` for duplicate **message** text
 - [x] 2.6 Slice/unit tests: 409 cooldown (`code=cooldown` + ISO `retryAfter`); 409 duplicate (`code=email_duplicate`); each 400 code above with same shape and null/omitted `retryAfter`
 - [x] 2.7 `make lint` + `./mvnw verify`; open PR phase 2
@@ -70,9 +70,9 @@
 > Depends on: Phases 3 and 4 | Parallel with: —
 > Order: test → DTO → mapper/service → controller assertions
 
-- [ ] 5.1 Extend `UserMeResponseDTO` with `pendingEmail`, `nameChangeAvailableAt`, `phoneChangeAvailableAt`, `emailChangeAvailableAt`
-- [ ] 5.2 Implement `activePendingEmail` / `resolvePendingEmailForMe` (coluna + token aberto não expirado); document that **only** GET `/me` uses it
-- [ ] 5.3 Update `UserService.toMeResponse` / `getMe` to use the helper + compute available-at from last_* + cooldown config
-- [ ] 5.4 Unit + MockMvc tests: active pending shown; ghost pending (expired/no open token) → `pendingEmail` null; cooldown hints
-- [ ] 5.5 Update README snippet for `/api/user/me` if it documents the response shape
-- [ ] 5.6 `make lint` + `./mvnw verify`; open PR phase 5
+- [x] 5.1 Extend `UserMeResponseDTO` with `pendingEmail`, `nameChangeAvailableAt`, `phoneChangeAvailableAt`, `emailChangeAvailableAt`
+- [x] 5.2 Implement `activePendingEmail` / `resolvePendingEmailForMe` (coluna + token aberto não expirado); document that **only** GET `/me` uses it
+- [x] 5.3 Update `UserService.toMeResponse` / `getMe` to use the helper + compute available-at from last_* + cooldown config
+- [x] 5.4 Unit + MockMvc tests: active pending shown; ghost pending (expired/no open token) → `pendingEmail` null; cooldown hints
+- [x] 5.5 Update README snippet for `/api/user/me` if it documents the response shape
+- [x] 5.6 `make lint` + `./mvnw verify`; open PR phase 5
