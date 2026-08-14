@@ -37,13 +37,13 @@
 > Depends on: Phase 2 | Parallel with: Phase 4
 > Order: test → request DTO → service → controller
 
-- [ ] 3.1 Failing unit tests for `UserProfileService.patchMe` (absent no-op, null→400 `field_null`, blank phone→400 `phone_blank`, name cooldown→409, gender always ok, same value no cooldown bump)
-- [ ] 3.2 Create `UserProfileUpdateRequestDTO` with `JsonNullable` fields
-- [ ] 3.3 Implement `UserProfileService.patchMe` (load via `UserService.requireByToken`, apply policy, persist `last_name_change_at` / `last_phone_change_at` only when value changes; throw `ProfileBadRequestException` / `ProfileCooldownException` — never bare `ResponseStatusException` for these)
-- [ ] 3.4 Add `PATCH /api/user/me` on `ProfileController` with `@Valid` + `isAuthenticated()`
-- [ ] 3.5 MockMvc slice tests: 401, 200 happy path, 400 blank phone (`code=phone_blank`), 409 name cooldown (`code=cooldown`, `retryAfter` ISO)
-- [ ] 3.6 Ensure `document` / `birthDate` untouched in assertions
-- [ ] 3.7 `make lint` + `./mvnw verify`; open PR phase 3
+- [x] 3.1 Failing unit tests for `UserProfileService.patchMe` (absent no-op, null→400 `field_null`, blank phone→400 `phone_blank`, name cooldown→409, gender always ok, same value no cooldown bump)
+- [x] 3.2 Create `UserProfileUpdateRequestDTO` with `JsonNullable` fields
+- [x] 3.3 Implement `UserProfileService.patchMe` (load via `UserService.requireByToken`, apply policy, persist `last_name_change_at` / `last_phone_change_at` only when value changes; throw `ProfileBadRequestException` / `ProfileCooldownException` — never bare `ResponseStatusException` for these)
+- [x] 3.4 Add `PATCH /api/user/me` on `ProfileController` with `@Valid` + `isAuthenticated()`
+- [x] 3.5 MockMvc slice tests: 401, 200 happy path, 400 blank phone (`code=phone_blank`), 409 name cooldown (`code=cooldown`, `retryAfter` ISO)
+- [x] 3.6 Ensure `document` / `birthDate` untouched in assertions
+- [x] 3.7 `make lint` + `./mvnw verify`; open PR phase 3
 
 ## 4. Phase 4 — Email change + verify (PR 4)
 
