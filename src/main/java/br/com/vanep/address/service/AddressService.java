@@ -89,7 +89,7 @@ public class AddressService {
       return Map.of();
     }
     return addressRepository.findAllById(addressIds).stream()
-        .collect(Collectors.toMap(AddressModel::getId, mapper::toResponse));
+        .collect(Collectors.toMap(address -> address.getId(), mapper::toResponse));
   }
 
   @Transactional

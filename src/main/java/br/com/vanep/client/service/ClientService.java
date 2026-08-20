@@ -53,7 +53,7 @@ public class ClientService {
     var addressesById =
         addressService.toResponsesByIds(
             page.getContent().stream()
-                .map(ClientModel::getAddressId)
+                .map(client -> client.getAddressId())
                 .filter(Objects::nonNull)
                 .distinct()
                 .toList());
