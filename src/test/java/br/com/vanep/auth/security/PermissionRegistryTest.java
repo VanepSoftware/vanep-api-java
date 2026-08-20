@@ -30,4 +30,13 @@ class PermissionRegistryTest {
   void containsReturnsFalseForUnknownPermission() {
     assertThat(PermissionRegistry.contains("fly_to_moon")).isFalse();
   }
+
+  @Test
+  void containsReturnsFalseForRemovedAddressCatalogPermissions() {
+    assertThat(PermissionRegistry.contains("list_addresses")).isFalse();
+    assertThat(PermissionRegistry.contains("show_address")).isFalse();
+    assertThat(PermissionRegistry.contains("create_address")).isFalse();
+    assertThat(PermissionRegistry.contains("update_address")).isFalse();
+    assertThat(PermissionRegistry.contains("delete_address")).isFalse();
+  }
 }

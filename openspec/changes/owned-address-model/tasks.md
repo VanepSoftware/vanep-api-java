@@ -59,9 +59,9 @@
 > Depends on: Phases 2, 3, and 4 | Parallel with: —
 > Order: test (404 no mapping) → delete controller → permissions → seeder
 
-- [ ] 5.1 MockMvc (or slice) asserting `GET/POST /api/addresses` is not mapped (404), including with admin JWT
-- [ ] 5.2 Delete `AddressController` and `AddressControllerTest`
-- [ ] 5.3 Remove `LIST_ADDRESSES`, `SHOW_ADDRESS`, `CREATE_ADDRESS`, `UPDATE_ADDRESS`, `DELETE_ADDRESS` from `PermissionEnum` and ADMIN (and any) bundles; drop dead strings from stored permission lists in seed
-- [ ] 5.4 Update `AddressSeeder` / entity seeders so each seed client/dependent/school gets its own **linked** address row (same CEP allowed); no unlinked seed rows
-- [ ] 5.5 Remove `existsByZipCodeAndNumber` if unused (dead code)
+- [x] 5.1 MockMvc (or slice) asserting `GET/POST /api/addresses` is not mapped (404), including with admin JWT
+- [x] 5.2 Delete `AddressController` and `AddressControllerTest`
+- [x] 5.3 Remove `LIST_ADDRESSES`, `SHOW_ADDRESS`, `CREATE_ADDRESS`, `UPDATE_ADDRESS`, `DELETE_ADDRESS` from `PermissionEnum` and ADMIN (and any) bundles; drop dead strings from stored permission lists in seed
+- [x] 5.4 Update `AddressSeeder` / entity seeders so each seed client/dependent/school gets its own **linked** address row (same CEP allowed); no unlinked seed rows
+- [x] 5.5 Remove `existsByZipCodeAndNumber` if unused (dead code)
 - [ ] 5.6 `make lint` + `./mvnw verify`; open PR phase 5

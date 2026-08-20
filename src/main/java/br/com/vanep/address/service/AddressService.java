@@ -19,8 +19,6 @@ import java.util.function.LongConsumer;
 import java.util.stream.Collectors;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -58,25 +56,6 @@ public class AddressService {
     return messages.getMessage(key, null, LocaleContextHolder.getLocale());
   }
 
-  public Page<AddressResponseDTO> findAll(Pageable pageable) {
-    return addressRepository.findAll(pageable).map(mapper::toResponse);
-  }
-
-  public AddressResponseDTO findByToken(String token) {
-    return mapper.toResponse(requireByToken(token));
-  }
-
-  public Long resolveAddressId(String addressToken) {
-    return requireByToken(addressToken).getId();
-  }
-
-  public String resolveAddressToken(Long addressId) {
-    if (addressId == null) {
-      return null;
-    }
-    return addressRepository.findById(addressId).map(address -> address.getToken()).orElse(null);
-  }
-
   public AddressResponseDTO toResponseOrNull(Long addressId) {
     if (addressId == null) {
       return null;
@@ -90,39 +69,6 @@ public class AddressService {
     }
     return addressRepository.findAllById(addressIds).stream()
         .collect(Collectors.toMap(address -> address.getId(), mapper::toResponse));
-  }
-
-  @Transactional
-  public AddressResponseDTO create(AddressRequestDTO request) {
-    AddressModel address = new AddressModel();
-    applyRequest(address, request);
-    return mapper.toResponse(addressRepository.save(address));
-  }
-
-  @Transactional
-  public AddressResponseDTO update(String token, AddressRequestDTO request) {
-    AddressModel address = requireByToken(token);
-    applyRequest(address, request);
-    return mapper.toResponse(addressRepository.save(address));
-  }
-
-  @Transactional
-  public void delete(String token) {
-    addressRepository.delete(requireByToken(token));
-  }
-
-  @Transactional
-  public AddressResponseDTO restore(String token) {
-    if (addressRepository.existsDeletedByToken(token)) {
-      addressRepository.restoreByToken(token);
-      return mapper.toResponse(requireByToken(token));
-    }
-
-    if (addressRepository.findByToken(token).isPresent()) {
-      throw new ResponseStatusException(HttpStatus.CONFLICT, message("address.already_active"));
-    }
-
-    throw new ResponseStatusException(HttpStatus.NOT_FOUND, message("address.not_found"));
   }
 
   @Transactional
@@ -283,12 +229,5 @@ public class AddressService {
         .findByToken(cityToken)
         .orElseThrow(
             () -> new ResponseStatusException(HttpStatus.NOT_FOUND, message("city.not_found")));
-  }
-
-  private AddressModel requireByToken(String token) {
-    return addressRepository
-        .findByToken(token)
-        .orElseThrow(
-            () -> new ResponseStatusException(HttpStatus.NOT_FOUND, message("address.not_found")));
   }
 }

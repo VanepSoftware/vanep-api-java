@@ -15,7 +15,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.jdbc.Sql;
-import org.springframework.transaction.annotation.Transactional;
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -75,26 +74,5 @@ class AddressRepositoryTest {
 
     assertThat(repository.findByToken(saved.getToken())).isEmpty();
     assertThat(repository.findAll()).isEmpty();
-  }
-
-  @Test
-  @Transactional
-  void restoreByTokenBringsSoftDeletedAddressBack() {
-    AddressModel saved = repository.saveAndFlush(newAddress("Rua Restaurada", "20"));
-    String token = saved.getToken();
-    repository.delete(saved);
-    repository.flush();
-
-    assertThat(repository.existsDeletedByToken(token)).isTrue();
-    assertThat(repository.restoreByToken(token)).isEqualTo(1);
-    assertThat(repository.existsDeletedByToken(token)).isFalse();
-  }
-
-  @Test
-  void existsByZipCodeAndNumberMatchesActiveAddress() {
-    repository.save(newAddress("Rua Barão de Jaguara", "1481"));
-
-    assertThat(repository.existsByZipCodeAndNumber("13015904", "1481")).isTrue();
-    assertThat(repository.existsByZipCodeAndNumber("13015904", "9999")).isFalse();
   }
 }

@@ -179,7 +179,6 @@ class ClientServiceTest {
     assertThat(result).isEqualTo(response);
     assertThat(client.getPhoto()).isEqualTo("photo.jpg");
     assertThat(client.getAddressId()).isEqualTo(5L);
-    verify(addressService, never()).resolveAddressId(any());
     verify(addressService, never()).upsertForClient(any(), any());
   }
 

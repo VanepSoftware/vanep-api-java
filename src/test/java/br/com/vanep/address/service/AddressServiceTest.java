@@ -33,8 +33,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.MessageSource;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -115,19 +113,6 @@ class AddressServiceTest {
   }
 
   @Test
-  void findAllReturnsPagedResponses() {
-    AddressModel address = addressWithToken("abc");
-    AddressResponseDTO response = responseFor("abc");
-    when(addressRepository.findAll(any(Pageable.class)))
-        .thenReturn(new PageImpl<>(List.of(address)));
-    when(mapper.toResponse(address)).thenReturn(response);
-
-    var result = service.findAll(Pageable.unpaged());
-
-    assertThat(result.getContent()).containsExactly(response);
-  }
-
-  @Test
   void toResponseOrNullReturnsNullWhenIdIsNull() {
     assertThat(service.toResponseOrNull(null)).isNull();
     verify(addressRepository, never()).findById(anyLong());
@@ -161,139 +146,6 @@ class AddressServiceTest {
     Map<Long, AddressResponseDTO> result = service.toResponsesByIds(List.of(10L));
 
     assertThat(result).containsEntry(10L, response);
-  }
-
-  @Test
-  void findByTokenReturnsResponse() {
-    AddressModel address = addressWithToken("tok");
-    AddressResponseDTO response = responseFor("tok");
-    when(addressRepository.findByToken("tok")).thenReturn(Optional.of(address));
-    when(mapper.toResponse(address)).thenReturn(response);
-
-    assertThat(service.findByToken("tok")).isEqualTo(response);
-  }
-
-  @Test
-  void findByTokenThrows404WhenNotFound() {
-    when(addressRepository.findByToken("missing")).thenReturn(Optional.empty());
-
-    assertThatThrownBy(() -> service.findByToken("missing"))
-        .isInstanceOf(ResponseStatusException.class)
-        .hasMessageContaining("404");
-  }
-
-  @Test
-  void createPersistsAddress() {
-    AddressModel saved = addressWithToken("tok");
-    AddressResponseDTO response = responseFor("tok");
-    when(cityRepository.findByToken("city-campinas")).thenReturn(Optional.of(city()));
-    when(addressRepository.save(any(AddressModel.class))).thenReturn(saved);
-    when(mapper.toResponse(saved)).thenReturn(response);
-
-    AddressResponseDTO result = service.create(requestFor("city-campinas", "Rua Barão de Jaguara"));
-
-    assertThat(result).isEqualTo(response);
-    verify(addressRepository).save(any(AddressModel.class));
-  }
-
-  @Test
-  void createThrows404WhenCityNotFound() {
-    when(cityRepository.findByToken("missing")).thenReturn(Optional.empty());
-
-    assertThatThrownBy(() -> service.create(requestFor("missing", "Rua Qualquer")))
-        .isInstanceOf(ResponseStatusException.class)
-        .hasMessageContaining("404");
-    verify(addressRepository, never()).save(any(AddressModel.class));
-  }
-
-  @Test
-  void updatePersistsFields() {
-    AddressModel address = addressWithToken("tok");
-    AddressResponseDTO response = responseFor("tok");
-    when(addressRepository.findByToken("tok")).thenReturn(Optional.of(address));
-    when(cityRepository.findByToken("city-campinas")).thenReturn(Optional.of(city()));
-    when(addressRepository.save(address)).thenReturn(address);
-    when(mapper.toResponse(address)).thenReturn(response);
-
-    AddressResponseDTO result = service.update("tok", requestFor("city-campinas", "Avenida Nova"));
-
-    assertThat(result).isEqualTo(response);
-    assertThat(address.getStreet()).isEqualTo("Avenida Nova");
-  }
-
-  @Test
-  void updateThrows404WhenAddressNotFound() {
-    when(addressRepository.findByToken("missing")).thenReturn(Optional.empty());
-
-    assertThatThrownBy(() -> service.update("missing", requestFor("city-campinas", "Rua X")))
-        .isInstanceOf(ResponseStatusException.class)
-        .hasMessageContaining("404");
-  }
-
-  @Test
-  void updateThrows404WhenCityNotFound() {
-    AddressModel address = addressWithToken("tok");
-    when(addressRepository.findByToken("tok")).thenReturn(Optional.of(address));
-    when(cityRepository.findByToken("missing")).thenReturn(Optional.empty());
-
-    assertThatThrownBy(() -> service.update("tok", requestFor("missing", "Rua X")))
-        .isInstanceOf(ResponseStatusException.class)
-        .hasMessageContaining("404");
-  }
-
-  @Test
-  void deleteSoftDeletesAddress() {
-    AddressModel address = addressWithToken("tok");
-    when(addressRepository.findByToken("tok")).thenReturn(Optional.of(address));
-
-    service.delete("tok");
-
-    verify(addressRepository).delete(address);
-  }
-
-  @Test
-  void deleteThrows404WhenNotFound() {
-    when(addressRepository.findByToken("missing")).thenReturn(Optional.empty());
-
-    assertThatThrownBy(() -> service.delete("missing"))
-        .isInstanceOf(ResponseStatusException.class)
-        .hasMessageContaining("404");
-  }
-
-  @Test
-  void restoreRecoversDeletedAddress() {
-    AddressModel address = addressWithToken("tok");
-    AddressResponseDTO response = responseFor("tok");
-    when(addressRepository.existsDeletedByToken("tok")).thenReturn(true);
-    when(addressRepository.findByToken("tok")).thenReturn(Optional.of(address));
-    when(mapper.toResponse(address)).thenReturn(response);
-
-    AddressResponseDTO result = service.restore("tok");
-
-    assertThat(result).isEqualTo(response);
-    verify(addressRepository).restoreByToken("tok");
-  }
-
-  @Test
-  void restoreThrows409WhenAlreadyActive() {
-    AddressModel address = addressWithToken("tok");
-    when(addressRepository.existsDeletedByToken("tok")).thenReturn(false);
-    when(addressRepository.findByToken("tok")).thenReturn(Optional.of(address));
-
-    assertThatThrownBy(() -> service.restore("tok"))
-        .isInstanceOf(ResponseStatusException.class)
-        .hasMessageContaining("409");
-    verify(addressRepository, never()).restoreByToken("tok");
-  }
-
-  @Test
-  void restoreThrows404WhenNotFound() {
-    when(addressRepository.existsDeletedByToken("missing")).thenReturn(false);
-    when(addressRepository.findByToken("missing")).thenReturn(Optional.empty());
-
-    assertThatThrownBy(() -> service.restore("missing"))
-        .isInstanceOf(ResponseStatusException.class)
-        .hasMessageContaining("404");
   }
 
   @Test
