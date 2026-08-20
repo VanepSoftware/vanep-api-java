@@ -223,6 +223,28 @@ class DependentControllerTest {
   }
 
   @Test
+  void createReturns400WhenNameTooLong() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/dependent")
+                .with(ownerJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"" + "a".repeat(256) + "\"}"))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void createReturns400WhenEmailInvalid() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/dependent")
+                .with(ownerJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"Lucas Souza\",\"email\":\"not-an-email\"}"))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
   void createWithNestedAddressPersistsExclusiveRowDistinctFromClientHome() throws Exception {
     AddressModel home = persistClientHomeAddress();
 
@@ -486,6 +508,60 @@ class DependentControllerTest {
         .andExpect(status().isBadRequest());
 
     assertThat(dependents.findByToken(own.getToken()).orElseThrow().getName()).isEqualTo("Own Kid");
+  }
+
+  @Test
+  void patchReturns400WhenNameTooLong() throws Exception {
+    DependentModel own = createDependent(ownerClientId, "Own Kid", true);
+
+    mockMvc
+        .perform(
+            patch("/api/dependent/" + own.getToken())
+                .with(ownerJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"" + "a".repeat(256) + "\"}"))
+        .andExpect(status().isBadRequest());
+
+    assertThat(dependents.findByToken(own.getToken()).orElseThrow().getName()).isEqualTo("Own Kid");
+  }
+
+  @Test
+  void patchReturns400WhenPhoneTooLong() throws Exception {
+    DependentModel own = createDependent(ownerClientId, "Own Kid", true);
+
+    mockMvc
+        .perform(
+            patch("/api/dependent/" + own.getToken())
+                .with(ownerJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"phone\":\"" + "1".repeat(33) + "\"}"))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void patchReturns400WhenDocumentTooLong() throws Exception {
+    DependentModel own = createDependent(ownerClientId, "Own Kid", true);
+
+    mockMvc
+        .perform(
+            patch("/api/dependent/" + own.getToken())
+                .with(ownerJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"document\":\"" + "1".repeat(65) + "\"}"))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void patchReturns400WhenEmailInvalid() throws Exception {
+    DependentModel own = createDependent(ownerClientId, "Own Kid", true);
+
+    mockMvc
+        .perform(
+            patch("/api/dependent/" + own.getToken())
+                .with(ownerJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"email\":\"not-an-email\"}"))
+        .andExpect(status().isBadRequest());
   }
 
   @Test
