@@ -25,6 +25,7 @@ import br.com.vanep.school.model.SchoolModel;
 import br.com.vanep.school.repository.SchoolRepository;
 import br.com.vanep.state.model.StateModel;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -124,6 +125,42 @@ class AddressServiceTest {
     var result = service.findAll(Pageable.unpaged());
 
     assertThat(result.getContent()).containsExactly(response);
+  }
+
+  @Test
+  void toResponseOrNullReturnsNullWhenIdIsNull() {
+    assertThat(service.toResponseOrNull(null)).isNull();
+    verify(addressRepository, never()).findById(anyLong());
+  }
+
+  @Test
+  void toResponseOrNullReturnsMappedAddress() {
+    AddressModel address = addressWithToken("tok");
+    address.setId(10L);
+    AddressResponseDTO response = responseFor("tok");
+    when(addressRepository.findById(10L)).thenReturn(Optional.of(address));
+    when(mapper.toResponse(address)).thenReturn(response);
+
+    assertThat(service.toResponseOrNull(10L)).isEqualTo(response);
+  }
+
+  @Test
+  void toResponsesByIdsReturnsEmptyMapWithoutQueryWhenNoIds() {
+    assertThat(service.toResponsesByIds(List.of())).isEmpty();
+    verify(addressRepository, never()).findAllById(any());
+  }
+
+  @Test
+  void toResponsesByIdsMapsPersistedRows() {
+    AddressModel address = addressWithToken("tok");
+    address.setId(10L);
+    AddressResponseDTO response = responseFor("tok");
+    when(addressRepository.findAllById(List.of(10L))).thenReturn(List.of(address));
+    when(mapper.toResponse(address)).thenReturn(response);
+
+    Map<Long, AddressResponseDTO> result = service.toResponsesByIds(List.of(10L));
+
+    assertThat(result).containsEntry(10L, response);
   }
 
   @Test

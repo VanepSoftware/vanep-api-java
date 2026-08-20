@@ -13,7 +13,10 @@ import br.com.vanep.dependent.model.DependentModel;
 import br.com.vanep.dependent.repository.DependentRepository;
 import br.com.vanep.school.model.SchoolModel;
 import br.com.vanep.school.repository.SchoolRepository;
+import java.util.Collection;
+import java.util.Map;
 import java.util.function.LongConsumer;
+import java.util.stream.Collectors;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.data.domain.Page;
@@ -72,6 +75,21 @@ public class AddressService {
       return null;
     }
     return addressRepository.findById(addressId).map(address -> address.getToken()).orElse(null);
+  }
+
+  public AddressResponseDTO toResponseOrNull(Long addressId) {
+    if (addressId == null) {
+      return null;
+    }
+    return addressRepository.findById(addressId).map(mapper::toResponse).orElse(null);
+  }
+
+  public Map<Long, AddressResponseDTO> toResponsesByIds(Collection<Long> addressIds) {
+    if (addressIds == null || addressIds.isEmpty()) {
+      return Map.of();
+    }
+    return addressRepository.findAllById(addressIds).stream()
+        .collect(Collectors.toMap(AddressModel::getId, mapper::toResponse));
   }
 
   @Transactional
