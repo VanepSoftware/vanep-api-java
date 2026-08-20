@@ -1,34 +1,58 @@
 package br.com.vanep.dependent.dto;
 
+import br.com.vanep.address.dto.AddressRequestDTO;
 import br.com.vanep.dependent.enums.Shift;
 import br.com.vanep.user.enums.Gender;
+import jakarta.validation.Valid;
 import java.time.LocalDate;
-import lombok.Getter;
-import lombok.Setter;
+import org.openapitools.jackson.nullable.JsonNullable;
 
-@Getter
-@Setter
-public class DependentUpdateDTO {
+public record DependentUpdateDTO(
+    JsonNullable<String> name,
+    JsonNullable<LocalDate> birthDate,
+    JsonNullable<Gender> gender,
+    JsonNullable<String> document,
+    JsonNullable<String> phone,
+    JsonNullable<String> email,
+    JsonNullable<Boolean> isSelf,
+    JsonNullable<Boolean> isDefault,
+    JsonNullable<Shift> shift,
+    JsonNullable<@Valid AddressRequestDTO> address,
+    JsonNullable<String> schoolToken) {
 
-  private String name;
-
-  private LocalDate birthDate;
-
-  private Gender gender;
-
-  private String document;
-
-  private String phone;
-
-  private String email;
-
-  private Boolean isSelf;
-
-  private Boolean isDefault;
-
-  private Shift shift;
-
-  private String schoolToken;
-
-  private String addressToken;
+  public DependentUpdateDTO {
+    if (name == null) {
+      name = JsonNullable.undefined();
+    }
+    if (birthDate == null) {
+      birthDate = JsonNullable.undefined();
+    }
+    if (gender == null) {
+      gender = JsonNullable.undefined();
+    }
+    if (document == null) {
+      document = JsonNullable.undefined();
+    }
+    if (phone == null) {
+      phone = JsonNullable.undefined();
+    }
+    if (email == null) {
+      email = JsonNullable.undefined();
+    }
+    if (isSelf == null) {
+      isSelf = JsonNullable.undefined();
+    }
+    if (isDefault == null) {
+      isDefault = JsonNullable.undefined();
+    }
+    if (shift == null) {
+      shift = JsonNullable.undefined();
+    }
+    if (address == null) {
+      address = JsonNullable.undefined();
+    }
+    if (schoolToken == null) {
+      schoolToken = JsonNullable.undefined();
+    }
+  }
 }
