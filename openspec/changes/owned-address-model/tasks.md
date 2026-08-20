@@ -1,9 +1,9 @@
 ## 0. Preparation
 
-- [ ] 0.1 Create branch `feat/owned-address-model` from `main`
-- [ ] 0.2 Review `proposal.md`, `design.md`, and specs (`owned-address`, `client-home-address`, `dependent`, `school-owned-address`)
-- [ ] 0.3 Confirm next Flyway version is **V20** (after `V19__add_user_profile_edit_columns.sql`)
-- [ ] 0.4 Recreate the local Postgres database (drop Docker volume / schema) so V20 applies on empty data — no backfill
+- [x] 0.1 Create branch `feat/owned-address-model` from `main`
+- [x] 0.2 Review `proposal.md`, `design.md`, and specs (`owned-address`, `client-home-address`, `dependent`, `school-owned-address`)
+- [x] 0.3 Confirm next Flyway version is **V20** (after `V19__add_user_profile_edit_columns.sql`)
+- [x] 0.4 Recreate the local Postgres database (drop Docker volume / schema) so V20 applies on empty data — no backfill
 
 ## 1. Phase 1 — Schema + AddressService (PR 1)
 
@@ -11,12 +11,12 @@
 > Depends on: — | Parallel with: —
 > Order: test → migration → repository → messages → service
 
-- [ ] 1.1 Persistence tests: two active clients cannot share the same `address_id` after the unique index
-- [ ] 1.2 Add `V20__owned_address_foreign_keys.sql`: FKs `address_id → address(id)` and partial unique indexes `WHERE address_id IS NOT NULL AND deleted_at IS NULL` on each owner table — no clone SQL
-- [ ] 1.3 Update table/column comments: address belongs to one owner, not a platform catalog; adjust `clean.sql` only if FK order requires it
-- [ ] 1.4 Unit tests for `upsertForClient` / `upsertForDependent` / `upsertForSchool`: first save creates+links; second save updates same id; clear calls `delete` and nulls pointer; unknown `cityToken` → 404 `city.not_found`; already owned → 409 `address.already_owned`; count exclusivity uses only active owners
-- [ ] 1.5 MessageSource keys EN + `messages_pt_BR.properties` (`address.already_owned`; reuse `address.not_found` / `city.not_found`)
-- [ ] 1.6 Implement upsert/clear and cross-table **active** ownership count on `AddressService`; repository queries without N+1
+- [x] 1.1 Unique pointers live in V20 on Postgres (`WHERE address_id IS NOT NULL AND deleted_at IS NULL`). H2 tests do not run Flyway — do not add a test-only unique index. Cross-table exclusivity is asserted in `AddressService` unit tests (task 1.4, 409 `address.already_owned`)
+- [x] 1.2 Add `V20__owned_address_foreign_keys.sql`: FKs `address_id → address(id)` and partial unique indexes `WHERE address_id IS NOT NULL AND deleted_at IS NULL` on each owner table — no clone SQL
+- [x] 1.3 Update table/column comments: address belongs to one owner, not a platform catalog; adjust `clean.sql` only if FK order requires it
+- [x] 1.4 Unit tests for `upsertForClient` / `upsertForDependent` / `upsertForSchool`: first save creates+links; second save updates same id; clear calls `delete` and nulls pointer; unknown `cityToken` → 404 `city.not_found`; already owned → 409 `address.already_owned`; count exclusivity uses only active owners
+- [x] 1.5 MessageSource keys EN + `messages_pt_BR.properties` (`address.already_owned`; reuse `address.not_found` / `city.not_found`)
+- [x] 1.6 Implement upsert/clear and cross-table **active** ownership count on `AddressService`; repository queries without N+1
 - [ ] 1.7 `make lint` + `./mvnw verify`; open PR phase 1 (pt-BR, lint/test status)
 
 ## 2. Phase 2 — Client `/me` address (PR 2)

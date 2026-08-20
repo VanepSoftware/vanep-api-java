@@ -9,4 +9,8 @@ public interface ClientRepository extends JpaRepository<ClientModel, Long> {
   Optional<ClientModel> findByToken(String token);
 
   Optional<ClientModel> findByUserId(Long userId);
+
+  long countByAddressId(Long addressId);
+
+  long countByAddressIdAndIdNot(Long addressId, Long id);
 }
