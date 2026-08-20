@@ -64,4 +64,4 @@
 - [x] 5.3 Remove `LIST_ADDRESSES`, `SHOW_ADDRESS`, `CREATE_ADDRESS`, `UPDATE_ADDRESS`, `DELETE_ADDRESS` from `PermissionEnum` and ADMIN (and any) bundles; drop dead strings from stored permission lists in seed
 - [x] 5.4 Update `AddressSeeder` / entity seeders so each seed client/dependent/school gets its own **linked** address row (same CEP allowed); no unlinked seed rows
 - [x] 5.5 Remove `existsByZipCodeAndNumber` if unused (dead code)
-- [ ] 5.6 `make lint` + `./mvnw verify`; open PR phase 5
+- [x] 5.6 `make lint` + `./mvnw verify`; open PR phase 5
