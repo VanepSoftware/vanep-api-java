@@ -17,7 +17,7 @@
 - [x] 1.4 Unit tests for `upsertForClient` / `upsertForDependent` / `upsertForSchool`: first save creates+links; second save updates same id; clear calls `delete` and nulls pointer; unknown `cityToken` → 404 `city.not_found`; already owned → 409 `address.already_owned`; count exclusivity uses only active owners
 - [x] 1.5 MessageSource keys EN + `messages_pt_BR.properties` (`address.already_owned`; reuse `address.not_found` / `city.not_found`)
 - [x] 1.6 Implement upsert/clear and cross-table **active** ownership count on `AddressService`; repository queries without N+1
-- [ ] 1.7 `make lint` + `./mvnw verify`; open PR phase 1 (pt-BR, lint/test status)
+- [x] 1.7 `make lint` + `./mvnw verify`; open PR phase 1 (pt-BR, lint/test status)
 
 ## 2. Phase 2 — Client `/me` address (PR 2)
 
