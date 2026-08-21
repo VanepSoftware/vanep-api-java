@@ -31,6 +31,7 @@ import br.com.vanep.state.seed.StateSeeder;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -171,6 +172,46 @@ class DataSeederTest {
     assertThat(captor.getAllValues())
         .extracting(bundle -> bundle.getName())
         .containsExactlyInAnyOrder("CLIENT", "ASSISTANT", "DRIVER");
+  }
+
+  @Test
+  void resyncsAdminBundleDroppingRemovedAddressPermissions() {
+    seeder.enabled = true;
+    RolePermissionModel stale = new RolePermissionModel();
+    stale.setName("ADMIN");
+    List<String> stalePermissions = new ArrayList<>(PermissionRegistry.all());
+    stalePermissions.add("list_addresses");
+    stalePermissions.add("show_address");
+    stalePermissions.add("create_address");
+    stalePermissions.add("update_address");
+    stalePermissions.add("delete_address");
+    stale.setPermissions(stalePermissions);
+
+    RoleModel adminRole = roleTaggedAs(RoleName.ADMIN);
+    adminRole.setRolePermission(stale);
+    RoleModel clientRole = roleTaggedAs(RoleName.CLIENT);
+    clientRole.setRolePermission(new RolePermissionModel());
+    RoleModel driverRole = roleTaggedAs(RoleName.DRIVER);
+    driverRole.setRolePermission(new RolePermissionModel());
+    RoleModel assistantRole = roleTaggedAs(RoleName.ASSISTANT);
+    assistantRole.setRolePermission(new RolePermissionModel());
+    when(roles.findByRoleName(RoleName.ADMIN)).thenReturn(Optional.of(adminRole));
+    when(roles.findByRoleName(RoleName.CLIENT)).thenReturn(Optional.of(clientRole));
+    when(roles.findByRoleName(RoleName.DRIVER)).thenReturn(Optional.of(driverRole));
+    when(roles.findByRoleName(RoleName.ASSISTANT)).thenReturn(Optional.of(assistantRole));
+    when(users.existsByEmail(anyString())).thenReturn(true);
+    when(users.findByTypeAndRoleIdIsNull(UserType.ADMIN)).thenReturn(List.of());
+    when(rolePermissions.save(any(RolePermissionModel.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+
+    seeder.run(new DefaultApplicationArguments());
+
+    ArgumentCaptor<RolePermissionModel> captor = ArgumentCaptor.forClass(RolePermissionModel.class);
+    verify(rolePermissions).save(captor.capture());
+    assertThat(captor.getValue().getPermissions())
+        .containsExactlyInAnyOrderElementsOf(PermissionRegistry.all())
+        .doesNotContain(
+            "list_addresses", "show_address", "create_address", "update_address", "delete_address");
   }
 
   @Test

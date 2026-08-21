@@ -1,6 +1,7 @@
 package br.com.vanep.permission.controller;
 
 import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.not;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -62,6 +63,11 @@ class PermissionControllerTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$").isArray())
         .andExpect(jsonPath("$", hasItem("list_drivers")))
-        .andExpect(jsonPath("$", hasItem("create_role_permission")));
+        .andExpect(jsonPath("$", hasItem("create_role_permission")))
+        .andExpect(jsonPath("$", not(hasItem("list_addresses"))))
+        .andExpect(jsonPath("$", not(hasItem("show_address"))))
+        .andExpect(jsonPath("$", not(hasItem("create_address"))))
+        .andExpect(jsonPath("$", not(hasItem("update_address"))))
+        .andExpect(jsonPath("$", not(hasItem("delete_address"))));
   }
 }
