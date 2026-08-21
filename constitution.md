@@ -35,60 +35,61 @@ Rules that MUST be followed in this codebase. Stack: **Java 25, Spring Boot 4, M
 
 ## API design
 
-10. **Validate request input with Bean Validation on dedicated request DTOs**, applied via `@Valid` in the controller — do not validate ad hoc inside business logic.
+10. **Validate request input with Bean Validation on dedicated request DTOs**, applied via `@Valid` in the controller — do not validate ad hoc inside business logic. Exception for PATCH: do **not** put `@NotNull` / `@NotBlank` on `JsonNullable` fields (omitted JSON would fail). Nested `@Valid` still applies when a present field is an object. Present-null vs present-blank vs uniqueness belong in the `@Service`.
 11. **Never bind a request body directly to a JPA model.** Accept a request DTO, map explicitly to the model. This is our equivalent of guarding against mass assignment.
 12. **Shape responses with explicit response DTOs** — never return raw JPA model graphs to clients (avoids lazy-loading leaks and over-exposure).
 13. **Expose and accept public resource identifiers as opaque `token` strings** (see `SecureTokens`), never internal numeric/sequential `id`s.
 14. **Represent fixed sets of values as backed Java `enum`s**, not loose strings or ints.
 15. **Prefix REST controllers with the global `/api`** (see `ApiWebConfig`) and keep them in `*.controller` packages.
+16. **Partial update is PATCH + `JsonNullable` on every mutable field** of that DTO (see `UserProfileUpdateRequestDTO`: compact canonical `undefined()` in the constructor). Omitted JSON → stored value unchanged. Present non-null → persist. Present JSON `null` → clear if the column is nullable; HTTP 400 if the column is NOT NULL (or the field must not be cleared). Do **not** wrap only a nested field and leave sibling `String`s — omit and `"x": null` collapse to the same Java `null`. Do **not** treat `if (getX() != null)` as omit (that cannot clear). Do **not** reuse the create `applyRequest` on PATCH (that is replace and copies nulls). Merge with `isPresent()` in the `@Service`. POST create remains a full body without `JsonNullable`. PUT remains full replace of a resource **or** of a dedicated sub-resource (e.g. `PUT /api/clients/me/address` with a complete `@Valid` address body). New partial-update endpoints MUST follow this rule. Existing PUT replace MAY stay until that resource is converted; when converting, convert the **whole** update DTO. Each PATCH MUST include a named test that a single-field body leaves every other stored field unchanged.
 
 ## Persistence
 
-16. **Avoid N+1 queries** when returning related data: use fetch joins, `@EntityGraph`, or batch fetching — do not lazily iterate associations in a loop.
-17. **Apply all schema changes through Flyway migrations** in `src/main/resources/db/migration`; never alter the database manually and never recreate existing tables — extend with new versioned revisions (see rule 2).
-18. **Use soft delete for all removable domain models.** Annotate models with Hibernate `@SoftDelete(columnName = "deleted_at", strategy = SoftDeleteType.TIMESTAMP)` and add a nullable `deleted_at` column in Flyway migrations. Call `repository.delete(model)` — Hibernate translates it to an `UPDATE`, not a physical `DELETE`. Do not map `deleted_at` as a Java field unless you need to read it explicitly; the annotation manages the column. Never issue native `DELETE FROM` or `@Query` deletes on soft-deletable tables in application code; reserve physical deletes for test cleanup scripts (e.g. `clean.sql`). For unique constraints on soft-deletable columns, use partial indexes with `WHERE deleted_at IS NULL` (see V6/V10 migrations).
+17. **Avoid N+1 queries** when returning related data: use fetch joins, `@EntityGraph`, or batch fetching — do not lazily iterate associations in a loop.
+18. **Apply all schema changes through Flyway migrations** in `src/main/resources/db/migration`; never alter the database manually and never recreate existing tables — extend with new versioned revisions (see rule 2).
+19. **Use soft delete for all removable domain models.** Annotate models with Hibernate `@SoftDelete(columnName = "deleted_at", strategy = SoftDeleteType.TIMESTAMP)` and add a nullable `deleted_at` column in Flyway migrations. Call `repository.delete(model)` — Hibernate translates it to an `UPDATE`, not a physical `DELETE`. Do not map `deleted_at` as a Java field unless you need to read it explicitly; the annotation manages the column. Never issue native `DELETE FROM` or `@Query` deletes on soft-deletable tables in application code; reserve physical deletes for test cleanup scripts (e.g. `clean.sql`). For unique constraints on soft-deletable columns, use partial indexes with `WHERE deleted_at IS NULL` (see V6/V10 migrations).
 
 ## Security
 
-19. **Protect routes through Spring Security / the OAuth2 Authorization Server.** New endpoints must declare their authorization rules in `SecurityConfig` (or method security); do not ship a publicly reachable endpoint by omission.
-20. **When adding a client-facing resource, define its authorization rule explicitly** alongside the endpoint — authorization is part of the feature, not a follow-up.
-21. **Centralize ownership (resource-owner) authorization in the global `SecurityEvaluator` bean (`@sec`), never in per-feature security services.** When an endpoint must also allow the resource's owner (e.g. `@PreAuthorize("hasAuthority('update_vehicle') or @sec.isVehicleOwner(#token, authentication)")`), add an `is<Entity>Owner(String token, Authentication authentication)` method to `SecurityEvaluator` (`br.com.vanep.auth.security`) that resolves the caller with `SecurityHelper.getCallerUid(authentication)` and compares it to the resource owner's user token. Do **not** create a `*SecurityService` per feature (e.g. `ClientSecurityService`, `VehicleSecurityService`) — that duplicates the same pattern across packages; those were consolidated into `@sec` in the ownership refactor.
+20. **Protect routes through Spring Security / the OAuth2 Authorization Server.** New endpoints must declare their authorization rules in `SecurityConfig` (or method security); do not ship a publicly reachable endpoint by omission.
+21. **When adding a client-facing resource, define its authorization rule explicitly** alongside the endpoint — authorization is part of the feature, not a follow-up.
+22. **Centralize ownership (resource-owner) authorization in the global `SecurityEvaluator` bean (`@sec`), never in per-feature security services.** When an endpoint must also allow the resource's owner (e.g. `@PreAuthorize("hasAuthority('update_vehicle') or @sec.isVehicleOwner(#token, authentication)")`), add an `is<Entity>Owner(String token, Authentication authentication)` method to `SecurityEvaluator` (`br.com.vanep.auth.security`) that resolves the caller with `SecurityHelper.getCallerUid(authentication)` and compares it to the resource owner's user token. Do **not** create a `*SecurityService` per feature (e.g. `ClientSecurityService`, `VehicleSecurityService`) — that duplicates the same pattern across packages; those were consolidated into `@sec` in the ownership refactor.
 
 ## Testing
 
-22. **Every new feature (or relevant change) ships with tests** covering its main behavior: unit tests (Mockito) for services/validators/policies, slice tests (`MockMvc` + security) for HTTP endpoints.
-23. **The build enforces a minimum line coverage (JaCoCo) on `verify`.** Run `./mvnw verify` (or `make test-coverage`) locally before opening a PR — a green local build prevents CI rework.
-24. **Tests use H2 in memory**; reuse the existing test profiles/properties in `src/test/resources` instead of inventing parallel config files.
+23. **Every new feature (or relevant change) ships with tests** covering its main behavior: unit tests (Mockito) for services/validators/policies, slice tests (`MockMvc` + security) for HTTP endpoints.
+24. **The build enforces a minimum line coverage (JaCoCo) on `verify`.** Run `./mvnw verify` (or `make test-coverage`) locally before opening a PR — a green local build prevents CI rework.
+25. **Tests use H2 in memory**; reuse the existing test profiles/properties in `src/test/resources` instead of inventing parallel config files.
 
 ## Code quality (Clean Code)
 
-25. **Write tests before the code** they cover (test-first).
-26. **Small functions, single purpose.** If you describe it with "and then… and after that…", split it.
-27. **Function names start with a verb and say exactly what they do.** Prefer `validateCpf()` over `handleData()`, `driverIndex` over `i`. Avoid generic names like `process()`, `handle()`, `calculate()`.
-28. **Use consistent vocabulary** across the codebase — pick `find` *or* `get` for the same idea and stick to it.
-29. **Comments explain the "why", not the "what".** Improve the code first; comment only what is non-obvious (business rules, workarounds for external bugs).
-30. **Explicit, clean error handling.** Throw meaningful exceptions; never swallow errors in empty `catch` blocks; don't mix business logic with error-handling noise.
-31. **Remove duplication and keep cohesion** (DRY + single responsibility per class).
-32. **Avoid `private` methods where a small, named, testable method would do; minimize unnecessary privacy.**
-33. **Delete dead code.** Leave code cleaner than you found it (boy scout rule); treat refactoring as first-class work.
-34. **When refactoring, prioritize clarity over conciseness.**
+26. **Write tests before the code** they cover (test-first).
+27. **Small functions, single purpose.** If you describe it with "and then… and after that…", split it.
+28. **Function names start with a verb and say exactly what they do.** Prefer `validateCpf()` over `handleData()`, `driverIndex` over `i`. Avoid generic names like `process()`, `handle()`, `calculate()`.
+29. **Use consistent vocabulary** across the codebase — pick `find` *or* `get` for the same idea and stick to it.
+30. **Comments explain the "why", not the "what".** Improve the code first; comment only what is non-obvious (business rules, workarounds for external bugs).
+31. **Explicit, clean error handling.** Throw meaningful exceptions; never swallow errors in empty `catch` blocks; don't mix business logic with error-handling noise.
+32. **Remove duplication and keep cohesion** (DRY + single responsibility per class).
+33. **Avoid `private` methods where a small, named, testable method would do; minimize unnecessary privacy.**
+34. **Delete dead code.** Leave code cleaner than you found it (boy scout rule); treat refactoring as first-class work.
+35. **When refactoring, prioritize clarity over conciseness.**
 
 ## Phased delivery
 
-35. **Split feature work into phases**; ship each phase on its own branch with one PR. Phases must be explicit and numbered in a generated `tasks.md`.
-36. **Before code generation, produce a dependency graph, layer assignment, and a PR plan table** (`| Phase | Contents | Depends on | Parallel with |`); do not implement until the plan is approved.
-37. **Dependency first:** artifacts with zero internal dependencies form the first PR; never generate a later layer before its dependency.
-38. **One dependency layer per PR**; never mix artifacts from different layers, and never ship an interface and its implementation in the same PR. If an upper layer ships first, use stubs/mocks until the dependency PR merges.
-39. **PRs in the same layer may be reviewed in parallel** only when they do not depend on each other.
-40. **Cap each PR at ~600 productive lines and 10 new files**; subdivide before implementing if exceeded.
-41. **Per phase, implement in order:** test → migration → model → repository → security/authorization → request DTO → service → controller → response DTO. Run migrations before tasks that depend on the new schema.
-42. **Every phase includes its own automated tests** (unit + slice) covering only the code delivered in that phase; do not defer testing to a later phase. CI must pass after each phase.
-43. **Run `./mvnw spotless:check` (`make lint`) and `./mvnw verify` (`make test-coverage`) before opening each phase PR.**
+36. **Split feature work into phases**; ship each phase on its own branch with one PR. Phases must be explicit and numbered in a generated `tasks.md`.
+37. **Before code generation, produce a dependency graph, layer assignment, and a PR plan table** (`| Phase | Contents | Depends on | Parallel with |`); do not implement until the plan is approved.
+38. **Dependency first:** artifacts with zero internal dependencies form the first PR; never generate a later layer before its dependency.
+39. **One dependency layer per PR**; never mix artifacts from different layers, and never ship an interface and its implementation in the same PR. If an upper layer ships first, use stubs/mocks until the dependency PR merges.
+40. **PRs in the same layer may be reviewed in parallel** only when they do not depend on each other.
+41. **Cap each PR at ~600 productive lines and 10 new files**; subdivide before implementing if exceeded.
+42. **Per phase, implement in order:** test → migration → model → repository → security/authorization → request DTO → service → controller → response DTO. Run migrations before tasks that depend on the new schema.
+43. **Every phase includes its own automated tests** (unit + slice) covering only the code delivered in that phase; do not defer testing to a later phase. CI must pass after each phase.
+44. **Run `./mvnw spotless:check` (`make lint`) and `./mvnw verify` (`make test-coverage`) before opening each phase PR.**
 
 ## Conventions
 
-44. **The build requires Spotless (Google Java Format).** Auto-fix with `make lint-fix` / `./mvnw spotless:apply`; verify with `make lint` / `./mvnw spotless:check`. Unformatted code fails CI. Never exclude `db/migration/` from migration-checksum protection while formatting (see rule 2).
-45. **Write user-facing validation and business error messages in Portuguese (pt-BR)**, consistent with existing controllers. Never hardcode the pt-BR string at the throw site — use an English message *key* (e.g. `role_permission.name.duplicate`) resolved through Spring's `MessageSource` (`src/main/resources/messages.properties` for the English default, `messages_pt_BR.properties` for the pt-BR translation actually served; `spring.mvc.locale=pt_BR` is fixed in `application.properties`). Inject `MessageSource` into the `@Service` and resolve with `messages.getMessage(key, args, LocaleContextHolder.getLocale())` before throwing.
-46. **Write commit messages and PR descriptions in pt-BR.** Include test and lint status in the PR description, and link the PR to its GitHub issue (`Closes #N` / via the GitHub Project) — we track work through native GitHub Issues/Projects, not ticket-prefixed titles.
-47. **Name files, classes, packages, and code identifiers in English — never pt-BR.** The codebase is English (`client`, `driver`, `user`, `ClientController`, `ClientRepository`); a new file must follow the same. This is the deliberate inverse of rules 45–46: *only* user-facing messages (rule 45) and commit/PR descriptions (rule 46) are pt-BR; everything in source — file names, identifiers, types — stays English.
-48. **Keep all non-user-facing string literals in source code in English** — MessageSource keys, logs, comments, and internal constants.
+45. **The build requires Spotless (Google Java Format).** Auto-fix with `make lint-fix` / `./mvnw spotless:apply`; verify with `make lint` / `./mvnw spotless:check`. Unformatted code fails CI. Never exclude `db/migration/` from migration-checksum protection while formatting (see rule 2).
+46. **Write user-facing validation and business error messages in Portuguese (pt-BR)**, consistent with existing controllers. Never hardcode the pt-BR string at the throw site — use an English message *key* (e.g. `role_permission.name.duplicate`) resolved through Spring's `MessageSource` (`src/main/resources/messages.properties` for the English default, `messages_pt_BR.properties` for the pt-BR translation actually served; `spring.mvc.locale=pt_BR` is fixed in `application.properties`). Inject `MessageSource` into the `@Service` and resolve with `messages.getMessage(key, args, LocaleContextHolder.getLocale())` before throwing.
+47. **Write commit messages and PR descriptions in pt-BR.** Include test and lint status in the PR description, and link the PR to its GitHub issue (`Closes #N` / via the GitHub Project) — we track work through native GitHub Issues/Projects, not ticket-prefixed titles.
+48. **Name files, classes, packages, and code identifiers in English — never pt-BR.** The codebase is English (`client`, `driver`, `user`, `ClientController`, `ClientRepository`); a new file must follow the same. This is the deliberate inverse of rules 46–47: *only* user-facing messages (rule 46) and commit/PR descriptions (rule 47) are pt-BR; everything in source — file names, identifiers, types — stays English.
+49. **Keep all non-user-facing string literals in source code in English** — MessageSource keys, logs, comments, and internal constants.
