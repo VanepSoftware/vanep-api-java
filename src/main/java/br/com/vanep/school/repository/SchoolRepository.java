@@ -13,6 +13,8 @@ public interface SchoolRepository extends JpaRepository<SchoolModel, Long> {
 
   boolean existsByCnpj(String cnpj);
 
+  boolean existsByCnpjAndTokenNot(String cnpj, String token);
+
   boolean existsByName(String name);
 
   long countByAddressId(Long addressId);

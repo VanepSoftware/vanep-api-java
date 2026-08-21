@@ -1,16 +1,27 @@
 package br.com.vanep.school.controller;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import br.com.vanep.address.model.AddressModel;
+import br.com.vanep.address.repository.AddressRepository;
+import br.com.vanep.city.model.CityModel;
+import br.com.vanep.city.repository.CityRepository;
+import br.com.vanep.country.model.CountryModel;
+import br.com.vanep.country.repository.CountryRepository;
 import br.com.vanep.school.model.SchoolModel;
 import br.com.vanep.school.repository.SchoolRepository;
+import br.com.vanep.state.model.StateModel;
+import br.com.vanep.state.repository.StateRepository;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -32,13 +43,38 @@ class SchoolControllerTest {
 
   @Autowired private WebApplicationContext context;
   @Autowired private SchoolRepository schools;
+  @Autowired private AddressRepository addresses;
+  @Autowired private CityRepository cities;
+  @Autowired private StateRepository states;
+  @Autowired private CountryRepository countries;
 
   private MockMvc mockMvc;
   private String schoolToken;
+  private String cityToken;
 
   @BeforeEach
   void setUp() {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
+
+    CountryModel country = new CountryModel();
+    country.setName("Brasil");
+    country.setIsoCode("BR");
+    country.setPhoneCode("+55");
+    country.setCurrency("BRL");
+    country.setLocale("pt-BR");
+    country = countries.save(country);
+
+    StateModel state = new StateModel();
+    state.setName("São Paulo");
+    state.setUf("SP");
+    state.setCountry(country);
+    state = states.save(state);
+
+    CityModel city = new CityModel();
+    city.setState(state);
+    city.setName("Campinas");
+    city = cities.save(city);
+    cityToken = city.getToken();
 
     SchoolModel school = new SchoolModel();
     school.setName("Escola Teste");
@@ -76,6 +112,30 @@ class SchoolControllerTest {
         .authorities(new SimpleGrantedAuthority("ROLE_CLIENT"));
   }
 
+  private AddressModel persistSchoolAddress(SchoolModel school, String street, String number) {
+    CityModel city = cities.findByToken(cityToken).orElseThrow();
+    AddressModel address = new AddressModel();
+    address.setCity(city);
+    address.setZipCode("13015904");
+    address.setStreet(street);
+    address.setNumber(number);
+    address.setDistrict("Centro");
+    address = addresses.save(address);
+    school.setAddressId(address.getId());
+    schools.save(school);
+    return address;
+  }
+
+  private String addressJson(String street, String number) {
+    return "{\"cityToken\":\""
+        + cityToken
+        + "\",\"zipCode\":\"13015904\",\"street\":\""
+        + street
+        + "\",\"number\":\""
+        + number
+        + "\",\"district\":\"Centro\"}";
+  }
+
   @Test
   void listRequiresAuthentication() throws Exception {
     mockMvc.perform(get("/api/schools")).andExpect(status().isUnauthorized());
@@ -91,7 +151,8 @@ class SchoolControllerTest {
     mockMvc
         .perform(get("/api/schools").with(adminJwt()))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.content[0].token").value(schoolToken));
+        .andExpect(jsonPath("$.content[0].token").value(schoolToken))
+        .andExpect(jsonPath("$.content[0].addressId").doesNotExist());
   }
 
   @Test
@@ -106,7 +167,9 @@ class SchoolControllerTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.token").value(schoolToken))
         .andExpect(jsonPath("$.name").value("Escola Teste"))
-        .andExpect(jsonPath("$.cnpj").value("11222333000181"));
+        .andExpect(jsonPath("$.cnpj").value("11222333000181"))
+        .andExpect(jsonPath("$.address").value(nullValue()))
+        .andExpect(jsonPath("$.addressId").doesNotExist());
   }
 
   @Test
@@ -161,7 +224,52 @@ class SchoolControllerTest {
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.token").isNotEmpty())
         .andExpect(jsonPath("$.name").value("Nova Escola"))
-        .andExpect(jsonPath("$.cnpj").value("44555666000172"));
+        .andExpect(jsonPath("$.cnpj").value("44555666000172"))
+        .andExpect(jsonPath("$.address").value(nullValue()))
+        .andExpect(jsonPath("$.addressId").doesNotExist());
+  }
+
+  @Test
+  void createWithNestedAddressReturns201AndOmitsAddressId() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/schools")
+                .with(adminJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"name\":\"Escola Com Endereco\",\"address\":"
+                        + addressJson("Rua da Escola", "100")
+                        + "}"))
+        .andExpect(status().isCreated())
+        .andExpect(jsonPath("$.address.street").value("Rua da Escola"))
+        .andExpect(jsonPath("$.address.number").value("100"))
+        .andExpect(jsonPath("$.address.cityToken").value(cityToken))
+        .andExpect(jsonPath("$.address.token").isNotEmpty())
+        .andExpect(jsonPath("$.addressId").doesNotExist());
+  }
+
+  @Test
+  void createIgnoresNumericAddressIdAndDoesNotLinkIt() throws Exception {
+    AddressModel catalog =
+        persistSchoolAddress(schools.findByToken(schoolToken).orElseThrow(), "Avenida", "1");
+
+    mockMvc
+        .perform(
+            post("/api/schools")
+                .with(adminJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"name\":\"Escola Sem Catalogo\",\"addressId\":" + catalog.getId() + "}"))
+        .andExpect(status().isCreated())
+        .andExpect(jsonPath("$.address").value(nullValue()))
+        .andExpect(jsonPath("$.addressId").doesNotExist());
+
+    SchoolModel created =
+        schools.findAll().stream()
+            .filter(school -> "Escola Sem Catalogo".equals(school.getName()))
+            .findFirst()
+            .orElseThrow();
+    assertThat(created.getAddressId()).isNull();
   }
 
   @Test
@@ -201,19 +309,21 @@ class SchoolControllerTest {
   void updateReturns200ForAdmin() throws Exception {
     mockMvc
         .perform(
-            put("/api/schools/" + schoolToken)
+            patch("/api/schools/" + schoolToken)
                 .with(adminJwt())
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"name\":\"Escola Atualizada\",\"cnpj\":\"11222333000181\"}"))
+                .content("{\"name\":\"Escola Atualizada\"}"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.name").value("Escola Atualizada"));
+        .andExpect(jsonPath("$.name").value("Escola Atualizada"))
+        .andExpect(jsonPath("$.cnpj").value("11222333000181"))
+        .andExpect(jsonPath("$.addressId").doesNotExist());
   }
 
   @Test
   void updateReturns403ForUserWithoutPermission() throws Exception {
     mockMvc
         .perform(
-            put("/api/schools/" + schoolToken)
+            patch("/api/schools/" + schoolToken)
                 .with(clientJwt())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"name\":\"x\"}"))
@@ -224,11 +334,158 @@ class SchoolControllerTest {
   void updateReturns404WhenMissing() throws Exception {
     mockMvc
         .perform(
-            put("/api/schools/doesnotexist")
+            patch("/api/schools/doesnotexist")
                 .with(adminJwt())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"name\":\"x\"}"))
         .andExpect(status().isNotFound());
+  }
+
+  @Test
+  void putSchoolIsNotMapped() throws Exception {
+    mockMvc
+        .perform(
+            put("/api/schools/" + schoolToken)
+                .with(adminJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"Escola Atualizada\"}"))
+        .andExpect(result -> assertThat(result.getResponse().getStatus()).isIn(404, 405));
+  }
+
+  @Test
+  void patchNestedAddressUpdatesOwnedRowInPlace() throws Exception {
+    SchoolModel school = schools.findByToken(schoolToken).orElseThrow();
+    AddressModel owned = persistSchoolAddress(school, "Rua da Escola", "10");
+
+    mockMvc
+        .perform(
+            patch("/api/schools/" + schoolToken)
+                .with(adminJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"address\":" + addressJson("Rua da Escola", "99") + "}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.address.token").value(owned.getToken()))
+        .andExpect(jsonPath("$.address.number").value("99"))
+        .andExpect(jsonPath("$.addressId").doesNotExist());
+  }
+
+  @Test
+  void patchNullAddressClearsOwnedAddress() throws Exception {
+    SchoolModel school = schools.findByToken(schoolToken).orElseThrow();
+    AddressModel owned = persistSchoolAddress(school, "Rua da Escola", "10");
+    String ownedToken = owned.getToken();
+
+    mockMvc
+        .perform(
+            patch("/api/schools/" + schoolToken)
+                .with(adminJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"address\":null}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.address").value(nullValue()))
+        .andExpect(jsonPath("$.addressId").doesNotExist());
+
+    SchoolModel reloaded = schools.findByToken(schoolToken).orElseThrow();
+    assertThat(reloaded.getAddressId()).isNull();
+    assertThat(addresses.findByToken(ownedToken)).isEmpty();
+  }
+
+  @Test
+  void patchNullCnpjClearsCnpj() throws Exception {
+    mockMvc
+        .perform(
+            patch("/api/schools/" + schoolToken)
+                .with(adminJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"cnpj\":null}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.cnpj").value(nullValue()));
+
+    assertThat(schools.findByToken(schoolToken).orElseThrow().getCnpj()).isNull();
+  }
+
+  @Test
+  void patchPresentBlankNameReturns400AndLeavesStoredName() throws Exception {
+    mockMvc
+        .perform(
+            patch("/api/schools/" + schoolToken)
+                .with(adminJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"\"}"))
+        .andExpect(status().isBadRequest());
+
+    assertThat(schools.findByToken(schoolToken).orElseThrow().getName()).isEqualTo("Escola Teste");
+  }
+
+  @Test
+  void patchPresentNullNameReturns400AndLeavesStoredName() throws Exception {
+    mockMvc
+        .perform(
+            patch("/api/schools/" + schoolToken)
+                .with(adminJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":null}"))
+        .andExpect(status().isBadRequest());
+
+    assertThat(schools.findByToken(schoolToken).orElseThrow().getName()).isEqualTo("Escola Teste");
+  }
+
+  @Test
+  void patchDuplicateCnpjOnAnotherSchoolReturns409() throws Exception {
+    SchoolModel other = new SchoolModel();
+    other.setName("Outra Escola");
+    other.setCnpj("99888777000166");
+    other = schools.save(other);
+
+    mockMvc
+        .perform(
+            patch("/api/schools/" + other.getToken())
+                .with(adminJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"cnpj\":\"11222333000181\"}"))
+        .andExpect(status().isConflict());
+
+    assertThat(schools.findByToken(other.getToken()).orElseThrow().getCnpj())
+        .isEqualTo("99888777000166");
+  }
+
+  @Test
+  void patchSameCnpjResentReturns200() throws Exception {
+    mockMvc
+        .perform(
+            patch("/api/schools/" + schoolToken)
+                .with(adminJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"cnpj\":\"11222333000181\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.cnpj").value("11222333000181"));
+  }
+
+  @Test
+  void patchNameOnlyLeavesCnpjPhoneEmailAndAddressUnchanged() throws Exception {
+    SchoolModel school = schools.findByToken(schoolToken).orElseThrow();
+    AddressModel owned = persistSchoolAddress(school, "Rua da Escola", "1481");
+
+    mockMvc
+        .perform(
+            patch("/api/schools/" + schoolToken)
+                .with(adminJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"Novo\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.name").value("Novo"))
+        .andExpect(jsonPath("$.cnpj").value("11222333000181"))
+        .andExpect(jsonPath("$.phone").value("11999990000"))
+        .andExpect(jsonPath("$.email").value("contato@escolateste.com.br"))
+        .andExpect(jsonPath("$.address.token").value(owned.getToken()))
+        .andExpect(jsonPath("$.address.number").value("1481"))
+        .andExpect(jsonPath("$.addressId").doesNotExist());
+
+    SchoolModel reloaded = schools.findByToken(schoolToken).orElseThrow();
+    assertThat(reloaded.getCnpj()).isEqualTo("11222333000181");
+    assertThat(reloaded.getPhone()).isEqualTo("11999990000");
+    assertThat(reloaded.getEmail()).isEqualTo("contato@escolateste.com.br");
+    assertThat(reloaded.getAddressId()).isEqualTo(owned.getId());
   }
 
   @Test
@@ -258,6 +515,19 @@ class SchoolControllerTest {
   }
 
   @Test
+  void deleteClearsOwnedAddress() throws Exception {
+    SchoolModel school = schools.findByToken(schoolToken).orElseThrow();
+    AddressModel owned = persistSchoolAddress(school, "Rua da Escola", "10");
+    String ownedToken = owned.getToken();
+
+    mockMvc
+        .perform(delete("/api/schools/" + schoolToken).with(adminJwt()))
+        .andExpect(status().isNoContent());
+
+    assertThat(addresses.findByToken(ownedToken)).isEmpty();
+  }
+
+  @Test
   void restoreReturns200AfterDelete() throws Exception {
     mockMvc.perform(delete("/api/schools/" + schoolToken).with(adminJwt()));
 
@@ -265,6 +535,20 @@ class SchoolControllerTest {
         .perform(post("/api/schools/" + schoolToken + "/restore").with(adminJwt()))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.token").value(schoolToken));
+  }
+
+  @Test
+  void restoreSchoolHasAddressNull() throws Exception {
+    SchoolModel school = schools.findByToken(schoolToken).orElseThrow();
+    persistSchoolAddress(school, "Rua da Escola", "10");
+
+    mockMvc.perform(delete("/api/schools/" + schoolToken).with(adminJwt()));
+
+    mockMvc
+        .perform(post("/api/schools/" + schoolToken + "/restore").with(adminJwt()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.address").value(nullValue()))
+        .andExpect(jsonPath("$.addressId").doesNotExist());
   }
 
   @Test

@@ -47,11 +47,11 @@
 > Depends on: Phase 1 | Parallel with: Phases 2, 3
 > Order: test → DTO → service → controller
 
-- [ ] 4.1 School address HTTP: failing unit + MockMvc — POST create with nested address; PATCH nested address updates; PATCH `"address": null` clears; PUT `/api/schools/{token}` is not mapped; no `addressId` in JSON; delete school clears address; restore school has `address` null
-- [ ] 4.2 School PATCH merge DTO: `SchoolUpdateRequestDTO` with `JsonNullable` on **name, cnpj, phone, email, address**; compact `undefined()` like `UserProfileUpdateRequestDTO`; `PATCH` + `update_school`; remove `PUT`; do not reuse create `applyRequest`
-- [ ] 4.3 School PATCH merge rules in `SchoolService`: name present blank/null → 400; name omitted → keep; cnpj/phone/email explicit null → clear; cnpj duplicate 409 excluding this school; same cnpj resent → 200; `delete` calls `clearForSchool` before deleting the school
-- [ ] 4.4 **Regression (named):** PATCH body only `{ "name": "Novo" }` on a school that has cnpj, phone, email, and address → those four remain unchanged (proves omit ≠ null)
-- [ ] 4.5 `make lint` + `./mvnw verify`; open PR phase 4
+- [x] 4.1 School address HTTP: failing unit + MockMvc — POST create with nested address; PATCH nested address updates; PATCH `"address": null` clears; PUT `/api/schools/{token}` is not mapped; no `addressId` in JSON; delete school clears address; restore school has `address` null
+- [x] 4.2 School PATCH merge DTO: `SchoolUpdateRequestDTO` with `JsonNullable` on **name, cnpj, phone, email, address**; compact `undefined()` like `UserProfileUpdateRequestDTO`; `PATCH` + `update_school`; remove `PUT`; do not reuse create `applyRequest`
+- [x] 4.3 School PATCH merge rules in `SchoolService`: name present blank/null → 400; name omitted → keep; cnpj/phone/email explicit null → clear; cnpj duplicate 409 excluding this school; same cnpj resent → 200; `delete` calls `clearForSchool` before deleting the school
+- [x] 4.4 **Regression (named):** PATCH body only `{ "name": "Novo" }` on a school that has cnpj, phone, email, and address → those four remain unchanged (proves omit ≠ null)
+- [x] 4.5 `make lint` + `./mvnw verify`; open PR phase 4
 
 ## 5. Phase 5 — Remove catalog + seeder 1:1 (PR 5)
 
