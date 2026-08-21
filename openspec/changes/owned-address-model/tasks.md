@@ -35,11 +35,11 @@
 > Depends on: Phase 1 | Parallel with: Phases 2, 4
 > Order: test → DTO → mapper/service → controller
 
-- [ ] 3.1 Failing unit + MockMvc — create/patch nested address distinct from client home; omit no-op; `"address": null` clears; `"phone": null` clears; `schoolToken` present (value or null) still 400; no `addressToken` on DTO; delete dependent clears address; restore dependent has `address` null
-- [ ] 3.2 `DependentUpdateDTO` with `JsonNullable` on **name, birthDate, gender, document, phone, email, isSelf, isDefault, shift, address**; compact `undefined()` like `UserProfileUpdateRequestDTO`; nested `AddressRequestDTO` / `AddressResponseDTO`; drop `addressToken` and treat `schoolToken` as present → 400
-- [ ] 3.3 Replace mapper `applyUpdate` (`if (getX() != null)`) with `isPresent()` merge in `DependentService`: name present blank/null → 400; isSelf/isDefault/shift present null → 400; birthDate/gender/document/phone/email explicit null → clear; document duplicate 409 excluding this token; same document resent → 200; `isDefault` present keeps existing RN12 (`isPresent()`, not `Boolean.equals` on a raw Boolean); `delete`/`restore` follow D10
-- [ ] 3.4 **Regression (named):** PATCH body only `{ "name": "Novo" }` on a dependent that has phone, email, birthDate, and address → those remain unchanged (proves omit ≠ null)
-- [ ] 3.5 `make lint` + `./mvnw verify`; open PR phase 3
+- [x] 3.1 Failing unit + MockMvc — create/patch nested address distinct from client home; omit no-op; `"address": null` clears; `"phone": null` clears; `schoolToken` present (value or null) still 400; no `addressToken` on DTO; delete dependent clears address; restore dependent has `address` null
+- [x] 3.2 `DependentUpdateDTO` with `JsonNullable` on **name, birthDate, gender, document, phone, email, isSelf, isDefault, shift, address**; compact `undefined()` like `UserProfileUpdateRequestDTO`; nested `AddressRequestDTO` / `AddressResponseDTO`; drop `addressToken` and treat `schoolToken` as present → 400
+- [x] 3.3 Replace mapper `applyUpdate` (`if (getX() != null)`) with `isPresent()` merge in `DependentService`: name present blank/null → 400; isSelf/isDefault/shift present null → 400; birthDate/gender/document/phone/email explicit null → clear; document duplicate 409 excluding this token; same document resent → 200; `isDefault` present keeps existing RN12 (`isPresent()`, not `Boolean.equals` on a raw Boolean); `delete`/`restore` follow D10
+- [x] 3.4 **Regression (named):** PATCH body only `{ "name": "Novo" }` on a dependent that has phone, email, birthDate, and address → those remain unchanged (proves omit ≠ null)
+- [x] 3.5 `make lint` + `./mvnw verify`; open PR phase 3
 
 ## 4. Phase 4 — School PATCH + owned address (PR 4)
 
