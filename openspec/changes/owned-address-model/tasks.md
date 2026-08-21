@@ -25,9 +25,9 @@
 > Depends on: Phase 1 | Parallel with: Phases 3, 4
 > Order: test → DTO → service → controller
 
-- [ ] 2.1 Failing unit + MockMvc for `GET /api/clients/me` nested address/null; `PUT/DELETE /api/clients/me/address` (200/401/204 idempotent); `PUT /api/clients/{token}` without `addressToken`
-- [ ] 2.2 Nested `AddressResponseDTO` on me/list/get; remove `addressToken` from update DTO; `ClientService`/`ClientMapper`/`ClientController` (`isAuthenticated()` + CLIENT like `getMyProfile`); `ClientService.delete` calls `clearForClient` before deleting the client
-- [ ] 2.3 `make lint` + `./mvnw verify`; open PR phase 2
+- [x] 2.1 Failing unit + MockMvc for `GET /api/clients/me` nested address/null; `PUT/DELETE /api/clients/me/address` (200/401/204 idempotent); `PUT /api/clients/{token}` without `addressToken`
+- [x] 2.2 Nested `AddressResponseDTO` on me/list/get; remove `addressToken` from update DTO; `ClientService`/`ClientMapper`/`ClientController` (`isAuthenticated()` + CLIENT like `getMyProfile`); `ClientService.delete` calls `clearForClient` before deleting the client
+- [x] 2.3 `make lint` + `./mvnw verify`; open PR phase 2
 
 ## 3. Phase 3 — Dependent PATCH JsonNullable + owned address (PR 3)
 
