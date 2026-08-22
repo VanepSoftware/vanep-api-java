@@ -1,5 +1,7 @@
 package br.com.vanep.client.controller;
 
+import br.com.vanep.address.dto.AddressRequestDTO;
+import br.com.vanep.address.dto.AddressResponseDTO;
 import br.com.vanep.auth.security.SecurityHelper;
 import br.com.vanep.client.dto.ClientMeSummaryResponseDTO;
 import br.com.vanep.client.dto.ClientResponseDTO;
@@ -35,6 +37,20 @@ public class ClientController {
   @PreAuthorize("isAuthenticated()")
   public ClientMeSummaryResponseDTO getMe(Authentication authentication) {
     return service.getMyProfile(SecurityHelper.requireCallerUid(authentication));
+  }
+
+  @PutMapping("/me/address")
+  @PreAuthorize("isAuthenticated()")
+  public AddressResponseDTO putMyAddress(
+      Authentication authentication, @Valid @RequestBody AddressRequestDTO request) {
+    return service.upsertMyAddress(SecurityHelper.requireCallerUid(authentication), request);
+  }
+
+  @DeleteMapping("/me/address")
+  @PreAuthorize("isAuthenticated()")
+  @ResponseStatus(HttpStatus.NO_CONTENT)
+  public void deleteMyAddress(Authentication authentication) {
+    service.clearMyAddress(SecurityHelper.requireCallerUid(authentication));
   }
 
   @GetMapping

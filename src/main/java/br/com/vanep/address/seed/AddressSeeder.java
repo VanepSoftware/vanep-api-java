@@ -4,8 +4,14 @@ import br.com.vanep.address.model.AddressModel;
 import br.com.vanep.address.repository.AddressRepository;
 import br.com.vanep.city.model.CityModel;
 import br.com.vanep.city.repository.CityRepository;
-import java.util.List;
+import br.com.vanep.client.model.ClientModel;
+import br.com.vanep.client.repository.ClientRepository;
+import br.com.vanep.dependent.model.DependentModel;
+import br.com.vanep.dependent.repository.DependentRepository;
+import br.com.vanep.school.model.SchoolModel;
+import br.com.vanep.school.repository.SchoolRepository;
 import java.util.Optional;
+import java.util.function.LongConsumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -14,41 +20,78 @@ import org.springframework.stereotype.Component;
 public class AddressSeeder {
 
   private static final Logger log = LoggerFactory.getLogger(AddressSeeder.class);
-
-  private record AddressSeed(
-      String cityName, String zipCode, String street, String number, String district) {}
-
-  private static final List<AddressSeed> SEEDS =
-      List.of(
-          new AddressSeed("São Paulo", "01310100", "Avenida Paulista", "1578", "Bela Vista"),
-          new AddressSeed("Campinas", "13015904", "Rua Barão de Jaguara", "1481", "Centro"));
+  private static final String SEED_CITY_NAME = "Campinas";
+  private static final String SEED_ZIP_CODE = "13015904";
+  private static final String SEED_STREET = "Rua Barão de Jaguara";
+  private static final String SEED_NUMBER = "1481";
+  private static final String SEED_DISTRICT = "Centro";
 
   private final AddressRepository addresses;
   private final CityRepository cities;
+  private final ClientRepository clients;
+  private final DependentRepository dependents;
+  private final SchoolRepository schools;
 
-  public AddressSeeder(AddressRepository addresses, CityRepository cities) {
+  public AddressSeeder(
+      AddressRepository addresses,
+      CityRepository cities,
+      ClientRepository clients,
+      DependentRepository dependents,
+      SchoolRepository schools) {
     this.addresses = addresses;
     this.cities = cities;
+    this.clients = clients;
+    this.dependents = dependents;
+    this.schools = schools;
   }
 
   public void seed() {
-    for (AddressSeed seed : SEEDS) {
-      Optional<CityModel> city = cities.findFirstByNameIgnoreCase(seed.cityName());
-      if (city.isEmpty()) {
-        log.info("Seed: address skipped; city not found ({}).", seed.cityName());
-        continue;
-      }
-      if (addresses.existsByZipCodeAndNumber(seed.zipCode(), seed.number())) {
-        continue;
-      }
-      AddressModel address = new AddressModel();
-      address.setCity(city.get());
-      address.setZipCode(seed.zipCode());
-      address.setStreet(seed.street());
-      address.setNumber(seed.number());
-      address.setDistrict(seed.district());
-      addresses.save(address);
-      log.info("Seed: address created ({}, {}).", seed.street(), seed.cityName());
+    Optional<CityModel> city = cities.findFirstByNameIgnoreCase(SEED_CITY_NAME);
+    if (city.isEmpty()) {
+      log.info("Seed: address skipped; city not found ({}).", SEED_CITY_NAME);
+      return;
     }
+    for (ClientModel client : clients.findAll()) {
+      linkIfMissing(
+          client.getAddressId(),
+          city.get(),
+          savedId -> {
+            client.setAddressId(savedId);
+            clients.save(client);
+          });
+    }
+    for (DependentModel dependent : dependents.findAll()) {
+      linkIfMissing(
+          dependent.getAddressId(),
+          city.get(),
+          savedId -> {
+            dependent.setAddressId(savedId);
+            dependents.save(dependent);
+          });
+    }
+    for (SchoolModel school : schools.findAll()) {
+      linkIfMissing(
+          school.getAddressId(),
+          city.get(),
+          savedId -> {
+            school.setAddressId(savedId);
+            schools.save(school);
+          });
+    }
+  }
+
+  private void linkIfMissing(Long currentAddressId, CityModel city, LongConsumer persistOwnerLink) {
+    if (currentAddressId != null) {
+      return;
+    }
+    AddressModel address = new AddressModel();
+    address.setCity(city);
+    address.setZipCode(SEED_ZIP_CODE);
+    address.setStreet(SEED_STREET);
+    address.setNumber(SEED_NUMBER);
+    address.setDistrict(SEED_DISTRICT);
+    AddressModel saved = addresses.save(address);
+    persistOwnerLink.accept(saved.getId());
+    log.info("Seed: linked address created (id={}).", saved.getId());
   }
 }

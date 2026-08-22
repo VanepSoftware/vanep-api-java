@@ -13,7 +13,13 @@ public interface SchoolRepository extends JpaRepository<SchoolModel, Long> {
 
   boolean existsByCnpj(String cnpj);
 
+  boolean existsByCnpjAndTokenNot(String cnpj, String token);
+
   boolean existsByName(String name);
+
+  long countByAddressId(Long addressId);
+
+  long countByAddressIdAndIdNot(Long addressId, Long id);
 
   @Modifying
   @Query(value = "UPDATE school SET deleted_at = NULL WHERE token = :token", nativeQuery = true)

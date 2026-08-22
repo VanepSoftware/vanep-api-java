@@ -1,5 +1,6 @@
 package br.com.vanep.school.dto;
 
+import br.com.vanep.address.dto.AddressResponseDTO;
 import java.time.Instant;
 
 public record SchoolResponseDTO(
@@ -8,6 +9,6 @@ public record SchoolResponseDTO(
     String cnpj,
     String phone,
     String email,
-    Long addressId,
+    AddressResponseDTO address,
     boolean active,
     Instant createdAt) {}
