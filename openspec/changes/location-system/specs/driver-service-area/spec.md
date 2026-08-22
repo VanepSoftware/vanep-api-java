@@ -2,7 +2,7 @@
 
 ### Requirement: Driver declares public service areas
 
-The system SHALL expose `GET /api/drivers/me/service-areas` and `PUT /api/drivers/me/service-areas` for the authenticated driver. The `PUT` MUST accept a list of Google `placeId` values and MUST replace the driver's whole set of areas.
+The system SHALL expose `GET /api/drivers/me/service-areas` and `PUT /api/drivers/me/service-areas` for the authenticated driver. The `PUT` MUST accept a list of Google `placeId` values, each with an optional `sessionToken`, and MUST replace the driver's whole set of areas.
 
 Each area MUST persist as a row in `driver_service_area` with `driver_id`, a required `city_id`, and a nullable `district_id`, where `district_id = NULL` means the whole city. The table MUST NOT contain street, number, complement, or zip code columns.
 
@@ -32,21 +32,44 @@ Each area MUST persist as a row in `driver_service_area` with `driver_id`, a req
 - **WHEN** a request without a valid Bearer token calls either endpoint
 - **THEN** the system returns `401 Unauthorized`
 
-### Requirement: District required when the city has districts
+### Requirement: District required by curated policy
 
-The system MUST reject a service area that names only a city when that city already has at least one registered district. Cities with no registered districts MUST accept a city-level area.
+The system MUST reject a service area whose resolved chain carries no district-level component when the city is under a policy that requires one. The policy is `COALESCE(city.requires_district, city.state.requires_district)`.
 
-This prevents a driver in the Federal District — which has a single municipality — from implicitly claiming the entire region.
+`state.requires_district` MUST be `NOT NULL DEFAULT false` and curated by migration, seeded `true` for `DF` and `SP`. `city.requires_district` MUST be nullable, where `NULL` means "inherit from the state"; it exists as a per-city override for states whose cities are heterogeneous, and MUST NOT be populated by the lazy resolver.
 
-#### Scenario: City level rejected where districts exist
+The decision MUST be derived from the resolved chain and the curated flags only. The system MUST NOT decide it by counting districts already registered under the city: that makes an identical request valid or invalid depending on when it is sent, and lets the earliest drivers in a launch market permanently claim a whole city.
 
-- **WHEN** a driver submits a `placeId` resolving to "Brasília" and districts already exist under it
+The effective flag MUST be read through the loaded `city → state` chain at validation time, and MUST NOT be copied onto the city row when the city is created.
+
+This prevents a driver in the Federal District — which has a single municipality — from implicitly claiming the entire 5,800 km² region.
+
+#### Scenario: City level rejected under a requiring state
+
+- **WHEN** a driver submits a `placeId` resolving to `[BR, DF, Brasília]` with no district component
+- **AND** `DF.requires_district` is true and `Brasília.requires_district` is null
 - **THEN** the system returns `400 Bad Request` with a pt-BR message resolved through MessageSource
+
+#### Scenario: City level rejected on the very first registration
+
+- **WHEN** the geographic tree contains no district at all under "Brasília"
+- **AND** a driver submits a `placeId` resolving to `[BR, DF, Brasília]`
+- **THEN** the system still returns `400 Bad Request`
 
 #### Scenario: City level accepted in a small city
 
-- **WHEN** a driver submits a `placeId` resolving to a city with no registered districts
+- **WHEN** a driver submits a `placeId` resolving to a city whose effective policy is false
 - **THEN** the system accepts the city-level area
+
+#### Scenario: City override wins over the state
+
+- **WHEN** a city has `requires_district` set to false and its state has `requires_district` true
+- **THEN** the system accepts a city-level area for that city
+
+#### Scenario: District component satisfies the policy
+
+- **WHEN** a driver submits a `placeId` resolving to `[BR, DF, Brasília, Taguatinga]`
+- **THEN** the system accepts it regardless of the policy flags
 
 ### Requirement: Service areas are public
 

@@ -2,7 +2,7 @@
 
 ### Requirement: Personal address created from a resolved place
 
-The system SHALL expose `PUT /api/user/me/address` and `GET /api/user/me/address` for the authenticated caller. The request MUST accept a Google `placeId` plus optional `number` and `complement`. The system MUST resolve the place server-side via Place Details and MUST NOT trust address components supplied by the client.
+The system SHALL expose `PUT /api/user/me/address` and `GET /api/user/me/address` for the authenticated caller. The request MUST accept a Google `placeId` plus optional `sessionToken`, `number` and `complement`. The system MUST resolve the place server-side via Place Details and MUST NOT trust address components supplied by the client.
 
 The resulting `address` row MUST link to the geographic tree through `city_id` and a nullable `district_id`, and MUST store `google_place_id`. The free-text `district` column MUST be removed in favour of the FK.
 

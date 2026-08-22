@@ -6,6 +6,14 @@ The system SHALL model geography as a single shared tree `country → state → 
 
 The `district` table MUST use soft delete (`@SoftDelete` with `deleted_at`) and MUST declare a partial unique index on (`parent_id`, `city_id`, `normalized_name`) `WHERE deleted_at IS NULL`. Public identifiers MUST be opaque `token` strings.
 
+The unique index MUST treat a `NULL` `parent_id` as a comparable value, using `NULLS NOT DISTINCT` or an equivalent expression such as `COALESCE(parent_id, 0)`. A plain unique index does not constrain rows whose `parent_id` is `NULL`, which is precisely the case of a district that is a direct child of a city.
+
+#### Scenario: Duplicate first level district rejected
+
+- **WHEN** a node named "Taguatinga" already exists with `parent_id` null under the city "Brasília"
+- **AND** a second insert attempts the same `city_id` and `normalized_name` with `parent_id` null
+- **THEN** the database rejects it through the unique index
+
 #### Scenario: Direct child of a city
 
 - **WHEN** a district node is created for "Taguatinga" under the city "Brasília"
@@ -61,6 +69,25 @@ The system SHALL keep `country` as the only curated level of the tree, because i
 - **WHEN** a chain resolves to a country whose `iso_code` has no active `country` row
 - **THEN** the system rejects the resolution with a business error resolved through MessageSource
 
+### Requirement: Unknown component types fail loudly
+
+The system MUST reject a resolution whose `addressComponents` carry a `type` that is not present in the decided `types` → level mapping, raising a business error resolved through MessageSource. The system MUST NOT silently skip an unrecognised component.
+
+Silently skipping produces a tree anchored at the wrong level, which surfaces only as a search that returns nothing — no error, no signal. Failing loudly converts a silent data defect into a visible one.
+
+The system SHALL additionally log a warning when `administrative_area_level_2` and `locality` resolve to the same name for one place, since that ambiguity is the known source of mis-levelling.
+
+#### Scenario: Unmapped type rejected
+
+- **WHEN** a place resolves with a component whose `type` is absent from the mapping table
+- **THEN** the system raises a business error resolved through MessageSource
+- **AND** persists no node
+
+#### Scenario: Ambiguous administrative levels logged
+
+- **WHEN** a place resolves with `administrative_area_level_2` and `locality` carrying the same name
+- **THEN** the system logs a warning identifying the place
+
 ### Requirement: Name normalization for node matching
 
 The system SHALL store a `normalized_name` for every tree node, derived by removing accents and lowercasing the canonical name returned by Google. Node lookup during resolution MUST use `normalized_name` scoped to the parent, never the raw display name.
@@ -69,6 +96,31 @@ The system SHALL store a `normalized_name` for every tree node, derived by remov
 
 - **WHEN** a chain resolves a component named "Brasília" and another resolves "BRASILIA" under the same state
 - **THEN** the system matches both to the same city node
+
+### Requirement: Place resolution honours the client session token
+
+The system MUST accept an optional `sessionToken` alongside every `placeId` it receives, and MUST forward it to the Google `Place Details` call. Autocomplete requests only qualify for session-based billing when the `Place Details` that closes the session carries the same token, and that call is made by the backend.
+
+When a `sessionToken` is present the system MUST call `Place Details` even if the `placeId` is already cached, so that the session closes, and MUST refresh the cache with the result. When no `sessionToken` is present the system SHALL serve a cached result and call `Place Details` only on a miss.
+
+The `Place Details` cache is an optimisation for cost and latency and MUST NOT be required for correctness.
+
+#### Scenario: Session token forwarded
+
+- **WHEN** a request carries a `placeId` and a `sessionToken`
+- **THEN** the system includes that `sessionToken` in the `Place Details` call
+
+#### Scenario: Cache bypassed to close a session
+
+- **WHEN** a request carries a `sessionToken` for a `placeId` already present in the cache
+- **THEN** the system calls `Place Details` anyway
+- **AND** refreshes the cached entry
+
+#### Scenario: Cache served without a session
+
+- **WHEN** a request carries a `placeId` already present in the cache and no `sessionToken`
+- **THEN** the system serves the cached result
+- **AND** performs no call to Google
 
 ### Requirement: Read-only anchor resolution
 

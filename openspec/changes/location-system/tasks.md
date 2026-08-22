@@ -28,6 +28,13 @@
 > Goal: eliminar o risco R1 do `design.md` com evidência real antes de qualquer migration.
 > O Google é inconsistente: em SP `administrative_area_level_2` e `locality` são ambos "São Paulo";
 > no DF `locality` ora é "Brasília", ora "Taguatinga". Errar isso faz o match falhar **silenciosamente**.
+>
+> **Esta é a fase de experimento com a API, e é onde toda questão em aberto se resolve.**
+> Qualquer ponto do design que hoje repouse sobre achismo, suposição ou "não sabemos" é decidido
+> aqui, com chamada real e evidência registrada — nunca inferido no papel e nunca empurrado para
+> uma fase de código. As questões abertas estão listadas em `design.md` § Open Questions; a fase 1
+> só encerra quando cada uma tiver resposta ou uma decisão explícita de conviver com ela.
+>
 > Depends on: Phase 0 | Parallel with: —
 > Order: coleta → análise → decisão registrada
 
@@ -36,8 +43,12 @@
 - [ ] 1.3 Salvar os JSONs crus como fixtures de teste em `src/test/resources/` — servirão para mockar o Places nas fases seguintes sem chamar a API real
 - [ ] 1.4 Montar a tabela de mapeamento `types` → nível (`country` / `state` / `city` / `district`), decidindo explicitamente o conflito `administrative_area_level_2` vs `locality`
 - [ ] 1.5 Registrar a tabela decidida em `design.md` como decisão **D11**, com as evidências que a sustentam
-- [ ] 1.6 Confirmar o próximo número de migration Flyway (última aplicada: `V19`)
-- [ ] 1.7 Abrir PR fase 1 (pt-BR, sem código de produção — fixtures + documento de decisão)
+- [ ] 1.6 **Q1 — o faturamento por sessão sobrevive a chaves distintas?** Autocomplete com a chave web/referrer e `Place Details` com a chave de servidor, mesmo `sessionToken`, mesmo projeto. Questão em aberto: resolver aqui, com evidência real (doc, suporte do Maps Platform ou experimento controlado — a fase escolhe o meio mais barato que dê resposta confiável). Registrar o achado e a consequência para o D5
+- [ ] 1.7 **Q2 — qual SKU o field mask do `Place Details` seleciona?** Comparar `id` + `addressComponents` contra um mask amplo. Questão em aberto: define se o cache do D5 se paga
+- [ ] 1.8 **Q3 — qual a ordem de grandeza do custo por busca?** Medir com números reais, não estimar. É o que dimensiona o rate limit do R6 e a quota da fase 0
+- [ ] 1.9 Varrer o `design.md` atrás de qualquer outra afirmação não verificada e resolvê-la aqui; atualizar a seção **Open Questions** com a resposta de cada item ou a decisão explícita de conviver com ele
+- [ ] 1.10 Confirmar o próximo número de migration Flyway (última aplicada: `V19`)
+- [ ] 1.11 Abrir PR fase 1 (pt-BR, sem código de produção — fixtures + documento de decisão)
 
 ## 2. Phase 2 — Árvore geográfica: `district` + migrations (PR 2)
 
@@ -47,11 +58,14 @@
 
 - [ ] 2.1 Testes de repositório para `DistrictRepository` (filho direto de city, filho aninhado, unique parcial, soft delete oculta)
 - [ ] 2.2 Migration `V20`: tabela `district` (auto-FK `parent_id`, `city_id`, `name`, `normalized_name`, `google_place_id`, soft delete, unique parcial em `parent_id` + `city_id` + `normalized_name` `WHERE deleted_at IS NULL`)
-- [ ] 2.3 Migration `V20` (cont.): adicionar `normalized_name` e `google_place_id` em `state` e `city`
-- [ ] 2.4 Criar feature package `br.com.vanep.district` com `model/DistrictModel`, `repository/DistrictRepository` (constituição regra 5)
-- [ ] 2.5 Adicionar `findByStateId` em `CityRepository` e `normalizedName` nos models de `state`/`city`
-- [ ] 2.6 Implementar utilitário de normalização (unaccent + lowercase) com testes unitários
-- [ ] 2.7 `make lint` + `./mvnw verify`; abrir PR fase 2
+- [ ] 2.3 **No índice do 2.2, tratar `parent_id` nulo como valor comparável** — `NULLS NOT DISTINCT` (PG 15+) ou `COALESCE(parent_id, 0)`. Índice único simples **não** restringe linhas com `parent_id` nulo, que é o caso do distrito filho direto de cidade — o R2 ficaria sem mitigação justamente no caso mais comum
+- [ ] 2.4 Migration `V20` (cont.): adicionar `normalized_name` e `google_place_id` em `state` e `city`
+- [ ] 2.5 Migration `V20` (cont.): adicionar `state.requires_district` (`NOT NULL DEFAULT false`) e `city.requires_district` (nullable); seed `UPDATE state SET requires_district = true WHERE uf IN ('DF','SP')` (D8)
+- [ ] 2.6 **Aplicar a `V20` manualmente contra o PostgreSQL local e verificar o índice** inserindo duas "Taguatinga" com `parent_id` nulo sob a mesma cidade — a suíte roda com `flyway.enabled=false` e `ddl-auto=create-drop`, então nenhum teste executa esta migration (R7)
+- [ ] 2.7 Criar feature package `br.com.vanep.district` com `model/DistrictModel`, `repository/DistrictRepository` (constituição regra 5)
+- [ ] 2.8 Adicionar `findByStateId` em `CityRepository`, `normalizedName` nos models de `state`/`city` e `requiresDistrict` em `StateModel`/`CityModel`
+- [ ] 2.9 Implementar utilitário de normalização (unaccent + lowercase) com testes unitários
+- [ ] 2.10 `make lint` + `./mvnw verify`; abrir PR fase 2
 
 ## 3. Phase 3 — Client do Google Places (PR 3)
 
@@ -64,8 +78,11 @@
 - [ ] 3.3 Adicionar propriedades `vanep.google.places.api-key` e `vanep.google.places.base-url` em `application.properties` como `${VAR}`; documentar em `.env.example` (regras 1 e 3)
 - [ ] 3.4 DTOs de resposta do Places (`PlaceDetailsResponseDTO`, `AddressComponentDTO`) — apenas os campos usados
 - [ ] 3.5 Implementar `PlacesClient` com `RestClient`, timeout explícito e tratamento de erro que lança exceção significativa (regra 30) — nunca `catch` vazio
-- [ ] 3.6 Adicionar cache em memória (Caffeine) de `Place Details` por `placeId`, com TTL configurável por env
-- [ ] 3.7 `make lint` + `./mvnw verify`; abrir PR fase 3
+- [ ] 3.6 `PlacesClient` aceita `sessionToken` opcional e o **repassa** ao `Place Details`; teste de contrato garantindo o repasse (D5)
+- [ ] 3.7 Aplicar o *field mask* decidido em 1.7 (mínimo: `id` + `addressComponents`) — o mask define o SKU cobrado
+- [ ] 3.8 Adicionar cache em memória (Caffeine) de `Place Details` por `placeId`, com TTL configurável por env
+- [ ] 3.9 **Cache ciente da sessão** (D5): com `sessionToken` presente, chamar o `Place Details` mesmo em cache hit (para encerrar a sessão) e atualizar a entrada; sem token, servir do cache. Testes cobrindo os dois caminhos
+- [ ] 3.10 `make lint` + `./mvnw verify`; abrir PR fase 3
 
 ## 4. Phase 4 — Resolver da árvore (PR 4)
 
@@ -77,10 +94,12 @@
 - [ ] 4.2 Testes unitários da regra D2: place "Taguatinga Norte" cujos componentes trazem "Taguatinga" ancora em "Taguatinga" e **não** cria nó "Taguatinga Norte"
 - [ ] 4.3 Testes unitários de `resolveAnchor` (read-only): componentes mais profundos que a árvore param no nó mais profundo existente e **nenhum insert** ocorre
 - [ ] 4.4 Testes unitários de `findAncestors(districtId)` subindo por `parent_id`
-- [ ] 4.5 Implementar mapeamento `types` → nível conforme a decisão D11 registrada na fase 1
-- [ ] 4.6 Implementar `LocationResolverService` (`resolveAndPersist` e `resolveAnchor`), sem detalhes de web ou JPA vazando para a regra (regra 9)
-- [ ] 4.7 Adicionar MessageSource keys (EN + `messages_pt_BR.properties`) para place não resolvido e país não suportado (regra 45)
-- [ ] 4.8 `make lint` + `./mvnw verify`; abrir PR fase 4
+- [ ] 4.5 Testes unitários de **falha alta em `type` não mapeado** (R1): componente com `type` fora da tabela D11 → erro de negócio, nenhum nó persistido. E teste do log de ambiguidade quando `administrative_area_level_2` e `locality` trazem o mesmo nome
+- [ ] 4.6 Implementar mapeamento `types` → nível conforme a decisão D11 registrada na fase 1, **rejeitando** `type` desconhecido em vez de ignorá-lo silenciosamente
+- [ ] 4.7 Implementar `LocationResolverService` (`resolveAndPersist` e `resolveAnchor`), sem detalhes de web ou JPA vazando para a regra (regra 9)
+- [ ] 4.8 Expor na cadeia resolvida se há componente de nível `district` — é a entrada da validação D8 da fase 6, que **não** pode consultar contagem de distritos no banco
+- [ ] 4.9 Adicionar MessageSource keys (EN + `messages_pt_BR.properties`) para place não resolvido, país não suportado e `type` desconhecido (regra 45)
+- [ ] 4.10 `make lint` + `./mvnw verify`; abrir PR fase 4
 
 ## 5. Phase 5 — Endereço pessoal (PR 5)
 
@@ -92,7 +111,7 @@
 - [ ] 5.2 Migration `V21`: `address` ganha `district_id` FK e `google_place_id`; **remove** `district varchar(128)`; cria as FKs faltantes de `school.address_id` e `dependent.address_id`; adiciona `assistant.address_id`
 - [ ] 5.3 Atualizar `AddressModel` (FK de district, `google_place_id`) e o model de `assistant`
 - [ ] 5.4 Declarar as regras de autorização em `SecurityConfig` para os endpoints novos (regras 19 e 20)
-- [ ] 5.5 Criar `PersonalAddressRequestDTO` (`placeId` `@NotBlank`, `number?`, `complement?`) com Bean Validation (regra 10)
+- [ ] 5.5 Criar `PersonalAddressRequestDTO` (`placeId` `@NotBlank`, `sessionToken?`, `number?`, `complement?`) com Bean Validation (regra 10)
 - [ ] 5.6 Implementar o service que resolve o place, persiste a cadeia e grava o endereço do chamador
 - [ ] 5.7 Adicionar `PUT /api/user/me/address` e `GET /api/user/me/address` com `@Valid` + `isAuthenticated()`
 - [ ] 5.8 Criar `PersonalAddressResponseDTO` expondo apenas tokens opacos (regras 12 e 13)
@@ -105,17 +124,19 @@
 > Depends on: Phase 4 | Parallel with: Phase 5, Phase 7
 > Order: test → migration → model → repository → security → request DTO → service → controller → response DTO
 
-- [ ] 6.1 Testes unitários da validação D8 (cidade com distritos → `400`; cidade sem distritos → aceita)
-- [ ] 6.2 Testes slice MockMvc: `401` sem token; `403` para usuário sem perfil de motorista; `200` cadastrando distrito; substituição completa do conjunto no `PUT`
-- [ ] 6.3 Migration `V22`: tabela `driver_service_area` (`driver_id`, `city_id` NOT NULL, `district_id` nullable, soft delete) — **sem** colunas de logradouro
-- [ ] 6.4 Criar feature package `br.com.vanep.driverservicearea` com model e repository
-- [ ] 6.5 Declarar as regras de autorização em `SecurityConfig`; se precisar de checagem de dono, adicionar ao `SecurityEvaluator` (`@sec`) — nunca criar `*SecurityService` por feature (regra 21)
-- [ ] 6.6 Criar `DriverServiceAreaRequestDTO` (lista de `placeId`) com Bean Validation
-- [ ] 6.7 Implementar o service (resolve cada place, aplica D8, substitui o conjunto do motorista)
-- [ ] 6.8 Adicionar `GET` e `PUT /api/drivers/me/service-areas`
-- [ ] 6.9 Criar `DriverServiceAreaResponseDTO` com nome da região + token opaco
-- [ ] 6.10 Adicionar MessageSource keys (EN + pt-BR) para "distrito obrigatório nesta cidade"
-- [ ] 6.11 `make lint` + `./mvnw verify`; abrir PR fase 6
+- [ ] 6.1 Testes unitários da policy D8 sobre a **cadeia resolvida** e os flags curados: cadeia sem distrito + estado `true` → `400`; cadeia sem distrito + estado `false` → aceita; override `city.requires_district = false` sob estado `true` → aceita; cadeia com distrito → aceita sempre
+- [ ] 6.2 Teste explícito do furo temporal: **árvore sem nenhum distrito sob Brasília**, cadeia `[BR, DF, Brasília]` → ainda `400`. Garante que a regra não depende de contagem no banco
+- [ ] 6.3 Testes slice MockMvc: `401` sem token; `403` para usuário sem perfil de motorista; `200` cadastrando distrito; substituição completa do conjunto no `PUT`
+- [ ] 6.4 Migration `V22`: tabela `driver_service_area` (`driver_id`, `city_id` NOT NULL, `district_id` nullable, soft delete) — **sem** colunas de logradouro
+- [ ] 6.5 Criar feature package `br.com.vanep.driverservicearea` com model e repository
+- [ ] 6.6 Declarar as regras de autorização em `SecurityConfig`; se precisar de checagem de dono, adicionar ao `SecurityEvaluator` (`@sec`) — nunca criar `*SecurityService` por feature (regra 21)
+- [ ] 6.7 Criar `DriverServiceAreaRequestDTO` (lista de itens `placeId` + `sessionToken?`) com Bean Validation
+- [ ] 6.8 Implementar a policy D8 como classe pura testável sem servlet nem JPA (regra 8): recebe a cadeia resolvida, lê `COALESCE(city.requires_district, city.state.requires_district)` através da cadeia já carregada — **sem query adicional** e sem copiar o flag para a linha de `city`
+- [ ] 6.9 Implementar o service (resolve cada place, aplica a policy D8, substitui o conjunto do motorista)
+- [ ] 6.10 Adicionar `GET` e `PUT /api/drivers/me/service-areas`
+- [ ] 6.11 Criar `DriverServiceAreaResponseDTO` com nome da região + token opaco
+- [ ] 6.12 Adicionar MessageSource keys (EN + pt-BR) para "distrito obrigatório nesta cidade"
+- [ ] 6.13 `make lint` + `./mvnw verify`; abrir PR fase 6
 
 ## 7. Phase 7 — Escola magra (PR 7)
 
@@ -123,13 +144,15 @@
 > Depends on: Phase 4 | Parallel with: Phase 5, Phase 6
 > Order: test → migration → model → service → controller → response DTO
 
-- [ ] 7.1 Testes slice: primeira resolução cria a escola; segunda reusa sem duplicar; `401` sem token
+- [ ] 7.1 Testes slice: primeira resolução cria a escola e retorna `201`; segunda reusa sem duplicar e retorna `200`; `401` sem token; rate limit excedido rejeita sem chamar o Google
 - [ ] 7.2 Migration `V23`: `school` ganha `google_place_id` (unique parcial `WHERE deleted_at IS NULL`), `city_id`, `district_id`; **remove** `cnpj`, `phone`, `email`
 - [ ] 7.3 Atualizar `SchoolModel`, `SchoolRepository` (busca por `google_place_id`), mapper e DTOs
-- [ ] 7.4 Implementar `GET /api/schools/resolve` (resolve `placeId` → `school` persistida)
-- [ ] 7.5 Remover `SchoolSeeder`
-- [ ] 7.6 Ajustar os testes existentes de `school` e `dependent` que dependiam de `cnpj`/`phone`/`email`
-- [ ] 7.7 `make lint` + `./mvnw verify`; abrir PR fase 7
+- [ ] 7.4 Implementar `POST /api/schools/resolve` — **não `GET`**: a operação faz `findOrCreate`, é escrita, e um `GET` é pré-buscável por intermediários (prefetch criaria escola). Idempotente por `google_place_id`: `201` ao criar, `200` quando já existia
+- [ ] 7.5 Criar `SchoolResolveRequestDTO` (`placeId` `@NotBlank`, `sessionToken?`) com Bean Validation
+- [ ] 7.6 Aplicar rate limit por usuário no endpoint (R6) — cada `placeId` distinto custa um `Place Details` pago e cria uma linha
+- [ ] 7.7 Remover `SchoolSeeder`
+- [ ] 7.8 Ajustar os testes existentes de `school` e `dependent` que dependiam de `cnpj`/`phone`/`email`
+- [ ] 7.9 `make lint` + `./mvnw verify`; abrir PR fase 7
 
 ## 8. Phase 8 — Busca de motoristas por origem + destino (PR 8)
 
@@ -143,9 +166,10 @@
 - [ ] 8.4 Teste garantindo que a busca **não cria** nós na árvore (assert de contagem antes/depois)
 - [ ] 8.5 Implementar a query de contenção em `DriverServiceAreaRepository` (`city_id` + `district_id IS NULL OR district_id IN (:ancestors)`), com fetch join para evitar N+1 (regra 16)
 - [ ] 8.6 Implementar o service de busca (resolve as duas âncoras, intersecta os conjuntos de motoristas)
-- [ ] 8.7 Adicionar `GET /api/drivers/search` com paginação e regra de autorização declarada
-- [ ] 8.8 Criar `DriverSearchResponseDTO` — sem nenhum campo de endereço residencial (regra de privacidade da spec)
-- [ ] 8.9 `make lint` + `./mvnw verify`; abrir PR fase 8
+- [ ] 8.7 Adicionar `GET /api/drivers/search` com paginação e regra de autorização declarada, aceitando `originSessionToken?` e `destinationSessionToken?` (uma sessão por caixa de autocomplete)
+- [ ] 8.8 Aplicar rate limit por usuário no endpoint (R6) — cada busca dispara dois `Place Details` pagos a partir de ids fornecidos pelo cliente
+- [ ] 8.9 Criar `DriverSearchResponseDTO` — sem nenhum campo de endereço residencial (regra de privacidade da spec)
+- [ ] 8.10 `make lint` + `./mvnw verify`; abrir PR fase 8
 
 ## 9. Phase 9 — Onboarding + limpeza (PR 9)
 
@@ -167,6 +191,6 @@
 
 ## 10. Encerramento
 
-- [ ] 10.1 Confirmar que os 5 specs da change foram cobertos pelas fases entregues
+- [ ] 10.1 Confirmar que os 6 specs da change foram cobertos pelas fases entregues
 - [ ] 10.2 Rodar `./mvnw verify` completo e confirmar a cobertura mínima do JaCoCo (regra 23)
 - [ ] 10.3 Sincronizar as specs para `openspec/specs/` (`/opsx:sync`) e arquivar a change (`/opsx:archive`)

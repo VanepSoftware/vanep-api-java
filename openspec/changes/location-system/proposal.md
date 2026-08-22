@@ -19,6 +19,7 @@ Além disso, os dois conceitos de endereço estão misturados: o endereço **res
 **Separação dos dois tipos de relação com a geografia**
 - `address` (PRIVADO): endereço residencial de client, driver, assistant, dependent e school. Ganha `district_id` FK (substitui o `district varchar(128)` solto), `google_place_id`, e as FKs faltantes de `school.address_id` / `dependent.address_id`; `assistant` ganha `address_id`.
 - `driver_service_area` (PÚBLICO, tabela nova): `driver_id` + `city_id` (obrigatório) + `district_id` (nullable = cidade inteira). **Não possui colunas de rua ou número** — vazamento de endereço residencial por essa tabela é estruturalmente impossível.
+- Declarar a cidade inteira só é permitido onde a política curada permite: `state.requires_district` (27 linhas, seed `DF`/`SP` = true) com override nullable em `city.requires_district`. A regra **não** olha quantos distritos já existem na árvore — isso tornaria o mesmo cadastro válido ou inválido conforme o relógio (ver D8).
 
 **Busca do cliente por origem + destino**
 - `GET /api/drivers/search` recebe `originPlaceId` e `destinationPlaceId` (destino é qualquer place, não obrigatoriamente escola).
@@ -27,6 +28,7 @@ Além disso, os dois conceitos de endereço estão misturados: o endereço **res
 
 **Escola**
 - `school` vira registro magro criado a partir de um place do Google (`google_place_id` único, `name`, `city_id`, `district_id`). `cnpj`, `phone` e `email` são removidos — não existem na base do Google e a Vanep não os possui.
+- `POST /api/schools/resolve` (não `GET`: a operação faz `findOrCreate`, é escrita), idempotente por `google_place_id` e com rate limit por usuário.
 
 **Onboarding**
 - `GET /api/user/me` passa a expor `onboarding.pendingSteps` como enum (`PERSONAL_ADDRESS`, `SERVICE_AREA`), permitindo ao mobile bloquear o acesso até o cadastro estar completo, sem lógica por papel no cliente.
@@ -51,6 +53,7 @@ Além disso, os dois conceitos de endereço estão misturados: o endereço **res
 - `personal-address`: endereço residencial privado, criado a partir de um place, vinculado à árvore e a todos os papéis.
 - `driver-service-area`: declaração pública das regiões onde o motorista trabalha, por nó da árvore.
 - `driver-location-search`: busca de motoristas por origem + destino com match por contenção na árvore.
+- `school-resolution`: resolução de um place do Google em uma `school` persistida e magra, idempotente por `google_place_id`.
 - `location-onboarding`: exposição dos passos pendentes de cadastro em `GET /api/user/me`.
 
 ### Modified Capabilities
@@ -62,8 +65,9 @@ Além disso, os dois conceitos de endereço estão misturados: o endereço **res
 - **Bloqueio externo (fase 0):** as chaves do Google Maps Platform (Places API New + Geocoding API) precisam ser criadas e restritas manualmente no Google Cloud Console antes de qualquer implementação. Nenhuma fase de código pode começar antes disso.
 - **Código:** novo feature package `br.com.vanep.district`; novo `br.com.vanep.driverservicearea`; novo `br.com.vanep.places` (client HTTP do Google + resolver da árvore); refatoração de `address`, `school`, `city`, `state`, `driver`; extensão de `UserMeResponseDTO`.
 - **Schema:** migrations Flyway a partir de `V20` (última aplicada: `V19`). Nenhuma migration existente é editada (constituição, regra 2).
-- **Deps:** cliente HTTP para o Places (`RestClient` do Spring, sem SDK adicional); cache em memória (Caffeine) para `Place Details` por `placeId`.
+- **Deps:** cliente HTTP para o Places (`RestClient` do Spring, sem SDK adicional); cache em memória (Caffeine) para `Place Details` por `placeId`, **ignorado quando a requisição traz `sessionToken`**, para que a sessão de autocomplete feche e entre no SKU de sessão (D5).
 - **Config:** `vanep.google.places.api-key`, `vanep.google.places.base-url`, `vanep.google.geocoding.enabled` — todos via env (`.env.example`), nunca hardcoded (constituição, regra 1/3).
+- **Cobertura declarada:** a v1 vale para DF e capital de SP. Abrir praça nova exige fixtures reais daquela praça e reconferência da tabela `types` → nível (R1) — não é rollout de configuração.
 - **Mensagens:** novas keys de MessageSource para erros de resolução de place, região inválida e onboarding incompleto (EN + pt-BR).
 - **Auth:** `PUT /api/user/me/address` e `/api/drivers/me/service-areas` com `isAuthenticated()`; busca autenticada; leituras de geografia autenticadas. Ownership via `@sec` quando aplicável (regra 21).
 - **Testes:** unit (resolver da árvore, policy de match) + slice MockMvc; o client do Google é mockado — nenhum teste chama a API real.
