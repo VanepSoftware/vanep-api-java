@@ -1,5 +1,6 @@
 package br.com.vanep.city.model;
 
+import br.com.vanep.location.LocationNameNormalizer;
 import br.com.vanep.state.model.StateModel;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -10,6 +11,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.UUID;
@@ -41,6 +43,19 @@ public class CityModel {
   @Column(nullable = false, length = 128)
   private String name;
 
+  @Column(name = "normalized_name", nullable = false, length = 128)
+  private String normalizedName;
+
+  @Column(name = "google_place_id", length = 255)
+  private String googlePlaceId;
+
+  /**
+   * Override do flag do estado. {@code null} significa "herda de {@code state.requiresDistrict}" —
+   * por isso é {@code Boolean} e não {@code boolean}. Ver D8.
+   */
+  @Column(name = "requires_district")
+  private Boolean requiresDistrict;
+
   @Column(name = "is_active", nullable = false)
   private boolean active = true;
 
@@ -57,5 +72,11 @@ public class CityModel {
     if (token == null) {
       token = UUID.randomUUID().toString().replace("-", "").substring(0, 25);
     }
+    normalizedName = LocationNameNormalizer.normalize(name);
+  }
+
+  @PreUpdate
+  void onUpdate() {
+    normalizedName = LocationNameNormalizer.normalize(name);
   }
 }

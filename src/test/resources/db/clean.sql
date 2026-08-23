@@ -19,6 +19,7 @@ delete from roles;
 delete from role_permissions;
 delete from school;
 delete from address;
+delete from district;
 delete from city;
 delete from state;
 delete from country;

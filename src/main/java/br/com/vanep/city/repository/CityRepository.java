@@ -1,6 +1,7 @@
 package br.com.vanep.city.repository;
 
 import br.com.vanep.city.model.CityModel;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -12,6 +13,12 @@ public interface CityRepository extends JpaRepository<CityModel, Long> {
   Optional<CityModel> findByToken(String token);
 
   Optional<CityModel> findFirstByNameIgnoreCase(String name);
+
+  List<CityModel> findByStateId(Long stateId);
+
+  Optional<CityModel> findByStateIdAndNormalizedName(Long stateId, String normalizedName);
+
+  Optional<CityModel> findByGooglePlaceId(String googlePlaceId);
 
   boolean existsByNameIgnoreCaseAndStateId(String name, Long stateId);
 
