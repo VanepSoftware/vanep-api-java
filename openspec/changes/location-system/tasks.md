@@ -76,16 +76,16 @@
 > Depends on: Phase 1 | Parallel with: Phase 2
 > Order: test → config → DTOs → client
 
-- [ ] 3.1 Testes unitários do `PlacesClient` usando as fixtures da tarefa 1.3 (resposta OK, place inexistente, erro 4xx/5xx, timeout) — client stubado ou `MockWebServer` local, **nenhuma chamada real** (constituição regra 50; o profile de teste já aponta `vanep.google.places.base-url` para `http://localhost:1` para que uma chamada não mockada falhe na hora)
-- [ ] 3.2 Criar feature package `br.com.vanep.places`
-- [ ] 3.3 Adicionar propriedades `vanep.google.places.api-key` e `vanep.google.places.base-url` em `application.properties` como `${VAR}`; documentar em `.env.example` (regras 1 e 3)
-- [ ] 3.4 DTOs de resposta do Places (`PlaceDetailsResponseDTO`, `AddressComponentDTO`) — apenas os campos usados
-- [ ] 3.5 Implementar `PlacesClient` com `RestClient`, timeout explícito e tratamento de erro que lança exceção significativa (regra 30) — nunca `catch` vazio
-- [ ] 3.6 `PlacesClient` aceita `sessionToken` opcional e o **repassa** ao `Place Details`; teste de contrato garantindo o repasse (D5)
-- [ ] 3.7 Aplicar o *field mask* decidido em 1.7 (mínimo: `id` + `addressComponents`) — o mask define o SKU cobrado
-- [ ] 3.8 Adicionar cache em memória (Caffeine) de `Place Details` por `placeId`, com TTL configurável por env
-- [ ] 3.9 **Cache ciente da sessão** (D5): com `sessionToken` presente, chamar o `Place Details` mesmo em cache hit (para encerrar a sessão) e atualizar a entrada; sem token, servir do cache. Testes cobrindo os dois caminhos
-- [ ] 3.10 `make lint` + `./mvnw verify`; abrir PR fase 3
+- [x] 3.1 Testes unitários do `PlacesClient` usando as fixtures da tarefa 1.3 (resposta OK, place inexistente, erro 4xx/5xx, timeout) — client stubado ou `MockWebServer` local, **nenhuma chamada real** (constituição regra 50; o profile de teste já aponta `vanep.google.places.base-url` para `http://localhost:1` para que uma chamada não mockada falhe na hora)
+- [x] 3.2 Criar feature package `br.com.vanep.places`
+- [x] 3.3 Adicionar propriedades `vanep.google.places.api-key` e `vanep.google.places.base-url` em `application.properties` como `${VAR}`; documentar em `.env.example` (regras 1 e 3)
+- [x] 3.4 DTOs de resposta do Places (`PlaceDetailsResponseDTO`, `AddressComponentDTO`) — apenas os campos usados
+- [x] 3.5 Implementar `PlacesClient` com `RestClient`, timeout explícito e tratamento de erro que lança exceção significativa (regra 30) — nunca `catch` vazio
+- [x] 3.6 `PlacesClient` aceita `sessionToken` opcional e o **repassa** ao `Place Details`; teste de contrato garantindo o repasse (D5)
+- [x] 3.7 Aplicar o *field mask* decidido em 1.7 (mínimo: `id` + `addressComponents`) — o mask define o SKU cobrado
+- [x] 3.8 Adicionar cache em memória (Caffeine) de `Place Details` por `placeId`, com TTL configurável por env
+- [x] 3.9 **Cache ciente da sessão** (D5): com `sessionToken` presente, chamar o `Place Details` mesmo em cache hit (para encerrar a sessão) e atualizar a entrada; sem token, servir do cache. Testes cobrindo os dois caminhos
+- [x] 3.10 `make lint` + `./mvnw verify`; abrir PR fase 3
 
 ## 4. Phase 4 — Resolver da árvore (PR 4)
 
