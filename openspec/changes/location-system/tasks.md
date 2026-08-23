@@ -68,7 +68,7 @@
 - [x] 2.7 Criar feature package `br.com.vanep.district` com `model/DistrictModel`, `repository/DistrictRepository` (constituição regra 5)
 - [x] 2.8 Adicionar `findByStateId` em `CityRepository`, `normalizedName` nos models de `state`/`city` e `requiresDistrict` em `StateModel`/`CityModel`
 - [x] 2.9 Implementar utilitário de normalização (unaccent + lowercase) com testes unitários
-- [ ] 2.10 `make lint` + `./mvnw verify`; abrir PR fase 2
+- [x] 2.10 `make lint` + `./mvnw verify`; abrir PR fase 2
 
 ## 3. Phase 3 — Client do Google Places (PR 3)
 
