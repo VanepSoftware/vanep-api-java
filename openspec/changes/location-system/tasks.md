@@ -64,7 +64,7 @@
 - [x] 2.3 **No índice do 2.2, tratar `parent_id` nulo como valor comparável** — usar `NULLS NOT DISTINCT`, disponível porque o `docker-compose.yml` roda `postgres:17-alpine` (PG 15+); o fallback `COALESCE(parent_id, 0)` fica descartado. Índice único simples **não** restringe linhas com `parent_id` nulo, que é o caso do distrito filho direto de cidade — o R2 ficaria sem mitigação justamente no caso mais comum
 - [x] 2.4 Migration `V21` (cont.): adicionar `normalized_name` e `google_place_id` em `state` e `city`
 - [x] 2.5 Migration `V21` (cont.): adicionar `state.requires_district` (`NOT NULL DEFAULT false`) e `city.requires_district` (nullable); seed `UPDATE state SET requires_district = true WHERE uf IN ('DF','SP')` (D8)
-- [ ] 2.6 **Aplicar a `V21` manualmente contra o PostgreSQL local e verificar o índice** inserindo duas "Taguatinga" com `parent_id` nulo sob a mesma cidade — a suíte roda com `flyway.enabled=false` e `ddl-auto=create-drop`, então nenhum teste executa esta migration (R7)
+- [x] 2.6 **Aplicar a `V21` manualmente contra o PostgreSQL local e verificar o índice** inserindo duas "Taguatinga" com `parent_id` nulo sob a mesma cidade — a suíte roda com `flyway.enabled=false` e `ddl-auto=create-drop`, então nenhum teste executa esta migration (R7)
 - [x] 2.7 Criar feature package `br.com.vanep.district` com `model/DistrictModel`, `repository/DistrictRepository` (constituição regra 5)
 - [x] 2.8 Adicionar `findByStateId` em `CityRepository`, `normalizedName` nos models de `state`/`city` e `requiresDistrict` em `StateModel`/`CityModel`
 - [x] 2.9 Implementar utilitário de normalização (unaccent + lowercase) com testes unitários
