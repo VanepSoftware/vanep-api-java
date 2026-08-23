@@ -13,6 +13,8 @@ public interface CountryRepository extends JpaRepository<CountryModel, Long> {
 
   Optional<CountryModel> findByName(String name);
 
+  Optional<CountryModel> findByIsoCodeIgnoreCase(String isoCode);
+
   boolean existsByName(String name);
 
   boolean existsByIsoCode(String isoCode);

@@ -93,16 +93,16 @@
 > Depends on: Phase 2, Phase 3 | Parallel with: —
 > Order: test → resolver → âncora → ancestrais
 
-- [ ] 4.1 Testes unitários de `LocationResolverService.resolveAndPersist` (cria cadeia nova; reusa cadeia existente; idempotência; país casado por ISO `BR`; país não suportado → erro de negócio)
-- [ ] 4.2 Testes unitários da regra D2: place "Taguatinga Norte" cujos componentes trazem "Taguatinga" ancora em "Taguatinga" e **não** cria nó "Taguatinga Norte"
-- [ ] 4.3 Testes unitários de `resolveAnchor` (read-only): componentes mais profundos que a árvore param no nó mais profundo existente e **nenhum insert** ocorre
-- [ ] 4.4 Testes unitários de `findAncestors(districtId)` subindo por `parent_id`
-- [ ] 4.5 Testes unitários de **falha alta em `type` não mapeado** (R1): componente com `type` fora da tabela D11 → erro de negócio, nenhum nó persistido. E teste do log de ambiguidade quando `administrative_area_level_2` e `locality` trazem o mesmo nome
-- [ ] 4.6 Implementar mapeamento `types` → nível conforme a decisão D11 registrada na fase 1, **rejeitando** `type` desconhecido em vez de ignorá-lo silenciosamente
-- [ ] 4.7 Implementar `LocationResolverService` (`resolveAndPersist` e `resolveAnchor`), sem detalhes de web ou JPA vazando para a regra (regra 9)
-- [ ] 4.8 Expor na cadeia resolvida se há componente de nível `district` — é a entrada da validação D8 da fase 6, que **não** pode consultar contagem de distritos no banco
-- [ ] 4.9 Adicionar MessageSource keys (EN + `messages_pt_BR.properties`) para place não resolvido, país não suportado e `type` desconhecido (regra 45)
-- [ ] 4.10 `make lint` + `./mvnw verify`; abrir PR fase 4
+- [x] 4.1 Testes unitários de `LocationResolverService.resolveAndPersist` (cria cadeia nova; reusa cadeia existente; idempotência; país casado por ISO `BR`; país não suportado → erro de negócio)
+- [x] 4.2 Testes unitários da regra D2: place "Taguatinga Norte" cujos componentes trazem "Taguatinga" ancora em "Taguatinga" e **não** cria nó "Taguatinga Norte"
+- [x] 4.3 Testes unitários de `resolveAnchor` (read-only): componentes mais profundos que a árvore param no nó mais profundo existente e **nenhum insert** ocorre
+- [x] 4.4 Testes unitários de `findAncestors(districtId)` subindo por `parent_id`
+- [x] 4.5 Testes unitários de **falha alta em `type` não mapeado** (R1): componente com `type` fora da tabela D11 → erro de negócio, nenhum nó persistido. E teste do descarte do distrito que repete o nome da cidade (caso Formosa/Itapetininga) — substitui o "log de ambiguidade entre `administrative_area_level_2` e `locality`" da redação original, que pressupunha o conflito refutado na fase 1
+- [x] 4.6 Implementar mapeamento `types` → nível conforme a decisão D11 registrada na fase 1, **rejeitando** `type` desconhecido em vez de ignorá-lo silenciosamente
+- [x] 4.7 Implementar `LocationResolverService` (`resolveAndPersist` e `resolveAnchor`), sem detalhes de web ou JPA vazando para a regra (regra 9)
+- [x] 4.8 Expor na cadeia resolvida se há componente de nível `district` — é a entrada da validação D8 da fase 6, que **não** pode consultar contagem de distritos no banco
+- [x] 4.9 Adicionar MessageSource keys (EN + `messages_pt_BR.properties`) para place não resolvido, país não suportado e `type` desconhecido (regra 45)
+- [x] 4.10 `make lint` + `./mvnw verify`; abrir PR fase 4
 
 ## 5. Phase 5 — Endereço pessoal (PR 5)
 

@@ -72,7 +72,20 @@ Regra dura, e o ponto mais frágil do desenho:
 
 Se o place escolhido fosse gravado direto, o motorista que selecionou "Taguatinga Norte" nunca casaria com um endereço cujos componentes resolvem para "Taguatinga". Ambos os lados atravessam a mesma normalização, então caem no mesmo nó por construção.
 
-Efeito colateral aceito: quem escolhe "Taguatinga Norte" acaba cobrindo Taguatinga inteira.
+Efeito colateral previsto: quem escolhe "Taguatinga Norte" acabaria cobrindo Taguatinga inteira.
+
+> **Atualização da fase 4 — esse efeito colateral provavelmente não acontece.** A fixture
+> `df-escola-objetivo` mostra que o Google devolve "Taguatinga Norte" como
+> `sublocality_level_2` **junto** com "Taguatinga" em `administrative_area_level_4`. Ou seja,
+> a cadeia resolvida é `Taguatinga → Taguatinga Norte → QI 21`, e quem escolhe Taguatinga Norte
+> cadastra o nó mais fundo, não a RA inteira.
+>
+> Duas ressalvas: não coletamos fixture do *place da região* "Taguatinga Norte" em si, só de um
+> endereço dentro dela — então o comportamento para aquele place específico segue não verificado.
+> E a diferença não afeta a correção da busca: a contenção do D4 compara contra os **ancestrais**
+> do ponto, então um motorista cadastrado em Taguatinga continua casando com um endereço em
+> Taguatinga Norte. A regra do D2 (persistir o derivado, nunca o escolhido) permanece intacta —
+> o que muda é só a granularidade que ela produz na prática.
 
 ### D3 — Escrita só no cadastro; busca é read-only
 
