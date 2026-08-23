@@ -47,3 +47,6 @@ out/
 
 # Local dev OAuth signing key (generated, never commit)
 .dev/
+
+# Regras locais do Claude (privadas, por máquina)
+.claude/rules/*.local.mdc

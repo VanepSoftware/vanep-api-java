@@ -51,7 +51,7 @@
 - [ ] 1.8 **Q3 — qual a ordem de grandeza do custo por busca?** Medir com números reais, não estimar. É o que dimensiona o rate limit do R6 e a quota da fase 0
 - [x] 1.9 Varrer o `design.md` atrás de qualquer outra afirmação não verificada e resolvê-la aqui; atualizar a seção **Open Questions** com a resposta de cada item ou a decisão explícita de conviver com ele
 - [x] 1.10 Confirmar o próximo número de migration Flyway — última aplicada é `V20__owned_address_foreign_keys.sql`, mergeada depois deste plano ser escrito, então as migrations desta change vão de `V21` a `V25` (já corrigido abaixo)
-- [ ] 1.11 Abrir PR fase 1 (pt-BR, sem código de produção — fixtures + documento de decisão)
+- [x] 1.11 Abrir PR fase 1 (pt-BR, sem código de produção — fixtures + documento de decisão)
 
 ## 2. Phase 2 — Árvore geográfica: `district` + migrations (PR 2)
 
