@@ -61,6 +61,10 @@ Rules that MUST be followed in this codebase. Stack: **Java 25, Spring Boot 4, M
 24. **The build enforces a minimum line coverage (JaCoCo) on `verify`.** Run `./mvnw verify` (or `make test-coverage`) locally before opening a PR — a green local build prevents CI rework.
 25. **Tests use H2 in memory**; reuse the existing test profiles/properties in `src/test/resources` instead of inventing parallel config files.
 
+50. **No test may call a real external API — ever.** The whole suite must pass with no network and no credentials. Unit, slice, and repository tests all stub the outbound client (`@MockitoBean`, a stubbed `RestClient`, or a local `MockWebServer`) and feed it **recorded fixtures** committed under `src/test/resources`. No test reaches Google Places, an SMTP server, or any third-party host — not even "just once", not even a test tagged to be skipped in CI. Three reasons, worst first: a real call **spends paid quota on every run** (Places bills per `Place Details`, and CI runs on every push); the suite becomes non-deterministic, failing on network or credential problems that have nothing to do with the code under test; and a green build starts depending on a secret that CI has no business holding. **Enforcement is configuration, not discipline** — `application-test.properties` pins every outbound base URL to an unroutable local address (`http://localhost:1/...`) and every key to an obviously fake value, so an accidental real call dies with a connection error instead of silently succeeding and billing. When new provider fixtures are needed, capture them **once**, in a documented manual spike, and commit the raw JSON; never re-capture from the suite.
+
+    > Rule 50 is numbered out of sequence on purpose: it belongs to Testing, but inserting it as 26 would renumber rules 26–49 and invalidate every `regra N` reference already written across `openspec/`.
+
 ## Code quality (Clean Code)
 
 26. **Write tests before the code** they cover (test-first).

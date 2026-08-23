@@ -1,0 +1,67 @@
+{
+    "id": "ChIJNaGf7cHMW5MRfKwnZi5uNUg",
+    "types": [
+        "sublocality_level_3",
+        "sublocality",
+        "political"
+    ],
+    "formattedAddress": "St. M QNM 17 - Ceil\u00e2ndia, Bras\u00edlia - DF, Brazil",
+    "addressComponents": [
+        {
+            "longText": "QNM 17",
+            "shortText": "QNM 17",
+            "types": [
+                "sublocality_level_3",
+                "sublocality",
+                "political"
+            ],
+            "languageCode": "pt"
+        },
+        {
+            "longText": "Setor M",
+            "shortText": "St. M",
+            "types": [
+                "sublocality_level_2",
+                "sublocality",
+                "political"
+            ],
+            "languageCode": "pt"
+        },
+        {
+            "longText": "Ceil\u00e2ndia",
+            "shortText": "Ceil\u00e2ndia",
+            "types": [
+                "administrative_area_level_4",
+                "political"
+            ],
+            "languageCode": "pt"
+        },
+        {
+            "longText": "Bras\u00edlia",
+            "shortText": "Bras\u00edlia",
+            "types": [
+                "administrative_area_level_2",
+                "political"
+            ],
+            "languageCode": "pt"
+        },
+        {
+            "longText": "Distrito Federal",
+            "shortText": "DF",
+            "types": [
+                "administrative_area_level_1",
+                "political"
+            ],
+            "languageCode": "pt"
+        },
+        {
+            "longText": "Brazil",
+            "shortText": "BR",
+            "types": [
+                "country",
+                "political"
+            ],
+            "languageCode": "en"
+        }
+    ]
+}

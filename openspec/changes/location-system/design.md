@@ -119,7 +119,7 @@ request sem sessionToken   →  serve do cache; só chama o Google em miss
 
 Quem envia token veio de uma caixa de autocomplete e precisa encerrar a sessão. Quem não envia veio de um `placeId` já persistido — o caso de maior repetição (o `placeId` da escola do dependente, reusado a cada busca), e onde o cache efetivamente paga. O cache é Caffeine em memória, então com mais de uma instância a taxa de acerto cai; ele é otimização de custo e latência, nunca requisito de correção.
 
-Dois pontos desta decisão ficam **em aberto** e são resolvidos na fase 1 — ver § Open Questions (Q1 e Q2). Nenhum dos dois muda a forma do D5 no papel; ambos mudam a conta.
+A fase 1 fechou a **Q2**: o mask mínimo (`id` + `addressComponents`) cai em *Place Details Essentials* — 10.000 eventos grátis por mês, US$ 5,00/1.000 depois. Com esse teto, o cache continua sendo otimização e não requisito, como já estava escrito. A **Q1** (a sessão sobrevive a chaves distintas?) segue aberta e depende de uma leitura do console de billing. Nenhuma das duas muda a forma do D5; ambas mudam a conta.
 
 Um teste de contrato deve garantir que o `sessionToken` recebido é repassado ao Google. Note que ele prova apenas o repasse: se o Google **faturou** como sessão só se confirma no console de billing.
 
@@ -213,20 +213,71 @@ Identificadores públicos permanecem `token` opaco (regra 13). O `placeId` do Go
 
 Enum backed (regra 14) em vez de flags booleanas: o mobile não precisa saber que `SERVICE_AREA` só se aplica a motorista, e passos futuros entram sem quebrar o app.
 
+### D11 — Mapeamento `types` → nível (decidido na fase 1, com evidência)
+
+Fixtures em `src/test/resources/fixtures/places/` (10 lugares reais, coletados uma vez — regra 50).
+
+| Nível | `types` aceitos | Observação |
+|---|---|---|
+| `country` | `country` | casar por `shortText` (ISO `BR`), nunca por `longText` — ele vem em inglês ("Brazil") |
+| `state` | `administrative_area_level_1` | `shortText` é a UF (`DF`, `SP`); `longText` pode vir em inglês ("State of Goiás") |
+| `city` | `administrative_area_level_2`, com fallback para `locality` | ver abaixo |
+| `district` profundidade 1 | `administrative_area_level_4` ou `sublocality_level_1` | |
+| `district` profundidade 2 | `sublocality_level_2` | |
+| `district` profundidade 3 | `sublocality_level_3` | |
+| ignorados | `route`, `street_number`, `postal_code`, `premise`, componente **sem `types`** | logradouro vai para `address`, não para a árvore |
+
+**`locality` não é o sinal de cidade — `administrative_area_level_2` é.** É o oposto do que o R1 supunha. Nas 10 fixtures, `administrative_area_level_2` trouxe a cidade correta em 10/10 (Brasília, São Paulo, Formosa, Itapetininga). Já `locality` apareceu em **2/10** — só nas cidades do interior, e ali apenas duplicando o `administrative_area_level_2`. Em nenhum endereço do DF e em nenhum endereço da capital de SP existe `locality`. O fallback existe só para o caso não observado de um place sem `administrative_area_level_2`.
+
+**`administrative_area_level_4` é ambíguo e exige desempate por nome.** No DF ele é a Região Administrativa (Taguatinga, Águas Claras, Ceilândia, Lago Norte) — exatamente o distrito que queremos. Mas em Formosa e Itapetininga ele **repete o nome da cidade**:
+
+```
+Formosa  → locality: Formosa | adm_4: Formosa | adm_2: Formosa
+```
+
+Sem tratamento, isso cria um distrito "Formosa" dentro da cidade "Formosa" em toda cidade do interior — poluição da árvore e o R2 em cheio. **Regra: descartar o componente de distrito cujo `normalized_name` seja igual ao da cidade resolvida.**
+
+**A ordem do array `addressComponents` não é confiável.** Duas fixtures do DF trazem os mesmos níveis em ordens opostas:
+
+```
+df-taguatinga-qnl5   → [route, QNL 5 (sl_3), Setor L Norte (sl_2), Taguatinga (adm_4), ...]
+df-escola-objetivo   → [<sem types>, Taguatinga Norte (sl_2), QI 21 (sl_3), Taguatinga (adm_4), ...]
+```
+
+O aninhamento tem de ser montado pela **profundidade declarada na tabela acima**, nunca pela posição no array. Um resolver que confie na ordem monta "Setor L Norte" como filho de "QNL 5" em um caso e o inverso no outro.
+
+**DF e capital de SP usam ramos disjuntos.** DF: `adm_4` → `sublocality_level_2` → `sublocality_level_3`, e nunca `sublocality_level_1`. Capital de SP: só `sublocality_level_1` (Pinheiros, Vila Mariana, Vila Gomes Cardim), e nunca `adm_4`. Por isso profundidade 1 aceita os dois `types`.
+
 ---
 
 ## Risks / Trade-offs
 
-**R1 — Mapeamento `types` → nível é inconsistente no Google (ALTO).**
-Em São Paulo `administrative_area_level_2` e `locality` são ambos "São Paulo"; no DF `locality` às vezes é "Brasília" e às vezes "Taguatinga". Se `locality` cair como `city` em SP e como `district` no DF, a árvore sai torta e o match falha **silenciosamente** — sem erro, apenas sem resultado.
+**R1 — Mapeamento `types` → nível é inconsistente no Google (ALTO → MÉDIO após a fase 1).**
+
+> ⚠️ **A formulação original deste risco estava errada, e a fase 1 provou isso.** Ela dizia: "em São Paulo `administrative_area_level_2` e `locality` são ambos 'São Paulo'; no DF `locality` às vezes é 'Brasília' e às vezes 'Taguatinga'". Nas 10 fixtures coletadas, `locality` **não aparece nem uma vez** no DF ou na capital de SP. O conflito temido não existe; o mapeamento real está na D11. Mantido aqui o que sobrou de risco de verdade.
+
+O que continua verdadeiro: os `types` variam por praça, e um mapeamento errado faz o match falhar **silenciosamente** — sem erro, apenas sem resultado. Os três pontos concretos que a fase 1 encontrou, todos capazes de produzir esse silêncio:
+
+1. **`administrative_area_level_4` duplica o nome da cidade no interior** (Formosa, Itapetininga) — sem desempate por nome, nasce um distrito espúrio em toda cidade pequena.
+2. **A ordem do array não é estável** — aninhar por posição inverte a hierarquia entre duas chamadas ao mesmo endpoint.
+3. **Existe componente sem o campo `types`** (fixture `df-escola-objetivo`, componente `"Q1 21 LOTE 18 A 26"`).
 
 O spike da fase 1 cobre a praça de lançamento (DF e capital de SP), mas o comportamento do Google varia entre capitais: bairro oficial nem sempre coincide com distrito administrativo, e zona rural frequentemente não traz `sublocality`. Ao abrir uma praça nova o risco **volta**, agora com dado real já na árvore.
 
 *Mitigações:*
-- Fase 1 coleta `addressComponents` crus de ~10 endereços reais e monta a tabela de mapeamento com evidência. Nenhuma migration antes disso.
-- **Falhar alto em `type` não mapeado:** ao encontrar um componente cujo `type` não está na tabela decidida, o resolver lança erro de negócio em vez de ignorar o componente. É o que converte "busca sem resultado" em erro visível — a única mitigação que ataca o silêncio, que é o que torna o R1 alto.
-- **Log de ambiguidade** quando `administrative_area_level_2` e `locality` trazem o mesmo nome (o caso SP), para detectar a divergência em produção antes de o usuário reclamar.
-- **Escopo declarado:** a v1 vale para DF e capital de SP. Abrir praça nova exige adicionar fixtures reais daquela praça e reconferir a tabela de mapeamento — não é rollout de configuração.
+- ~~Fase 1 coleta `addressComponents` crus~~ — **feito.** 10 fixtures em `src/test/resources/fixtures/places/`, tabela D11 decidida com evidência. Nenhuma migration foi escrita antes disso.
+- **Falhar alto em `type` não mapeado, com uma exceção explícita.** Ao encontrar um componente cujo `type` não está na D11, o resolver lança erro de negócio em vez de ignorar. É o que converte "busca sem resultado" em erro visível.
+
+  ⚠️ **Esta mitigação, como estava escrita, rejeitaria endereços válidos.** A fixture `df-escola-objetivo` traz um componente **sem o campo `types`** (`"Q1 21 LOTE 18 A 26"`). "Falhar em tudo que não está na tabela" derruba a resolução do Colégio Objetivo inteiro — um place real, de uma escola real, na praça de lançamento. A regra correta separa dois casos:
+
+  | Caso | Ação |
+  |---|---|
+  | Componente **sem `types`** (campo ausente ou lista vazia) | ignorar, com log em `WARN` |
+  | Componente com `types` presentes, **todos** fora da D11 | erro de negócio |
+  | Componente com `types` presentes, **algum** na lista de ignorados (`route`, `postal_code`, …) | ignorar em silêncio |
+
+- **Log de ambiguidade** quando um componente de distrito tem o mesmo `normalized_name` da cidade (o caso Formosa/Itapetininga), para medir em produção com que frequência o desempate da D11 dispara.
+- **Escopo declarado:** a v1 vale para DF e capital de SP. Abrir praça nova exige adicionar fixtures reais daquela praça e reconferir a D11 — não é rollout de configuração. Reforçado pela evidência: DF e SP já usam ramos de `types` **disjuntos** entre si, então não há motivo para supor que uma terceira praça reuse qualquer um dos dois.
 
 **R2 — O primeiro cadastro define o nome canônico da região.**
 Como a árvore é lazy, o primeiro motorista a cadastrar Taguatinga cria o nó. Se o Google devolver grafia diferente depois, surge nó duplicado irmão.
@@ -235,14 +286,11 @@ Como a árvore é lazy, o primeiro motorista a cadastrar Taguatinga cria o nó. 
 ⚠️ **Esta mitigação não funciona ingenuamente.** Distrito de primeiro nível tem `parent_id = NULL`, e em PostgreSQL `NULL` não é igual a `NULL` num índice único — duas "Taguatinga" filhas diretas de Brasília passariam pelo índice sem conflito. É justamente o caso mais comum. O índice tem de usar uma das formas:
 
 ```sql
--- PostgreSQL 15+
 CREATE UNIQUE INDEX ... ON district (parent_id, city_id, normalized_name)
   NULLS NOT DISTINCT WHERE deleted_at IS NULL;
-
--- ou, portátil: expressão que elimina o NULL
-CREATE UNIQUE INDEX ... ON district (COALESCE(parent_id, 0), city_id, normalized_name)
-  WHERE deleted_at IS NULL;
 ```
+
+`NULLS NOT DISTINCT` exige PostgreSQL 15+, e o `docker-compose.yml` roda `postgres:17-alpine` — está disponível. O fallback portátil (`COALESCE(parent_id, 0)`) fica descartado por ser menos legível sem ganho.
 
 **R6 — Endpoints que gastam dinheiro por request não têm limite (MÉDIO).**
 `POST /api/schools/resolve` e `GET /api/drivers/search` disparam `Place Details` pago a partir de `placeId` fornecido pelo cliente. Um usuário autenticado varrendo `placeId`s gera custo no Google e, no caso da escola, linha nova no banco a cada id distinto. O R3 trata custo como "monitorar quota", o que não impede abuso.
@@ -269,27 +317,28 @@ Aceito explicitamente: não há dados reais em produção (confirmado com o time
 
 **Toda questão em aberto se resolve na fase 1.** Ela existe para isso: é a fase de experimento com a API, com chamada real e chave real. Nada neste design que dependa de achismo, suposição ou "não sabemos" pode atravessar para uma fase de código — ou a fase 1 responde, ou registra a decisão explícita de conviver com a incerteza, com o motivo. Não se decide nenhuma dessas no papel.
 
-| # | Questão | Depende de | Impacto se a resposta for a desfavorável |
+| # | Questão | Status | Resposta / evidência |
 |---|---|---|---|
-| **Q1** | O faturamento por sessão sobrevive ao autocomplete usar a chave de referrer/bundle e o `Place Details` usar a chave de servidor, no mesmo projeto? | D5 | O autocomplete passa a ser cobrado avulso. Muda o custo, não a arquitetura — a reação correta é quantificar antes de mexer no D5 |
-| **Q2** | Qual SKU o *field mask* do `Place Details` seleciona? Pedir só `id` + `addressComponents` cai na faixa mais barata? | D5 | Define se o cache por `placeId` se paga ou é complexidade sem retorno |
-| **Q3** | Qual a ordem de grandeza do custo por busca, no volume projetado? | R3, R6 | É o que dimensiona o rate limit e a quota; sem isso ambos são chute |
-| **Q4** | Qual o mapeamento `types` → nível que vale para DF e capital de SP? | R1, D11 | É o risco alto da change; sem evidência a árvore sai torta e o match falha em silêncio |
-| **Q5** | O comportamento dos `addressComponents` se mantém fora de DF/SP? | R1 | Não bloqueia a v1 (o escopo declarado é DF + capital de SP), mas define o que abrir praça nova exige |
+| **Q1** | O faturamento por sessão sobrevive a chaves distintas (autocomplete com referrer, `Place Details` com servidor)? | 🟡 **parcial** | A doc confirma que o SKU **Autocomplete Session Usage custa US$ 0, ilimitado**, e que a sessão só entra nele se o `Place Details` que a encerra carregar o mesmo `sessionToken`. Isso *eleva* a importância do D5: sem o repasse, cada tecla vira `Autocomplete Requests` (10k grátis, depois US$ 2,83/1.000). **O que falta:** confirmar que a fronteira entre chaves não quebra a sessão. Só o relatório de billing responde — pendente de verificação humana |
+| **Q2** | Qual SKU o *field mask* seleciona? | ✅ **resolvida** | Documentado, sem gastar chamada. `id` → *Place Details Essentials IDs Only* (grátis ilimitado); `addressComponents` e `formattedAddress` → *Place Details Essentials* (**10.000 grátis/mês**, US$ 5,00/1.000 depois). O mask mínimo da change cai na faixa paga mais barata que ainda devolve componentes. **Consequência para o D5:** o cache se paga, mas o teto gratuito é generoso o bastante para não ser requisito de correção — segue como otimização, exatamente como o D5 já dizia |
+| **Q3** | Qual a ordem de grandeza do custo por busca? | 🟡 **parcial** | Tabela conhecida: 1 busca = 2 `Place Details` = 2 eventos do balde de 10.000/mês → **~5.000 buscas/mês grátis**; acima disso, **US$ 0,01 por busca**. 1 endereço salvo = 1 evento; 1 escola resolvida = 1 evento (mais o SKU Pro, ver Q6). **O que falta:** confirmar no relatório de billing que os eventos caem no SKU previsto. Pendente de verificação humana |
+| **Q4** | Qual o mapeamento `types` → nível para DF e capital de SP? | ✅ **resolvida** | Ver **D11**. 10 fixtures reais. A premissa do R1 estava errada: `locality` não é o sinal de cidade — `administrative_area_level_2` é (10/10) |
+| **Q5** | O comportamento se mantém fora de DF/SP? | ❌ **não, e está aceito** | As fixtures de Formosa (GO) e Itapetininga (SP) já divergem: `administrative_area_level_4` repete o nome da cidade, o que no DF nunca acontece. DF e capital de SP usam ramos de `types` disjuntos entre si. Não bloqueia a v1 (escopo declarado), mas confirma que **abrir praça nova exige fixtures novas e reconferência da D11** — não é configuração |
+| **Q6** | Resolver uma escola exige `displayName`, que é SKU **Pro**. De onde vem o nome? | 🔴 **aberta, decidir na fase 7** | `SchoolModel.name` é obrigatório e a fase 7 o mantém. `displayName` está no *Place Details Pro*, SKU distinto do Essentials — um mask que peça os dois é cobrado nos dois. Alternativa: o cliente já recebe o nome do autocomplete de graça e o envia junto do `placeId`; o backend continua re-resolvendo a **geografia** pelos `addressComponents` (fronteira de confiança intacta) e usa o texto do cliente apenas como rótulo. Risco reduzido a "nome errado na listagem", não a árvore torta |
 
-Q1, Q2 e Q3 se resolvem pelo meio mais barato que dê resposta confiável — doc oficial, suporte do Maps Platform ou experimento controlado, nessa ordem de preferência. A fase 1 é o momento certo para o experimento porque o projeto ainda tem tráfego zero de Places: qualquer linha de SKU no relatório é atribuível sem ambiguidade, o que deixa de ser verdade depois do lançamento.
+**Q2, Q4 e Q5 estão fechadas.** Q1 e Q3 têm a parte documental resolvida e dependem de uma leitura do console de billing — a única evidência que fecha as duas. A leitura deve ser feita **antes do lançamento**, enquanto o projeto ainda tem tráfego baixo de Places e cada linha de SKU no relatório é atribuível sem ambiguidade. Q6 nasceu na fase 1 e é decidida na fase 7, que é quando ela morde.
 
 ## Migration Plan
 
-Sem backfill. Migrations a partir de `V20` (última aplicada: `V19`), nenhuma migration existente editada (regra 2).
+Sem backfill. Migrations a partir de `V21` (última aplicada: `V20__owned_address_foreign_keys.sql`, mergeada depois deste documento ser escrito), nenhuma migration existente editada (regra 2).
 
 | Migration | Conteúdo |
 |-----------|----------|
-| `V20` | `district` (auto-FK, soft delete, unique parcial em `parent_id` + `city_id` + `normalized_name` com tratamento de `NULL` — ver R2); `google_place_id` + `normalized_name` em `state` e `city`; `state.requires_district` (`NOT NULL DEFAULT false`) e `city.requires_district` (nullable) com seed `DF = true`, `SP = true` (D8) |
-| `V21` | `address`: `district_id` FK, `google_place_id`; remove `district varchar`; FKs de `school.address_id` e `dependent.address_id`; `assistant.address_id` |
-| `V22` | `driver_service_area` |
-| `V23` | `school`: `google_place_id` único, `city_id`, `district_id`; remove `cnpj`, `phone`, `email` |
-| `V24` | remove `driver.city` e `driver.service_areas` |
+| `V21` | `district` (auto-FK, soft delete, unique parcial em `parent_id` + `city_id` + `normalized_name` com tratamento de `NULL` — ver R2); `google_place_id` + `normalized_name` em `state` e `city`; `state.requires_district` (`NOT NULL DEFAULT false`) e `city.requires_district` (nullable) com seed `DF = true`, `SP = true` (D8) |
+| `V22` | `address`: `district_id` FK, `google_place_id`; remove `district varchar`; FKs de `school.address_id` e `dependent.address_id`; `assistant.address_id` |
+| `V23` | `driver_service_area` |
+| `V24` | `school`: `google_place_id` único, `city_id`, `district_id`; remove `cnpj`, `phone`, `email` |
+| `V25` | remove `driver.city` e `driver.service_areas` |
 
 ---
 
@@ -333,18 +382,18 @@ Sem backfill. Migrations a partir de `V20` (última aplicada: `V19`), nenhuma mi
 |-------|----------|------------|---------------|
 | 0 | **Bloqueio humano.** Google Cloud Console: habilitar Places API (New) + Geocoding API, criar 3 chaves restritas (server/web/mobile), popular `.env` e `.env.example` | — | — |
 | 1 | Spike: coletar `addressComponents` de ~10 endereços reais, definir tabela `types` → nível, registrar em `design.md` | 0 | — |
-| 2 | Migrations `V20`; `district` (model, repo, feature package); `normalized_name` em state/city | 1 | 3 |
+| 2 | Migration `V21`; `district` (model, repo, feature package); `normalized_name` em state/city | 1 | 3 |
 | 3 | `br.com.vanep.places`: `PlacesClient` (RestClient), config por env, cache Caffeine, DTOs de resposta | 1 | 2 |
 | 4 | `LocationResolverService`: `addressComponents` → `findOrCreate` da cadeia; resolução de âncora read-only; ancestrais de distrito | 2, 3 | — |
-| 5 | Migration `V21`; endereço pessoal: refactor de `address`, FKs faltantes, `assistant.address_id`, `PUT/GET /api/user/me/address` | 4 | 6, 7 |
-| 6 | Migration `V22`; `driver_service_area`: tabela, model, repo, validação D8, `GET/PUT /api/drivers/me/service-areas` | 4 | 5, 7 |
-| 7 | Migration `V23`; `school` magra: `google_place_id`, remoção de cnpj/phone/email, `GET /api/schools/resolve` | 4 | 5, 6 |
+| 5 | Migration `V22`; endereço pessoal: refactor de `address`, FKs faltantes, `assistant.address_id`, `PUT/GET /api/user/me/address` | 4 | 6, 7 |
+| 6 | Migration `V23`; `driver_service_area`: tabela, model, repo, validação D8, `GET/PUT /api/drivers/me/service-areas` | 4 | 5, 7 |
+| 7 | Migration `V24`; `school` magra: `google_place_id`, remoção de cnpj/phone/email, `GET /api/schools/resolve` | 4 | 5, 6 |
 | 8 | `GET /api/drivers/search`: origem + destino, match por contenção, paginação | 5, 6, 7 | — |
-| 9 | Migration `V24`; `onboarding.pendingSteps` em `/me`; remoção de seeders, do CRUD de escrita de city e de `driver.city`/`service_areas` | 8 | — |
+| 9 | Migration `V25`; `onboarding.pendingSteps` em `/me`; remoção de seeders, do CRUD de escrita de city e de `driver.city`/`service_areas` | 8 | — |
 
 Cada fase é uma branch e um PR (regra 35), respeita ~600 linhas produtivas e 10 arquivos novos (regra 40), e ship com seus próprios testes (regra 42). Fases 2 e 3 podem ser revisadas em paralelo; 5, 6 e 7 também.
 
-**"Parallel with" é paralelismo de review, não de merge (regra 39).** A entrega usa PRs empilhados: a fase 8 mergeia na 7, a 7 na 6, e assim por diante até a 1 chegar na `main`. Como a ordem de merge é a ordem da stack, `V20 → V21 → V22 → V23 → V24` chegam ao banco em ordem crescente, e o Flyway (que roda com `out-of-order` desabilitado) não tem como falhar por versão fora de ordem.
+**"Parallel with" é paralelismo de review, não de merge (regra 39).** A entrega usa PRs empilhados: a fase 8 mergeia na 7, a 7 na 6, e assim por diante até a 1 chegar na `main`. Como a ordem de merge é a ordem da stack, `V21 → V22 → V23 → V24 → V25` chegam ao banco em ordem crescente, e o Flyway (que roda com `out-of-order` desabilitado) não tem como falhar por versão fora de ordem.
 
 A garantia depende da stack, não do plano: **se a stack for reordenada** — por exemplo aprovando a fase 6 primeiro e desempilhando-a antes da 5 — a migration da fase desempilhada precisa ser renumerada para o próximo `V` livre antes do merge. Caso contrário o `validate` do Flyway falha no deploy seguinte, ao encontrar uma versão resolvida menor que a última aplicada.
 

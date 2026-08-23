@@ -1,0 +1,81 @@
+{
+    "id": "EmJTdC4gTCBOb3J0ZSBRbmwgNSBDb25qdW50byBJIEogLSBTdC4gTCBOb3J0ZSBRTkwgNSAtIFRhZ3VhdGluZ2EsIEJyYXPDrWxpYSAtIERGLCA3MjE1MC02MDksIEJyYXppbCIuKiwKFAoSCUtILkPUzFuTEcVhDjZTaz-tEhQKEgmJAuhT1MxbkxFvHY4ww3mv6g",
+    "types": [
+        "route"
+    ],
+    "formattedAddress": "St. L Norte Qnl 5 Conjunto I J - St. L Norte QNL 5 - Taguatinga, Bras\u00edlia - DF, 72150-609, Brazil",
+    "addressComponents": [
+        {
+            "longText": "Setor L Norte Qnl 5 Conjunto I J",
+            "shortText": "St. L Norte Qnl 5 Conjunto I J",
+            "types": [
+                "route"
+            ],
+            "languageCode": "pt"
+        },
+        {
+            "longText": "QNL 5",
+            "shortText": "QNL 5",
+            "types": [
+                "sublocality_level_3",
+                "sublocality",
+                "political"
+            ],
+            "languageCode": "pt"
+        },
+        {
+            "longText": "Setor L Norte",
+            "shortText": "St. L Norte",
+            "types": [
+                "sublocality_level_2",
+                "sublocality",
+                "political"
+            ],
+            "languageCode": "pt"
+        },
+        {
+            "longText": "Taguatinga",
+            "shortText": "Taguatinga",
+            "types": [
+                "administrative_area_level_4",
+                "political"
+            ],
+            "languageCode": "pt"
+        },
+        {
+            "longText": "Bras\u00edlia",
+            "shortText": "Bras\u00edlia",
+            "types": [
+                "administrative_area_level_2",
+                "political"
+            ],
+            "languageCode": "pt"
+        },
+        {
+            "longText": "Distrito Federal",
+            "shortText": "DF",
+            "types": [
+                "administrative_area_level_1",
+                "political"
+            ],
+            "languageCode": "pt"
+        },
+        {
+            "longText": "Brazil",
+            "shortText": "BR",
+            "types": [
+                "country",
+                "political"
+            ],
+            "languageCode": "en"
+        },
+        {
+            "longText": "72150-609",
+            "shortText": "72150-609",
+            "types": [
+                "postal_code"
+            ],
+            "languageCode": "en-US"
+        }
+    ]
+}

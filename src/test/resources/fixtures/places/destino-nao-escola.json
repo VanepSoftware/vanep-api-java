@@ -1,0 +1,83 @@
+{
+    "id": "ChIJ9Y8QHpswWpMRzohd-1XpYt0",
+    "types": [
+        "shopping_mall",
+        "point_of_interest",
+        "establishment"
+    ],
+    "formattedAddress": "SHIN CA 4 - Lago Norte CA 4 - Lago Norte, Bras\u00edlia - DF, 71503-504, Brazil",
+    "addressComponents": [
+        {
+            "longText": "SHIN CA 4",
+            "shortText": "SHIN CA 4",
+            "types": [
+                "route"
+            ],
+            "languageCode": "pt"
+        },
+        {
+            "longText": "CA 4",
+            "shortText": "CA 4",
+            "types": [
+                "sublocality_level_3",
+                "sublocality",
+                "political"
+            ],
+            "languageCode": "pt"
+        },
+        {
+            "longText": "Lago Norte",
+            "shortText": "Lago Norte",
+            "types": [
+                "sublocality_level_2",
+                "sublocality",
+                "political"
+            ],
+            "languageCode": "und"
+        },
+        {
+            "longText": "Lago Norte",
+            "shortText": "Lago Norte",
+            "types": [
+                "administrative_area_level_4",
+                "political"
+            ],
+            "languageCode": "pt"
+        },
+        {
+            "longText": "Bras\u00edlia",
+            "shortText": "Bras\u00edlia",
+            "types": [
+                "administrative_area_level_2",
+                "political"
+            ],
+            "languageCode": "pt"
+        },
+        {
+            "longText": "Distrito Federal",
+            "shortText": "DF",
+            "types": [
+                "administrative_area_level_1",
+                "political"
+            ],
+            "languageCode": "pt"
+        },
+        {
+            "longText": "Brazil",
+            "shortText": "BR",
+            "types": [
+                "country",
+                "political"
+            ],
+            "languageCode": "en"
+        },
+        {
+            "longText": "71503-504",
+            "shortText": "71503-504",
+            "types": [
+                "postal_code"
+            ],
+            "languageCode": "en-US"
+        }
+    ]
+}
