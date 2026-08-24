@@ -163,16 +163,16 @@
 > Depends on: Phase 5, Phase 6, Phase 7 | Parallel with: —
 > Order: test → repository query → service → controller → response DTO
 
-- [ ] 8.1 Testes de repositório em H2 cobrindo os cenários da spec: cobre ambos; cobre só um (exclui); área ampla cobre ponto profundo; distrito irmão não casa; cidade diferente não casa
-- [ ] 8.2 Teste explícito de que a query **executa em H2** sem extensão espacial
-- [ ] 8.3 Testes slice MockMvc: `200` com resultados paginados; destino não-escola aceito; `400` para `placeId` inválido; `401` sem token
-- [ ] 8.4 Teste garantindo que a busca **não cria** nós na árvore (assert de contagem antes/depois)
-- [ ] 8.5 Implementar a query de contenção em `DriverServiceAreaRepository` (`city_id` + `district_id IS NULL OR district_id IN (:ancestors)`), com fetch join para evitar N+1 (regra 16)
-- [ ] 8.6 Implementar o service de busca (resolve as duas âncoras, intersecta os conjuntos de motoristas)
-- [ ] 8.7 Adicionar `GET /api/drivers/search` com paginação e regra de autorização declarada, aceitando `originSessionToken?` e `destinationSessionToken?` (uma sessão por caixa de autocomplete)
-- [ ] 8.8 Aplicar rate limit por usuário no endpoint (R6) — cada busca dispara dois `Place Details` pagos a partir de ids fornecidos pelo cliente
-- [ ] 8.9 Criar `DriverSearchResponseDTO` — sem nenhum campo de endereço residencial (regra de privacidade da spec)
-- [ ] 8.10 `make lint` + `./mvnw verify`; abrir PR fase 8
+- [x] 8.1 Testes de repositório em H2 cobrindo os cenários da spec: cobre ambos; cobre só um (exclui); área ampla cobre ponto profundo; distrito irmão não casa; cidade diferente não casa
+- [x] 8.2 Teste explícito de que a query **executa em H2** sem extensão espacial
+- [x] 8.3 Testes slice MockMvc: `200` com resultados paginados; destino não-escola aceito; `400` para `placeId` inválido; `401` sem token
+- [x] 8.4 Teste garantindo que a busca **não cria** nós na árvore (assert de contagem antes/depois)
+- [x] 8.5 Implementar a query de contenção em `DriverServiceAreaRepository` (`city_id` + `district_id IS NULL OR district_id IN (:ancestors)`), com fetch join para evitar N+1 (regra 16)
+- [x] 8.6 Implementar o service de busca (resolve as duas âncoras, intersecta os conjuntos de motoristas)
+- [x] 8.7 Adicionar `GET /api/drivers/search` com paginação e regra de autorização declarada, aceitando `originSessionToken?` e `destinationSessionToken?` (uma sessão por caixa de autocomplete)
+- [x] 8.8 Aplicar rate limit por usuário no endpoint (R6) — cada busca dispara dois `Place Details` pagos a partir de ids fornecidos pelo cliente
+- [x] 8.9 Criar `DriverSearchResponseDTO` — sem nenhum campo de endereço residencial (regra de privacidade da spec)
+- [x] 8.10 `make lint` + `./mvnw verify`; abrir PR fase 8
 
 ## 9. Phase 9 — Onboarding + limpeza (PR 9)
 

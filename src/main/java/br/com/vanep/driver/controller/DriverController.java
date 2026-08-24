@@ -3,7 +3,9 @@ package br.com.vanep.driver.controller;
 import br.com.vanep.auth.security.SecurityHelper;
 import br.com.vanep.driver.dto.DriverMeSummaryResponseDTO;
 import br.com.vanep.driver.dto.DriverResponseDTO;
+import br.com.vanep.driver.dto.DriverSearchResponseDTO;
 import br.com.vanep.driver.dto.DriverUpdateRequestDTO;
+import br.com.vanep.driver.service.DriverSearchService;
 import br.com.vanep.driver.service.DriverService;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
@@ -19,6 +21,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -27,9 +30,33 @@ import org.springframework.web.bind.annotation.RestController;
 public class DriverController {
 
   private final DriverService service;
+  private final DriverSearchService searchService;
 
-  public DriverController(DriverService service) {
+  public DriverController(DriverService service, DriverSearchService searchService) {
     this.service = service;
+    this.searchService = searchService;
+  }
+
+  /**
+   * Busca por origem + destino. Continua {@code GET} porque é genuinamente read-only: resolve as
+   * âncoras sem escrever na árvore (D3). Cada caixa de autocomplete manda a sua própria sessão.
+   */
+  @GetMapping("/search")
+  @PreAuthorize("isAuthenticated()")
+  public Page<DriverSearchResponseDTO> search(
+      Authentication authentication,
+      @RequestParam String originPlaceId,
+      @RequestParam(required = false) String originSessionToken,
+      @RequestParam String destinationPlaceId,
+      @RequestParam(required = false) String destinationSessionToken,
+      @PageableDefault(size = 20) Pageable pageable) {
+    return searchService.search(
+        SecurityHelper.requireCallerUid(authentication),
+        originPlaceId,
+        originSessionToken,
+        destinationPlaceId,
+        destinationSessionToken,
+        pageable);
   }
 
   @GetMapping("/me")
