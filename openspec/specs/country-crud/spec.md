@@ -1,7 +1,15 @@
 # Country CRUD Specification
 
 ## Purpose
-The country capability allows administrative management of countries in the system. Countries serve as the root of the geographical hierarchy (Country -> State -> City -> Address) and define internationalization formats, currency, and DDI values.
+The country capability allows administrative management of countries in the system. Countries serve as the root of the geographical hierarchy (Country -> State -> City -> District -> Address) and define internationalization formats, currency, and DDI values.
+
+### Country is the only curated level
+
+Since the `location-system` change, `country` is the **only** level of the geographic tree that is created by hand. `state`, `city` and `district` are created on demand by `LocationResolverService` from Google Places `addressComponents`, and their write endpoints and seeders were removed — a parallel manual CRUD would create rows that never match the resolved ones.
+
+This is why an unknown country is a **business error** (`UnsupportedCountryException` -> HTTP 400, "we do not operate in this country yet") rather than a row to create: it is a deliberate product decision about where the platform operates, not missing data.
+
+Two curated flags live one level down, on `state`, for the same reason: `state.requires_district` (with a nullable `city.requires_district` override) answers "may a driver declare this whole city as a service area?", which Google cannot answer.
 
 ## Requirements
 

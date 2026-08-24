@@ -69,6 +69,7 @@ class UserProfileServiceTest {
                   null,
                   null,
                   null,
+                  null,
                   null);
             });
   }

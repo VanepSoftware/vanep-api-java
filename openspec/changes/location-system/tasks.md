@@ -180,18 +180,18 @@
 > Depends on: Phase 8 | Parallel with: —
 > Order: test → migration → enum → service → response DTO → remoções
 
-- [ ] 9.1 Testes slice de `GET /api/user/me`: motorista sem nada → `[PERSONAL_ADDRESS, SERVICE_AREA]`; motorista só sem áreas → `[SERVICE_AREA]`; cliente sem endereço → `[PERSONAL_ADDRESS]` e nunca `SERVICE_AREA`; totalmente cadastrado → lista vazia
-- [ ] 9.2 Criar enum backed `OnboardingStep` (regra 14)
-- [ ] 9.3 Estender `UserMeResponseDTO` com o objeto `onboarding.pendingSteps`
-- [ ] 9.4 Implementar o cálculo dos passos pendentes no service, sem N+1 (regra 16)
-- [ ] 9.5 Migration `V25`: remover `driver.city` e `driver.service_areas`
+- [x] 9.1 Testes slice de `GET /api/user/me`: motorista sem nada → `[PERSONAL_ADDRESS, SERVICE_AREA]`; motorista só sem áreas → `[SERVICE_AREA]`; cliente sem endereço → `[PERSONAL_ADDRESS]` e nunca `SERVICE_AREA`; totalmente cadastrado → lista vazia
+- [x] 9.2 Criar enum backed `OnboardingStep` (regra 14)
+- [x] 9.3 Estender `UserMeResponseDTO` com o objeto `onboarding.pendingSteps`
+- [x] 9.4 Implementar o cálculo dos passos pendentes no service, sem N+1 (regra 16)
+- [x] 9.5 Migration `V25`: remover `driver.city` e `driver.service_areas`
 - [ ] 9.5b Remover `client.address_id` (migration + `ClientModel`, `ClientService`, DTOs e testes): o endereço residencial passou a morar em `users.address_id` na fase 5, e manter os dois é duas fontes de verdade para o mesmo endereço. Não foi feito na fase 5 para não estourar o limite de arquivos da regra 41
-- [ ] 9.6 Remover os campos correspondentes de `DriverModel`, `DriverUpdateRequestDTO`, `DriverResponseDTO`, `DriverMeSummaryResponseDTO` e `DriverService`
-- [ ] 9.7 Remover `CitySeeder` e `StateSeeder`; ajustar `SeedRunner` (ou equivalente) para não referenciá-los
-- [ ] 9.8 Remover `POST`/`PUT`/`DELETE`/`restore` de `CityController` e os métodos de escrita de `CityService` (a fonte passa a ser o Google); manter as leituras
-- [ ] 9.9 Deletar código morto resultante (regra 33) e ajustar os testes existentes que dependiam dos seeders
-- [ ] 9.10 Atualizar a spec main `openspec/specs/country-crud/spec.md` para refletir que `country` é o único nível curado
-- [ ] 9.11 `make lint` + `./mvnw verify`; abrir PR fase 9
+- [x] 9.6 Remover os campos correspondentes de `DriverModel`, `DriverUpdateRequestDTO`, `DriverResponseDTO`, `DriverMeSummaryResponseDTO` e `DriverService`
+- [x] 9.7 Remover `CitySeeder` e `StateSeeder`; ajustar `SeedRunner` (ou equivalente) para não referenciá-los
+- [x] 9.8 Remover `POST`/`PUT`/`DELETE`/`restore` de `CityController` e os métodos de escrita de `CityService` (a fonte passa a ser o Google); manter as leituras
+- [x] 9.9 Deletar código morto resultante (regra 33) e ajustar os testes existentes que dependiam dos seeders
+- [x] 9.10 Atualizar a spec main `openspec/specs/country-crud/spec.md` para refletir que `country` é o único nível curado
+- [x] 9.11 `make lint` + `./mvnw verify`; abrir PR fase 9
 
 ## 10. Encerramento
 

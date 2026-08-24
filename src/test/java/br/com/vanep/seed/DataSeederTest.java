@@ -11,7 +11,6 @@ import static org.mockito.Mockito.when;
 
 import br.com.vanep.auth.security.PermissionEnum;
 import br.com.vanep.auth.security.PermissionRegistry;
-import br.com.vanep.city.seed.CitySeeder;
 import br.com.vanep.client.repository.ClientRepository;
 import br.com.vanep.country.seed.CountrySeeder;
 import br.com.vanep.dependent.seed.DependentSeeder;
@@ -26,7 +25,6 @@ import br.com.vanep.role.model.RoleModel;
 import br.com.vanep.role.repository.RoleRepository;
 import br.com.vanep.rolepermission.model.RolePermissionModel;
 import br.com.vanep.rolepermission.repository.RolePermissionRepository;
-import br.com.vanep.state.seed.StateSeeder;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
@@ -55,8 +53,6 @@ class DataSeederTest {
   @Mock private DriverCnhSeeder driverCnhSeeder;
   @Mock private DriverDocumentSeeder driverDocumentSeeder;
   @Mock private CountrySeeder countrySeeder;
-  @Mock private StateSeeder stateSeeder;
-  @Mock private CitySeeder citySeeder;
   @Mock private DriverRatingSeeder driverRatingSeeder;
   @Mock private PasswordEncoder passwordEncoder;
 
@@ -75,8 +71,6 @@ class DataSeederTest {
             driverCnhSeeder,
             driverDocumentSeeder,
             countrySeeder,
-            stateSeeder,
-            citySeeder,
             driverRatingSeeder,
             passwordEncoder);
 

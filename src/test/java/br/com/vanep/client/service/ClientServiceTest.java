@@ -98,6 +98,7 @@ class ClientServiceTest {
         null,
         null,
         null,
+        null,
         null);
   }
 

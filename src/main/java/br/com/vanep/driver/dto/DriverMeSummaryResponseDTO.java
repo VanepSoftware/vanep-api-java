@@ -8,7 +8,6 @@ public record DriverMeSummaryResponseDTO(
     String token,
     String photo,
     BigDecimal rating,
-    String city,
     DriverApprovalStatus approvalStatus,
     boolean available,
     boolean active,

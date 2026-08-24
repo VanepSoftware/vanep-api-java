@@ -18,4 +18,5 @@ public record UserMeResponseDTO(
     String pendingEmail,
     Instant nameChangeAvailableAt,
     Instant phoneChangeAvailableAt,
-    Instant emailChangeAvailableAt) {}
+    Instant emailChangeAvailableAt,
+    OnboardingResponseDTO onboarding) {}

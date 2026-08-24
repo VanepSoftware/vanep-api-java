@@ -58,8 +58,6 @@ public class DriverModel {
   @Column(name = "experience_years")
   private Integer experienceYears;
 
-  @Column private String city;
-
   @Column(name = "base_price", nullable = false, precision = 12, scale = 2)
   private BigDecimal basePrice;
 
@@ -75,10 +73,6 @@ public class DriverModel {
 
   @Column(name = "wait_tolerance_minutes")
   private Integer waitToleranceMinutes;
-
-  @JdbcTypeCode(SqlTypes.JSON)
-  @Column(name = "service_areas", columnDefinition = "jsonb")
-  private List<String> serviceAreas;
 
   @Enumerated(EnumType.STRING)
   @Column(name = "approval_status", nullable = false, length = 16)

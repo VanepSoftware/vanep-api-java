@@ -2,7 +2,6 @@ package br.com.vanep.seed;
 
 import br.com.vanep.auth.security.PermissionEnum;
 import br.com.vanep.auth.security.PermissionRegistry;
-import br.com.vanep.city.seed.CitySeeder;
 import br.com.vanep.client.model.ClientModel;
 import br.com.vanep.client.repository.ClientRepository;
 import br.com.vanep.country.seed.CountrySeeder;
@@ -18,7 +17,6 @@ import br.com.vanep.role.model.RoleModel;
 import br.com.vanep.role.repository.RoleRepository;
 import br.com.vanep.rolepermission.model.RolePermissionModel;
 import br.com.vanep.rolepermission.repository.RolePermissionRepository;
-import br.com.vanep.state.seed.StateSeeder;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
@@ -52,8 +50,6 @@ public class DataSeeder implements ApplicationRunner {
   private final DriverCnhSeeder driverCnhSeeder;
   private final DriverDocumentSeeder driverDocumentSeeder;
   private final CountrySeeder countrySeeder;
-  private final StateSeeder stateSeeder;
-  private final CitySeeder citySeeder;
   private final DriverRatingSeeder driverRatingSeeder;
   private final PasswordEncoder passwordEncoder;
 
@@ -82,8 +78,6 @@ public class DataSeeder implements ApplicationRunner {
       DriverCnhSeeder driverCnhSeeder,
       DriverDocumentSeeder driverDocumentSeeder,
       CountrySeeder countrySeeder,
-      StateSeeder stateSeeder,
-      CitySeeder citySeeder,
       DriverRatingSeeder driverRatingSeeder,
       PasswordEncoder passwordEncoder) {
     this.users = users;
@@ -95,8 +89,6 @@ public class DataSeeder implements ApplicationRunner {
     this.driverCnhSeeder = driverCnhSeeder;
     this.driverDocumentSeeder = driverDocumentSeeder;
     this.countrySeeder = countrySeeder;
-    this.stateSeeder = stateSeeder;
-    this.citySeeder = citySeeder;
     this.driverRatingSeeder = driverRatingSeeder;
     this.passwordEncoder = passwordEncoder;
   }
@@ -118,8 +110,6 @@ public class DataSeeder implements ApplicationRunner {
     driverCnhSeeder.seed();
     driverDocumentSeeder.seed();
     countrySeeder.seed();
-    stateSeeder.seed();
-    citySeeder.seed();
     driverRatingSeeder.seed();
     if (seedOnly) {
       log.info("Seed-only: data seeded; the application will shut down.");

@@ -104,7 +104,6 @@ class RegistrationServiceTest {
     verify(drivers).save(driver.capture());
     assertThat(driver.getValue().getApprovalStatus()).isEqualTo(DriverApprovalStatus.PENDING);
     assertThat(driver.getValue().getBasePrice()).isEqualByComparingTo("120.00");
-    assertThat(driver.getValue().getCity()).isEqualTo("Taguatinga");
   }
 
   @Test
