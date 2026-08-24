@@ -13,15 +13,15 @@
 
 - [x] 0.1 Abrir o projeto no Google Cloud Console (mesmo projeto do Firebase) e confirmar que há **billing account** vinculada — as APIs do Maps Platform não respondem sem billing, mesmo dentro da cota gratuita
 - [x] 0.2 Habilitar a **Places API (New)** — atenção: é a "(New)", não a legada; os campos `addressComponents` e o contrato de `Place Details` diferem entre as duas
-- [ ] 0.3 Habilitar a **Geocoding API** — não é usada na v1 (ver `design.md` D6), habilitar apenas para o spike da fase 1 poder comparar componentes se necessário
+- [x] 0.3 ~~Habilitar a **Geocoding API**~~ — **desabilitada, decisão final**: o spike da fase 1 resolveu a D11 só com `addressComponents` do `Place Details`, então a Geocoding nunca foi usada. O D6 (adiar a Geocoding) se confirma. Reabrir só se abrir praça nova cujos componentes divergirem
 - [x] 0.4 Criar a **chave de servidor** (backend Java), restrita por **endereço IP** e limitada às APIs acima
 - [ ] 0.5 Criar a **chave web** (vanep-frontend), restrita por **HTTP referrer**, limitada a Places API (New)
 - [ ] 0.6 Criar a **chave mobile** (vanep-mobile), restrita por **package name + SHA-1 / bundle id**, limitada a Places API (New)
-- [ ] 0.7 Definir **quota diária** por chave no console, para evitar surpresa de fatura enquanto o volume é desconhecido
+- [x] 0.7 Definir **quota diária** por chave no console, para evitar surpresa de fatura enquanto o volume é desconhecido
 - [x] 0.8 Adicionar ao `.env` local (nunca commitado — constituição regra 4): `GOOGLE_PLACES_API_KEY`, `GOOGLE_PLACES_BASE_URL`
 - [x] 0.9 Documentar os **placeholders** em `.env.example` (sem valores reais) e registrar as propriedades correspondentes em `application.properties` como `${VAR}` — nunca hardcoded (regras 1 e 3)
 - [x] 0.10 Validar manualmente com um `curl` de `Place Details` para um endereço conhecido do DF, confirmando que a chave de servidor responde `200` e traz `addressComponents`
-- [ ] 0.11 Comunicar ao time que a fase 0 está concluída e as fases seguintes estão desbloqueadas
+- [x] 0.11 Comunicar ao time que a fase 0 está concluída e as fases seguintes estão desbloqueadas
 
 ## 1. Phase 1 — Spike: mapeamento `types` → nível (PR 1)
 
@@ -48,7 +48,7 @@
 - [x] 1.5 Registrar a tabela decidida em `design.md` como decisão **D11**, com as evidências que a sustentam
 - [ ] 1.6 **Q1 — o faturamento por sessão sobrevive a chaves distintas?** Autocomplete com a chave web/referrer e `Place Details` com a chave de servidor, mesmo `sessionToken`, mesmo projeto. Questão em aberto: resolver aqui, com evidência real (doc, suporte do Maps Platform ou experimento controlado — a fase escolhe o meio mais barato que dê resposta confiável). Registrar o achado e a consequência para o D5
 - [x] 1.7 **Q2 — qual SKU o field mask do `Place Details` seleciona?** Comparar `id` + `addressComponents` contra um mask amplo. Questão em aberto: define se o cache do D5 se paga
-- [ ] 1.8 **Q3 — qual a ordem de grandeza do custo por busca?** Medir com números reais, não estimar. É o que dimensiona o rate limit do R6 e a quota da fase 0
+- [x] 1.8 **Q3 — qual a ordem de grandeza do custo por busca?** **Respondida**: relatório de billing zerado após o spike — as ~26 chamadas ficaram inteiramente dentro da cota gratuita, confirmando a tabela (10.000 eventos/mês grátis em Place Details Essentials, US$ 5/1.000 depois; 1 busca = 2 eventos ⇒ ~5.000 buscas/mês grátis). Quota diária de 300 definida, o que tranca o projeto dentro do gratuito por construção
 - [x] 1.9 Varrer o `design.md` atrás de qualquer outra afirmação não verificada e resolvê-la aqui; atualizar a seção **Open Questions** com a resposta de cada item ou a decisão explícita de conviver com ele
 - [x] 1.10 Confirmar o próximo número de migration Flyway — última aplicada é `V20__owned_address_foreign_keys.sql`, mergeada depois deste plano ser escrito, então as migrations desta change vão de `V21` a `V25` (já corrigido abaixo)
 - [x] 1.11 Abrir PR fase 1 (pt-BR, sem código de produção — fixtures + documento de decisão)
