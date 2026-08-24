@@ -127,19 +127,19 @@
 > Depends on: Phase 4 | Parallel with: Phase 5, Phase 7
 > Order: test → migration → model → repository → security → request DTO → service → controller → response DTO
 
-- [ ] 6.1 Testes unitários da policy D8 sobre a **cadeia resolvida** e os flags curados: cadeia sem distrito + estado `true` → `400`; cadeia sem distrito + estado `false` → aceita; override `city.requires_district = false` sob estado `true` → aceita; cadeia com distrito → aceita sempre
-- [ ] 6.2 Teste explícito do furo temporal: **árvore sem nenhum distrito sob Brasília**, cadeia `[BR, DF, Brasília]` → ainda `400`. Garante que a regra não depende de contagem no banco
-- [ ] 6.3 Testes slice MockMvc: `401` sem token; `403` para usuário sem perfil de motorista; `200` cadastrando distrito; substituição completa do conjunto no `PUT`
-- [ ] 6.4 Migration `V23`: tabela `driver_service_area` (`driver_id`, `city_id` NOT NULL, `district_id` nullable, soft delete) — **sem** colunas de logradouro
-- [ ] 6.5 Criar feature package `br.com.vanep.driverservicearea` com model e repository
-- [ ] 6.6 Declarar as regras de autorização em `SecurityConfig`; se precisar de checagem de dono, adicionar ao `SecurityEvaluator` (`@sec`) — nunca criar `*SecurityService` por feature (regra 21)
-- [ ] 6.7 Criar `DriverServiceAreaRequestDTO` (lista de itens `placeId` + `sessionToken?`) com Bean Validation
-- [ ] 6.8 Implementar a policy D8 como classe pura testável sem servlet nem JPA (regra 8): recebe a cadeia resolvida, lê `COALESCE(city.requires_district, city.state.requires_district)` através da cadeia já carregada — **sem query adicional** e sem copiar o flag para a linha de `city`
-- [ ] 6.9 Implementar o service (resolve cada place, aplica a policy D8, substitui o conjunto do motorista)
+- [x] 6.1 Testes unitários da policy D8 sobre a **cadeia resolvida** e os flags curados: cadeia sem distrito + estado `true` → `400`; cadeia sem distrito + estado `false` → aceita; override `city.requires_district = false` sob estado `true` → aceita; cadeia com distrito → aceita sempre
+- [x] 6.2 Teste explícito do furo temporal: **árvore sem nenhum distrito sob Brasília**, cadeia `[BR, DF, Brasília]` → ainda `400`. Garante que a regra não depende de contagem no banco
+- [x] 6.3 Testes slice MockMvc: `401` sem token; `403` para usuário sem perfil de motorista; `200` cadastrando distrito; substituição completa do conjunto no `PUT`
+- [x] 6.4 Migration `V23`: tabela `driver_service_area` (`driver_id`, `city_id` NOT NULL, `district_id` nullable, soft delete) — **sem** colunas de logradouro
+- [x] 6.5 Criar feature package `br.com.vanep.driverservicearea` com model e repository
+- [x] 6.6 Declarar as regras de autorização em `SecurityConfig`; se precisar de checagem de dono, adicionar ao `SecurityEvaluator` (`@sec`) — nunca criar `*SecurityService` por feature (regra 21)
+- [x] 6.7 Criar `DriverServiceAreaRequestDTO` (lista de itens `placeId` + `sessionToken?`) com Bean Validation
+- [x] 6.8 Implementar a policy D8 como classe pura testável sem servlet nem JPA (regra 8): recebe a cadeia resolvida, lê `COALESCE(city.requires_district, city.state.requires_district)` através da cadeia já carregada — **sem query adicional** e sem copiar o flag para a linha de `city`
+- [x] 6.9 Implementar o service (resolve cada place, aplica a policy D8, substitui o conjunto do motorista)
 - [ ] 6.10 Adicionar `GET` e `PUT /api/drivers/me/service-areas`
-- [ ] 6.11 Criar `DriverServiceAreaResponseDTO` com nome da região + token opaco
-- [ ] 6.12 Adicionar MessageSource keys (EN + pt-BR) para "distrito obrigatório nesta cidade"
-- [ ] 6.13 `make lint` + `./mvnw verify`; abrir PR fase 6
+- [x] 6.11 Criar `DriverServiceAreaResponseDTO` com nome da região + token opaco
+- [x] 6.12 Adicionar MessageSource keys (EN + pt-BR) para "distrito obrigatório nesta cidade"
+- [x] 6.13 `make lint` + `./mvnw verify`; abrir PR fase 6
 
 ## 7. Phase 7 — Escola magra (PR 7)
 
