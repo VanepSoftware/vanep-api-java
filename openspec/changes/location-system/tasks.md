@@ -16,7 +16,7 @@
 - [x] 0.3 ~~Habilitar a **Geocoding API**~~ — **desabilitada, decisão final**: o spike da fase 1 resolveu a D11 só com `addressComponents` do `Place Details`, então a Geocoding nunca foi usada. O D6 (adiar a Geocoding) se confirma. Reabrir só se abrir praça nova cujos componentes divergirem
 - [x] 0.4 Criar a **chave de servidor** (backend Java), restrita por **endereço IP** e limitada às APIs acima
 - [ ] 0.5 Criar a **chave web** (vanep-frontend), restrita por **HTTP referrer**, limitada a Places API (New)
-- [ ] 0.6 Criar a **chave mobile** (vanep-mobile), restrita por **package name + SHA-1 / bundle id**, limitada a Places API (New)
+- [x] 0.6 Criar a **chave mobile** (vanep-mobile) — **duas chaves**, porque a restrição de aplicação é exclusiva por tipo: Android (`com.vanep.vanep_mobile` + SHA-1 do debug keystore) e iOS (`com.vanep.vanepMobile`). Verificadas: sem os headers de app devolvem `403 API_KEY_*_APP_BLOCKED`, com eles devolvem `200`. Pendente: o SHA-1 é de debug — o keystore de release ainda não existe (`build.gradle.kts` assina com `debug`), e o SHA-1 dele terá de ser adicionado antes de publicar
 - [x] 0.7 Definir **quota diária** por chave no console, para evitar surpresa de fatura enquanto o volume é desconhecido
 - [x] 0.8 Adicionar ao `.env` local (nunca commitado — constituição regra 4): `GOOGLE_PLACES_API_KEY`, `GOOGLE_PLACES_BASE_URL`
 - [x] 0.9 Documentar os **placeholders** em `.env.example` (sem valores reais) e registrar as propriedades correspondentes em `application.properties` como `${VAR}` — nunca hardcoded (regras 1 e 3)
