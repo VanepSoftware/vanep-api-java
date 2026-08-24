@@ -26,7 +26,6 @@ import br.com.vanep.role.model.RoleModel;
 import br.com.vanep.role.repository.RoleRepository;
 import br.com.vanep.rolepermission.model.RolePermissionModel;
 import br.com.vanep.rolepermission.repository.RolePermissionRepository;
-import br.com.vanep.school.seed.SchoolSeeder;
 import br.com.vanep.state.seed.StateSeeder;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
@@ -55,7 +54,6 @@ class DataSeederTest {
   @Mock private DependentSeeder dependentSeeder;
   @Mock private DriverCnhSeeder driverCnhSeeder;
   @Mock private DriverDocumentSeeder driverDocumentSeeder;
-  @Mock private SchoolSeeder schoolSeeder;
   @Mock private CountrySeeder countrySeeder;
   @Mock private StateSeeder stateSeeder;
   @Mock private CitySeeder citySeeder;
@@ -76,7 +74,6 @@ class DataSeederTest {
             dependentSeeder,
             driverCnhSeeder,
             driverDocumentSeeder,
-            schoolSeeder,
             countrySeeder,
             stateSeeder,
             citySeeder,

@@ -147,15 +147,15 @@
 > Depends on: Phase 4 | Parallel with: Phase 5, Phase 6
 > Order: test → migration → model → service → controller → response DTO
 
-- [ ] 7.1 Testes slice: primeira resolução cria a escola e retorna `201`; segunda reusa sem duplicar e retorna `200`; `401` sem token; rate limit excedido rejeita sem chamar o Google
-- [ ] 7.2 Migration `V24`: `school` ganha `google_place_id` (unique parcial `WHERE deleted_at IS NULL`), `city_id`, `district_id`; **remove** `cnpj`, `phone`, `email`
-- [ ] 7.3 Atualizar `SchoolModel`, `SchoolRepository` (busca por `google_place_id`), mapper e DTOs
-- [ ] 7.4 Implementar `POST /api/schools/resolve` — **não `GET`**: a operação faz `findOrCreate`, é escrita, e um `GET` é pré-buscável por intermediários (prefetch criaria escola). Idempotente por `google_place_id`: `201` ao criar, `200` quando já existia
-- [ ] 7.5 Criar `SchoolResolveRequestDTO` (`placeId` `@NotBlank`, `sessionToken?`) com Bean Validation
-- [ ] 7.6 Aplicar rate limit por usuário no endpoint (R6) — cada `placeId` distinto custa um `Place Details` pago e cria uma linha
-- [ ] 7.7 Remover `SchoolSeeder`
-- [ ] 7.8 Ajustar os testes existentes de `school` e `dependent` que dependiam de `cnpj`/`phone`/`email`
-- [ ] 7.9 `make lint` + `./mvnw verify`; abrir PR fase 7
+- [x] 7.1 Testes slice: primeira resolução cria a escola e retorna `201`; segunda reusa sem duplicar e retorna `200`; `401` sem token; rate limit excedido rejeita sem chamar o Google
+- [x] 7.2 Migration `V24`: `school` ganha `google_place_id` (unique parcial `WHERE deleted_at IS NULL`), `city_id`, `district_id`; **remove** `cnpj`, `phone`, `email`
+- [x] 7.3 Atualizar `SchoolModel`, `SchoolRepository` (busca por `google_place_id`), mapper e DTOs
+- [x] 7.4 Implementar `POST /api/schools/resolve` — **não `GET`**: a operação faz `findOrCreate`, é escrita, e um `GET` é pré-buscável por intermediários (prefetch criaria escola). Idempotente por `google_place_id`: `201` ao criar, `200` quando já existia
+- [x] 7.5 Criar `SchoolResolveRequestDTO` (`placeId` `@NotBlank`, `sessionToken?`) com Bean Validation
+- [x] 7.6 Aplicar rate limit por usuário no endpoint (R6) — cada `placeId` distinto custa um `Place Details` pago e cria uma linha
+- [x] 7.7 Remover `SchoolSeeder`
+- [x] 7.8 Ajustar os testes existentes de `school` e `dependent` que dependiam de `cnpj`/`phone`/`email`
+- [x] 7.9 `make lint` + `./mvnw verify`; abrir PR fase 7
 
 ## 8. Phase 8 — Busca de motoristas por origem + destino (PR 8)
 

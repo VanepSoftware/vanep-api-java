@@ -11,9 +11,7 @@ public interface SchoolRepository extends JpaRepository<SchoolModel, Long> {
 
   Optional<SchoolModel> findByToken(String token);
 
-  boolean existsByCnpj(String cnpj);
-
-  boolean existsByCnpjAndTokenNot(String cnpj, String token);
+  Optional<SchoolModel> findByGooglePlaceId(String googlePlaceId);
 
   boolean existsByName(String name);
 

@@ -28,6 +28,18 @@ public class PlacesClient {
    */
   static final String FIELD_MASK = "id,formattedAddress,addressComponents";
 
+  /**
+   * Mask do caminho de escola. Acrescenta {@code displayName}, que é <b>SKU Pro</b> — cobrado por
+   * cima do Essentials na mesma chamada (Q6).
+   *
+   * <p>Vale a troca porque uma escola nasce uma vez por {@code placeId} distinto, não por
+   * requisição: o custo Pro é limitado pelo número de escolas que existem, não pelo tráfego. A
+   * alternativa (o cliente enviar o nome que já recebeu de graça do autocomplete) sairia mais
+   * barata, mas o nome da escola é rótulo de um recurso <b>compartilhado</b> — quem cria vê o nome
+   * aparecer para todo mundo, e um texto plantado envenenaria a listagem alheia.
+   */
+  static final String FIELD_MASK_WITH_NAME = FIELD_MASK + ",displayName";
+
   private final RestClient restClient;
   private final Cache<String, PlaceDetailsResponseDTO> cache;
 
@@ -54,32 +66,46 @@ public class PlacesClient {
    * <p>Sem token, o {@code placeId} veio de algo já persistido e o cache vale.
    */
   public PlaceDetailsResponseDTO findPlaceDetails(String placeId, String sessionToken) {
-    if (placeId == null || placeId.isBlank()) {
-      throw new IllegalArgumentException("placeId não pode ser nulo ou vazio.");
-    }
-    if (hasSession(sessionToken)) {
-      PlaceDetailsResponseDTO fresh = fetchFromGoogle(placeId, sessionToken);
-      cache.put(placeId, fresh);
-      return fresh;
-    }
-    PlaceDetailsResponseDTO cached = cache.getIfPresent(placeId);
-    if (cached != null) {
-      return cached;
-    }
-    PlaceDetailsResponseDTO fetched = fetchFromGoogle(placeId, null);
-    cache.put(placeId, fetched);
-    return fetched;
+    return findPlaceDetails(placeId, sessionToken, FIELD_MASK);
   }
 
   public PlaceDetailsResponseDTO findPlaceDetails(String placeId) {
-    return findPlaceDetails(placeId, null);
+    return findPlaceDetails(placeId, null, FIELD_MASK);
+  }
+
+  /** Caminho de escola: traz também o nome do lugar. Custa um SKU Pro a mais — ver Q6. */
+  public PlaceDetailsResponseDTO findPlaceDetailsWithName(String placeId, String sessionToken) {
+    return findPlaceDetails(placeId, sessionToken, FIELD_MASK_WITH_NAME);
+  }
+
+  private PlaceDetailsResponseDTO findPlaceDetails(
+      String placeId, String sessionToken, String fieldMask) {
+    if (placeId == null || placeId.isBlank()) {
+      throw new IllegalArgumentException("placeId não pode ser nulo ou vazio.");
+    }
+    // A chave inclui o mask: uma entrada gravada com o mask estreito não tem
+    // displayName, e servi-la ao caminho de escola devolveria nome nulo.
+    String cacheKey = fieldMask + "|" + placeId;
+    if (hasSession(sessionToken)) {
+      PlaceDetailsResponseDTO fresh = fetchFromGoogle(placeId, sessionToken, fieldMask);
+      cache.put(cacheKey, fresh);
+      return fresh;
+    }
+    PlaceDetailsResponseDTO cached = cache.getIfPresent(cacheKey);
+    if (cached != null) {
+      return cached;
+    }
+    PlaceDetailsResponseDTO fetched = fetchFromGoogle(placeId, null, fieldMask);
+    cache.put(cacheKey, fetched);
+    return fetched;
   }
 
   boolean hasSession(String sessionToken) {
     return sessionToken != null && !sessionToken.isBlank();
   }
 
-  private PlaceDetailsResponseDTO fetchFromGoogle(String placeId, String sessionToken) {
+  private PlaceDetailsResponseDTO fetchFromGoogle(
+      String placeId, String sessionToken, String fieldMask) {
     try {
       PlaceDetailsResponseDTO response =
           restClient
@@ -92,7 +118,7 @@ public class PlacesClient {
                     }
                     return uriBuilder.build(placeId);
                   })
-              .header("X-Goog-FieldMask", FIELD_MASK)
+              .header("X-Goog-FieldMask", fieldMask)
               .retrieve()
               // 400 e 404 dizem que o placeId enviado não presta — é dado de entrada.
               // Qualquer outro erro (401, 403, 429, 5xx) é credencial, quota ou o

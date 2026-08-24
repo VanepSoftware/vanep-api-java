@@ -13,9 +13,25 @@ import java.util.List;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record PlaceDetailsResponseDTO(
-    String id, String formattedAddress, List<AddressComponentDTO> addressComponents) {
+    String id,
+    String formattedAddress,
+    List<AddressComponentDTO> addressComponents,
+    DisplayName displayName) {
 
   public PlaceDetailsResponseDTO {
     addressComponents = addressComponents == null ? List.of() : List.copyOf(addressComponents);
+  }
+
+  public PlaceDetailsResponseDTO(
+      String id, String formattedAddress, List<AddressComponentDTO> addressComponents) {
+    this(id, formattedAddress, addressComponents, null);
+  }
+
+  /** Só vem preenchido quando o field mask pede {@code displayName} (SKU Pro — ver Q6). */
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  public record DisplayName(String text, String languageCode) {}
+
+  public String displayNameText() {
+    return displayName == null ? null : displayName.text();
   }
 }

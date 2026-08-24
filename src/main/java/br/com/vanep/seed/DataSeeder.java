@@ -18,7 +18,6 @@ import br.com.vanep.role.model.RoleModel;
 import br.com.vanep.role.repository.RoleRepository;
 import br.com.vanep.rolepermission.model.RolePermissionModel;
 import br.com.vanep.rolepermission.repository.RolePermissionRepository;
-import br.com.vanep.school.seed.SchoolSeeder;
 import br.com.vanep.state.seed.StateSeeder;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
@@ -52,7 +51,6 @@ public class DataSeeder implements ApplicationRunner {
   private final DependentSeeder dependentSeeder;
   private final DriverCnhSeeder driverCnhSeeder;
   private final DriverDocumentSeeder driverDocumentSeeder;
-  private final SchoolSeeder schoolSeeder;
   private final CountrySeeder countrySeeder;
   private final StateSeeder stateSeeder;
   private final CitySeeder citySeeder;
@@ -83,7 +81,6 @@ public class DataSeeder implements ApplicationRunner {
       DependentSeeder dependentSeeder,
       DriverCnhSeeder driverCnhSeeder,
       DriverDocumentSeeder driverDocumentSeeder,
-      SchoolSeeder schoolSeeder,
       CountrySeeder countrySeeder,
       StateSeeder stateSeeder,
       CitySeeder citySeeder,
@@ -97,7 +94,6 @@ public class DataSeeder implements ApplicationRunner {
     this.dependentSeeder = dependentSeeder;
     this.driverCnhSeeder = driverCnhSeeder;
     this.driverDocumentSeeder = driverDocumentSeeder;
-    this.schoolSeeder = schoolSeeder;
     this.countrySeeder = countrySeeder;
     this.stateSeeder = stateSeeder;
     this.citySeeder = citySeeder;
@@ -121,7 +117,6 @@ public class DataSeeder implements ApplicationRunner {
     dependentSeeder.seed();
     driverCnhSeeder.seed();
     driverDocumentSeeder.seed();
-    schoolSeeder.seed();
     countrySeeder.seed();
     stateSeeder.seed();
     citySeeder.seed();
