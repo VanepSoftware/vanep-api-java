@@ -136,7 +136,7 @@
 - [x] 6.7 Criar `DriverServiceAreaRequestDTO` (lista de itens `placeId` + `sessionToken?`) com Bean Validation
 - [x] 6.8 Implementar a policy D8 como classe pura testável sem servlet nem JPA (regra 8): recebe a cadeia resolvida, lê `COALESCE(city.requires_district, city.state.requires_district)` através da cadeia já carregada — **sem query adicional** e sem copiar o flag para a linha de `city`
 - [x] 6.9 Implementar o service (resolve cada place, aplica a policy D8, substitui o conjunto do motorista)
-- [ ] 6.10 Adicionar `GET` e `PUT /api/drivers/me/service-areas`
+- [x] 6.10 Adicionar `GET` e `PUT /api/drivers/me/service-areas`
 - [x] 6.11 Criar `DriverServiceAreaResponseDTO` com nome da região + token opaco
 - [x] 6.12 Adicionar MessageSource keys (EN + pt-BR) para "distrito obrigatório nesta cidade"
 - [x] 6.13 `make lint` + `./mvnw verify`; abrir PR fase 6
