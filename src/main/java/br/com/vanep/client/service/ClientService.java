@@ -1,7 +1,5 @@
 package br.com.vanep.client.service;
 
-import br.com.vanep.address.dto.AddressRequestDTO;
-import br.com.vanep.address.dto.AddressResponseDTO;
 import br.com.vanep.address.service.AddressService;
 import br.com.vanep.client.dto.ClientMeSummaryResponseDTO;
 import br.com.vanep.client.dto.ClientResponseDTO;
@@ -53,7 +51,7 @@ public class ClientService {
     var addressesById =
         addressService.toResponsesByIds(
             page.getContent().stream()
-                .map(client -> client.getAddressId())
+                .map(client -> client.getUser().getAddressId())
                 .filter(Objects::nonNull)
                 .distinct()
                 .toList());
@@ -61,7 +59,9 @@ public class ClientService {
         client ->
             mapper.toResponse(
                 client,
-                client.getAddressId() == null ? null : addressesById.get(client.getAddressId())));
+                client.getUser().getAddressId() == null
+                    ? null
+                    : addressesById.get(client.getUser().getAddressId())));
   }
 
   public ClientResponseDTO findByToken(String token) {
@@ -76,17 +76,7 @@ public class ClientService {
     return mapper.toMeSummary(
         client,
         userService.toMeResponse(user),
-        addressService.toResponseOrNull(client.getAddressId()));
-  }
-
-  @Transactional
-  public AddressResponseDTO upsertMyAddress(String uid, AddressRequestDTO request) {
-    return addressService.upsertForClient(requireOwnClient(uid).getId(), request);
-  }
-
-  @Transactional
-  public void clearMyAddress(String uid) {
-    addressService.clearForClient(requireOwnClient(uid).getId());
+        addressService.toResponseOrNull(client.getUser().getAddressId()));
   }
 
   @Transactional
@@ -101,12 +91,12 @@ public class ClientService {
   @Transactional
   public void delete(String token) {
     ClientModel client = requireByToken(token);
-    addressService.clearForClient(client.getId());
     clients.delete(client);
   }
 
   private ClientResponseDTO toListResponse(ClientModel client) {
-    return mapper.toResponse(client, addressService.toResponseOrNull(client.getAddressId()));
+    return mapper.toResponse(
+        client, addressService.toResponseOrNull(client.getUser().getAddressId()));
   }
 
   private ClientModel requireOwnClient(String uid) {

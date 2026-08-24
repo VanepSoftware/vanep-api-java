@@ -72,23 +72,6 @@ public class AddressService {
   }
 
   @Transactional
-  public AddressResponseDTO upsertForClient(Long clientId, AddressRequestDTO request) {
-    ClientModel client = requireClient(clientId);
-    return upsertOwnedAddress(
-        client.getAddressId(),
-        request,
-        () ->
-            rejectIfOwnedByAnotherActiveOwner(
-                clients.countByAddressIdAndIdNot(client.getAddressId(), client.getId()),
-                dependents.countByAddressId(client.getAddressId()),
-                schools.countByAddressId(client.getAddressId())),
-        savedId -> {
-          client.setAddressId(savedId);
-          clients.save(client);
-        });
-  }
-
-  @Transactional
   public AddressResponseDTO upsertForDependent(Long dependentId, AddressRequestDTO request) {
     DependentModel dependent = requireDependent(dependentId);
     return upsertOwnedAddress(
@@ -96,7 +79,6 @@ public class AddressService {
         request,
         () ->
             rejectIfOwnedByAnotherActiveOwner(
-                clients.countByAddressId(dependent.getAddressId()),
                 dependents.countByAddressIdAndIdNot(dependent.getAddressId(), dependent.getId()),
                 schools.countByAddressId(dependent.getAddressId())),
         savedId -> {
@@ -113,23 +95,12 @@ public class AddressService {
         request,
         () ->
             rejectIfOwnedByAnotherActiveOwner(
-                clients.countByAddressId(school.getAddressId()),
                 dependents.countByAddressId(school.getAddressId()),
                 schools.countByAddressIdAndIdNot(school.getAddressId(), school.getId())),
         savedId -> {
           school.setAddressId(savedId);
           schools.save(school);
         });
-  }
-
-  @Transactional
-  public void clearForClient(Long clientId) {
-    ClientModel client = requireClient(clientId);
-    softDeleteOwnedAddress(client.getAddressId());
-    if (client.getAddressId() != null) {
-      client.setAddressId(null);
-      clients.save(client);
-    }
   }
 
   @Transactional
@@ -184,9 +155,12 @@ public class AddressService {
     addressRepository.findById(addressId).ifPresent(addressRepository::delete);
   }
 
-  private void rejectIfOwnedByAnotherActiveOwner(
-      long clientCount, long dependentCount, long schoolCount) {
-    if (clientCount + dependentCount + schoolCount > 0) {
+  /**
+   * O cliente saiu da conta: o endereço residencial dele mora em {@code users.address_id} desde a
+   * fase 5 e não disputa mais a posse de uma linha de {@code address} com dependente e escola.
+   */
+  private void rejectIfOwnedByAnotherActiveOwner(long dependentCount, long schoolCount) {
+    if (dependentCount + schoolCount > 0) {
       throw new ResponseStatusException(HttpStatus.CONFLICT, message("address.already_owned"));
     }
   }

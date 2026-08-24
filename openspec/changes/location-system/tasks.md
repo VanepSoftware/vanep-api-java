@@ -14,7 +14,7 @@
 - [x] 0.1 Abrir o projeto no Google Cloud Console (mesmo projeto do Firebase) e confirmar que há **billing account** vinculada — as APIs do Maps Platform não respondem sem billing, mesmo dentro da cota gratuita
 - [x] 0.2 Habilitar a **Places API (New)** — atenção: é a "(New)", não a legada; os campos `addressComponents` e o contrato de `Place Details` diferem entre as duas
 - [ ] 0.3 Habilitar a **Geocoding API** — não é usada na v1 (ver `design.md` D6), habilitar apenas para o spike da fase 1 poder comparar componentes se necessário
-- [ ] 0.4 Criar a **chave de servidor** (backend Java), restrita por **endereço IP** e limitada às APIs acima
+- [x] 0.4 Criar a **chave de servidor** (backend Java), restrita por **endereço IP** e limitada às APIs acima
 - [ ] 0.5 Criar a **chave web** (vanep-frontend), restrita por **HTTP referrer**, limitada a Places API (New)
 - [ ] 0.6 Criar a **chave mobile** (vanep-mobile), restrita por **package name + SHA-1 / bundle id**, limitada a Places API (New)
 - [ ] 0.7 Definir **quota diária** por chave no console, para evitar surpresa de fatura enquanto o volume é desconhecido
@@ -185,7 +185,7 @@
 - [x] 9.3 Estender `UserMeResponseDTO` com o objeto `onboarding.pendingSteps`
 - [x] 9.4 Implementar o cálculo dos passos pendentes no service, sem N+1 (regra 16)
 - [x] 9.5 Migration `V25`: remover `driver.city` e `driver.service_areas`
-- [ ] 9.5b Remover `client.address_id` (migration + `ClientModel`, `ClientService`, DTOs e testes): o endereço residencial passou a morar em `users.address_id` na fase 5, e manter os dois é duas fontes de verdade para o mesmo endereço. Não foi feito na fase 5 para não estourar o limite de arquivos da regra 41
+- [x] 9.5b Remover `client.address_id` (migration + `ClientModel`, `ClientService`, DTOs e testes): o endereço residencial passou a morar em `users.address_id` na fase 5, e manter os dois é duas fontes de verdade para o mesmo endereço. Não foi feito na fase 5 para não estourar o limite de arquivos da regra 41
 - [x] 9.6 Remover os campos correspondentes de `DriverModel`, `DriverUpdateRequestDTO`, `DriverResponseDTO`, `DriverMeSummaryResponseDTO` e `DriverService`
 - [x] 9.7 Remover `CitySeeder` e `StateSeeder`; ajustar `SeedRunner` (ou equivalente) para não referenciá-los
 - [x] 9.8 Remover `POST`/`PUT`/`DELETE`/`restore` de `CityController` e os métodos de escrita de `CityService` (a fonte passa a ser o Google); manter as leituras
@@ -195,6 +195,6 @@
 
 ## 10. Encerramento
 
-- [ ] 10.1 Confirmar que os 6 specs da change foram cobertos pelas fases entregues
-- [ ] 10.2 Rodar `./mvnw verify` completo e confirmar a cobertura mínima do JaCoCo (regra 23)
+- [x] 10.1 Confirmar que os 6 specs da change foram cobertos pelas fases entregues
+- [x] 10.2 Rodar `./mvnw verify` completo e confirmar a cobertura mínima do JaCoCo (regra 23)
 - [ ] 10.3 Sincronizar as specs para `openspec/specs/` (`/opsx:sync`) e arquivar a change (`/opsx:archive`)

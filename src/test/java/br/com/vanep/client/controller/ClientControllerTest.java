@@ -159,9 +159,10 @@ class ClientControllerTest {
     address.setComplement("Apto 12");
     address = addresses.save(address);
 
-    ClientModel client = clients.findByToken(clientToken).orElseThrow();
-    client.setAddressId(address.getId());
-    clients.save(client);
+    // O endereço residencial mora em users.address_id desde a fase 5.
+    UserModel owner = users.findByToken(ownerUid).orElseThrow();
+    owner.setAddressId(address.getId());
+    users.save(owner);
     return address;
   }
 
@@ -376,7 +377,11 @@ class ClientControllerTest {
   }
 
   @Test
-  void deleteClearsHomeAddress() throws Exception {
+  /**
+   * Apagar o perfil de cliente não apaga mais o endereço residencial: ele é do usuário, e o mesmo
+   * ser humano pode continuar na plataforma com outro papel.
+   */
+  void deleteKeepsTheUserHomeAddress() throws Exception {
     AddressModel address = persistLinkedHomeAddress();
     String addressToken = address.getToken();
 
@@ -384,7 +389,7 @@ class ClientControllerTest {
         .perform(delete("/api/clients/" + clientToken).with(adminJwt()))
         .andExpect(status().isNoContent());
 
-    assertThat(addresses.findByToken(addressToken)).isEmpty();
+    assertThat(addresses.findByToken(addressToken)).isPresent();
   }
 
   @Test
@@ -443,127 +448,6 @@ class ClientControllerTest {
 
     mockMvc
         .perform(get("/api/clients/me").with(driverJwt(driverUid)))
-        .andExpect(status().isForbidden());
-  }
-
-  @Test
-  void putMeAddressRequiresAuthentication() throws Exception {
-    mockMvc
-        .perform(
-            put("/api/clients/me/address")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(addressBody("Rua Barão de Jaguara", null)))
-        .andExpect(status().isUnauthorized());
-  }
-
-  @Test
-  void putMeAddressCreatesHomeAddress() throws Exception {
-    mockMvc
-        .perform(
-            put("/api/clients/me/address")
-                .with(ownerJwt())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(addressBody("Rua Barão de Jaguara", null)))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.token").isString())
-        .andExpect(jsonPath("$.street").value("Rua Barão de Jaguara"))
-        .andExpect(jsonPath("$.cityToken").value(cityToken))
-        .andExpect(jsonPath("$.cityName").value("Campinas"))
-        .andExpect(jsonPath("$.stateUf").value("SP"));
-
-    mockMvc
-        .perform(get("/api/clients/me").with(ownerJwt()))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.address.street").value("Rua Barão de Jaguara"))
-        .andExpect(jsonPath("$.address.cityToken").value(cityToken));
-  }
-
-  @Test
-  void putMeAddressUpdatesHomeAddressInPlace() throws Exception {
-    AddressModel address = persistLinkedHomeAddress();
-
-    mockMvc
-        .perform(
-            put("/api/clients/me/address")
-                .with(ownerJwt())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(addressBody("Rua Barão de Jaguara", "Fundos")))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.token").value(address.getToken()))
-        .andExpect(jsonPath("$.complement").value("Fundos"));
-  }
-
-  @Test
-  void putMeAddressReturns403ForDriverUid() throws Exception {
-    UserModel driverUser = new UserModel();
-    driverUser.setType(UserType.DRIVER);
-    driverUser.setName("Driver");
-    driverUser.setEmail("driver-put@vanep.com");
-    driverUser.setDocument("11122233344");
-    driverUser.setVerified(true);
-    final String driverUid = users.save(driverUser).getToken();
-
-    mockMvc
-        .perform(
-            put("/api/clients/me/address")
-                .with(driverJwt(driverUid))
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(addressBody("Rua Barão de Jaguara", null)))
-        .andExpect(status().isForbidden());
-  }
-
-  @Test
-  void putMeAddressReturns400ForInvalidZipCode() throws Exception {
-    mockMvc
-        .perform(
-            put("/api/clients/me/address")
-                .with(ownerJwt())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    "{\"cityToken\":\""
-                        + cityToken
-                        + "\",\"zipCode\":\"13\",\"street\":\"Rua\",\"number\":\"1\",\"district\":\"Centro\"}"))
-        .andExpect(status().isBadRequest());
-  }
-
-  @Test
-  void deleteMeAddressRequiresAuthentication() throws Exception {
-    mockMvc.perform(delete("/api/clients/me/address")).andExpect(status().isUnauthorized());
-  }
-
-  @Test
-  void deleteMeAddressReturns204AndClears() throws Exception {
-    persistLinkedHomeAddress();
-
-    mockMvc
-        .perform(delete("/api/clients/me/address").with(ownerJwt()))
-        .andExpect(status().isNoContent());
-
-    mockMvc
-        .perform(get("/api/clients/me").with(ownerJwt()))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.address").value(nullValue()));
-  }
-
-  @Test
-  void deleteMeAddressWhenNoneReturns204() throws Exception {
-    mockMvc
-        .perform(delete("/api/clients/me/address").with(ownerJwt()))
-        .andExpect(status().isNoContent());
-  }
-
-  @Test
-  void deleteMeAddressReturns403ForDriverUid() throws Exception {
-    UserModel driverUser = new UserModel();
-    driverUser.setType(UserType.DRIVER);
-    driverUser.setName("Driver");
-    driverUser.setEmail("driver-del@vanep.com");
-    driverUser.setDocument("55566677788");
-    driverUser.setVerified(true);
-    final String driverUid = users.save(driverUser).getToken();
-
-    mockMvc
-        .perform(delete("/api/clients/me/address").with(driverJwt(driverUid)))
         .andExpect(status().isForbidden());
   }
 }

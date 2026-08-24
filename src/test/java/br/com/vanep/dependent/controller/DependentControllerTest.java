@@ -138,8 +138,8 @@ class DependentControllerTest {
   private AddressModel persistClientHomeAddress() {
     AddressModel address = persistAddress("Rua da Casa", "10");
     ClientModel client = clients.findByToken(ownerClientToken).orElseThrow();
-    client.setAddressId(address.getId());
-    clients.save(client);
+    client.getUser().setAddressId(address.getId());
+    users.save(client.getUser());
     return address;
   }
 

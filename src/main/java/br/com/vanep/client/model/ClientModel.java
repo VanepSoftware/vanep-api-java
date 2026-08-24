@@ -44,9 +44,6 @@ public class ClientModel {
   @Column(precision = 3, scale = 2)
   private BigDecimal rating;
 
-  @Column(name = "address_id")
-  private Long addressId;
-
   @Column(name = "is_active", nullable = false)
   private boolean active = true;
 

@@ -1,7 +1,6 @@
 package br.com.vanep.address.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.lenient;
@@ -33,8 +32,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.MessageSource;
-import org.springframework.http.HttpStatus;
-import org.springframework.web.server.ResponseStatusException;
 
 @ExtendWith(MockitoExtension.class)
 class AddressServiceTest {
@@ -55,8 +52,6 @@ class AddressServiceTest {
         new AddressService(
             addressRepository, cityRepository, mapper, messages, clients, dependents, schools);
     lenient().when(messages.getMessage(any(), any(), any())).thenAnswer(inv -> inv.getArgument(0));
-    lenient().when(clients.countByAddressId(anyLong())).thenReturn(0L);
-    lenient().when(clients.countByAddressIdAndIdNot(anyLong(), anyLong())).thenReturn(0L);
     lenient().when(dependents.countByAddressId(anyLong())).thenReturn(0L);
     lenient().when(dependents.countByAddressIdAndIdNot(anyLong(), anyLong())).thenReturn(0L);
     lenient().when(schools.countByAddressId(anyLong())).thenReturn(0L);
@@ -149,30 +144,6 @@ class AddressServiceTest {
   }
 
   @Test
-  void upsertForClientCreatesAndLinksWhenOwnerHasNone() {
-    ClientModel client = clientWithId(1L);
-    AddressResponseDTO response = responseFor("tok");
-    when(clients.findById(1L)).thenReturn(Optional.of(client));
-    when(cityRepository.findByToken("city-campinas")).thenReturn(Optional.of(city()));
-    when(addressRepository.save(any(AddressModel.class)))
-        .thenAnswer(
-            inv -> {
-              AddressModel saved = inv.getArgument(0);
-              saved.setId(10L);
-              saved.setToken("tok");
-              return saved;
-            });
-    when(mapper.toResponse(any(AddressModel.class))).thenReturn(response);
-
-    AddressResponseDTO result =
-        service.upsertForClient(1L, requestFor("city-campinas", "Rua Barão de Jaguara"));
-
-    assertThat(result).isEqualTo(response);
-    assertThat(client.getAddressId()).isEqualTo(10L);
-    verify(clients).save(client);
-  }
-
-  @Test
   void upsertForDependentCreatesAndLinksWhenOwnerHasNone() {
     DependentModel dependent = dependentWithId(2L);
     AddressResponseDTO response = responseFor("dep-tok");
@@ -221,28 +192,6 @@ class AddressServiceTest {
   }
 
   @Test
-  void upsertForClientUpdatesSameRowOnSecondSave() {
-    ClientModel client = clientWithId(1L);
-    client.setAddressId(10L);
-    AddressModel existing = addressWithToken("tok");
-    existing.setId(10L);
-    AddressResponseDTO response = responseFor("tok");
-    when(clients.findById(1L)).thenReturn(Optional.of(client));
-    when(addressRepository.findById(10L)).thenReturn(Optional.of(existing));
-    when(cityRepository.findByToken("city-campinas")).thenReturn(Optional.of(city()));
-    when(addressRepository.save(existing)).thenReturn(existing);
-    when(mapper.toResponse(existing)).thenReturn(response);
-
-    AddressResponseDTO result =
-        service.upsertForClient(1L, requestFor("city-campinas", "Avenida Nova"));
-
-    assertThat(result).isEqualTo(response);
-    assertThat(existing.getStreet()).isEqualTo("Avenida Nova");
-    assertThat(client.getAddressId()).isEqualTo(10L);
-    verify(clients, never()).save(any());
-  }
-
-  @Test
   void upsertForDependentUpdatesSameRowOnSecondSave() {
     DependentModel dependent = dependentWithId(2L);
     dependent.setAddressId(20L);
@@ -283,22 +232,6 @@ class AddressServiceTest {
   }
 
   @Test
-  void clearForClientDeletesAddressAndNullsPointer() {
-    ClientModel client = clientWithId(1L);
-    client.setAddressId(10L);
-    AddressModel existing = addressWithToken("tok");
-    existing.setId(10L);
-    when(clients.findById(1L)).thenReturn(Optional.of(client));
-    when(addressRepository.findById(10L)).thenReturn(Optional.of(existing));
-
-    service.clearForClient(1L);
-
-    verify(addressRepository).delete(existing);
-    assertThat(client.getAddressId()).isNull();
-    verify(clients).save(client);
-  }
-
-  @Test
   void clearForDependentDeletesAddressAndNullsPointer() {
     DependentModel dependent = dependentWithId(2L);
     dependent.setAddressId(20L);
@@ -328,66 +261,6 @@ class AddressServiceTest {
     verify(addressRepository).delete(existing);
     assertThat(school.getAddressId()).isNull();
     verify(schools).save(school);
-  }
-
-  @Test
-  void upsertForClientThrows404WhenCityNotFound() {
-    ClientModel client = clientWithId(1L);
-    when(clients.findById(1L)).thenReturn(Optional.of(client));
-    when(cityRepository.findByToken("missing")).thenReturn(Optional.empty());
-
-    assertThatThrownBy(() -> service.upsertForClient(1L, requestFor("missing", "Rua Qualquer")))
-        .isInstanceOf(ResponseStatusException.class)
-        .satisfies(
-            ex -> {
-              ResponseStatusException status = (ResponseStatusException) ex;
-              assertThat(status.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
-              assertThat(status.getReason()).isEqualTo("city.not_found");
-            });
-    verify(addressRepository, never()).save(any(AddressModel.class));
-  }
-
-  @Test
-  void upsertForClientThrows409WhenAddressAlreadyOwned() {
-    ClientModel client = clientWithId(1L);
-    client.setAddressId(10L);
-    when(clients.findById(1L)).thenReturn(Optional.of(client));
-    when(schools.countByAddressId(10L)).thenReturn(1L);
-
-    assertThatThrownBy(
-            () -> service.upsertForClient(1L, requestFor("city-campinas", "Rua Qualquer")))
-        .isInstanceOf(ResponseStatusException.class)
-        .satisfies(
-            ex -> {
-              ResponseStatusException status = (ResponseStatusException) ex;
-              assertThat(status.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
-              assertThat(status.getReason()).isEqualTo("address.already_owned");
-            });
-    verify(addressRepository, never()).save(any(AddressModel.class));
-    verify(addressRepository, never()).findById(anyLong());
-  }
-
-  @Test
-  void upsertForClientIgnoresSoftDeletedOwnersInExclusivityCount() {
-    ClientModel client = clientWithId(1L);
-    client.setAddressId(10L);
-    AddressModel existing = addressWithToken("tok");
-    existing.setId(10L);
-    AddressResponseDTO response = responseFor("tok");
-    when(clients.findById(1L)).thenReturn(Optional.of(client));
-    when(schools.countByAddressId(10L)).thenReturn(0L);
-    when(addressRepository.findById(10L)).thenReturn(Optional.of(existing));
-    when(cityRepository.findByToken("city-campinas")).thenReturn(Optional.of(city()));
-    when(addressRepository.save(existing)).thenReturn(existing);
-    when(mapper.toResponse(existing)).thenReturn(response);
-
-    AddressResponseDTO result =
-        service.upsertForClient(1L, requestFor("city-campinas", "Avenida Nova"));
-
-    assertThat(result).isEqualTo(response);
-    verify(clients).countByAddressIdAndIdNot(10L, 1L);
-    verify(dependents).countByAddressId(10L);
-    verify(schools).countByAddressId(10L);
   }
 
   private ClientModel clientWithId(Long id) {
