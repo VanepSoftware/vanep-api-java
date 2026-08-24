@@ -1,6 +1,5 @@
 package br.com.vanep.seed;
 
-import br.com.vanep.address.seed.AddressSeeder;
 import br.com.vanep.auth.security.PermissionEnum;
 import br.com.vanep.auth.security.PermissionRegistry;
 import br.com.vanep.city.seed.CitySeeder;
@@ -57,7 +56,6 @@ public class DataSeeder implements ApplicationRunner {
   private final CountrySeeder countrySeeder;
   private final StateSeeder stateSeeder;
   private final CitySeeder citySeeder;
-  private final AddressSeeder addressSeeder;
   private final DriverRatingSeeder driverRatingSeeder;
   private final PasswordEncoder passwordEncoder;
 
@@ -89,7 +87,6 @@ public class DataSeeder implements ApplicationRunner {
       CountrySeeder countrySeeder,
       StateSeeder stateSeeder,
       CitySeeder citySeeder,
-      AddressSeeder addressSeeder,
       DriverRatingSeeder driverRatingSeeder,
       PasswordEncoder passwordEncoder) {
     this.users = users;
@@ -104,7 +101,6 @@ public class DataSeeder implements ApplicationRunner {
     this.countrySeeder = countrySeeder;
     this.stateSeeder = stateSeeder;
     this.citySeeder = citySeeder;
-    this.addressSeeder = addressSeeder;
     this.driverRatingSeeder = driverRatingSeeder;
     this.passwordEncoder = passwordEncoder;
   }
@@ -129,7 +125,6 @@ public class DataSeeder implements ApplicationRunner {
     countrySeeder.seed();
     stateSeeder.seed();
     citySeeder.seed();
-    addressSeeder.seed();
     driverRatingSeeder.seed();
     if (seedOnly) {
       log.info("Seed-only: data seeded; the application will shut down.");

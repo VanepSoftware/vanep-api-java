@@ -132,7 +132,6 @@ class DependentControllerTest {
     address.setZipCode("13015904");
     address.setStreet(street);
     address.setNumber(number);
-    address.setDistrict("Centro");
     return addresses.save(address);
   }
 

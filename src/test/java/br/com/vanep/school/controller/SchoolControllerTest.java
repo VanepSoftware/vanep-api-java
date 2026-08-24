@@ -119,7 +119,6 @@ class SchoolControllerTest {
     address.setZipCode("13015904");
     address.setStreet(street);
     address.setNumber(number);
-    address.setDistrict("Centro");
     address = addresses.save(address);
     school.setAddressId(address.getId());
     schools.save(school);

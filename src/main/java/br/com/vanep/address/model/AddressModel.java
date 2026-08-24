@@ -1,6 +1,7 @@
 package br.com.vanep.address.model;
 
 import br.com.vanep.city.model.CityModel;
+import br.com.vanep.district.model.DistrictModel;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -38,7 +39,8 @@ public class AddressModel {
   @JoinColumn(name = "city_id", nullable = false)
   private CityModel city;
 
-  @Column(name = "zip_code", nullable = false, length = 8)
+  /** Nulo é legítimo: places reais do DF vêm sem {@code postal_code} (fixture df-ceilandia). */
+  @Column(name = "zip_code", length = 8)
   private String zipCode;
 
   @Column(nullable = false, length = 255)
@@ -50,8 +52,16 @@ public class AddressModel {
   @Column(length = 128)
   private String complement;
 
-  @Column(length = 128)
-  private String district;
+  /**
+   * Nó da árvore em que este endereço está. Substitui o antigo {@code district varchar}: texto
+   * livre nunca casaria com o nó que o motorista escolheu como área de atuação.
+   */
+  @ManyToOne(fetch = FetchType.EAGER)
+  @JoinColumn(name = "district_id")
+  private DistrictModel district;
+
+  @Column(name = "google_place_id", length = 255)
+  private String googlePlaceId;
 
   @Column(name = "is_active", nullable = false)
   private boolean active = true;

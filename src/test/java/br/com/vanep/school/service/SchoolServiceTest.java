@@ -86,8 +86,7 @@ class SchoolServiceTest {
   }
 
   private AddressRequestDTO addressRequest() {
-    return new AddressRequestDTO(
-        "city-campinas", "13015904", "Rua da Escola", "1481", null, "Centro");
+    return new AddressRequestDTO("city-campinas", "13015904", "Rua da Escola", "1481", null);
   }
 
   private AddressResponseDTO addressResponse() {

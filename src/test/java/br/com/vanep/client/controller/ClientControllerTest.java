@@ -18,6 +18,8 @@ import br.com.vanep.client.model.ClientModel;
 import br.com.vanep.client.repository.ClientRepository;
 import br.com.vanep.country.model.CountryModel;
 import br.com.vanep.country.repository.CountryRepository;
+import br.com.vanep.district.model.DistrictModel;
+import br.com.vanep.district.repository.DistrictRepository;
 import br.com.vanep.state.model.StateModel;
 import br.com.vanep.state.repository.StateRepository;
 import br.com.vanep.user.enums.UserType;
@@ -48,6 +50,7 @@ class ClientControllerTest {
   @Autowired private ClientRepository clients;
   @Autowired private AddressRepository addresses;
   @Autowired private CityRepository cities;
+  @Autowired private DistrictRepository districts;
   @Autowired private StateRepository states;
   @Autowired private CountryRepository countries;
 
@@ -140,13 +143,20 @@ class ClientControllerTest {
 
   private AddressModel persistLinkedHomeAddress() {
     CityModel city = cities.findByToken(cityToken).orElseThrow();
+
+    // O bairro agora é nó da árvore, não texto livre: a resposta expõe o nome do nó.
+    DistrictModel centro = new DistrictModel();
+    centro.setCity(city);
+    centro.setName("Centro");
+    centro = districts.save(centro);
+
     AddressModel address = new AddressModel();
     address.setCity(city);
+    address.setDistrict(centro);
     address.setZipCode("13015904");
     address.setStreet("Rua Barão de Jaguara");
     address.setNumber("1481");
     address.setComplement("Apto 12");
-    address.setDistrict("Centro");
     address = addresses.save(address);
 
     ClientModel client = clients.findByToken(clientToken).orElseThrow();
@@ -291,7 +301,6 @@ class ClientControllerTest {
     catalog.setZipCode("01310100");
     catalog.setStreet("Avenida Paulista");
     catalog.setNumber("1000");
-    catalog.setDistrict("Bela Vista");
     catalog = addresses.save(catalog);
 
     mockMvc

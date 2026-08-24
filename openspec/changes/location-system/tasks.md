@@ -110,16 +110,16 @@
 > Depends on: Phase 4 | Parallel with: Phase 6, Phase 7
 > Order: test → migration → model → security → request DTO → service → controller → response DTO
 
-- [ ] 5.1 Testes slice MockMvc: `401` sem token; `200` criando endereço a partir de `placeId`; `400` para `placeId` inválido; `complement` preservado; componentes enviados pelo cliente ignorados
-- [ ] 5.2 Migration `V22`: `address` ganha `district_id` FK e `google_place_id`; **remove** `district varchar(128)`; cria as FKs faltantes de `school.address_id` e `dependent.address_id`; adiciona `assistant.address_id`
-- [ ] 5.3 Atualizar `AddressModel` (FK de district, `google_place_id`) e o model de `assistant`
-- [ ] 5.4 Declarar as regras de autorização em `SecurityConfig` para os endpoints novos (regras 19 e 20)
-- [ ] 5.5 Criar `PersonalAddressRequestDTO` (`placeId` `@NotBlank`, `sessionToken?`, `number?`, `complement?`) com Bean Validation (regra 10)
-- [ ] 5.6 Implementar o service que resolve o place, persiste a cadeia e grava o endereço do chamador
-- [ ] 5.7 Adicionar `PUT /api/user/me/address` e `GET /api/user/me/address` com `@Valid` + `isAuthenticated()`
-- [ ] 5.8 Criar `PersonalAddressResponseDTO` expondo apenas tokens opacos (regras 12 e 13)
-- [ ] 5.9 Remover `AddressSeeder`
-- [ ] 5.10 `make lint` + `./mvnw verify`; abrir PR fase 5
+- [x] 5.1 Testes slice MockMvc: `401` sem token; `200` criando endereço a partir de `placeId`; `400` para `placeId` inválido; `complement` preservado; componentes enviados pelo cliente ignorados
+- [x] 5.2 Migration `V22`: `address` ganha `district_id` FK e `google_place_id`; **remove** `district varchar(128)`; cria as FKs faltantes de `school.address_id` e `dependent.address_id`; adiciona `assistant.address_id`
+- [x] 5.3 Atualizar `AddressModel` (FK de district, `google_place_id`) e o model de `assistant`
+- [x] 5.4 Declarar as regras de autorização em `SecurityConfig` para os endpoints novos (regras 19 e 20)
+- [x] 5.5 Criar `PersonalAddressRequestDTO` (`placeId` `@NotBlank`, `sessionToken?`, `number?`, `complement?`) com Bean Validation (regra 10)
+- [x] 5.6 Implementar o service que resolve o place, persiste a cadeia e grava o endereço do chamador
+- [x] 5.7 Adicionar `PUT /api/user/me/address` e `GET /api/user/me/address` com `@Valid` + `isAuthenticated()`
+- [x] 5.8 Criar `PersonalAddressResponseDTO` expondo apenas tokens opacos (regras 12 e 13)
+- [x] 5.9 Remover `AddressSeeder`
+- [x] 5.10 `make lint` + `./mvnw verify`; abrir PR fase 5
 
 ## 6. Phase 6 — Áreas de atuação do motorista (PR 6)
 
@@ -185,6 +185,7 @@
 - [ ] 9.3 Estender `UserMeResponseDTO` com o objeto `onboarding.pendingSteps`
 - [ ] 9.4 Implementar o cálculo dos passos pendentes no service, sem N+1 (regra 16)
 - [ ] 9.5 Migration `V25`: remover `driver.city` e `driver.service_areas`
+- [ ] 9.5b Remover `client.address_id` (migration + `ClientModel`, `ClientService`, DTOs e testes): o endereço residencial passou a morar em `users.address_id` na fase 5, e manter os dois é duas fontes de verdade para o mesmo endereço. Não foi feito na fase 5 para não estourar o limite de arquivos da regra 41
 - [ ] 9.6 Remover os campos correspondentes de `DriverModel`, `DriverUpdateRequestDTO`, `DriverResponseDTO`, `DriverMeSummaryResponseDTO` e `DriverService`
 - [ ] 9.7 Remover `CitySeeder` e `StateSeeder`; ajustar `SeedRunner` (ou equivalente) para não referenciá-los
 - [ ] 9.8 Remover `POST`/`PUT`/`DELETE`/`restore` de `CityController` e os métodos de escrita de `CityService` (a fonte passa a ser o Google); manter as leituras

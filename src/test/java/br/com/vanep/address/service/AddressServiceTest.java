@@ -109,7 +109,7 @@ class AddressServiceTest {
   }
 
   private AddressRequestDTO requestFor(String cityToken, String street) {
-    return new AddressRequestDTO(cityToken, "13015904", street, "1481", null, "Centro");
+    return new AddressRequestDTO(cityToken, "13015904", street, "1481", null);
   }
 
   @Test

@@ -102,8 +102,7 @@ class ClientServiceTest {
   }
 
   private AddressRequestDTO addressRequest() {
-    return new AddressRequestDTO(
-        "city-campinas", "13015904", "Rua Barão de Jaguara", "1481", null, "Centro");
+    return new AddressRequestDTO("city-campinas", "13015904", "Rua Barão de Jaguara", "1481", null);
   }
 
   @Test

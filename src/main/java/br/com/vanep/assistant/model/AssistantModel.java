@@ -56,6 +56,9 @@ public class AssistantModel {
   @Column(name = "verification_status", nullable = false, length = 16)
   private VerificationStatus verificationStatus = VerificationStatus.PENDING;
 
+  @Column(name = "address_id")
+  private Long addressId;
+
   @Column private String photo;
 
   @Column(name = "activated_at")

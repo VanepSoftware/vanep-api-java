@@ -14,5 +14,4 @@ public record AddressRequestDTO(
         String street,
     @Size(max = 16, message = "O número deve ter no máximo 16 caracteres.") String number,
     @Size(max = 128, message = "O complemento deve ter no máximo 128 caracteres.")
-        String complement,
-    @Size(max = 128, message = "O bairro deve ter no máximo 128 caracteres.") String district) {}
+        String complement) {}

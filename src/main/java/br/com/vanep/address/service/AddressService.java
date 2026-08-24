@@ -221,7 +221,6 @@ public class AddressService {
     address.setStreet(request.street());
     address.setNumber(request.number());
     address.setComplement(request.complement());
-    address.setDistrict(request.district());
   }
 
   private CityModel requireCityByToken(String cityToken) {

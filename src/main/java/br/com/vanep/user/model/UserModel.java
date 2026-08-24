@@ -45,6 +45,13 @@ public class UserModel {
   @Column(name = "country_id")
   private Long countryId;
 
+  /**
+   * Endereço residencial, qualquer que seja o papel. Mora em {@code users} e não no papel porque o
+   * endereço é do ser humano — quem é cliente e motorista ao mesmo tempo tem um endereço, não dois.
+   */
+  @Column(name = "address_id")
+  private Long addressId;
+
   @Column(nullable = false)
   private String name;
 
