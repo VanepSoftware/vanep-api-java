@@ -89,6 +89,7 @@ public class DriverDocumentService {
 
     return mapper.toResponse(driverDocumentRepository.save(document));
   }
+
   @Transactional(readOnly = true)
   public Page<DriverDocumentResponseDTO> findAll(
       String driverToken,
@@ -146,6 +147,7 @@ public class DriverDocumentService {
 
     return documents.map(mapper::toResponse);
   }
+
   @Transactional(readOnly = true)
   public DriverDocumentResponseDTO findByToken(String token) {
     return mapper.toResponse(requireByToken(token));
