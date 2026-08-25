@@ -248,6 +248,33 @@ class DriverDocumentControllerTest {
   }
 
   @Test
+  void updateResetsStatusToPending() throws Exception {
+    DriverDocumentModel doc = documents.findByToken(docToken).orElseThrow();
+    doc.setStatus(DocumentStatusEnum.APPROVED);
+    documents.save(doc);
+
+    String body =
+        """
+        {
+          "documentType": "CRLV",
+          "fileUrl": "https://storage.vanep.com.br/new-crlv.pdf",
+          "expiresAt": "2028-01-01"
+        }
+        """;
+
+    mockMvc
+        .perform(
+            put("/api/driver-documents/" + docToken)
+                .with(driverJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.token").value(docToken))
+        .andExpect(jsonPath("$.fileUrl").value("https://storage.vanep.com.br/new-crlv.pdf"))
+        .andExpect(jsonPath("$.status").value("PENDING"));
+  }
+
+  @Test
   void deleteReturns204ForOwner() throws Exception {
     mockMvc
         .perform(delete("/api/driver-documents/" + docToken).with(driverJwt()))

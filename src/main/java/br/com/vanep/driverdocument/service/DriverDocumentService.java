@@ -89,7 +89,7 @@ public class DriverDocumentService {
 
     return mapper.toResponse(driverDocumentRepository.save(document));
   }
-
+  @Transactional(readOnly = true)
   public Page<DriverDocumentResponseDTO> findAll(
       String driverToken,
       DocumentTypeEnum documentType,
@@ -146,7 +146,7 @@ public class DriverDocumentService {
 
     return documents.map(mapper::toResponse);
   }
-
+  @Transactional(readOnly = true)
   public DriverDocumentResponseDTO findByToken(String token) {
     return mapper.toResponse(requireByToken(token));
   }
@@ -157,6 +157,7 @@ public class DriverDocumentService {
     document.setDocumentType(request.documentType());
     document.setFileUrl(request.fileUrl());
     document.setExpiresAt(request.expiresAt());
+    document.setStatus(DocumentStatusEnum.PENDING);
 
     return mapper.toResponse(driverDocumentRepository.save(document));
   }
