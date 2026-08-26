@@ -9,7 +9,7 @@
 
 | Phase | Contents | Depends on | Parallel with |
 | :--- | :--- | :--- | :--- |
-| **Phase 1** | Foundation (Migration V19, enums, JPA entity, repository queries, SecurityEvaluator update, permission enum additions) | — | — |
+| **Phase 1** | Foundation (Migration V21, enums, JPA entity, repository queries, SecurityEvaluator update, permission enum additions) | — | — |
 | **Phase 2** | REST API (DTOs, mapper, service logic, controller endpoints, i18n messages) | Phase 1 | — |
 | **Phase 3** | Seed & Tests (DataSeeder extension, clean.sql check, DriverDocumentServiceTest, DriverDocumentControllerTest) | Phase 2 | — |
 
@@ -18,7 +18,7 @@
 ## 2. Dependency Graph & Layer Assignment
 
 ```
-[Migration V19 & DocumentTypeEnum & DocumentStatusEnum & PermissionEnum & DriverDocumentModel]
+[Migration V21 & DocumentTypeEnum & DocumentStatusEnum & PermissionEnum & DriverDocumentModel]
                                            │
                                            ▼
                                [DriverDocumentRepository]
@@ -41,7 +41,7 @@
 ## 3. Checklist of Tasks
 
 ### Phase 1 — Foundation
-- [x] 1.1 Create Flyway migration `V19__create_driver_document_table.sql`.
+- [x] 1.1 Create Flyway migration `V21__create_driver_document_table.sql`.
 - [x] 1.2 Create enums `DocumentTypeEnum.java` and `DocumentStatusEnum.java` in `br.com.vanep.driverdocument.enums`.
 - [x] 1.3 Create entity `DriverDocumentModel.java` in `br.com.vanep.driverdocument.model`.
 - [x] 1.4 Add permissions (`LIST_DRIVER_DOCUMENTS`, `SHOW_DRIVER_DOCUMENT`, `CREATE_DRIVER_DOCUMENT`, `UPDATE_DRIVER_DOCUMENT`, `DELETE_DRIVER_DOCUMENT`, `RESTORE_DRIVER_DOCUMENT`) to `PermissionEnum.java`.

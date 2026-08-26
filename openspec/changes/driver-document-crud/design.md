@@ -7,7 +7,7 @@ A funcionalidade de documentos do motorista (`driver_document`) permite que moto
 ## Goals / Non-Goals
 
 **Goals:**
-- Criar a migration `V19__create_driver_document_table.sql` com Soft Delete (`deleted_at`) e índices parciais.
+- Criar a migration `V21__create_driver_document_table.sql` com Soft Delete (`deleted_at`) e índices parciais.
 - Criar a entidade JPA `DriverDocumentModel` com suporte a `@SoftDelete(columnName = "deleted_at", strategy = SoftDeleteType.TIMESTAMP)`.
 - Criar os enums `DocumentTypeEnum` (ex.: `CRLV`, `CRIMINAL_RECORD`, `RESIDENCE_PROOF`, `OTHER`) e `DocumentStatusEnum` (ex.: `PENDING`, `APPROVED`, `REJECTED`).
 - Implementar DTOs de Request e Response com Bean Validation (`@Valid`, `@NotNull`, `@NotBlank`, `@Size`).
@@ -23,7 +23,7 @@ A funcionalidade de documentos do motorista (`driver_document`) permite que moto
 
 ## Decisions
 
-### D1 — Schema do Banco de Dados (`V19__create_driver_document_table.sql`)
+### D1 — Schema do Banco de Dados (`V21__create_driver_document_table.sql`)
 
 ```sql
 create table driver_document (
