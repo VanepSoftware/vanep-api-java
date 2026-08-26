@@ -12,6 +12,7 @@ import br.com.vanep.driver.DriverApprovalStatus;
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.drivercnh.seed.DriverCnhSeeder;
+import br.com.vanep.driverdocument.seed.DriverDocumentSeeder;
 import br.com.vanep.driverrating.seed.DriverRatingSeeder;
 import br.com.vanep.role.RoleName;
 import br.com.vanep.role.model.RoleModel;
@@ -51,6 +52,7 @@ public class DataSeeder implements ApplicationRunner {
   private final RolePermissionRepository rolePermissions;
   private final DependentSeeder dependentSeeder;
   private final DriverCnhSeeder driverCnhSeeder;
+  private final DriverDocumentSeeder driverDocumentSeeder;
   private final SchoolSeeder schoolSeeder;
   private final CountrySeeder countrySeeder;
   private final StateSeeder stateSeeder;
@@ -82,6 +84,7 @@ public class DataSeeder implements ApplicationRunner {
       RolePermissionRepository rolePermissions,
       DependentSeeder dependentSeeder,
       DriverCnhSeeder driverCnhSeeder,
+      DriverDocumentSeeder driverDocumentSeeder,
       SchoolSeeder schoolSeeder,
       CountrySeeder countrySeeder,
       StateSeeder stateSeeder,
@@ -96,6 +99,7 @@ public class DataSeeder implements ApplicationRunner {
     this.rolePermissions = rolePermissions;
     this.dependentSeeder = dependentSeeder;
     this.driverCnhSeeder = driverCnhSeeder;
+    this.driverDocumentSeeder = driverDocumentSeeder;
     this.schoolSeeder = schoolSeeder;
     this.countrySeeder = countrySeeder;
     this.stateSeeder = stateSeeder;
@@ -120,6 +124,7 @@ public class DataSeeder implements ApplicationRunner {
     seedDrivers();
     dependentSeeder.seed();
     driverCnhSeeder.seed();
+    driverDocumentSeeder.seed();
     schoolSeeder.seed();
     countrySeeder.seed();
     stateSeeder.seed();
@@ -227,11 +232,13 @@ public class DataSeeder implements ApplicationRunner {
               PermissionEnum.CREATE_ASSISTANT_INVITE.value(),
               PermissionEnum.CANCEL_ASSISTANT_INVITE.value(),
               PermissionEnum.CREATE_DRIVER_CNH.value(),
-              PermissionEnum.LIST_DRIVER_CNHS.value()));
+              PermissionEnum.LIST_DRIVER_CNHS.value(),
+              PermissionEnum.CREATE_DRIVER_DOCUMENT.value(),
+              PermissionEnum.LIST_DRIVER_DOCUMENTS.value()));
       bundle = rolePermissions.save(bundle);
       driverRole.setRolePermission(bundle);
       roles.save(driverRole);
-      log.info("Seed: DRIVER bundle created with assistant and CNH permissions.");
+      log.info("Seed: DRIVER bundle created with assistant, CNH and Document permissions.");
     }
   }
 
