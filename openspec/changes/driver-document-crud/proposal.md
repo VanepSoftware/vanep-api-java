@@ -6,7 +6,7 @@ Esta proposta define a criação da infraestrutura de banco de dados, modelo JPA
 
 ## What Changes
 
-- **Nova Migration:** `V19__create_driver_document_table.sql` contendo tabela `driver_document` com FK para `driver`, campos de identificação, tipo, URL/caminho do arquivo, status de verificação, suporte a soft delete (`deleted_at`) e índices parciais.
+- **Nova Migration:** `V21__create_driver_document_table.sql` contendo tabela `driver_document` com FK para `driver`, campos de identificação, tipo, URL/caminho do arquivo, status de verificação, suporte a soft delete (`deleted_at`) e índices parciais.
 - **Pacote de Negócio:** `br.com.vanep.driverdocument` estruturado por camada (`controller`, `dto`, `enums`, `mapper`, `model`, `repository`, `service`).
 - **Enums de Domínio:** `DocumentTypeEnum` (ex.: `CRLV`, `CRIMINAL_RECORD`, `RESIDENCE_PROOF`, `OTHER`) e `DocumentStatusEnum` (ex.: `PENDING`, `APPROVED`, `REJECTED`).
 - **Novas Permissões:** `LIST_DRIVER_DOCUMENTS`, `SHOW_DRIVER_DOCUMENT`, `CREATE_DRIVER_DOCUMENT`, `UPDATE_DRIVER_DOCUMENT`, `DELETE_DRIVER_DOCUMENT`, `RESTORE_DRIVER_DOCUMENT` adicionadas em `PermissionEnum.java`.
@@ -33,7 +33,7 @@ Esta proposta define a criação da infraestrutura de banco de dados, modelo JPA
 
 ## Impact
 
-- **Database:** Nova tabela `driver_document` através da migration `V19`.
+- **Database:** Nova tabela `driver_document` através da migration `V21`.
 - **Entity:** Nova entidade JPA `DriverDocumentModel` com `@SoftDelete`.
 - **Security:** Inclusão de 6 novas permissões em `PermissionEnum` e método em `@sec`.
 - **API:** Novos endpoints sob o prefixo global `/api/driver-documents`.
