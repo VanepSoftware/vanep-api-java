@@ -6,7 +6,7 @@ import br.com.vanep.driverdocument.enums.DocumentStatusEnum;
 import br.com.vanep.driverdocument.enums.DocumentTypeEnum;
 import br.com.vanep.driverdocument.model.DriverDocumentModel;
 import br.com.vanep.driverdocument.repository.DriverDocumentRepository;
-import br.com.vanep.user.UserRepository;
+import br.com.vanep.user.repository.UserRepository;
 import java.time.LocalDate;
 import java.util.Optional;
 import org.slf4j.Logger;
