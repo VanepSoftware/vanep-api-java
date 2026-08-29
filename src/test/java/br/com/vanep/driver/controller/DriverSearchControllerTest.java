@@ -170,6 +170,16 @@ class DriverSearchControllerTest {
         .willReturn(fixture("df-ceilandia"));
     BDDMockito.given(places.findPlaceDetails("escola", null))
         .willReturn(fixture("df-escola-objetivo"));
+    BDDMockito.given(places.findPlaceDetails("taguatinga-ra", null))
+        .willReturn(
+            new PlaceDetailsResponseDTO(
+                "taguatinga-ra",
+                "Taguatinga, Brasília - DF",
+                fixture("df-taguatinga-qnl5").addressComponents().stream()
+                    .filter(component -> !component.types().contains("sublocality"))
+                    .filter(component -> !component.types().contains("route"))
+                    .filter(component -> !component.types().contains("postal_code"))
+                    .toList()));
   }
 
   @Test
@@ -345,8 +355,36 @@ class DriverSearchControllerTest {
     mockMvc
         .perform(get("/api/drivers/search").with(as(clientUid)).param("placeId", "escola"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.content.length()").value(1))
         .andExpect(jsonPath("$.content[0].name").value("Motorista taguatinga@vanep.com"));
+  }
+
+  /// Buscar uma região ampla tem de encontrar quem trabalha dentro dela: sumir
+  /// faria a busca genérica devolver menos gente que a específica.
+  @Test
+  void findsDriversWorkingInsideTheSearchedRegion() throws Exception {
+    stubPlaces();
+    createDriverWithAreas("qnl5@vanep.com", "taguatinga");
+    giveArea("taguatinga@vanep.com", districtNamed("Taguatinga"));
+
+    mockMvc
+        .perform(get("/api/drivers/search").with(as(clientUid)).param("placeId", "taguatinga-ra"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content.length()").value(2))
+        .andExpect(jsonPath("$.content[0].name").value("Motorista taguatinga@vanep.com"))
+        .andExpect(jsonPath("$.content[1].name").value("Motorista qnl5@vanep.com"));
+  }
+
+  @Test
+  void aSiblingBranchStillDoesNotMatch() throws Exception {
+    stubPlaces();
+    createDriverWithAreas("qnl5@vanep.com", "taguatinga");
+    createDriverWithAreas("aguas@vanep.com", "aguas-claras");
+
+    mockMvc
+        .perform(get("/api/drivers/search").with(as(clientUid)).param("placeId", "taguatinga"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content.length()").value(1))
+        .andExpect(jsonPath("$.content[0].name").value("Motorista qnl5@vanep.com"));
   }
 
   @Test

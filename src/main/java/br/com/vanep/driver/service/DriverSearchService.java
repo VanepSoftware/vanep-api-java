@@ -1,6 +1,8 @@
 package br.com.vanep.driver.service;
 
 import br.com.vanep.auth.security.RateLimiter;
+import br.com.vanep.district.model.DistrictModel;
+import br.com.vanep.district.repository.DistrictRepository;
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.dto.DriverSearchResponseDTO;
 import br.com.vanep.driver.model.DriverModel;
@@ -39,6 +41,7 @@ public class DriverSearchService {
   private final PlacesClient places;
   private final LocationResolverService resolver;
   private final DriverServiceAreaRepository areas;
+  private final DistrictRepository districts;
   private final DriverRepository drivers;
   private final RateLimiter rateLimiter;
   private final MessageSource messages;
@@ -47,12 +50,14 @@ public class DriverSearchService {
       PlacesClient places,
       LocationResolverService resolver,
       DriverServiceAreaRepository areas,
+      DistrictRepository districts,
       DriverRepository drivers,
       @Qualifier("placesRateLimiter") RateLimiter rateLimiter,
       MessageSource messages) {
     this.places = places;
     this.resolver = resolver;
     this.areas = areas;
+    this.districts = districts;
     this.drivers = drivers;
     this.rateLimiter = rateLimiter;
     this.messages = messages;
@@ -95,22 +100,24 @@ public class DriverSearchService {
    * também Brasília inteira merece a posição de quem cadastrou QNL 5.
    */
   List<Long> rankDriverIds(ResolvedLocationChainDTO anchor) {
-    List<Long> ancestorIds = ancestorIdsOf(anchor);
-    int wholeCityRank = ancestorIds.size();
+    Map<Long, Integer> distanceByDistrict = distanceByDistrict(anchor);
+    int wholeCityRank = Integer.MAX_VALUE;
 
     List<Object[]> matches =
         anchor.deepestDistrict().isEmpty() && !anchor.anchoredAboveTheDistrictComponents()
             ? areas.findDriverMatchesInCity(anchor.city().getId())
             : areas.findDriverMatchesCoveringPoint(
-                anchor.city().getId(), sentinelIfEmpty(ancestorIds));
+                anchor.city().getId(), sentinelIfEmpty(List.copyOf(distanceByDistrict.keySet())));
 
     Map<Long, Integer> bestRankByDriver = new HashMap<>();
     for (Object[] match : matches) {
       Long driverId = (Long) match[0];
       Long districtId = (Long) match[1];
-      int rank =
-          districtId == null ? wholeCityRank : rankOf(districtId, ancestorIds, wholeCityRank);
-      bestRankByDriver.merge(driverId, rank, Math::min);
+      Integer distance = districtId == null ? wholeCityRank : distanceByDistrict.get(districtId);
+      if (distance == null) {
+        continue;
+      }
+      bestRankByDriver.merge(driverId, distance, Math::min);
     }
 
     // Desempate por id para a ordem ser determinística entre requisições iguais.
@@ -121,21 +128,41 @@ public class DriverSearchService {
         .toList();
   }
 
-  int rankOf(Long districtId, List<Long> ancestorIds, int fallback) {
-    int index = ancestorIds.indexOf(districtId);
-    return index < 0 ? fallback : index;
+  /**
+   * Distância em níveis entre cada distrito relevante e o ponto buscado: o próprio nó é 0, os
+   * ancestrais sobem, os descendentes descem. Distritos fora do ramo não entram no mapa e por isso
+   * não casam — um irmão não atende o ponto.
+   */
+  Map<Long, Integer> distanceByDistrict(ResolvedLocationChainDTO anchor) {
+    Map<Long, Integer> distances = new HashMap<>();
+    Optional<DistrictModel> deepest = anchor.deepestDistrict();
+    if (deepest.isEmpty()) {
+      return distances;
+    }
+
+    List<DistrictModel> ancestors = resolver.findAncestors(deepest.get());
+    for (int level = 0; level < ancestors.size(); level++) {
+      distances.put(ancestors.get(level).getId(), level);
+    }
+
+    Map<Long, List<DistrictModel>> childrenByParent = new HashMap<>();
+    for (DistrictModel district : districts.findByCityId(anchor.city().getId())) {
+      Long parentId = district.getParent() == null ? null : district.getParent().getId();
+      childrenByParent.computeIfAbsent(parentId, id -> new ArrayList<>()).add(district);
+    }
+    collectDescendants(deepest.get().getId(), 1, childrenByParent, distances);
+    return distances;
   }
 
-  List<Long> ancestorIdsOf(ResolvedLocationChainDTO anchor) {
-    List<Long> ancestorIds = new ArrayList<>();
-    anchor
-        .deepestDistrict()
-        .ifPresent(
-            deepest ->
-                resolver
-                    .findAncestors(deepest)
-                    .forEach(district -> ancestorIds.add(district.getId())));
-    return ancestorIds;
+  void collectDescendants(
+      Long parentId,
+      int distance,
+      Map<Long, List<DistrictModel>> childrenByParent,
+      Map<Long, Integer> distances) {
+    for (DistrictModel child : childrenByParent.getOrDefault(parentId, List.of())) {
+      distances.merge(child.getId(), distance, Math::min);
+      collectDescendants(child.getId(), distance + 1, childrenByParent, distances);
+    }
   }
 
   /** {@code in ()} vazio não é válido em JPQL; o sentinela nunca casa com id real. */
