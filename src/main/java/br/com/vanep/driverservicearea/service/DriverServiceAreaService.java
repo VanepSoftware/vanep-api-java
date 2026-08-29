@@ -68,8 +68,28 @@ public class DriverServiceAreaService {
 
     // Resolve tudo antes de apagar qualquer coisa: se um place da lista for
     // recusado, o motorista não pode terminar sem região nenhuma.
+    Map<String, DriverServiceAreaModel> current = new LinkedHashMap<>();
+    for (DriverServiceAreaModel existing : areas.findByDriverId(driver.getId())) {
+      current.put(existing.getToken(), existing);
+    }
+
     Map<String, DriverServiceAreaModel> resolved = new LinkedHashMap<>();
     for (DriverServiceAreaRequestDTO.Item item : request.areas()) {
+      DriverServiceAreaModel area = new DriverServiceAreaModel();
+      area.setDriver(driver);
+
+      if (item.isExistingArea()) {
+        DriverServiceAreaModel existing = current.get(item.areaToken());
+        if (existing == null) {
+          throw new ResponseStatusException(
+              HttpStatus.BAD_REQUEST, message("driver_service_area.area_token.unknown"));
+        }
+        area.setCity(existing.getCity());
+        area.setDistrict(existing.getDistrict());
+        resolved.putIfAbsent(dedupeKey(area), area);
+        continue;
+      }
+
       ResolvedLocationChainDTO chain =
           resolver.resolveAndPersist(places.findPlaceDetails(item.placeId(), item.sessionToken()));
 
@@ -78,8 +98,6 @@ public class DriverServiceAreaService {
             HttpStatus.BAD_REQUEST, message("driver_service_area.district_required"));
       }
 
-      DriverServiceAreaModel area = new DriverServiceAreaModel();
-      area.setDriver(driver);
       area.setCity(chain.city());
       // A praça declarada é a RA, não a quadra dentro dela: ver shallowestDistrict.
       area.setDistrict(chain.shallowestDistrict().orElse(null));
@@ -88,7 +106,7 @@ public class DriverServiceAreaService {
       resolved.putIfAbsent(dedupeKey(area), area);
     }
 
-    areas.deleteAll(areas.findByDriverId(driver.getId()));
+    areas.deleteAll(current.values());
     areas.flush();
 
     List<DriverServiceAreaResponseDTO> saved = new ArrayList<>();

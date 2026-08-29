@@ -380,4 +380,67 @@ class DriverServiceAreaControllerTest {
         .andExpect(jsonPath("$.length()").value(1))
         .andExpect(jsonPath("$[0].stateUf").value("DF"));
   }
+
+  /// Reenviar uma região já salva não pode custar um Place Details: ela já foi
+  /// resolvida uma vez e chegaria exatamente no mesmo nó.
+  @Test
+  void keepsAnExistingAreaWithoutAskingGoogleAgain() throws Exception {
+    BDDMockito.given(places.findPlaceDetails("taguatinga", null))
+        .willReturn(fixture("df-taguatinga-qnl5"));
+    BDDMockito.given(places.findPlaceDetails("aguas-claras", null))
+        .willReturn(fixture("df-aguas-claras"));
+
+    String response =
+        mockMvc
+            .perform(
+                put("/api/drivers/me/service-areas")
+                    .with(as(driverUid))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(body("taguatinga")))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    String existingToken = MAPPER.readTree(response).get(0).get("token").asText();
+
+    BDDMockito.reset(places);
+    BDDMockito.given(places.findPlaceDetails("aguas-claras", null))
+        .willReturn(fixture("df-aguas-claras"));
+
+    mockMvc
+        .perform(
+            put("/api/drivers/me/service-areas")
+                .with(as(driverUid))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"areas\":[{\"areaToken\":\""
+                        + existingToken
+                        + "\"},{\"placeId\":\"aguas-claras\"}]}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.length()").value(2));
+
+    BDDMockito.then(places).should(BDDMockito.never()).findPlaceDetails("taguatinga", null);
+  }
+
+  @Test
+  void rejectsAnAreaTokenThatIsNoLongerRegistered() throws Exception {
+    mockMvc
+        .perform(
+            put("/api/drivers/me/service-areas")
+                .with(as(driverUid))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"areas\":[{\"areaToken\":\"nao-existe\"}]}"))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void rejectsAnItemWithNeitherIdentifier() throws Exception {
+    mockMvc
+        .perform(
+            put("/api/drivers/me/service-areas")
+                .with(as(driverUid))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"areas\":[{}]}"))
+        .andExpect(status().isBadRequest());
+  }
 }
