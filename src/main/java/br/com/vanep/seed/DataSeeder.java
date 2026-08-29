@@ -174,12 +174,23 @@ public class DataSeeder implements ApplicationRunner {
     if (clientRole.getRolePermission() == null) {
       RolePermissionModel bundle = new RolePermissionModel();
       bundle.setName(CLIENT_BUNDLE_NAME);
-      bundle.setPermissions(List.copyOf(PermissionEnum.crudFor("dependents")));
+      bundle.setPermissions(clientPermissions());
       bundle = rolePermissions.save(bundle);
       clientRole.setRolePermission(bundle);
       roles.save(clientRole);
-      log.info("Seed: CLIENT bundle created with dependents permissions.");
+      log.info("Seed: CLIENT bundle created with dependents and driver read permissions.");
     }
+  }
+
+  /**
+   * Cliente precisa enxergar motorista: é o produto. A leitura é só de listagem e detalhe — nada de
+   * criar, editar ou remover, que continuam do admin e do próprio motorista.
+   */
+  static List<String> clientPermissions() {
+    List<String> permissions = new java.util.ArrayList<>(PermissionEnum.crudFor("dependents"));
+    permissions.add(PermissionEnum.LIST_DRIVERS.value());
+    permissions.add(PermissionEnum.SHOW_DRIVER.value());
+    return List.copyOf(permissions);
   }
 
   private void seedAssistantPermissions() {
