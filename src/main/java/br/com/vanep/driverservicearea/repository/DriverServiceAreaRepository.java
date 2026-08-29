@@ -70,6 +70,16 @@ public interface DriverServiceAreaRepository extends JpaRepository<DriverService
       """)
   List<Object[]> findDriverMatchesInCity(Long cityId);
 
+  /** Áreas de vários motoristas de uma vez, com cidade e distrito carregados (regra 17). */
+  @Query(
+      """
+      select area from DriverServiceAreaModel area
+      join fetch area.city city
+      left join fetch area.district
+      where area.driver.id in :driverIds
+      """)
+  List<DriverServiceAreaModel> findByDriverIds(Collection<Long> driverIds);
+
   /**
    * Busca ampla: a âncora parou na cidade, então todo motorista da cidade serve — inclusive quem
    * declarou apenas um distrito. Excluí-los faria uma busca mais genérica devolver menos resultados

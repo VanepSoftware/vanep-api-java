@@ -1,6 +1,7 @@
 package br.com.vanep.driver.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.hasItems;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -259,6 +260,32 @@ class DriverSearchControllerTest {
         .perform(get("/api/drivers/search").with(as(clientUid)).param("placeId", "taguatinga"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.content[0].name").value("Motorista " + email));
+  }
+
+  /// As regiões atendidas são dado público (nós da árvore, sem logradouro) e o app
+  /// as mostra abaixo do nome do motorista.
+  @Test
+  void returnsTheRegionsTheDriverCovers() throws Exception {
+    stubPlaces();
+    createDriverWithAreas("exato@vanep.com", "taguatinga", "aguas-claras");
+
+    mockMvc
+        .perform(get("/api/drivers/search").with(as(clientUid)).param("placeId", "taguatinga"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content[0].serviceAreas.length()").value(2))
+        .andExpect(jsonPath("$.content[0].serviceAreas", hasItems("QNL 5", "Águas Claras")));
+  }
+
+  @Test
+  void reportsAWholeCityAreaByTheCityName() throws Exception {
+    stubPlaces();
+    createDriverWithAreas("qnl5@vanep.com", "taguatinga");
+    giveArea("cidade@vanep.com", null);
+
+    mockMvc
+        .perform(get("/api/drivers/search").with(as(clientUid)).param("placeId", "taguatinga"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content[1].serviceAreas[0]").value("Brasília"));
   }
 
   @Test

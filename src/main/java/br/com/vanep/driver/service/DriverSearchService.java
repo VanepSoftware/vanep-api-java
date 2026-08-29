@@ -4,6 +4,7 @@ import br.com.vanep.auth.security.RateLimiter;
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.dto.DriverSearchResponseDTO;
 import br.com.vanep.driver.model.DriverModel;
+import br.com.vanep.driverservicearea.model.DriverServiceAreaModel;
 import br.com.vanep.driverservicearea.repository.DriverServiceAreaRepository;
 import br.com.vanep.location.dto.ResolvedLocationChainDTO;
 import br.com.vanep.location.service.LocationResolverService;
@@ -160,12 +161,33 @@ public class DriverSearchService {
     Map<Long, DriverModel> byId = new HashMap<>();
     drivers.findActiveByIds(pageIds, Pageable.unpaged()).forEach(d -> byId.put(d.getId(), d));
 
+    Map<Long, List<String>> areaNamesByDriver = findAreaNames(pageIds);
+
     List<DriverSearchResponseDTO> content =
-        pageIds.stream().map(byId::get).filter(Objects::nonNull).map(this::toResponse).toList();
+        pageIds.stream()
+            .map(byId::get)
+            .filter(Objects::nonNull)
+            .map(driver -> toResponse(driver, areaNamesByDriver))
+            .toList();
     return new PageImpl<>(content, pageable, ranked.size());
   }
 
-  DriverSearchResponseDTO toResponse(DriverModel driver) {
+  /**
+   * Nomes das regiões por motorista, em uma consulta só para a página inteira. Buscar por motorista
+   * dentro do laço seria uma query por linha (regra 17).
+   */
+  Map<Long, List<String>> findAreaNames(List<Long> driverIds) {
+    Map<Long, List<String>> namesByDriver = new HashMap<>();
+    for (DriverServiceAreaModel area : areas.findByDriverIds(driverIds)) {
+      String name =
+          area.getDistrict() == null ? area.getCity().getName() : area.getDistrict().getName();
+      namesByDriver.computeIfAbsent(area.getDriver().getId(), id -> new ArrayList<>()).add(name);
+    }
+    return namesByDriver;
+  }
+
+  DriverSearchResponseDTO toResponse(
+      DriverModel driver, Map<Long, List<String>> areaNamesByDriver) {
     return new DriverSearchResponseDTO(
         driver.getToken(),
         driver.getUser().getName(),
@@ -173,7 +195,8 @@ public class DriverSearchService {
         driver.getRating(),
         driver.getBasePrice(),
         driver.getExperienceYears(),
-        driver.isAvailable());
+        driver.isAvailable(),
+        areaNamesByDriver.getOrDefault(driver.getId(), List.of()));
   }
 
   private String message(String key) {
