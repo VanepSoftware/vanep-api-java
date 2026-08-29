@@ -38,25 +38,18 @@ public class DriverController {
   }
 
   /**
-   * Busca por origem + destino. Continua {@code GET} porque é genuinamente read-only: resolve as
-   * âncoras sem escrever na árvore (D3). Cada caixa de autocomplete manda a sua própria sessão.
+   * Busca por um lugar. Continua {@code GET} porque é genuinamente read-only: resolve a âncora sem
+   * escrever na árvore (D3). O resultado vem ordenado do mais específico para o mais amplo.
    */
   @GetMapping("/search")
   @PreAuthorize("isAuthenticated()")
   public Page<DriverSearchResponseDTO> search(
       Authentication authentication,
-      @RequestParam String originPlaceId,
-      @RequestParam(required = false) String originSessionToken,
-      @RequestParam String destinationPlaceId,
-      @RequestParam(required = false) String destinationSessionToken,
+      @RequestParam String placeId,
+      @RequestParam(required = false) String sessionToken,
       @PageableDefault(size = 20) Pageable pageable) {
     return searchService.search(
-        SecurityHelper.requireCallerUid(authentication),
-        originPlaceId,
-        originSessionToken,
-        destinationPlaceId,
-        destinationSessionToken,
-        pageable);
+        SecurityHelper.requireCallerUid(authentication), placeId, sessionToken, pageable);
   }
 
   @GetMapping("/me")

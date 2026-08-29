@@ -44,6 +44,33 @@ public interface DriverServiceAreaRepository extends JpaRepository<DriverService
   List<Long> findDriverIdsCoveringPoint(Long cityId, Collection<Long> ancestorIds);
 
   /**
+   * O mesmo match da contenção, mas devolvendo <b>qual</b> distrito casou.
+   *
+   * <p>O ranking precisa disso: a posição desse distrito na lista de ancestrais do ponto é a
+   * distância entre a área do motorista e o lugar buscado. Sem o distrito de volta, só daria para
+   * dizer que casou, não o quão perto.
+   *
+   * <p>Cada linha é {@code [driverId, districtId]}, com {@code districtId} nulo quando a área é a
+   * cidade inteira.
+   */
+  @Query(
+      """
+      select area.driver.id, district.id from DriverServiceAreaModel area
+      left join area.district district
+      where area.city.id = :cityId
+        and (district is null or district.id in :ancestorIds)
+      """)
+  List<Object[]> findDriverMatchesCoveringPoint(Long cityId, Collection<Long> ancestorIds);
+
+  @Query(
+      """
+      select area.driver.id, district.id from DriverServiceAreaModel area
+      left join area.district district
+      where area.city.id = :cityId
+      """)
+  List<Object[]> findDriverMatchesInCity(Long cityId);
+
+  /**
    * Busca ampla: a âncora parou na cidade, então todo motorista da cidade serve — inclusive quem
    * declarou apenas um distrito. Excluí-los faria uma busca mais genérica devolver menos resultados
    * que uma específica, que é o contrário do que o usuário espera.

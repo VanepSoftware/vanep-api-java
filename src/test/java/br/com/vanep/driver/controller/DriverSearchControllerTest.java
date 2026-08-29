@@ -11,15 +11,17 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import br.com.vanep.city.repository.CityRepository;
 import br.com.vanep.country.model.CountryModel;
 import br.com.vanep.country.repository.CountryRepository;
+import br.com.vanep.district.model.DistrictModel;
 import br.com.vanep.district.repository.DistrictRepository;
 import br.com.vanep.driver.DriverApprovalStatus;
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
+import br.com.vanep.driverservicearea.model.DriverServiceAreaModel;
+import br.com.vanep.driverservicearea.repository.DriverServiceAreaRepository;
 import br.com.vanep.places.client.PlacesClient;
 import br.com.vanep.places.dto.PlaceDetailsResponseDTO;
 import br.com.vanep.places.exception.PlaceNotFoundException;
 import br.com.vanep.state.repository.StateRepository;
-import br.com.vanep.state.seed.StateSeeder;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
@@ -54,10 +56,10 @@ class DriverSearchControllerTest {
   @Autowired private UserRepository users;
   @Autowired private DriverRepository drivers;
   @Autowired private CountryRepository countries;
-  @Autowired private StateSeeder stateSeeder;
   @Autowired private CityRepository cities;
   @Autowired private StateRepository states;
   @Autowired private DistrictRepository districts;
+  @Autowired private DriverServiceAreaRepository areas;
 
   @MockitoBean private PlacesClient places;
 
@@ -74,8 +76,6 @@ class DriverSearchControllerTest {
     brasil.setPhoneCode("+55");
     brasil.setCurrency("BRL");
     countries.save(brasil);
-    // Country and state are curated: the resolver reads them, never creates them.
-    stateSeeder.seed();
 
     UserModel client = new UserModel();
     client.setType(UserType.CLIENT);
@@ -98,13 +98,7 @@ class DriverSearchControllerTest {
     return jwt().jwt(builder -> builder.claim("uid", uid).subject(uid));
   }
 
-  /** Cria um motorista e cadastra as áreas dele pelo endpoint real, que é quem popula a árvore. */
-  private String createDriverWithAreas(String email, String... placeIds) throws Exception {
-    return createDriverWithAreas(email, DriverApprovalStatus.APPROVED, placeIds);
-  }
-
-  private String createDriverWithAreas(
-      String email, DriverApprovalStatus approvalStatus, String... placeIds) throws Exception {
+  private DriverModel saveDriver(String email) {
     UserModel driverUser = new UserModel();
     driverUser.setType(UserType.DRIVER);
     driverUser.setName("Motorista " + email);
@@ -117,23 +111,53 @@ class DriverSearchControllerTest {
     DriverModel driver = new DriverModel();
     driver.setUser(driverUser);
     driver.setBasePrice(BigDecimal.valueOf(75));
-    driver.setApprovalStatus(approvalStatus);
-    drivers.save(driver);
+    driver.setApprovalStatus(DriverApprovalStatus.APPROVED);
+    return drivers.save(driver);
+  }
+
+  /** Cadastra pelo endpoint real, que é quem popula a árvore a partir do place. */
+  private String createDriverWithAreas(String email, String... placeIds) throws Exception {
+    DriverModel driver = saveDriver(email);
 
     StringBuilder body = new StringBuilder("{\"areas\":[");
-    for (int i = 0; i < placeIds.length; i++) {
-      body.append(i > 0 ? "," : "").append("{\"placeId\":\"").append(placeIds[i]).append("\"}");
+    for (int index = 0; index < placeIds.length; index++) {
+      body.append(index > 0 ? "," : "")
+          .append("{\"placeId\":\"")
+          .append(placeIds[index])
+          .append("\"}");
     }
     body.append("]}");
 
     mockMvc
         .perform(
             put("/api/drivers/me/service-areas")
-                .with(as(driverUser.getToken()))
+                .with(as(driver.getUser().getToken()))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body.toString()))
         .andExpect(status().isOk());
-    return driverUser.getToken();
+    return driver.getUser().getToken();
+  }
+
+  /**
+   * Área ligada direto ao nó, sem passar pelo endpoint. Necessário para montar níveis que a policy
+   * D8 recusaria — cidade inteira no DF, por exemplo — em um teste que é sobre ordenação, não sobre
+   * aquela regra.
+   */
+  private DriverModel giveArea(String email, DistrictModel district) {
+    DriverModel driver = saveDriver(email);
+    DriverServiceAreaModel area = new DriverServiceAreaModel();
+    area.setDriver(driver);
+    area.setCity(cities.findAll().getFirst());
+    area.setDistrict(district);
+    areas.save(area);
+    return driver;
+  }
+
+  private DistrictModel districtNamed(String name) {
+    return districts.findAll().stream()
+        .filter(district -> district.getName().equals(name))
+        .findFirst()
+        .orElseThrow();
   }
 
   private void stubPlaces() throws IOException {
@@ -150,108 +174,100 @@ class DriverSearchControllerTest {
   @Test
   void rejectsUnauthenticated() throws Exception {
     mockMvc
-        .perform(
-            get("/api/drivers/search")
-                .param("originPlaceId", "taguatinga")
-                .param("destinationPlaceId", "aguas-claras"))
+        .perform(get("/api/drivers/search").param("placeId", "taguatinga"))
         .andExpect(status().isUnauthorized());
   }
 
   @Test
-  void returnsDriverCoveringBothPoints() throws Exception {
+  void returnsDriverWhoseAreaIsExactlyThePoint() throws Exception {
     stubPlaces();
-    createDriverWithAreas("ambos@vanep.com", "taguatinga", "aguas-claras");
+    createDriverWithAreas("exato@vanep.com", "taguatinga");
 
     mockMvc
-        .perform(
-            get("/api/drivers/search")
-                .with(as(clientUid))
-                .param("originPlaceId", "taguatinga")
-                .param("destinationPlaceId", "aguas-claras"))
+        .perform(get("/api/drivers/search").with(as(clientUid)).param("placeId", "taguatinga"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.content.length()").value(1))
-        .andExpect(jsonPath("$.content[0].name").value("Motorista ambos@vanep.com"))
-        .andExpect(jsonPath("$.content[0].token").isNotEmpty());
+        .andExpect(jsonPath("$.content[0].name").value("Motorista exato@vanep.com"));
+  }
+
+  @Test
+  void excludesDriverInASiblingRegion() throws Exception {
+    stubPlaces();
+    createDriverWithAreas("aguas@vanep.com", "aguas-claras");
+
+    mockMvc
+        .perform(get("/api/drivers/search").with(as(clientUid)).param("placeId", "taguatinga"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content.length()").value(0));
   }
 
   /**
-   * O default do model é PENDING: quem acabou de se cadastrar e declarou as áreas apareceria na
-   * vitrine sem ninguém ter aprovado, e um REJECTED continuaria aparecendo para sempre.
+   * O requisito central: quanto mais perto do ponto, mais cedo aparece. Os quatro níveis são
+   * montados explicitamente porque com árvore rasa a ordenação pareceria funcionar mesmo quebrada.
    */
   @Test
-  void excludesDriverWhoIsNotApprovedYet() throws Exception {
+  void ranksFromTheMostSpecificAreaToTheWholeCity() throws Exception {
     stubPlaces();
-    createDriverWithAreas(
-        "pendente@vanep.com", DriverApprovalStatus.PENDING, "taguatinga", "aguas-claras");
+    createDriverWithAreas("qnl5@vanep.com", "taguatinga");
+
+    DriverModel setorDriver = giveArea("setor@vanep.com", districtNamed("Setor L Norte"));
+    DriverModel taguatingaDriver = giveArea("taguatinga@vanep.com", districtNamed("Taguatinga"));
+    DriverModel cidadeDriver = giveArea("cidade@vanep.com", null);
 
     mockMvc
-        .perform(
-            get("/api/drivers/search")
-                .with(as(clientUid))
-                .param("originPlaceId", "taguatinga")
-                .param("destinationPlaceId", "aguas-claras"))
+        .perform(get("/api/drivers/search").with(as(clientUid)).param("placeId", "taguatinga"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.content.length()").value(0));
+        .andExpect(jsonPath("$.content.length()").value(4))
+        .andExpect(jsonPath("$.content[0].name").value("Motorista qnl5@vanep.com"))
+        .andExpect(jsonPath("$.content[1].name").value("Motorista setor@vanep.com"))
+        .andExpect(jsonPath("$.content[2].name").value("Motorista taguatinga@vanep.com"))
+        .andExpect(jsonPath("$.content[3].name").value("Motorista cidade@vanep.com"));
+
+    assertThat(setorDriver.getId()).isNotNull();
+    assertThat(taguatingaDriver.getId()).isNotNull();
+    assertThat(cidadeDriver.getId()).isNotNull();
   }
 
   @Test
-  void excludesDriverWhoseApprovalWasRejected() throws Exception {
+  void wholeCityDriverIsReturnedLastNotFilteredOut() throws Exception {
     stubPlaces();
-    createDriverWithAreas(
-        "recusado@vanep.com", DriverApprovalStatus.REJECTED, "taguatinga", "aguas-claras");
+    createDriverWithAreas("qnl5@vanep.com", "taguatinga");
+    giveArea("cidade@vanep.com", null);
 
     mockMvc
-        .perform(
-            get("/api/drivers/search")
-                .with(as(clientUid))
-                .param("originPlaceId", "taguatinga")
-                .param("destinationPlaceId", "aguas-claras"))
+        .perform(get("/api/drivers/search").with(as(clientUid)).param("placeId", "taguatinga"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.content.length()").value(0));
+        .andExpect(jsonPath("$.content.length()").value(2))
+        .andExpect(jsonPath("$.content[1].name").value("Motorista cidade@vanep.com"));
   }
 
+  /** Quem cadastrou o nó exato e também a cidade inteira merece a posição do nó exato. */
   @Test
-  void excludesDriverCoveringOnlyOnePoint() throws Exception {
+  void driverKeepsTheBestRankAmongTheirAreas() throws Exception {
     stubPlaces();
-    createDriverWithAreas("so-origem@vanep.com", "taguatinga");
+    String email = "ambos@vanep.com";
+    createDriverWithAreas(email, "taguatinga");
+    DriverModel driver = drivers.findAll().getFirst();
+    DriverServiceAreaModel cityWide = new DriverServiceAreaModel();
+    cityWide.setDriver(driver);
+    cityWide.setCity(cities.findAll().getFirst());
+    areas.save(cityWide);
+
+    giveArea("cidade@vanep.com", null);
 
     mockMvc
-        .perform(
-            get("/api/drivers/search")
-                .with(as(clientUid))
-                .param("originPlaceId", "taguatinga")
-                .param("destinationPlaceId", "aguas-claras"))
+        .perform(get("/api/drivers/search").with(as(clientUid)).param("placeId", "taguatinga"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.content.length()").value(0));
-  }
-
-  @Test
-  void acceptsANonSchoolDestination() throws Exception {
-    stubPlaces();
-    createDriverWithAreas("ambos@vanep.com", "taguatinga", "aguas-claras");
-
-    // Destino é um endereço residencial, não uma escola.
-    mockMvc
-        .perform(
-            get("/api/drivers/search")
-                .with(as(clientUid))
-                .param("originPlaceId", "aguas-claras")
-                .param("destinationPlaceId", "taguatinga"))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.content.length()").value(1));
+        .andExpect(jsonPath("$.content[0].name").value("Motorista " + email));
   }
 
   @Test
   void neverExposesResidentialAddressOfTheDriver() throws Exception {
     stubPlaces();
-    createDriverWithAreas("ambos@vanep.com", "taguatinga", "aguas-claras");
+    createDriverWithAreas("exato@vanep.com", "taguatinga");
 
     mockMvc
-        .perform(
-            get("/api/drivers/search")
-                .with(as(clientUid))
-                .param("originPlaceId", "taguatinga")
-                .param("destinationPlaceId", "aguas-claras"))
+        .perform(get("/api/drivers/search").with(as(clientUid)).param("placeId", "taguatinga"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.content[0].street").doesNotExist())
         .andExpect(jsonPath("$.content[0].zipCode").doesNotExist())
@@ -261,21 +277,49 @@ class DriverSearchControllerTest {
   }
 
   @Test
-  void isPaginated() throws Exception {
+  void paginatesPreservingTheRankOrder() throws Exception {
     stubPlaces();
-    createDriverWithAreas("a@vanep.com", "taguatinga", "aguas-claras");
-    createDriverWithAreas("b@vanep.com", "taguatinga", "aguas-claras");
+    createDriverWithAreas("qnl5@vanep.com", "taguatinga");
+    giveArea("cidade@vanep.com", null);
 
     mockMvc
         .perform(
             get("/api/drivers/search")
                 .with(as(clientUid))
-                .param("originPlaceId", "taguatinga")
-                .param("destinationPlaceId", "aguas-claras")
+                .param("placeId", "taguatinga")
                 .param("size", "1"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.content.length()").value(1))
-        .andExpect(jsonPath("$.totalElements").value(2));
+        .andExpect(jsonPath("$.totalElements").value(2))
+        .andExpect(jsonPath("$.content[0].name").value("Motorista qnl5@vanep.com"));
+
+    mockMvc
+        .perform(
+            get("/api/drivers/search")
+                .with(as(clientUid))
+                .param("placeId", "taguatinga")
+                .param("size", "1")
+                .param("page", "1"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content[0].name").value("Motorista cidade@vanep.com"));
+  }
+
+  /**
+   * Escola entra na mesma caixa que endereço. O motorista precisa cobrir Taguatinga, e não QNL 5:
+   * registrar o place "taguatinga" o coloca no nó mais fundo daquela cadeia (D2), que é irmão do
+   * ramo da escola.
+   */
+  @Test
+  void acceptsASchoolAsTheSearchedPlace() throws Exception {
+    stubPlaces();
+    createDriverWithAreas("qnl5@vanep.com", "taguatinga");
+    giveArea("taguatinga@vanep.com", districtNamed("Taguatinga"));
+
+    mockMvc
+        .perform(get("/api/drivers/search").with(as(clientUid)).param("placeId", "escola"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content.length()").value(1))
+        .andExpect(jsonPath("$.content[0].name").value("Motorista taguatinga@vanep.com"));
   }
 
   @Test
@@ -285,11 +329,7 @@ class DriverSearchControllerTest {
         .willThrow(new PlaceNotFoundException("inexistente"));
 
     mockMvc
-        .perform(
-            get("/api/drivers/search")
-                .with(as(clientUid))
-                .param("originPlaceId", "inexistente")
-                .param("destinationPlaceId", "aguas-claras"))
+        .perform(get("/api/drivers/search").with(as(clientUid)).param("placeId", "inexistente"))
         .andExpect(status().isBadRequest());
   }
 
@@ -297,18 +337,14 @@ class DriverSearchControllerTest {
   @Test
   void createsNoTreeNodesWhileSearching() throws Exception {
     stubPlaces();
-    createDriverWithAreas("ambos@vanep.com", "taguatinga", "aguas-claras");
+    createDriverWithAreas("exato@vanep.com", "taguatinga");
 
     long statesBefore = states.count();
     long citiesBefore = cities.count();
     long districtsBefore = districts.count();
 
     mockMvc
-        .perform(
-            get("/api/drivers/search")
-                .with(as(clientUid))
-                .param("originPlaceId", "escola")
-                .param("destinationPlaceId", "ceilandia"))
+        .perform(get("/api/drivers/search").with(as(clientUid)).param("placeId", "ceilandia"))
         .andExpect(status().isOk());
 
     assertThat(states.count()).isEqualTo(statesBefore);
@@ -321,33 +357,24 @@ class DriverSearchControllerTest {
     stubPlaces();
 
     mockMvc
-        .perform(
-            get("/api/drivers/search")
-                .with(as(clientUid))
-                .param("originPlaceId", "taguatinga")
-                .param("destinationPlaceId", "aguas-claras"))
+        .perform(get("/api/drivers/search").with(as(clientUid)).param("placeId", "taguatinga"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.content.length()").value(0));
   }
 
   @Test
-  void forwardsBothSessionTokensIndependently() throws Exception {
-    BDDMockito.given(places.findPlaceDetails("taguatinga", "sessao-origem"))
+  void forwardsTheSessionTokenToThePlacesClient() throws Exception {
+    BDDMockito.given(places.findPlaceDetails("taguatinga", "sessao-1"))
         .willReturn(fixture("df-taguatinga-qnl5"));
-    BDDMockito.given(places.findPlaceDetails("aguas-claras", "sessao-destino"))
-        .willReturn(fixture("df-aguas-claras"));
 
     mockMvc
         .perform(
             get("/api/drivers/search")
                 .with(as(clientUid))
-                .param("originPlaceId", "taguatinga")
-                .param("originSessionToken", "sessao-origem")
-                .param("destinationPlaceId", "aguas-claras")
-                .param("destinationSessionToken", "sessao-destino"))
+                .param("placeId", "taguatinga")
+                .param("sessionToken", "sessao-1"))
         .andExpect(status().isOk());
 
-    BDDMockito.then(places).should().findPlaceDetails("taguatinga", "sessao-origem");
-    BDDMockito.then(places).should().findPlaceDetails("aguas-claras", "sessao-destino");
+    BDDMockito.then(places).should().findPlaceDetails("taguatinga", "sessao-1");
   }
 }
