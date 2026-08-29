@@ -295,6 +295,86 @@ make db-seed   # cria admin@vanep.com.br / password
 
 ---
 
+## Geolocalização (Google Places)
+
+A geografia da Vanep é uma **árvore única e compartilhada** — `country → state → city → district ⟲` — construída sob demanda a partir do Google Places. Motorista e cliente atravessam a mesma normalização, então caem no mesmo nó por construção; sem isso o ponto de embarque do cliente nunca casaria com a área do motorista.
+
+### O que é curado e o que nasce sozinho
+
+| Nível | Origem |
+|---|---|
+| `country` | **curado.** País ausente é decisão de negócio ("não atendemos aqui"), não dado faltando — a API responde `400` |
+| `state`, `city`, `district` | criados sob demanda pelo resolver, a partir dos `addressComponents` do Places |
+
+Duas colunas curadas moram em `state`: `requires_district` (e o override opcional `city.requires_district`) respondem *"o motorista pode declarar esta cidade inteira como área de atuação?"*. No DF um único município cobre 5.800 km², então lá a resposta é não. O Google não tem como responder isso — é política de produto.
+
+### Três chaves, não uma
+
+A restrição de aplicação do Google é **exclusiva por tipo**: uma chave é restrita por IP **ou** por referrer **ou** por package+SHA-1 — nunca por dois. Daí precisarmos de uma por superfície:
+
+| Chave | Restrição | Onde vive | Chama |
+|---|---|---|---|
+| servidor | endereço IP | `.env` desta API | `Place Details` |
+| web | referrer HTTP | `vanep-frontend` | autocomplete |
+| Android | package + SHA-1 | `vanep-mobile` | autocomplete |
+| iOS | bundle id | `vanep-mobile` | autocomplete |
+
+Todas com `API restrictions → Restrict key → Places API (New)`. Atenção: é a **"(New)"** — a legada tem outro contrato de `addressComponents` e o código não serve para ela.
+
+Para criar as chaves do zero, veja [`docs/google-places-keys.md`](docs/google-places-keys.md).
+
+### O backend não faz proxy de autocomplete
+
+Proxiar adicionaria uma ida ao servidor **a cada tecla**, sem ganho. O autocomplete roda no cliente (web/mobile) com a chave da plataforma; o backend só chama `Place Details`, e nunca confia em componentes enviados pelo cliente — recebe apenas o `placeId` e re-resolve.
+
+### O `sessionToken` atravessa a fronteira, e isso é dinheiro
+
+Uma sessão do Places só entra no SKU **gratuito** se o `Place Details` que a encerra carregar o **mesmo token** dos autocompletes. Como quem chama o `Place Details` é o backend, o cliente precisa enviar o `sessionToken` junto do `placeId`, e o backend precisa repassá-lo.
+
+Sem isso, cada tecla digitada vira um `Autocomplete Request` cobrado à parte — custo maior desde o primeiro usuário, não só em escala.
+
+Por isso o cache de `Place Details` é **ciente da sessão**:
+
+```
+requisição COM sessionToken  →  SEMPRE chama o Google (encerra a sessão)
+                                e atualiza o cache
+requisição SEM sessionToken  →  serve do cache; só chama em miss
+```
+
+Servir do cache quando há token economizaria uma chamada e faria o cliente pagar cada tecla — sairia **mais caro** que não cachear.
+
+### Custo
+
+Desde 1º de março de 2025 não há mais crédito mensal fixo: a cota gratuita é **por SKU**, reseta dia 1º e não acumula.
+
+| SKU | Grátis/mês | Depois |
+|---|---|---|
+| Place Details Essentials | 10.000 | US$ 5,00 / 1.000 |
+| Place Details Essentials **IDs Only** | ilimitado | — |
+| Autocomplete Requests | 10.000 | US$ 2,83 / 1.000 |
+| Autocomplete **Session Usage** | ilimitado | US$ 0 |
+
+O *field mask* decide o SKU. O mask padrão (`id,formattedAddress,addressComponents`) cai inteiro em *Place Details Essentials* — uma cobrança só. **Não acrescente campo sem conferir em qual SKU ele cai**: `displayName`, por exemplo, é Pro e é cobrado por cima.
+
+Na prática: 1 busca = 2 eventos, 1 endereço salvo = 1, 1 escola resolvida = 1 (+ o SKU Pro do nome). Uma quota diária por chave no console é o freio contra fatura surpresa.
+
+### Erros: de quem é a culpa
+
+A distinção não é cosmética — define se o usuário deve agir ou esperar:
+
+| Origem | HTTP | Significa |
+|---|---|---|
+| `400`, `404` do Google | `400` | o `placeId` do cliente não presta |
+| `401`, `403`, `429`, `5xx` | `503` | credencial, quota ou fornecedor fora do ar — problema nosso |
+
+Um `403` costuma ser **o IP**, não o código. IP residencial é dinâmico: quando ele muda, a chave de servidor para de funcionar sozinha e o sintoma chega como "algo deu errado". Confira `error.details[].reason` antes de qualquer outra hipótese — `API_KEY_IP_ADDRESS_BLOCKED`, `SERVICE_DISABLED` e estouro de quota são coisas diferentes.
+
+### Nenhum teste chama a API real
+
+Constituição, regra 50. A suíte roda sem rede e sem credencial: tudo é mockado com as fixtures em `src/test/resources/fixtures/places/`, coletadas **uma vez** num spike manual.
+
+A regra é aplicada por configuração, não por disciplina — `application-test.properties` aponta `vanep.google.places.base-url` para `http://localhost:1`, então uma chamada não mockada morre em *connection refused* em vez de consumir quota paga. O `PlacesTestIsolationTest` falha se alguém apontar o profile de teste para um host real.
+
 ## E-mail (verificação de conta e reset de senha)
 
 A API envia e-mails transacionais em dois fluxos: **verificação de e-mail** (no cadastro por e-mail/senha) e **reset de senha** (esqueci minha senha). O login exige e-mail verificado — sem e-mail funcional, usuários cadastrados por e-mail/senha não conseguem logar.
