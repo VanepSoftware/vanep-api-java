@@ -1,12 +1,12 @@
 package br.com.vanep.places.exception;
 
 /**
- * O Google Places não pôde ser consultado: erro de rede, timeout, credencial rejeitada ou resposta
- * inesperada.
+ * Google Places could not be queried: network error, timeout, rejected credential, or unexpected
+ * response.
  *
- * <p>Distinta de {@link PlaceNotFoundException}: aqui o problema é nosso ou do fornecedor, não do
- * {@code placeId} que o cliente enviou. Quem trata precisa saber a diferença — uma vira 5xx, a
- * outra vira 4xx.
+ * <p>Distinct from {@link PlaceNotFoundException}: here the problem is ours or the provider's, not
+ * the {@code placeId} the client sent. Whoever handles it needs to know the difference — one
+ * becomes a 5xx, the other a 4xx.
  */
 public class PlaceLookupException extends RuntimeException {
 

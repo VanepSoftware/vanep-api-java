@@ -9,11 +9,11 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 
 /**
- * Guarda a regra 50 da constituição: nenhum teste chama API externa real.
+ * Guards constitution rule 50: no test calls a real external API.
  *
- * <p>A regra é aplicada por configuração, não por disciplina — mas configuração pode ser alterada.
- * Este teste falha se alguém apontar o profile de teste para um host de verdade, que é como uma
- * suíte passa a gastar quota paga a cada push sem ninguém perceber.
+ * <p>The rule is enforced by configuration, not discipline — but configuration can be changed.
+ * This test fails if someone points the test profile at a real host, which is how a suite starts
+ * burning paid quota on every push without anyone noticing.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -30,7 +30,7 @@ class PlacesTestIsolationTest {
     String host = URI.create(baseUrl).getHost();
 
     assertThat(host)
-        .as("base-url do profile de teste tem de ser inalcançável (regra 50)")
+        .as("test profile base-url must be unreachable (rule 50)")
         .isIn("localhost", "127.0.0.1", "::1");
     assertThat(baseUrl).doesNotContain("googleapis.com");
   }
@@ -38,7 +38,7 @@ class PlacesTestIsolationTest {
   @Test
   void testProfileNeverCarriesARealApiKey() {
     assertThat(apiKey)
-        .as("chave do profile de teste tem de ser obviamente falsa (regra 50)")
+        .as("test profile api key must be obviously fake (rule 50)")
         .contains("test");
   }
 }
