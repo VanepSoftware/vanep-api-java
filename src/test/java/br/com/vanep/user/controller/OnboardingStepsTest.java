@@ -14,6 +14,7 @@ import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.places.client.PlacesClient;
 import br.com.vanep.places.dto.PlaceDetailsResponseDTO;
+import br.com.vanep.state.seed.StateSeeder;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
@@ -49,6 +50,7 @@ class OnboardingStepsTest {
   @Autowired private UserRepository users;
   @Autowired private DriverRepository drivers;
   @Autowired private CountryRepository countries;
+  @Autowired private StateSeeder stateSeeder;
 
   @MockitoBean private PlacesClient places;
 
@@ -64,6 +66,8 @@ class OnboardingStepsTest {
     brasil.setPhoneCode("+55");
     brasil.setCurrency("BRL");
     countries.save(brasil);
+    // Country and state are curated: the resolver reads them, never creates them.
+    stateSeeder.seed();
 
     BDDMockito.given(places.findPlaceDetails("taguatinga", null))
         .willReturn(fixture("df-taguatinga-qnl5"));

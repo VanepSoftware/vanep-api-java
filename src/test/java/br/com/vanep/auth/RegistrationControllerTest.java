@@ -108,7 +108,6 @@ class RegistrationControllerTest {
                 .param("email", "bruno@vanep.com")
                 .param("password", "secret1")
                 .param("document", VALID_CPF_BRUNO)
-                .param("city", "Taguatinga")
                 .param("basePrice", "120.00")
                 .param("acceptTerms", "true"))
         .andExpect(status().is3xxRedirection())

@@ -90,7 +90,6 @@ class RegistrationServiceTest {
     form.setEmail("bruno@vanep.com");
     form.setPassword("secret1");
     form.setDocument("52998224725");
-    form.setCity("Taguatinga");
     form.setBasePrice(new BigDecimal("120.00"));
     form.setExperienceYears(5);
     form.setAcceptTerms(true);

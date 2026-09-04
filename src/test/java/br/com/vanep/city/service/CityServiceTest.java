@@ -11,7 +11,6 @@ import br.com.vanep.city.model.CityModel;
 import br.com.vanep.city.repository.CityRepository;
 import br.com.vanep.country.model.CountryModel;
 import br.com.vanep.state.model.StateModel;
-import br.com.vanep.state.repository.StateRepository;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -28,7 +27,6 @@ import org.springframework.web.server.ResponseStatusException;
 class CityServiceTest {
 
   @Mock private CityRepository cityRepository;
-  @Mock private StateRepository stateRepository;
   @Mock private CityMapper mapper;
   @Mock private MessageSource messages;
 
@@ -36,7 +34,7 @@ class CityServiceTest {
 
   @BeforeEach
   void setUp() {
-    service = new CityService(cityRepository, stateRepository, mapper, messages);
+    service = new CityService(cityRepository, mapper, messages);
   }
 
   private StateModel stateSp() {
