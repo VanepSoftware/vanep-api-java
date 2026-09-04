@@ -1,16 +1,16 @@
 package br.com.vanep.location.exception;
 
 /**
- * O país do place não está cadastrado. {@code country} é o único nível curado da árvore — os demais
- * nascem sob demanda —, então um país ausente é decisão de negócio ("não atendemos aqui"), não dado
- * faltando.
+ * The place's country is not registered. {@code country} and {@code state} are the curated levels
+ * of the tree — city and district are born on demand — so a missing country is a business decision
+ * ("we don't operate here"), not missing data.
  */
 public class UnsupportedCountryException extends RuntimeException {
 
   private final String isoCode;
 
   public UnsupportedCountryException(String isoCode) {
-    super("País não suportado: " + isoCode);
+    super("Unsupported country: " + isoCode);
     this.isoCode = isoCode;
   }
 

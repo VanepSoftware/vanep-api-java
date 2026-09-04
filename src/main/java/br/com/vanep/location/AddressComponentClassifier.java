@@ -160,12 +160,25 @@ public final class AddressComponentClassifier {
 
   /**
    * Remove o que sobra depois da precedência: o {@code locality} redundante quando há {@code
-   * administrative_area_level_2}, e o distrito que repete o nome da própria cidade.
+   * administrative_area_level_2}, e o distrito que apenas repete o nome do nó imediatamente acima
+   * dele na cadeia.
    *
-   * <p>O segundo caso é real e comum: em Formosa e Itapetininga o Google devolve o mesmo texto em
-   * {@code locality}, {@code administrative_area_level_4} e {@code administrative_area_level_2}.
-   * Sem o descarte nasceria um distrito "Formosa" dentro da cidade "Formosa" em toda cidade
-   * pequena.
+   * <p>O Google repete o mesmo texto em níveis diferentes em dois padrões distintos, e os dois
+   * nascem nas fixtures coletadas na fase 1:
+   *
+   * <ul>
+   *   <li>contra a cidade — em Formosa e Itapetininga o mesmo nome vem em {@code locality}, {@code
+   *       administrative_area_level_4} e {@code administrative_area_level_2}. Sem descarte nasceria
+   *       um distrito "Formosa" dentro da cidade "Formosa" em toda cidade pequena;
+   *   <li>contra o distrito de cima — em {@code destino-nao-escola} "Lago Norte" vem em {@code
+   *       administrative_area_level_4} (profundidade 1) <b>e</b> em {@code sublocality_level_2}
+   *       (profundidade 2), sob a cidade Brasília. Comparar só com a cidade não pega este: a árvore
+   *       viraria Brasília → Lago Norte → Lago Norte → CA 4, o mesmo nome em dois nós.
+   * </ul>
+   *
+   * <p>Uma regra só cobre os dois: descer a cadeia do raso para o fundo e descartar o componente
+   * cujo nome normalizado seja igual ao do pai — a cidade, no primeiro nível, e o distrito já
+   * aceito, nos demais. Fica o nó mais raso, e o descendente real (CA 4) reancora nele.
    */
   private static List<LocationComponentDTO> dropRedundantComponents(
       List<LocationComponentDTO> classified) {
@@ -173,22 +186,34 @@ public final class AddressComponentClassifier {
     if (city.isEmpty()) {
       return classified;
     }
-    String cityName = LocationNameNormalizer.normalize(city.get().name());
     List<LocationComponentDTO> kept = new ArrayList<>();
     for (LocationComponentDTO component : classified) {
-      if (component.level() == LocationLevel.CITY && component != city.get()) {
+      if (component.level() == LocationLevel.CITY) {
+        if (component == city.get()) {
+          kept.add(component);
+        }
         continue;
       }
-      if (component.level() == LocationLevel.DISTRICT
-          && LocationNameNormalizer.normalize(component.name()).equals(cityName)) {
+      if (component.level() != LocationLevel.DISTRICT) {
+        kept.add(component);
+      }
+    }
+
+    // Os distritos entram pela profundidade declarada (D11), nunca pela posição no array:
+    // é a mesma ordem que o resolver usa para aninhar, então é nela que "o pai" existe.
+    String parentName = LocationNameNormalizer.normalize(city.get().name());
+    for (LocationComponentDTO district : districtsFromShallowToDeep(classified)) {
+      String districtName = LocationNameNormalizer.normalize(district.name());
+      if (districtName.equals(parentName)) {
         log.warn(
-            "District component named after its city, dropped: {} (type={}, city={})",
-            component.name(),
-            component.sourceType(),
-            cityName);
+            "District component named after its parent, dropped: {} (type={}, parent={})",
+            district.name(),
+            district.sourceType(),
+            parentName);
         continue;
       }
-      kept.add(component);
+      kept.add(district);
+      parentName = districtName;
     }
     return kept;
   }

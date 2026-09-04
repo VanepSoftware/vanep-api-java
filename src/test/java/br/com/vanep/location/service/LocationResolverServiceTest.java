@@ -12,9 +12,11 @@ import br.com.vanep.district.repository.DistrictRepository;
 import br.com.vanep.location.dto.ResolvedLocationChainDTO;
 import br.com.vanep.location.exception.UnknownAddressComponentException;
 import br.com.vanep.location.exception.UnsupportedCountryException;
+import br.com.vanep.location.exception.UnsupportedStateException;
 import br.com.vanep.places.dto.AddressComponentDTO;
 import br.com.vanep.places.dto.PlaceDetailsResponseDTO;
 import br.com.vanep.state.repository.StateRepository;
+import br.com.vanep.state.seed.StateSeeder;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -39,15 +41,22 @@ class LocationResolverServiceTest {
   @Autowired private StateRepository states;
   @Autowired private CityRepository cities;
   @Autowired private DistrictRepository districts;
+  @Autowired private StateSeeder stateSeeder;
 
+  /**
+   * Country and state are the curated levels: the resolver reads them, never creates them. The
+   * suite runs with {@code flyway.enabled=false}, so the seed has to be invoked explicitly here —
+   * and invoking the real seeder is what keeps this test honest about the curated data shipped.
+   */
   @BeforeEach
-  void seedCuratedCountry() {
+  void seedCuratedGeography() {
     CountryModel brasil = new CountryModel();
     brasil.setName("Brasil");
     brasil.setIsoCode("BR");
     brasil.setPhoneCode("+55");
     brasil.setCurrency("BRL");
     countries.save(brasil);
+    stateSeeder.seed();
   }
 
   private PlaceDetailsResponseDTO fixture(String name) throws IOException {
@@ -140,12 +149,29 @@ class LocationResolverServiceTest {
 
     assertThatThrownBy(() -> resolver.resolveAndPersist(abroad))
         .isInstanceOf(UnsupportedCountryException.class);
-    assertThat(states.count()).isZero();
+    assertThat(cities.count()).isZero();
+  }
+
+  /**
+   * A UF outside the 27 seeded ones is a place we do not serve, exactly like an unsupported
+   * country. Creating the row here was what forced {@code requires_district} to be decided in Java.
+   */
+  @Test
+  void rejectsAPlaceWhoseStateIsNotSeeded() {
+    PlaceDetailsResponseDTO unknownUf =
+        place(
+            component("Brazil", "BR", "country", "political"),
+            component("Nova Unidade", "ZZ", "administrative_area_level_1", "political"),
+            component("Cidade Nova", "Cidade Nova", "administrative_area_level_2", "political"));
+
+    assertThatThrownBy(() -> resolver.resolveAndPersist(unknownUf))
+        .isInstanceOf(UnsupportedStateException.class);
+    assertThat(states.findByUf("ZZ")).isEmpty();
     assertThat(cities.count()).isZero();
   }
 
   @Test
-  void appliesTheCuratedDistrictPolicyToLazilyCreatedStates() throws IOException {
+  void readsTheCuratedDistrictPolicyFromTheSeededStates() throws IOException {
     resolver.resolveAndPersist(fixture("df-taguatinga-qnl5"));
     resolver.resolveAndPersist(fixture("interior-formosa-go"));
 
@@ -259,7 +285,6 @@ class LocationResolverServiceTest {
     assertThatThrownBy(() -> resolver.resolveAndPersist(withUnknownType))
         .isInstanceOf(UnknownAddressComponentException.class);
 
-    assertThat(states.count()).isZero();
     assertThat(cities.count()).isZero();
     assertThat(districts.count()).isZero();
   }

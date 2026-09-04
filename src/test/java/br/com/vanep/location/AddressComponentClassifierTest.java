@@ -113,6 +113,29 @@ class AddressComponentClassifierTest {
   }
 
   /**
+   * A fixture destino-nao-escola traz "Lago Norte" duas vezes: em {@code
+   * administrative_area_level_4} e em {@code sublocality_level_2}. A cidade é Brasília, então
+   * nenhuma das duas é descartada por repetir o nome da cidade — só por repetir o nome do pai.
+   */
+  @Test
+  void dropsDistrictThatOnlyRepeatsItsParentName() throws IOException {
+    assertThat(
+            AddressComponentClassifier.districtsFromShallowToDeep(
+                classifyFixture("destino-nao-escola")))
+        .extracting(LocationComponentDTO::name)
+        .containsExactly("Lago Norte", "CA 4");
+  }
+
+  /** O mesmo descarte um nível acima: distrito que repete o nome da cidade não entra na árvore. */
+  @Test
+  void dropsDistrictNamedAfterItsCity() throws IOException {
+    assertThat(
+            AddressComponentClassifier.districtsFromShallowToDeep(
+                classifyFixture("interior-formosa-go")))
+        .isEmpty();
+  }
+
+  /**
    * As duas fixtures do DF trazem os mesmos níveis em ordens opostas no array. Ordenar pela
    * profundidade declarada é o que impede a hierarquia de sair invertida em uma delas.
    */

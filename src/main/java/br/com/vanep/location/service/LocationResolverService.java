@@ -7,13 +7,13 @@ import br.com.vanep.country.repository.CountryRepository;
 import br.com.vanep.district.model.DistrictModel;
 import br.com.vanep.district.repository.DistrictRepository;
 import br.com.vanep.location.AddressComponentClassifier;
-import br.com.vanep.location.DistrictRequirementPolicy;
 import br.com.vanep.location.LocationNameNormalizer;
 import br.com.vanep.location.dto.LocationComponentDTO;
 import br.com.vanep.location.dto.ResolvedLocationChainDTO;
 import br.com.vanep.location.enums.LocationLevel;
 import br.com.vanep.location.exception.PlaceNotResolvableException;
 import br.com.vanep.location.exception.UnsupportedCountryException;
+import br.com.vanep.location.exception.UnsupportedStateException;
 import br.com.vanep.places.dto.PlaceDetailsResponseDTO;
 import br.com.vanep.state.model.StateModel;
 import br.com.vanep.state.repository.StateRepository;
@@ -60,7 +60,7 @@ public class LocationResolverService {
 
     CountryModel country = requireSupportedCountry(components);
     StateModel state =
-        findOrCreateState(country, requireComponent(components, LocationLevel.STATE));
+        requireSupportedState(country, requireComponent(components, LocationLevel.STATE));
     CityModel city = findOrCreateCity(state, requireComponent(components, LocationLevel.CITY));
 
     List<DistrictModel> chain = new ArrayList<>();
@@ -150,7 +150,7 @@ public class LocationResolverService {
     return countries.findByIsoCodeIgnoreCase(component.shortName());
   }
 
-  /** País é o único nível curado: ausente significa "não atendemos aqui", não "criar agora". */
+  /** País é curado: ausente significa "não atendemos aqui", não "criar agora". */
   private CountryModel requireSupportedCountry(List<LocationComponentDTO> components) {
     LocationComponentDTO component = requireComponent(components, LocationLevel.COUNTRY);
     return countries
@@ -158,25 +158,22 @@ public class LocationResolverService {
         .orElseThrow(() -> new UnsupportedCountryException(component.shortName()));
   }
 
+  /**
+   * Estado é curado pelo mesmo motivo que o país, e por um a mais: {@code requires_district} (D8) é
+   * decisão de produto por UF. Criar a linha aqui significaria escolher esse flag em código — foi o
+   * que existiu como {@code Set.of("DF", "SP")} no resolver, duplicando a lista do seed. O Brasil
+   * tem 27 unidades e elas são semeadas de uma vez; UF fora disso é lugar que não atendemos.
+   */
+  private StateModel requireSupportedState(CountryModel country, LocationComponentDTO component) {
+    return states
+        .findByCountryIdAndUfIgnoreCase(country.getId(), component.shortName())
+        .orElseThrow(() -> new UnsupportedStateException(component.shortName()));
+  }
+
   private LocationComponentDTO requireComponent(
       List<LocationComponentDTO> components, LocationLevel level) {
     return AddressComponentClassifier.findFirstOfLevel(components, level)
         .orElseThrow(() -> new PlaceNotResolvableException(level.name()));
-  }
-
-  private StateModel findOrCreateState(CountryModel country, LocationComponentDTO component) {
-    return states
-        .findByCountryIdAndUfIgnoreCase(country.getId(), component.shortName())
-        .orElseGet(
-            () -> {
-              StateModel state = new StateModel();
-              state.setCountry(country);
-              state.setName(component.name());
-              state.setUf(component.shortName().toUpperCase(java.util.Locale.ROOT));
-              state.setRequiresDistrict(
-                  DistrictRequirementPolicy.requiresDistrict(component.shortName()));
-              return states.save(state);
-            });
   }
 
   private CityModel findOrCreateCity(StateModel state, LocationComponentDTO component) {
