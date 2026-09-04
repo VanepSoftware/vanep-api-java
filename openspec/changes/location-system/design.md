@@ -345,15 +345,19 @@ Sobra a **Q1**, e ela não é fechável agora: depende de tráfego real de autoc
 
 ## Migration Plan
 
-Sem backfill. Migrations a partir de `V21` (última aplicada: `V20__owned_address_foreign_keys.sql`, mergeada depois deste documento ser escrito), nenhuma migration existente editada (regra 2).
+Sem backfill. Migrations a partir de `V22` (última aplicada: `V21__create_driver_document_table.sql`, mergeada na `main` enquanto esta stack estava aberta — a numeração desta change andou de `V21–V25` para `V22–V30`), nenhuma migration existente editada (regra 2).
 
 | Migration | Conteúdo |
 |-----------|----------|
-| `V21` | `district` (auto-FK, soft delete, unique parcial em `parent_id` + `city_id` + `normalized_name` com tratamento de `NULL` — ver R2); `google_place_id` + `normalized_name` em `state` e `city`; `state.requires_district` (`NOT NULL DEFAULT false`) e `city.requires_district` (nullable) com seed `DF = true`, `SP = true` (D8) |
-| `V22` | `address`: `district_id` FK, `google_place_id`; remove `district varchar`; FKs de `school.address_id` e `dependent.address_id`; `assistant.address_id` |
-| `V23` | `driver_service_area` |
-| `V24` | `school`: `google_place_id` único, `city_id`, `district_id`; remove `cnpj`, `phone`, `email` |
-| `V25` | remove `driver.city` e `driver.service_areas` |
+| `V22` | `district` (auto-FK, soft delete, unique parcial em `parent_id` + `city_id` + `normalized_name` com tratamento de `NULL` — ver R2) |
+| `V23` | `google_place_id` + `normalized_name` em `state` e `city` |
+| `V24` | `state.requires_district` (`NOT NULL DEFAULT false`) e `city.requires_district` (nullable) — só as colunas; quais UFs exigem distrito é dado curado no `StateSeeder` (D8) |
+| `V25` | `address`: `district_id` FK, `google_place_id`; remove `district varchar`; FKs de `school.address_id` e `dependent.address_id` |
+| `V26` | `driver_service_area` |
+| `V27` | `school`: `google_place_id` único, `city_id`, `district_id`; remove `cnpj`, `phone`, `email` |
+| `V28` | remove `driver.city` e `driver.service_areas` |
+| `V29` | remove `client.address_id` |
+| `V30` | permissão de leitura de motorista para o cliente |
 
 ---
 
@@ -397,18 +401,18 @@ Sem backfill. Migrations a partir de `V21` (última aplicada: `V20__owned_addres
 |-------|----------|------------|---------------|
 | 0 | **Bloqueio humano.** Google Cloud Console: habilitar Places API (New) + Geocoding API, criar 3 chaves restritas (server/web/mobile), popular `.env` e `.env.example` | — | — |
 | 1 | Spike: coletar `addressComponents` de ~10 endereços reais, definir tabela `types` → nível, registrar em `design.md` | 0 | — |
-| 2 | Migration `V21`; `district` (model, repo, feature package); `normalized_name` em state/city | 1 | 3 |
+| 2 | Migrations `V22`–`V24`; `district` (model, repo, feature package); `normalized_name` em state/city | 1 | 3 |
 | 3 | `br.com.vanep.places`: `PlacesClient` (RestClient), config por env, cache Caffeine, DTOs de resposta | 1 | 2 |
 | 4 | `LocationResolverService`: `addressComponents` → `findOrCreate` da cadeia; resolução de âncora read-only; ancestrais de distrito | 2, 3 | — |
-| 5 | Migration `V22`; endereço pessoal: refactor de `address`, FKs faltantes, `assistant.address_id`, `PUT/GET /api/user/me/address` | 4 | 6, 7 |
-| 6 | Migration `V23`; `driver_service_area`: tabela, model, repo, validação D8, `GET/PUT /api/drivers/me/service-areas` | 4 | 5, 7 |
-| 7 | Migration `V24`; `school` magra: `google_place_id`, remoção de cnpj/phone/email, `GET /api/schools/resolve` | 4 | 5, 6 |
+| 5 | Migration `V25`; endereço pessoal: refactor de `address`, FKs faltantes, `PUT/GET /api/user/me/address` | 4 | 6, 7 |
+| 6 | Migration `V26`; `driver_service_area`: tabela, model, repo, validação D8, `GET/PUT /api/drivers/me/service-areas` | 4 | 5, 7 |
+| 7 | Migration `V27`; `school` magra: `google_place_id`, remoção de cnpj/phone/email, `GET /api/schools/resolve` | 4 | 5, 6 |
 | 8 | `GET /api/drivers/search`: origem + destino, match por contenção, paginação | 5, 6, 7 | — |
-| 9 | Migration `V25`; `onboarding.pendingSteps` em `/me`; remoção de seeders, do CRUD de escrita de city e de `driver.city`/`service_areas` | 8 | — |
+| 9 | Migration `V28`; `onboarding.pendingSteps` em `/me`; remoção de seeders, do CRUD de escrita de city e de `driver.city`/`service_areas` | 8 | — |
 
 Cada fase é uma branch e um PR (regra 35), respeita ~600 linhas produtivas e 10 arquivos novos (regra 40), e ship com seus próprios testes (regra 42). Fases 2 e 3 podem ser revisadas em paralelo; 5, 6 e 7 também.
 
-**"Parallel with" é paralelismo de review, não de merge (regra 39).** A entrega usa PRs empilhados: a fase 8 mergeia na 7, a 7 na 6, e assim por diante até a 1 chegar na `main`. Como a ordem de merge é a ordem da stack, `V21 → V22 → V23 → V24 → V25` chegam ao banco em ordem crescente, e o Flyway (que roda com `out-of-order` desabilitado) não tem como falhar por versão fora de ordem.
+**"Parallel with" é paralelismo de review, não de merge (regra 39).** A entrega usa PRs empilhados: a fase 8 mergeia na 7, a 7 na 6, e assim por diante até a 1 chegar na `main`. Como a ordem de merge é a ordem da stack, `V22 → … → V30` chegam ao banco em ordem crescente, e o Flyway (que roda com `out-of-order` desabilitado) não tem como falhar por versão fora de ordem.
 
 A garantia depende da stack, não do plano: **se a stack for reordenada** — por exemplo aprovando a fase 6 primeiro e desempilhando-a antes da 5 — a migration da fase desempilhada precisa ser renumerada para o próximo `V` livre antes do merge. Caso contrário o `validate` do Flyway falha no deploy seguinte, ao encontrar uma versão resolvida menor que a última aplicada.
 

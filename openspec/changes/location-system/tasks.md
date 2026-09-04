@@ -50,7 +50,7 @@
 - [x] 1.7 **Q2 — qual SKU o field mask do `Place Details` seleciona?** Comparar `id` + `addressComponents` contra um mask amplo. Questão em aberto: define se o cache do D5 se paga
 - [x] 1.8 **Q3 — qual a ordem de grandeza do custo por busca?** **Respondida**: relatório de billing zerado após o spike — as ~26 chamadas ficaram inteiramente dentro da cota gratuita, confirmando a tabela (10.000 eventos/mês grátis em Place Details Essentials, US$ 5/1.000 depois; 1 busca = 2 eventos ⇒ ~5.000 buscas/mês grátis). Quota diária de 300 definida, o que tranca o projeto dentro do gratuito por construção
 - [x] 1.9 Varrer o `design.md` atrás de qualquer outra afirmação não verificada e resolvê-la aqui; atualizar a seção **Open Questions** com a resposta de cada item ou a decisão explícita de conviver com ele
-- [x] 1.10 Confirmar o próximo número de migration Flyway — última aplicada é `V20__owned_address_foreign_keys.sql`, mergeada depois deste plano ser escrito, então as migrations desta change vão de `V21` a `V25` (já corrigido abaixo)
+- [x] 1.10 Confirmar o próximo número de migration Flyway — a `main` mergeou a `V21__create_driver_document_table.sql` enquanto esta stack estava aberta, então as migrations desta change vão de `V22` a `V30` (já corrigido abaixo)
 - [x] 1.11 Abrir PR fase 1 (pt-BR, sem código de produção — fixtures + documento de decisão)
 
 ## 2. Phase 2 — Árvore geográfica: `district` + migrations (PR 2)
@@ -60,11 +60,11 @@
 > Order: test → migration → model → repository
 
 - [x] 2.1 Testes de repositório para `DistrictRepository` (filho direto de city, filho aninhado, unique parcial, soft delete oculta)
-- [x] 2.2 Migration `V21`: tabela `district` (auto-FK `parent_id`, `city_id`, `name`, `normalized_name`, `google_place_id`, soft delete, unique parcial em `parent_id` + `city_id` + `normalized_name` `WHERE deleted_at IS NULL`)
+- [x] 2.2 Migration `V22`: tabela `district` (auto-FK `parent_id`, `city_id`, `name`, `normalized_name`, `google_place_id`, soft delete, unique parcial em `parent_id` + `city_id` + `normalized_name` `WHERE deleted_at IS NULL`)
 - [x] 2.3 **No índice do 2.2, tratar `parent_id` nulo como valor comparável** — usar `NULLS NOT DISTINCT`, disponível porque o `docker-compose.yml` roda `postgres:17-alpine` (PG 15+); o fallback `COALESCE(parent_id, 0)` fica descartado. Índice único simples **não** restringe linhas com `parent_id` nulo, que é o caso do distrito filho direto de cidade — o R2 ficaria sem mitigação justamente no caso mais comum
-- [x] 2.4 Migration `V21` (cont.): adicionar `normalized_name` e `google_place_id` em `state` e `city`
-- [x] 2.5 Migration `V21` (cont.): adicionar `state.requires_district` (`NOT NULL DEFAULT false`) e `city.requires_district` (nullable); seed `UPDATE state SET requires_district = true WHERE uf IN ('DF','SP')` (D8)
-- [x] 2.6 **Aplicar a `V21` manualmente contra o PostgreSQL local e verificar o índice** inserindo duas "Taguatinga" com `parent_id` nulo sob a mesma cidade — a suíte roda com `flyway.enabled=false` e `ddl-auto=create-drop`, então nenhum teste executa esta migration (R7)
+- [x] 2.4 Migration `V23`: adicionar `normalized_name` e `google_place_id` em `state` e `city`
+- [x] 2.5 Migration `V24`: adicionar `state.requires_district` (`NOT NULL DEFAULT false`) e `city.requires_district` (nullable). Só as colunas: quais UFs exigem distrito é dado curado e vive num lugar só, o `StateSeeder` — um `UPDATE` aqui não alcança linha de `state` criada depois (D8)
+- [x] 2.6 **Aplicar a `V22` manualmente contra o PostgreSQL local e verificar o índice** inserindo duas "Taguatinga" com `parent_id` nulo sob a mesma cidade — a suíte roda com `flyway.enabled=false` e `ddl-auto=create-drop`, então nenhum teste executa esta migration (R7)
 - [x] 2.7 Criar feature package `br.com.vanep.district` com `model/DistrictModel`, `repository/DistrictRepository` (constituição regra 5)
 - [x] 2.8 Adicionar `findByStateId` em `CityRepository`, `normalizedName` nos models de `state`/`city` e `requiresDistrict` em `StateModel`/`CityModel`
 - [x] 2.9 Implementar utilitário de normalização (unaccent + lowercase) com testes unitários
@@ -111,7 +111,7 @@
 > Order: test → migration → model → security → request DTO → service → controller → response DTO
 
 - [x] 5.1 Testes slice MockMvc: `401` sem token; `200` criando endereço a partir de `placeId`; `400` para `placeId` inválido; `complement` preservado; componentes enviados pelo cliente ignorados
-- [x] 5.2 Migration `V22`: `address` ganha `district_id` FK e `google_place_id`; **remove** `district varchar(128)`; cria as FKs faltantes de `school.address_id` e `dependent.address_id`; adiciona `assistant.address_id`
+- [x] 5.2 Migration `V25`: `address` ganha `district_id` FK e `google_place_id`; **remove** `district varchar(128)`; cria as FKs faltantes de `school.address_id` e `dependent.address_id` (o `assistant` não ganha coluna: o endereço é do ser humano e mora em `users`)
 - [x] 5.3 Atualizar `AddressModel` (FK de district, `google_place_id`) e o model de `assistant`
 - [x] 5.4 Declarar as regras de autorização em `SecurityConfig` para os endpoints novos (regras 19 e 20)
 - [x] 5.5 Criar `PersonalAddressRequestDTO` (`placeId` `@NotBlank`, `sessionToken?`, `number?`, `complement?`) com Bean Validation (regra 10)
@@ -130,7 +130,7 @@
 - [x] 6.1 Testes unitários da policy D8 sobre a **cadeia resolvida** e os flags curados: cadeia sem distrito + estado `true` → `400`; cadeia sem distrito + estado `false` → aceita; override `city.requires_district = false` sob estado `true` → aceita; cadeia com distrito → aceita sempre
 - [x] 6.2 Teste explícito do furo temporal: **árvore sem nenhum distrito sob Brasília**, cadeia `[BR, DF, Brasília]` → ainda `400`. Garante que a regra não depende de contagem no banco
 - [x] 6.3 Testes slice MockMvc: `401` sem token; `403` para usuário sem perfil de motorista; `200` cadastrando distrito; substituição completa do conjunto no `PUT`
-- [x] 6.4 Migration `V23`: tabela `driver_service_area` (`driver_id`, `city_id` NOT NULL, `district_id` nullable, soft delete) — **sem** colunas de logradouro
+- [x] 6.4 Migration `V26`: tabela `driver_service_area` (`driver_id`, `city_id` NOT NULL, `district_id` nullable, soft delete) — **sem** colunas de logradouro
 - [x] 6.5 Criar feature package `br.com.vanep.driverservicearea` com model e repository
 - [x] 6.6 Declarar as regras de autorização em `SecurityConfig`; se precisar de checagem de dono, adicionar ao `SecurityEvaluator` (`@sec`) — nunca criar `*SecurityService` por feature (regra 21)
 - [x] 6.7 Criar `DriverServiceAreaRequestDTO` (lista de itens `placeId` + `sessionToken?`) com Bean Validation
@@ -148,7 +148,7 @@
 > Order: test → migration → model → service → controller → response DTO
 
 - [x] 7.1 Testes slice: primeira resolução cria a escola e retorna `201`; segunda reusa sem duplicar e retorna `200`; `401` sem token; rate limit excedido rejeita sem chamar o Google
-- [x] 7.2 Migration `V24`: `school` ganha `google_place_id` (unique parcial `WHERE deleted_at IS NULL`), `city_id`, `district_id`; **remove** `cnpj`, `phone`, `email`
+- [x] 7.2 Migration `V27`: `school` ganha `google_place_id` (unique parcial `WHERE deleted_at IS NULL`), `city_id`, `district_id`; **remove** `cnpj`, `phone`, `email`
 - [x] 7.3 Atualizar `SchoolModel`, `SchoolRepository` (busca por `google_place_id`), mapper e DTOs
 - [x] 7.4 Implementar `POST /api/schools/resolve` — **não `GET`**: a operação faz `findOrCreate`, é escrita, e um `GET` é pré-buscável por intermediários (prefetch criaria escola). Idempotente por `google_place_id`: `201` ao criar, `200` quando já existia
 - [x] 7.5 Criar `SchoolResolveRequestDTO` (`placeId` `@NotBlank`, `sessionToken?`) com Bean Validation
@@ -184,7 +184,7 @@
 - [x] 9.2 Criar enum backed `OnboardingStep` (regra 14)
 - [x] 9.3 Estender `UserMeResponseDTO` com o objeto `onboarding.pendingSteps`
 - [x] 9.4 Implementar o cálculo dos passos pendentes no service, sem N+1 (regra 16)
-- [x] 9.5 Migration `V25`: remover `driver.city` e `driver.service_areas`
+- [x] 9.5 Migration `V28`: remover `driver.city` e `driver.service_areas`
 - [x] 9.5b Remover `client.address_id` (migration + `ClientModel`, `ClientService`, DTOs e testes): o endereço residencial passou a morar em `users.address_id` na fase 5, e manter os dois é duas fontes de verdade para o mesmo endereço. Não foi feito na fase 5 para não estourar o limite de arquivos da regra 41
 - [x] 9.6 Remover os campos correspondentes de `DriverModel`, `DriverUpdateRequestDTO`, `DriverResponseDTO`, `DriverMeSummaryResponseDTO` e `DriverService`
 - [x] 9.7 Remover `CitySeeder` e `StateSeeder`; ajustar `SeedRunner` (ou equivalente) para não referenciá-los

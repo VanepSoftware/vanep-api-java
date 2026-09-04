@@ -64,7 +64,7 @@ Além disso, os dois conceitos de endereço estão misturados: o endereço **res
 
 - **Bloqueio externo (fase 0):** as chaves do Google Maps Platform (Places API New + Geocoding API) precisam ser criadas e restritas manualmente no Google Cloud Console antes de qualquer implementação. Nenhuma fase de código pode começar antes disso.
 - **Código:** novo feature package `br.com.vanep.district`; novo `br.com.vanep.driverservicearea`; novo `br.com.vanep.places` (client HTTP do Google + resolver da árvore); refatoração de `address`, `school`, `city`, `state`, `driver`; extensão de `UserMeResponseDTO`.
-- **Schema:** migrations Flyway a partir de `V21` (última aplicada: `V20__owned_address_foreign_keys.sql`). Nenhuma migration existente é editada (constituição, regra 2).
+- **Schema:** migrations Flyway a partir de `V22` (última aplicada: `V21__create_driver_document_table.sql`). Nenhuma migration existente é editada (constituição, regra 2).
 - **Deps:** cliente HTTP para o Places (`RestClient` do Spring, sem SDK adicional); cache em memória (Caffeine) para `Place Details` por `placeId`, **ignorado quando a requisição traz `sessionToken`**, para que a sessão de autocomplete feche e entre no SKU de sessão (D5).
 - **Config:** `vanep.google.places.api-key`, `vanep.google.places.base-url`, `vanep.google.geocoding.enabled` — todos via env (`.env.example`), nunca hardcoded (constituição, regra 1/3).
 - **Cobertura declarada:** a v1 vale para DF e capital de SP. Abrir praça nova exige fixtures reais daquela praça e reconferência da tabela `types` → nível (R1) — não é rollout de configuração.
