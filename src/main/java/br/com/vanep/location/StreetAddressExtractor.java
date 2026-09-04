@@ -1,7 +1,6 @@
 package br.com.vanep.location;
 
 import br.com.vanep.location.dto.LocationComponentDTO;
-import br.com.vanep.places.dto.AddressComponentDTO;
 import br.com.vanep.places.dto.PlaceDetailsResponseDTO;
 import java.util.List;
 import java.util.Optional;
@@ -70,7 +69,7 @@ public final class StreetAddressExtractor {
   private static Optional<String> findLongText(PlaceDetailsResponseDTO details, String type) {
     return details.addressComponents().stream()
         .filter(component -> component.types().contains(type))
-        .map(AddressComponentDTO::longText)
+        .map(component -> component.longText())
         .filter(text -> text != null && !text.isBlank())
         .findFirst();
   }
