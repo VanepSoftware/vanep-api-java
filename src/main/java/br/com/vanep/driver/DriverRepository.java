@@ -17,19 +17,33 @@ public interface DriverRepository extends JpaRepository<DriverModel, Long> {
   Optional<DriverModel> findByToken(String token);
 
   /**
-   * Motoristas por id, já com o usuário carregado. O fetch join existe para a busca: sem ele, ler o
-   * nome de cada motorista da página dispararia uma query por linha (regra 17).
+   * Motoristas visíveis na busca, por id, já com o usuário carregado.
+   *
+   * <p>O fetch join existe para a busca: sem ele, ler o nome de cada motorista da página dispararia
+   * uma query por linha (regra 17).
+   *
+   * <p>Filtra {@code approvalStatus} além de {@code active}. O default do model é {@code PENDING},
+   * então quem se cadastrou e declarou área de atuação apareceria na vitrine antes de ser aprovado
+   * — e um {@code REJECTED} continuaria aparecendo para sempre. A busca é o marketplace: só entra
+   * quem está aprovado.
    */
   @Query(
       value =
           """
           select distinct driver from DriverModel driver
           join fetch driver.user
-          where driver.id in :ids and driver.active = true
+          where driver.id in :ids
+            and driver.active = true
+            and driver.approvalStatus = br.com.vanep.driver.DriverApprovalStatus.APPROVED
           """,
       countQuery =
-          "select count(driver) from DriverModel driver where driver.id in :ids and driver.active = true")
-  Page<DriverModel> findActiveByIds(@Param("ids") Collection<Long> ids, Pageable pageable);
+          """
+          select count(driver) from DriverModel driver
+          where driver.id in :ids
+            and driver.active = true
+            and driver.approvalStatus = br.com.vanep.driver.DriverApprovalStatus.APPROVED
+          """)
+  Page<DriverModel> findSearchableByIds(@Param("ids") Collection<Long> ids, Pageable pageable);
 
   @Query("select d.user.token from DriverModel d where d.token = :token")
   Optional<String> findUserTokenByDriverToken(@Param("token") String token);

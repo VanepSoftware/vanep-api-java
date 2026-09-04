@@ -90,7 +90,7 @@ public class DriverSearchService {
     if (covering.isEmpty()) {
       return Page.empty(pageable);
     }
-    return drivers.findActiveByIds(covering, pageable).map(this::toResponse);
+    return drivers.findSearchableByIds(covering, pageable).map(this::toResponse);
   }
 
   /**

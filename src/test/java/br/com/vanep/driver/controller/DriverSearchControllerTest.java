@@ -19,6 +19,7 @@ import br.com.vanep.places.client.PlacesClient;
 import br.com.vanep.places.dto.PlaceDetailsResponseDTO;
 import br.com.vanep.places.exception.PlaceNotFoundException;
 import br.com.vanep.state.repository.StateRepository;
+import br.com.vanep.state.seed.StateSeeder;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
@@ -53,6 +54,7 @@ class DriverSearchControllerTest {
   @Autowired private UserRepository users;
   @Autowired private DriverRepository drivers;
   @Autowired private CountryRepository countries;
+  @Autowired private StateSeeder stateSeeder;
   @Autowired private CityRepository cities;
   @Autowired private StateRepository states;
   @Autowired private DistrictRepository districts;
@@ -72,6 +74,8 @@ class DriverSearchControllerTest {
     brasil.setPhoneCode("+55");
     brasil.setCurrency("BRL");
     countries.save(brasil);
+    // Country and state are curated: the resolver reads them, never creates them.
+    stateSeeder.seed();
 
     UserModel client = new UserModel();
     client.setType(UserType.CLIENT);
@@ -96,6 +100,11 @@ class DriverSearchControllerTest {
 
   /** Cria um motorista e cadastra as áreas dele pelo endpoint real, que é quem popula a árvore. */
   private String createDriverWithAreas(String email, String... placeIds) throws Exception {
+    return createDriverWithAreas(email, DriverApprovalStatus.APPROVED, placeIds);
+  }
+
+  private String createDriverWithAreas(
+      String email, DriverApprovalStatus approvalStatus, String... placeIds) throws Exception {
     UserModel driverUser = new UserModel();
     driverUser.setType(UserType.DRIVER);
     driverUser.setName("Motorista " + email);
@@ -108,7 +117,7 @@ class DriverSearchControllerTest {
     DriverModel driver = new DriverModel();
     driver.setUser(driverUser);
     driver.setBasePrice(BigDecimal.valueOf(75));
-    driver.setApprovalStatus(DriverApprovalStatus.APPROVED);
+    driver.setApprovalStatus(approvalStatus);
     drivers.save(driver);
 
     StringBuilder body = new StringBuilder("{\"areas\":[");
@@ -163,6 +172,42 @@ class DriverSearchControllerTest {
         .andExpect(jsonPath("$.content.length()").value(1))
         .andExpect(jsonPath("$.content[0].name").value("Motorista ambos@vanep.com"))
         .andExpect(jsonPath("$.content[0].token").isNotEmpty());
+  }
+
+  /**
+   * O default do model é PENDING: quem acabou de se cadastrar e declarou as áreas apareceria na
+   * vitrine sem ninguém ter aprovado, e um REJECTED continuaria aparecendo para sempre.
+   */
+  @Test
+  void excludesDriverWhoIsNotApprovedYet() throws Exception {
+    stubPlaces();
+    createDriverWithAreas(
+        "pendente@vanep.com", DriverApprovalStatus.PENDING, "taguatinga", "aguas-claras");
+
+    mockMvc
+        .perform(
+            get("/api/drivers/search")
+                .with(as(clientUid))
+                .param("originPlaceId", "taguatinga")
+                .param("destinationPlaceId", "aguas-claras"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content.length()").value(0));
+  }
+
+  @Test
+  void excludesDriverWhoseApprovalWasRejected() throws Exception {
+    stubPlaces();
+    createDriverWithAreas(
+        "recusado@vanep.com", DriverApprovalStatus.REJECTED, "taguatinga", "aguas-claras");
+
+    mockMvc
+        .perform(
+            get("/api/drivers/search")
+                .with(as(clientUid))
+                .param("originPlaceId", "taguatinga")
+                .param("destinationPlaceId", "aguas-claras"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content.length()").value(0));
   }
 
   @Test
