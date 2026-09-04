@@ -40,6 +40,8 @@ public interface DriverServiceAreaRepository extends JpaRepository<DriverService
       left join area.district district
       where area.city.id = :cityId
         and (district is null or district.id in :ancestorIds)
+        and area.driver.active = true
+        and area.driver.approvalStatus = br.com.vanep.driver.DriverApprovalStatus.APPROVED
       """)
   List<Long> findDriverIdsCoveringPoint(Long cityId, Collection<Long> ancestorIds);
 
@@ -59,6 +61,8 @@ public interface DriverServiceAreaRepository extends JpaRepository<DriverService
       left join area.district district
       where area.city.id = :cityId
         and (district is null or district.id in :ancestorIds)
+        and area.driver.active = true
+        and area.driver.approvalStatus = br.com.vanep.driver.DriverApprovalStatus.APPROVED
       """)
   List<Object[]> findDriverMatchesCoveringPoint(Long cityId, Collection<Long> ancestorIds);
 
@@ -67,6 +71,8 @@ public interface DriverServiceAreaRepository extends JpaRepository<DriverService
       select area.driver.id, district.id from DriverServiceAreaModel area
       left join area.district district
       where area.city.id = :cityId
+        and area.driver.active = true
+        and area.driver.approvalStatus = br.com.vanep.driver.DriverApprovalStatus.APPROVED
       """)
   List<Object[]> findDriverMatchesInCity(Long cityId);
 
@@ -89,6 +95,8 @@ public interface DriverServiceAreaRepository extends JpaRepository<DriverService
       """
       select distinct area.driver.id from DriverServiceAreaModel area
       where area.city.id = :cityId
+        and area.driver.active = true
+        and area.driver.approvalStatus = br.com.vanep.driver.DriverApprovalStatus.APPROVED
       """)
   List<Long> findDriverIdsInCity(Long cityId);
 }

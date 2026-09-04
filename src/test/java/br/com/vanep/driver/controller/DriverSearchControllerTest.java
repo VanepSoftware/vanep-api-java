@@ -19,10 +19,12 @@ import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.driverservicearea.model.DriverServiceAreaModel;
 import br.com.vanep.driverservicearea.repository.DriverServiceAreaRepository;
+import br.com.vanep.location.service.LocationResolverService;
 import br.com.vanep.places.client.PlacesClient;
 import br.com.vanep.places.dto.PlaceDetailsResponseDTO;
 import br.com.vanep.places.exception.PlaceNotFoundException;
 import br.com.vanep.state.repository.StateRepository;
+import br.com.vanep.state.seed.StateSeeder;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
@@ -57,9 +59,11 @@ class DriverSearchControllerTest {
   @Autowired private UserRepository users;
   @Autowired private DriverRepository drivers;
   @Autowired private CountryRepository countries;
+  @Autowired private StateSeeder stateSeeder;
   @Autowired private CityRepository cities;
   @Autowired private StateRepository states;
   @Autowired private DistrictRepository districts;
+  @Autowired private LocationResolverService resolver;
   @Autowired private DriverServiceAreaRepository areas;
 
   @MockitoBean private PlacesClient places;
@@ -77,6 +81,8 @@ class DriverSearchControllerTest {
     brasil.setPhoneCode("+55");
     brasil.setCurrency("BRL");
     countries.save(brasil);
+    // Country and state are curated: the resolver reads them, never creates them.
+    stateSeeder.seed();
 
     UserModel client = new UserModel();
     client.setType(UserType.CLIENT);
@@ -100,6 +106,10 @@ class DriverSearchControllerTest {
   }
 
   private DriverModel saveDriver(String email) {
+    return saveDriver(email, DriverApprovalStatus.APPROVED);
+  }
+
+  private DriverModel saveDriver(String email, DriverApprovalStatus approvalStatus) {
     UserModel driverUser = new UserModel();
     driverUser.setType(UserType.DRIVER);
     driverUser.setName("Motorista " + email);
@@ -112,13 +122,18 @@ class DriverSearchControllerTest {
     DriverModel driver = new DriverModel();
     driver.setUser(driverUser);
     driver.setBasePrice(BigDecimal.valueOf(75));
-    driver.setApprovalStatus(DriverApprovalStatus.APPROVED);
+    driver.setApprovalStatus(approvalStatus);
     return drivers.save(driver);
   }
 
   /** Cadastra pelo endpoint real, que é quem popula a árvore a partir do place. */
   private String createDriverWithAreas(String email, String... placeIds) throws Exception {
-    DriverModel driver = saveDriver(email);
+    return createDriverWithAreas(email, DriverApprovalStatus.APPROVED, placeIds);
+  }
+
+  private String createDriverWithAreas(
+      String email, DriverApprovalStatus approvalStatus, String... placeIds) throws Exception {
+    DriverModel driver = saveDriver(email, approvalStatus);
 
     StringBuilder body = new StringBuilder("{\"areas\":[");
     for (int index = 0; index < placeIds.length; index++) {
@@ -144,6 +159,19 @@ class DriverSearchControllerTest {
    * D8 recusaria — cidade inteira no DF, por exemplo — em um teste que é sobre ordenação, não sobre
    * aquela regra.
    */
+  /**
+   * Popula a árvore a partir das fixtures, sem criar motorista.
+   *
+   * <p>Os testes de ranking precisam de nós de vários níveis (QNL 5, Setor L Norte, Taguatinga)
+   * para atribuir áreas explicitamente. Eles não podem nascer do endpoint de áreas: ele registra a
+   * RA, não a quadra, que é justamente a regra da fase 6.
+   */
+  private void seedTree(String... placeIds) throws IOException {
+    for (String placeId : placeIds) {
+      resolver.resolveAndPersist(fixture(placeId));
+    }
+  }
+
   private DriverModel giveArea(String email, DistrictModel district) {
     DriverModel driver = saveDriver(email);
     DriverServiceAreaModel area = new DriverServiceAreaModel();
@@ -161,7 +189,22 @@ class DriverSearchControllerTest {
         .orElseThrow();
   }
 
+  /** Um place que para na cidade: Brasília, sem componente de bairro nenhum. */
+  private PlaceDetailsResponseDTO cityOnly() throws IOException {
+    return new PlaceDetailsResponseDTO(
+        "brasilia",
+        "Brasília - DF",
+        fixture("df-taguatinga-qnl5").addressComponents().stream()
+            .filter(
+                component ->
+                    component.types().contains("country")
+                        || component.types().contains("administrative_area_level_1")
+                        || component.types().contains("administrative_area_level_2"))
+            .toList());
+  }
+
   private void stubPlaces() throws IOException {
+    BDDMockito.given(places.findPlaceDetails("brasilia", null)).willReturn(cityOnly());
     BDDMockito.given(places.findPlaceDetails("taguatinga", null))
         .willReturn(fixture("df-taguatinga-qnl5"));
     BDDMockito.given(places.findPlaceDetails("aguas-claras", null))
@@ -187,6 +230,50 @@ class DriverSearchControllerTest {
     mockMvc
         .perform(get("/api/drivers/search").param("placeId", "taguatinga"))
         .andExpect(status().isUnauthorized());
+  }
+
+  /**
+   * Buscar a cidade inteira tem de achar quem atende uma parte dela. O mapa de distâncias vem vazio
+   * — não há bairro no pedido para medir distância —, e tratar isso como "não casou" fazia a busca
+   * por "Brasília" devolver zero enquanto a busca por "Taguatinga" achava o mesmo motorista. Como o
+   * D8 proíbe declarar o DF inteiro, era o caso comum, não a exceção.
+   */
+  @Test
+  void findsDriverOfADistrictWhenTheSearchIsTheWholeCity() throws Exception {
+    stubPlaces();
+    createDriverWithAreas("taguatinga@vanep.com", "taguatinga");
+
+    mockMvc
+        .perform(get("/api/drivers/search").with(as(clientUid)).param("placeId", "brasilia"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content.length()").value(1))
+        .andExpect(jsonPath("$.content[0].name").value("Motorista taguatinga@vanep.com"));
+  }
+
+  /**
+   * O default do model é PENDING: quem acabou de se cadastrar e declarou as áreas apareceria na
+   * vitrine sem ninguém ter aprovado, e um REJECTED continuaria aparecendo para sempre.
+   */
+  @Test
+  void excludesDriverWhoIsNotApprovedYet() throws Exception {
+    stubPlaces();
+    createDriverWithAreas("pendente@vanep.com", DriverApprovalStatus.PENDING, "taguatinga");
+
+    mockMvc
+        .perform(get("/api/drivers/search").with(as(clientUid)).param("placeId", "taguatinga"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content.length()").value(0));
+  }
+
+  @Test
+  void excludesDriverWhoseApprovalWasRejected() throws Exception {
+    stubPlaces();
+    createDriverWithAreas("recusado@vanep.com", DriverApprovalStatus.REJECTED, "taguatinga");
+
+    mockMvc
+        .perform(get("/api/drivers/search").with(as(clientUid)).param("placeId", "taguatinga"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content.length()").value(0));
   }
 
   @Test
@@ -219,7 +306,8 @@ class DriverSearchControllerTest {
   @Test
   void ranksFromTheMostSpecificAreaToTheWholeCity() throws Exception {
     stubPlaces();
-    createDriverWithAreas("qnl5@vanep.com", "taguatinga");
+    seedTree("df-taguatinga-qnl5");
+    giveArea("qnl5@vanep.com", districtNamed("QNL 5"));
 
     DriverModel setorDriver = giveArea("setor@vanep.com", districtNamed("Setor L Norte"));
     DriverModel taguatingaDriver = giveArea("taguatinga@vanep.com", districtNamed("Taguatinga"));
@@ -283,7 +371,8 @@ class DriverSearchControllerTest {
         .perform(get("/api/drivers/search").with(as(clientUid)).param("placeId", "taguatinga"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.content[0].serviceAreas.length()").value(2))
-        .andExpect(jsonPath("$.content[0].serviceAreas", hasItems("QNL 5", "Águas Claras")));
+        // A área declarada é a RA, não a quadra dentro dela (fase 6).
+        .andExpect(jsonPath("$.content[0].serviceAreas", hasItems("Taguatinga", "Águas Claras")));
   }
 
   @Test
@@ -349,7 +438,8 @@ class DriverSearchControllerTest {
   @Test
   void acceptsASchoolAsTheSearchedPlace() throws Exception {
     stubPlaces();
-    createDriverWithAreas("qnl5@vanep.com", "taguatinga");
+    seedTree("df-taguatinga-qnl5");
+    giveArea("qnl5@vanep.com", districtNamed("QNL 5"));
     giveArea("taguatinga@vanep.com", districtNamed("Taguatinga"));
 
     mockMvc
@@ -363,7 +453,8 @@ class DriverSearchControllerTest {
   @Test
   void findsDriversWorkingInsideTheSearchedRegion() throws Exception {
     stubPlaces();
-    createDriverWithAreas("qnl5@vanep.com", "taguatinga");
+    seedTree("df-taguatinga-qnl5");
+    giveArea("qnl5@vanep.com", districtNamed("QNL 5"));
     giveArea("taguatinga@vanep.com", districtNamed("Taguatinga"));
 
     mockMvc

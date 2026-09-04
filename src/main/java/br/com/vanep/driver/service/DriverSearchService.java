@@ -103,8 +103,13 @@ public class DriverSearchService {
     Map<Long, Integer> distanceByDistrict = distanceByDistrict(anchor);
     int wholeCityRank = Integer.MAX_VALUE;
 
+    // Busca pela cidade inteira: o cliente digitou "Brasília" e não há bairro no
+    // pedido, então não existe ramo contra o qual medir distância.
+    boolean anchoredOnTheWholeCity =
+        anchor.deepestDistrict().isEmpty() && !anchor.anchoredAboveTheDistrictComponents();
+
     List<Object[]> matches =
-        anchor.deepestDistrict().isEmpty() && !anchor.anchoredAboveTheDistrictComponents()
+        anchoredOnTheWholeCity
             ? areas.findDriverMatchesInCity(anchor.city().getId())
             : areas.findDriverMatchesCoveringPoint(
                 anchor.city().getId(), sentinelIfEmpty(List.copyOf(distanceByDistrict.keySet())));
@@ -113,7 +118,8 @@ public class DriverSearchService {
     for (Object[] match : matches) {
       Long driverId = (Long) match[0];
       Long districtId = (Long) match[1];
-      Integer distance = districtId == null ? wholeCityRank : distanceByDistrict.get(districtId);
+      Integer distance =
+          rankOf(districtId, distanceByDistrict, anchoredOnTheWholeCity, wholeCityRank);
       if (distance == null) {
         continue;
       }
@@ -126,6 +132,29 @@ public class DriverSearchService {
             Map.Entry.<Long, Integer>comparingByValue().thenComparing(Map.Entry.comparingByKey()))
         .map(Map.Entry::getKey)
         .toList();
+  }
+
+  /**
+   * O rank de uma área, ou {@code null} quando ela não atende o ponto.
+   *
+   * <p>Numa busca por bairro, o rank é a distância no mapa e um distrito fora do ramo não casa: um
+   * irmão não atende o ponto.
+   *
+   * <p>Numa busca pela cidade inteira o mapa está vazio — não há bairro no pedido para medir
+   * distância. Tratar isso como "não casou" era o furo: o motorista de Taguatinga sumia da busca
+   * por "Brasília", e como o D8 proíbe declarar o DF inteiro, a busca mais genérica devolvia zero
+   * enquanto a específica achava. Aqui qualquer região da cidade casa, com rank 0 — quem declarou
+   * uma região é mais específico que quem declarou a cidade toda, que continua por último.
+   */
+  Integer rankOf(
+      Long districtId,
+      Map<Long, Integer> distanceByDistrict,
+      boolean anchoredOnTheWholeCity,
+      int wholeCityRank) {
+    if (districtId == null) {
+      return wholeCityRank;
+    }
+    return anchoredOnTheWholeCity ? 0 : distanceByDistrict.get(districtId);
   }
 
   /**
@@ -186,7 +215,7 @@ public class DriverSearchService {
     }
 
     Map<Long, DriverModel> byId = new HashMap<>();
-    drivers.findActiveByIds(pageIds, Pageable.unpaged()).forEach(d -> byId.put(d.getId(), d));
+    drivers.findSearchableByIds(pageIds, Pageable.unpaged()).forEach(d -> byId.put(d.getId(), d));
 
     Map<Long, List<String>> areaNamesByDriver = findAreaNames(pageIds);
 
