@@ -13,8 +13,10 @@ import br.com.vanep.country.model.CountryModel;
 import br.com.vanep.country.repository.CountryRepository;
 import br.com.vanep.district.repository.DistrictRepository;
 import br.com.vanep.places.client.PlacesClient;
+import br.com.vanep.places.dto.AddressComponentDTO;
 import br.com.vanep.places.dto.PlaceDetailsResponseDTO;
 import br.com.vanep.places.exception.PlaceNotFoundException;
+import br.com.vanep.state.seed.StateSeeder;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
@@ -22,6 +24,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.BDDMockito;
@@ -52,6 +55,7 @@ class PersonalAddressControllerTest {
   @Autowired private UserRepository users;
   @Autowired private AddressRepository addresses;
   @Autowired private CountryRepository countries;
+  @Autowired private StateSeeder stateSeeder;
   @Autowired private DistrictRepository districts;
 
   @MockitoBean private PlacesClient places;
@@ -69,6 +73,8 @@ class PersonalAddressControllerTest {
     brasil.setPhoneCode("+55");
     brasil.setCurrency("BRL");
     countries.save(brasil);
+    // Country and state are curated: the resolver reads them, never creates them.
+    stateSeeder.seed();
 
     UserModel user = new UserModel();
     user.setType(UserType.DRIVER);
@@ -85,6 +91,22 @@ class PersonalAddressControllerTest {
         new ClassPathResource("fixtures/places/" + name + ".json")
             .getContentAsString(StandardCharsets.UTF_8);
     return MAPPER.readValue(json, PlaceDetailsResponseDTO.class);
+  }
+
+  private AddressComponentDTO component(String longText, String shortText, String... types) {
+    return new AddressComponentDTO(longText, shortText, List.of(types));
+  }
+
+  /** Um place que para na RA: cidade e Águas Claras, e nada abaixo disso. */
+  private PlaceDetailsResponseDTO administrativeRegionOnly() {
+    return new PlaceDetailsResponseDTO(
+        "ra-inteira",
+        "Águas Claras, Brasília - DF",
+        List.of(
+            component("Brazil", "BR", "country", "political"),
+            component("Distrito Federal", "DF", "administrative_area_level_1", "political"),
+            component("Brasília", "Brasília", "administrative_area_level_2", "political"),
+            component("Águas Claras", "Águas Claras", "administrative_area_level_4", "political")));
   }
 
   private JwtRequestPostProcessor caller() {
@@ -215,20 +237,43 @@ class PersonalAddressControllerTest {
         .andExpect(status().isBadRequest());
   }
 
+  /**
+   * A recusa é de place que para na região, não de place sem {@code route}. Esta fixture sintética
+   * tem cidade e RA e nada abaixo: descreve Águas Claras inteira, não uma casa dentro dela.
+   */
   @Test
-  void rejectsAPlaceWithoutAStreet() throws Exception {
-    BDDMockito.given(places.findPlaceDetails("setor-inteiro", null))
-        .willReturn(fixture("df-ceilandia"));
+  void rejectsAPlaceThatStopsAtTheAdministrativeRegion() throws Exception {
+    BDDMockito.given(places.findPlaceDetails("ra-inteira", null))
+        .willReturn(administrativeRegionOnly());
 
     mockMvc
         .perform(
             put("/api/user/me/address")
                 .with(caller())
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"placeId\":\"setor-inteiro\"}"))
+                .content("{\"placeId\":\"ra-inteira\"}"))
         .andExpect(status().isBadRequest());
 
     assertThat(addresses.count()).isZero();
+  }
+
+  /**
+   * O contra-exemplo que o 400 anterior escondia: a fixture df-ceilandia é a QNM 17, um pin
+   * legítimo, e o Google não lhe deu {@code route} nenhum — a quadra veio como {@code
+   * sublocality_level_3}. Antes virava 400; agora o logradouro sai da própria quadra.
+   */
+  @Test
+  void acceptsABlockAddressThatTheGoogleDidNotLabelAsRoute() throws Exception {
+    BDDMockito.given(places.findPlaceDetails("qnm-17", null)).willReturn(fixture("df-ceilandia"));
+
+    mockMvc
+        .perform(
+            put("/api/user/me/address")
+                .with(caller())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"placeId\":\"qnm-17\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.street").value("QNM 17"));
   }
 
   @Test

@@ -31,6 +31,10 @@ create index address_district_idx on address (district_id) where deleted_at is n
 -- motorista ao mesmo tempo. O endereço residencial é do ser humano, não do
 -- papel — e o endpoint é /api/user/me/address. Logo, mora em `users`.
 --
+-- Por isso `assistant` também não ganha coluna própria: assistente logado lê o
+-- endereço do seu `users`, e uma FK no papel seria a mesma duplicação que este
+-- comentário acabou de recusar.
+--
 -- `client.address_id` fica redundante a partir daqui. Não é removido nesta
 -- migration porque arrastaria ClientService, DTOs e testes para dentro de uma
 -- fase que já está no limite de arquivos (regra 41); a remoção está registrada
@@ -42,12 +46,6 @@ alter table users add constraint users_address_id_fkey
     foreign key (address_id) references address (id);
 create unique index users_address_id_active_key
     on users (address_id) where address_id is not null and deleted_at is null;
-
-alter table assistant add column address_id bigint;
-alter table assistant add constraint assistant_address_id_fkey
-    foreign key (address_id) references address (id);
-create unique index assistant_address_id_active_key
-    on assistant (address_id) where address_id is not null and deleted_at is null;
 
 comment on column users.address_id is
     'Endereço residencial do usuário, qualquer que seja o papel. Privado: nunca aparece em resposta de busca.';
