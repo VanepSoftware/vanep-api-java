@@ -81,7 +81,8 @@ public class DriverServiceAreaService {
       DriverServiceAreaModel area = new DriverServiceAreaModel();
       area.setDriver(driver);
       area.setCity(chain.city());
-      area.setDistrict(chain.deepestDistrict().orElse(null));
+      // A praça declarada é a RA, não a quadra dentro dela: ver shallowestDistrict.
+      area.setDistrict(chain.shallowestDistrict().orElse(null));
       // Dois places distintos podem resolver para o mesmo nó (D2). Deduplicar aqui
       // evita esbarrar no índice único e devolver 500 para um pedido legítimo.
       resolved.putIfAbsent(dedupeKey(area), area);

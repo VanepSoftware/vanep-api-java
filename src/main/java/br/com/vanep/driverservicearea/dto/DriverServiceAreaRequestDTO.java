@@ -12,7 +12,18 @@ import java.util.List;
  * <p>Cada item traz o seu próprio {@code sessionToken} porque cada caixa de autocomplete tem uma
  * sessão própria no Places (D5).
  */
-public record DriverServiceAreaRequestDTO(@NotEmpty @Valid List<Item> areas) {
+public record DriverServiceAreaRequestDTO(
+    @NotEmpty @Size(max = MAX_AREAS, message = "{driver_service_area.areas.too_many}") @Valid
+        List<Item> areas) {
+
+  /**
+   * Teto de regiões por motorista.
+   *
+   * <p>Sem ele, cada item da lista é um {@code Place Details} pago disparado dentro da mesma
+   * requisição, e o {@code sessionToken} ainda fura o cache (D5): um motorista autenticado mandando
+   * 200 ids viram 200 chamadas ao Google. O rate limit global cobre login e signup, não este PUT.
+   */
+  public static final int MAX_AREAS = 10;
 
   public record Item(
       @NotBlank @Size(max = 255) String placeId, @Size(max = 255) String sessionToken) {}

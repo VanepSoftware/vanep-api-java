@@ -13,9 +13,11 @@ import br.com.vanep.country.repository.CountryRepository;
 import br.com.vanep.driver.DriverApprovalStatus;
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
+import br.com.vanep.driverservicearea.dto.DriverServiceAreaRequestDTO;
 import br.com.vanep.driverservicearea.repository.DriverServiceAreaRepository;
 import br.com.vanep.places.client.PlacesClient;
 import br.com.vanep.places.dto.PlaceDetailsResponseDTO;
+import br.com.vanep.state.seed.StateSeeder;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
@@ -50,6 +52,7 @@ class DriverServiceAreaControllerTest {
   @Autowired private UserRepository users;
   @Autowired private DriverRepository drivers;
   @Autowired private CountryRepository countries;
+  @Autowired private StateSeeder stateSeeder;
   @Autowired private DriverServiceAreaRepository areas;
 
   @MockitoBean private PlacesClient places;
@@ -68,6 +71,8 @@ class DriverServiceAreaControllerTest {
     brasil.setPhoneCode("+55");
     brasil.setCurrency("BRL");
     countries.save(brasil);
+    // Country and state are curated: the resolver reads them, never creates them.
+    stateSeeder.seed();
 
     UserModel driverUser = new UserModel();
     driverUser.setType(UserType.DRIVER);
@@ -132,8 +137,13 @@ class DriverServiceAreaControllerTest {
         .andExpect(status().isForbidden());
   }
 
+  /**
+   * A fixture é um endereço de rua, que é o que o autocomplete devolve na prática: ela traz a
+   * cadeia inteira (Taguatinga → Setor L Norte → QNL 5). A praça declarada tem de ser a RA. Guardar
+   * a quadra faria o motorista sumir do resto de Taguatinga na busca, que casa por ancestrais (D4).
+   */
   @Test
-  void registersADistrictAsServiceArea() throws Exception {
+  void registersTheAdministrativeRegionAsServiceAreaNotTheBlockInsideIt() throws Exception {
     BDDMockito.given(places.findPlaceDetails("taguatinga", null))
         .willReturn(fixture("df-taguatinga-qnl5"));
 
@@ -144,10 +154,51 @@ class DriverServiceAreaControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body("taguatinga")))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$[0].name").value("QNL 5"))
+        .andExpect(jsonPath("$[0].name").value("Taguatinga"))
         .andExpect(jsonPath("$[0].cityName").value("Brasília"))
         .andExpect(jsonPath("$[0].coversWholeCity").value(false))
         .andExpect(jsonPath("$[0].token").isNotEmpty());
+  }
+
+  /**
+   * Dois endereços de quadras diferentes da mesma RA declaram a mesma praça. Sem o achatamento
+   * seriam duas linhas; com ele, uma — e é a deduplicação por nó que já existia que resolve.
+   */
+  @Test
+  void collapsesTwoAddressesOfTheSameRegionIntoOneArea() throws Exception {
+    BDDMockito.given(places.findPlaceDetails("qnl5", null))
+        .willReturn(fixture("df-taguatinga-qnl5"));
+    BDDMockito.given(places.findPlaceDetails("objetivo", null))
+        .willReturn(fixture("df-escola-objetivo"));
+
+    mockMvc
+        .perform(
+            put("/api/drivers/me/service-areas")
+                .with(as(driverUid))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"areas\":[{\"placeId\":\"qnl5\"},{\"placeId\":\"objetivo\"}]}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.length()").value(1))
+        .andExpect(jsonPath("$[0].name").value("Taguatinga"));
+  }
+
+  /** Cada item da lista é um Place Details pago disparado na mesma requisição. */
+  @Test
+  void rejectsMoreAreasThanTheCap() throws Exception {
+    String tooMany =
+        java.util.stream.IntStream.rangeClosed(0, DriverServiceAreaRequestDTO.MAX_AREAS)
+            .mapToObj(index -> "{\"placeId\":\"place-" + index + "\"}")
+            .collect(java.util.stream.Collectors.joining(",", "{\"areas\":[", "]}"));
+
+    mockMvc
+        .perform(
+            put("/api/drivers/me/service-areas")
+                .with(as(driverUid))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(tooMany))
+        .andExpect(status().isBadRequest());
+
+    BDDMockito.then(places).shouldHaveNoInteractions();
   }
 
   @Test

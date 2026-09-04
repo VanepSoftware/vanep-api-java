@@ -31,11 +31,26 @@ public record ResolvedLocationChainDTO(
 
   /**
    * O nó mais profundo resolvido: o distrito mais fundo, ou vazio quando a cadeia para na cidade.
+   *
+   * <p>É o nó certo para <b>endereço</b> — a pessoa mora na quadra, não na RA inteira.
    */
   public Optional<DistrictModel> deepestDistrict() {
     return districts.isEmpty()
         ? Optional.empty()
         : Optional.of(districts.get(districts.size() - 1));
+  }
+
+  /**
+   * O primeiro distrito abaixo da cidade: a RA no DF, o bairro na capital de SP.
+   *
+   * <p>É o nó certo para <b>área de atuação</b>, e é o oposto do endereço de casa. O autocomplete
+   * do Places quase nunca devolve o pin da RA: devolve um endereço, e com ele a cadeia inteira
+   * (Taguatinga → Setor L Norte → QNL 5). Guardar o nó mais fundo faria o motorista declarar que
+   * atende uma quadra — e, como a busca casa por ancestrais (D4), ele sumiria do resto de
+   * Taguatinga.
+   */
+  public Optional<DistrictModel> shallowestDistrict() {
+    return districts.isEmpty() ? Optional.empty() : Optional.of(districts.get(0));
   }
 
   /**
