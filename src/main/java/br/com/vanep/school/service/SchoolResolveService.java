@@ -8,6 +8,8 @@ import br.com.vanep.places.dto.PlaceDetailsResponseDTO;
 import br.com.vanep.school.dto.SchoolResolveRequestDTO;
 import br.com.vanep.school.model.SchoolModel;
 import br.com.vanep.school.repository.SchoolRepository;
+import java.util.Optional;
+import java.util.Set;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
@@ -24,6 +26,9 @@ import org.springframework.web.server.ResponseStatusException;
  */
 @Service
 public class SchoolResolveService {
+
+  /** Os dois {@code types} que o Google dá a uma escola — ver as fixtures da fase 1. */
+  private static final Set<String> SCHOOL_TYPES = Set.of("school", "educational_institution");
 
   private final PlacesClient places;
   private final LocationResolverService resolver;
@@ -47,11 +52,25 @@ public class SchoolResolveService {
   /** Resultado do resolve: a escola e se ela nasceu agora — o controller traduz em 201 ou 200. */
   public record Resolution(SchoolModel school, boolean created) {}
 
+  /**
+   * Ordem: banco primeiro, Google depois.
+   *
+   * <p>A escola que já existe é o caso comum — o pai reabrindo o mesmo colégio —, e para ele nada
+   * do Google é necessário. Perguntar antes de olhar a tabela pagava um SKU Pro para descobrir algo
+   * que já estava salvo, e ainda consumia o limite do R6, o que fazia o pai levar 429 por reabrir a
+   * mesma escola. Se o app abriu uma sessão de autocomplete, ela é encerrada pelo SKU gratuito.
+   */
   @Transactional
   public Resolution resolve(String callerUid, SchoolResolveRequestDTO request) {
-    // O limite vem antes da chamada ao Google de propósito (R6): cada placeId
-    // distinto custa um Place Details pago E cria uma linha. Varrer ids seria
-    // gastar dinheiro nosso e sujar uma tabela compartilhada.
+    Optional<SchoolModel> known = schools.findByGooglePlaceId(request.placeId());
+    if (known.isPresent()) {
+      places.closeAutocompleteSession(request.placeId(), request.sessionToken());
+      return new Resolution(known.get(), false);
+    }
+
+    // O limite guarda o caminho caro (R6): cada placeId desconhecido custa um
+    // Place Details pago E cria uma linha numa tabela compartilhada. Varrer ids
+    // seria gastar dinheiro nosso e sujar o catálogo de todo mundo.
     if (!rateLimiter.tryAcquire("school-resolve:" + callerUid)) {
       throw new ResponseStatusException(
           HttpStatus.TOO_MANY_REQUESTS, message("location.place.rate_limited"));
@@ -59,11 +78,29 @@ public class SchoolResolveService {
 
     PlaceDetailsResponseDTO details =
         places.findPlaceDetailsWithName(request.placeId(), request.sessionToken());
+    requireSchool(details);
 
+    // O Google pode devolver um id canônico diferente do pedido quando o place
+    // foi sucedido por outro. Só aqui dá para saber, então a tabela é conferida
+    // de novo antes de criar.
     return schools
         .findByGooglePlaceId(details.id())
         .map(existing -> new Resolution(existing, false))
         .orElseGet(() -> new Resolution(create(details), true));
+  }
+
+  /**
+   * Um {@code placeId} qualquer não vira escola.
+   *
+   * <p>A Q6 trancou o <b>nome</b> para ninguém plantar texto na listagem compartilhada, e o id
+   * ficou aberto: shopping, farmácia ou a casa de alguém entravam no catálogo que todo mundo vê,
+   * com o nome oficial do Google e cara de escola de verdade. O mesmo estrago, por outra porta.
+   */
+  private void requireSchool(PlaceDetailsResponseDTO details) {
+    if (details.types().stream().noneMatch(SCHOOL_TYPES::contains)) {
+      throw new ResponseStatusException(
+          HttpStatus.BAD_REQUEST, message("school.place.not_a_school"));
+    }
   }
 
   private SchoolModel create(PlaceDetailsResponseDTO details) {

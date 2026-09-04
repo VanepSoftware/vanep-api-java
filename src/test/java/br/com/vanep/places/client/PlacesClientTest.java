@@ -85,13 +85,41 @@ class PlacesClientTest {
     server.verify();
   }
 
+  /**
+   * O mask decide o SKU. Os quatro campos ficam em <i>Place Details Essentials</i>, uma cobrança só
+   * — {@code types} inclusive, que é o que permite recusar um shopping antes de ele virar escola
+   * sem subir a fatura. Campo novo aqui exige conferir o SKU antes.
+   */
   @Test
   void requestsOnlyTheEssentialsFieldMask() throws IOException {
     expectSuccessOnce("df-aguas-claras");
 
     client.findPlaceDetails(PLACE_ID);
 
-    assertThat(PlacesClient.FIELD_MASK).isEqualTo("id,formattedAddress,addressComponents");
+    assertThat(PlacesClient.FIELD_MASK).isEqualTo("id,formattedAddress,addressComponents,types");
+    server.verify();
+  }
+
+  /** Encerrar a sessão não pode custar mais que o SKU gratuito de id. */
+  @Test
+  void closesTheAutocompleteSessionWithTheFreeIdOnlyMask() throws IOException {
+    server
+        .expect(ExpectedCount.once(), requestTo(org.hamcrest.Matchers.startsWith(DETAILS_URL)))
+        .andExpect(queryParam("sessionToken", "session-abc"))
+        .andExpect(header("X-Goog-FieldMask", "id"))
+        .andRespond(withSuccess(fixture("df-taguatinga-qnl5"), MediaType.APPLICATION_JSON));
+
+    client.closeAutocompleteSession(PLACE_ID, "session-abc");
+
+    server.verify();
+  }
+
+  /** Sem token não há sessão a encerrar, e uma chamada a mais seria dinheiro fora. */
+  @Test
+  void doesNotCallGoogleToCloseASessionThatDoesNotExist() {
+    client.closeAutocompleteSession(PLACE_ID, null);
+    client.closeAutocompleteSession(PLACE_ID, "  ");
+
     server.verify();
   }
 

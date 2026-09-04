@@ -26,7 +26,16 @@ public class PlacesClient {
    * O field mask decide o SKU cobrado (Q2). Estes três campos ficam todos em <i>Place Details
    * Essentials</i>, uma cobrança só. Não acrescente campo aqui sem conferir em qual SKU ele cai.
    */
-  static final String FIELD_MASK = "id,formattedAddress,addressComponents";
+  static final String FIELD_MASK = "id,formattedAddress,addressComponents,types";
+
+  /**
+   * Só o {@code id}: <i>Place Details Essentials IDs Only</i>, SKU gratuito.
+   *
+   * <p>Existe para encerrar uma sessão de autocomplete sem pagar por dados que já temos. Sem essa
+   * chamada, as teclas digitadas na caixa de busca não entram no SKU de sessão e são cobradas
+   * avulsas (D5).
+   */
+  static final String FIELD_MASK_ID_ONLY = "id";
 
   /**
    * Mask do caminho de escola. Acrescenta {@code displayName}, que é <b>SKU Pro</b> — cobrado por
@@ -76,6 +85,21 @@ public class PlacesClient {
   /** Caminho de escola: traz também o nome do lugar. Custa um SKU Pro a mais — ver Q6. */
   public PlaceDetailsResponseDTO findPlaceDetailsWithName(String placeId, String sessionToken) {
     return findPlaceDetails(placeId, sessionToken, FIELD_MASK_WITH_NAME);
+  }
+
+  /**
+   * Encerra a sessão de autocomplete sem pedir dado nenhum além do {@code id}.
+   *
+   * <p>Para quando já temos a resposta no banco e nada do Google é necessário, mas a sessão que o
+   * app abriu precisa ser fechada mesmo assim: se ficar aberta, cada tecla digitada vira cobrança
+   * avulsa em vez de entrar no SKU de sessão (D5). Sem token não há sessão a encerrar e nada é
+   * chamado.
+   */
+  public void closeAutocompleteSession(String placeId, String sessionToken) {
+    if (sessionToken == null || sessionToken.isBlank()) {
+      return;
+    }
+    findPlaceDetails(placeId, sessionToken, FIELD_MASK_ID_ONLY);
   }
 
   private PlaceDetailsResponseDTO findPlaceDetails(

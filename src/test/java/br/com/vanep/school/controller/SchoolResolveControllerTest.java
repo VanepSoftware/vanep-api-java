@@ -12,6 +12,7 @@ import br.com.vanep.country.repository.CountryRepository;
 import br.com.vanep.places.client.PlacesClient;
 import br.com.vanep.places.dto.PlaceDetailsResponseDTO;
 import br.com.vanep.school.repository.SchoolRepository;
+import br.com.vanep.state.seed.StateSeeder;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
@@ -44,6 +45,7 @@ class SchoolResolveControllerTest {
   @Autowired private WebApplicationContext context;
   @Autowired private UserRepository users;
   @Autowired private CountryRepository countries;
+  @Autowired private StateSeeder stateSeeder;
   @Autowired private SchoolRepository schools;
 
   @MockitoBean private PlacesClient places;
@@ -61,6 +63,8 @@ class SchoolResolveControllerTest {
     brasil.setPhoneCode("+55");
     brasil.setCurrency("BRL");
     countries.save(brasil);
+    // Country and state are curated: the resolver reads them, never creates them.
+    stateSeeder.seed();
 
     UserModel user = new UserModel();
     user.setType(UserType.CLIENT);
@@ -83,6 +87,7 @@ class SchoolResolveControllerTest {
         base.id(),
         base.formattedAddress(),
         base.addressComponents(),
+        base.types(),
         new PlaceDetailsResponseDTO.DisplayName("Colégio Objetivo Taguatinga", "pt-BR"));
   }
 

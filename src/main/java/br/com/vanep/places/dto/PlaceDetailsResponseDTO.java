@@ -16,15 +16,17 @@ public record PlaceDetailsResponseDTO(
     String id,
     String formattedAddress,
     List<AddressComponentDTO> addressComponents,
+    List<String> types,
     DisplayName displayName) {
 
   public PlaceDetailsResponseDTO {
     addressComponents = addressComponents == null ? List.of() : List.copyOf(addressComponents);
+    types = types == null ? List.of() : List.copyOf(types);
   }
 
   public PlaceDetailsResponseDTO(
       String id, String formattedAddress, List<AddressComponentDTO> addressComponents) {
-    this(id, formattedAddress, addressComponents, null);
+    this(id, formattedAddress, addressComponents, List.of(), null);
   }
 
   /** Só vem preenchido quando o field mask pede {@code displayName} (SKU Pro — ver Q6). */
