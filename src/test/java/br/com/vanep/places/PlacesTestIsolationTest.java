@@ -11,9 +11,9 @@ import org.springframework.test.context.ActiveProfiles;
 /**
  * Guards constitution rule 50: no test calls a real external API.
  *
- * <p>The rule is enforced by configuration, not discipline — but configuration can be changed.
- * This test fails if someone points the test profile at a real host, which is how a suite starts
- * burning paid quota on every push without anyone noticing.
+ * <p>The rule is enforced by configuration, not discipline — but configuration can be changed. This
+ * test fails if someone points the test profile at a real host, which is how a suite starts burning
+ * paid quota on every push without anyone noticing.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -37,8 +37,6 @@ class PlacesTestIsolationTest {
 
   @Test
   void testProfileNeverCarriesARealApiKey() {
-    assertThat(apiKey)
-        .as("test profile api key must be obviously fake (rule 50)")
-        .contains("test");
+    assertThat(apiKey).as("test profile api key must be obviously fake (rule 50)").contains("test");
   }
 }
