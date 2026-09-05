@@ -61,11 +61,6 @@
             <input id="experienceYears" type="number" min="0" th:field="*{experienceYears}" />
           </div>
 
-          <div class="field">
-            <label for="city">Cidade de atuação</label>
-            <input id="city" type="text" th:field="*{city}" />
-            <div class="form-error" th:if="${#fields.hasErrors('city')}" th:errors="*{city}"></div>
-          </div>
 
           <div class="field">
             <label for="basePrice">Valor base (R$)</label>

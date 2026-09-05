@@ -13,7 +13,6 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class AssistantMapper {
-
   public AssistantInviteResponseDTO toInviteResponse(AssistantInviteModel invite) {
     return new AssistantInviteResponseDTO(
         invite.getToken(),
@@ -46,6 +45,6 @@ public class AssistantMapper {
 
   public AssistantDriverSummaryDTO toDriverSummary(DriverModel driver) {
     return new AssistantDriverSummaryDTO(
-        driver.getUser().getName(), driver.getPhoto(), driver.getCity(), driver.getRating());
+        driver.getUser().getName(), driver.getPhoto(), driver.getRating());
   }
 }

@@ -1,6 +1,7 @@
 package br.com.vanep.state.model;
 
 import br.com.vanep.country.model.CountryModel;
+import br.com.vanep.location.LocationNameNormalizer;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -10,6 +11,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.UUID;
@@ -26,7 +28,6 @@ import org.hibernate.annotations.UpdateTimestamp;
 @Getter
 @Setter
 public class StateModel {
-
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;
@@ -44,6 +45,15 @@ public class StateModel {
   @Column(nullable = false, length = 2)
   private String uf;
 
+  @Column(name = "normalized_name", nullable = false, length = 64)
+  private String normalizedName;
+
+  @Column(name = "google_place_id", length = 255)
+  private String googlePlaceId;
+
+  @Column(name = "requires_district", nullable = false)
+  private boolean requiresDistrict = false;
+
   @Column(name = "is_active", nullable = false)
   private boolean active = true;
 
@@ -60,5 +70,11 @@ public class StateModel {
     if (token == null) {
       token = UUID.randomUUID().toString().replace("-", "").substring(0, 25);
     }
+    normalizedName = LocationNameNormalizer.normalize(name);
+  }
+
+  @PreUpdate
+  void onUpdate() {
+    normalizedName = LocationNameNormalizer.normalize(name);
   }
 }

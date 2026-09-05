@@ -48,7 +48,6 @@ import org.springframework.web.context.WebApplicationContext;
 @ActiveProfiles("test")
 @Sql(scripts = "/db/clean.sql", executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
 class DependentControllerTest {
-
   private static final String OWNER_EMAIL = "owner@vanep.com";
   private static final String OTHER_EMAIL = "other@vanep.com";
   private static final String ADMIN_EMAIL = "admin@vanep.com";
@@ -132,15 +131,14 @@ class DependentControllerTest {
     address.setZipCode("13015904");
     address.setStreet(street);
     address.setNumber(number);
-    address.setDistrict("Centro");
     return addresses.save(address);
   }
 
   private AddressModel persistClientHomeAddress() {
     AddressModel address = persistAddress("Rua da Casa", "10");
     ClientModel client = clients.findByToken(ownerClientToken).orElseThrow();
-    client.setAddressId(address.getId());
-    clients.save(client);
+    client.getUser().setAddressId(address.getId());
+    users.save(client.getUser());
     return address;
   }
 

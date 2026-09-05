@@ -35,7 +35,6 @@ import org.springframework.web.context.WebApplicationContext;
 @ActiveProfiles("test")
 @Sql(scripts = "/db/clean.sql", executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
 class DriverControllerTest {
-
   @Autowired private WebApplicationContext context;
   @Autowired private UserRepository users;
   @Autowired private DriverRepository drivers;
@@ -187,7 +186,6 @@ class DriverControllerTest {
           "bio": "Expert driver",
           "cnpj": "11222333000181",
           "experienceYears": 10,
-          "city": "São Paulo",
           "basePrice": 120.50,
           "workStartTime": "08:00:00",
           "workEndTime": "18:00:00",
@@ -207,7 +205,6 @@ class DriverControllerTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.photo").value("http://photo.url"))
         .andExpect(jsonPath("$.bio").value("Expert driver"))
-        .andExpect(jsonPath("$.city").value("São Paulo"))
         .andExpect(jsonPath("$.basePrice").value(120.50))
         .andExpect(jsonPath("$.workDays[0]").value("Monday"))
         .andExpect(jsonPath("$.available").value(true));
@@ -218,7 +215,6 @@ class DriverControllerTest {
     String requestBody =
         """
         {
-          "city": "Rio de Janeiro",
           "basePrice": 150.00,
           "available": false
         }
@@ -231,7 +227,6 @@ class DriverControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(requestBody))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.city").value("Rio de Janeiro"))
         .andExpect(jsonPath("$.basePrice").value(150.00))
         .andExpect(jsonPath("$.available").value(false));
   }
@@ -241,7 +236,6 @@ class DriverControllerTest {
     String requestBody =
         """
         {
-          "city": "",
           "basePrice": -10.00,
           "available": null
         }
@@ -261,7 +255,6 @@ class DriverControllerTest {
     String requestBody =
         """
         {
-          "city": "Curitiba",
           "basePrice": 100.00,
           "available": true
         }
@@ -299,12 +292,10 @@ class DriverControllerTest {
 
   @Test
   void restoreReturns200ForAdmin() throws Exception {
-    // Delete first
     mockMvc
         .perform(delete("/api/drivers/" + driverToken).with(adminJwt()))
         .andExpect(status().isNoContent());
 
-    // Restore
     mockMvc
         .perform(post("/api/drivers/" + driverToken + "/restore").with(adminJwt()))
         .andExpect(status().isOk())

@@ -1,0 +1,62 @@
+{
+    "id": "Ek1SLiBTZXJyYSBkZSBCcmFnYW7Dp2EgLSBWaWxhIEdvbWVzIENhcmRpbSwgU8OjbyBQYXVsbyAtIFNQLCAwMzMxOC0wMDAsIEJyYXppbCIuKiwKFAoSCX8auMOSXs6UEa8F3o51TIAyEhQKEgnldMRFjF7OlBFsCebEiFkK4Q",
+    "types": [
+        "route"
+    ],
+    "formattedAddress": "R. Serra de Bragan\u00e7a - Vila Gomes Cardim, S\u00e3o Paulo - SP, 03318-000, Brazil",
+    "addressComponents": [
+        {
+            "longText": "Rua Serra de Bragan\u00e7a",
+            "shortText": "R. Serra de Bragan\u00e7a",
+            "types": [
+                "route"
+            ],
+            "languageCode": "pt"
+        },
+        {
+            "longText": "Vila Gomes Cardim",
+            "shortText": "Vila Gomes Cardim",
+            "types": [
+                "sublocality_level_1",
+                "sublocality",
+                "political"
+            ],
+            "languageCode": "pt"
+        },
+        {
+            "longText": "S\u00e3o Paulo",
+            "shortText": "S\u00e3o Paulo",
+            "types": [
+                "administrative_area_level_2",
+                "political"
+            ],
+            "languageCode": "pt"
+        },
+        {
+            "longText": "S\u00e3o Paulo",
+            "shortText": "SP",
+            "types": [
+                "administrative_area_level_1",
+                "political"
+            ],
+            "languageCode": "pt"
+        },
+        {
+            "longText": "Brazil",
+            "shortText": "BR",
+            "types": [
+                "country",
+                "political"
+            ],
+            "languageCode": "en"
+        },
+        {
+            "longText": "03318-000",
+            "shortText": "03318-000",
+            "types": [
+                "postal_code"
+            ],
+            "languageCode": "en-US"
+        }
+    ]
+}

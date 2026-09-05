@@ -1,0 +1,73 @@
+{
+    "id": "ChIJG8T6VpBZzpQRlRIN0v62pnA",
+    "types": [
+        "school",
+        "educational_institution",
+        "point_of_interest",
+        "establishment"
+    ],
+    "formattedAddress": "R. Estela, 268 - Vila Mariana, S\u00e3o Paulo - SP, 04011-001, Brazil",
+    "addressComponents": [
+        {
+            "longText": "268",
+            "shortText": "268",
+            "types": [
+                "street_number"
+            ],
+            "languageCode": "en-US"
+        },
+        {
+            "longText": "Rua Estela",
+            "shortText": "R. Estela",
+            "types": [
+                "route"
+            ],
+            "languageCode": "pt"
+        },
+        {
+            "longText": "Vila Mariana",
+            "shortText": "Vila Mariana",
+            "types": [
+                "sublocality_level_1",
+                "sublocality",
+                "political"
+            ],
+            "languageCode": "pt"
+        },
+        {
+            "longText": "S\u00e3o Paulo",
+            "shortText": "S\u00e3o Paulo",
+            "types": [
+                "administrative_area_level_2",
+                "political"
+            ],
+            "languageCode": "pt"
+        },
+        {
+            "longText": "S\u00e3o Paulo",
+            "shortText": "SP",
+            "types": [
+                "administrative_area_level_1",
+                "political"
+            ],
+            "languageCode": "pt"
+        },
+        {
+            "longText": "Brazil",
+            "shortText": "BR",
+            "types": [
+                "country",
+                "political"
+            ],
+            "languageCode": "en"
+        },
+        {
+            "longText": "04011-001",
+            "shortText": "04011-001",
+            "types": [
+                "postal_code"
+            ],
+            "languageCode": "en-US"
+        }
+    ]
+}

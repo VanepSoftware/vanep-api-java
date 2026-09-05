@@ -44,7 +44,6 @@ import org.springframework.web.server.ResponseStatusException;
 
 @ExtendWith(MockitoExtension.class)
 class DependentServiceTest {
-
   private static final String CLIENT_EMAIL = "ana.souza@vanep.com";
   private static final Long CLIENT_ID = 100L;
   private static final Long DEPENDENT_ID = 55L;
@@ -127,8 +126,7 @@ class DependentServiceTest {
   }
 
   private AddressRequestDTO addressRequest() {
-    return new AddressRequestDTO(
-        "city-campinas", "13015904", "Rua Barão de Jaguara", "1481", null, "Centro");
+    return new AddressRequestDTO("city-campinas", "13015904", "Rua Barão de Jaguara", "1481", null);
   }
 
   private DependentModel dependent(boolean isDefault) {

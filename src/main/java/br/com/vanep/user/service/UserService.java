@@ -16,21 +16,23 @@ import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class UserService {
-
   private final UserRepository users;
   private final MessageSource messages;
   private final EmailVerificationTokenRepository verificationTokens;
   private final UserProfileChangePolicy profileChangePolicy;
+  private final OnboardingService onboardingService;
 
   public UserService(
       UserRepository users,
       MessageSource messages,
       EmailVerificationTokenRepository verificationTokens,
-      UserProfileChangePolicy profileChangePolicy) {
+      UserProfileChangePolicy profileChangePolicy,
+      OnboardingService onboardingService) {
     this.users = users;
     this.messages = messages;
     this.verificationTokens = verificationTokens;
     this.profileChangePolicy = profileChangePolicy;
+    this.onboardingService = onboardingService;
   }
 
   private String message(String key) {
@@ -72,7 +74,8 @@ public class UserService {
         resolvePendingEmailForMe(user, now).orElse(null),
         profileChangePolicy.retryAfter(user.getLastNameChangeAt(), now).orElse(null),
         profileChangePolicy.retryAfter(user.getLastPhoneChangeAt(), now).orElse(null),
-        profileChangePolicy.retryAfter(user.getLastEmailChangeAt(), now).orElse(null));
+        profileChangePolicy.retryAfter(user.getLastEmailChangeAt(), now).orElse(null),
+        onboardingService.findPendingSteps(user));
   }
 
   Optional<String> resolvePendingEmailForMe(UserModel user, Instant now) {

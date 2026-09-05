@@ -39,7 +39,6 @@ import org.springframework.web.server.ResponseStatusException;
 
 @ExtendWith(MockitoExtension.class)
 class SchoolServiceTest {
-
   private static final Long SCHOOL_ID = 7L;
   private static final String TOKEN = "tok";
 
@@ -63,31 +62,20 @@ class SchoolServiceTest {
     school.setId(SCHOOL_ID);
     school.setToken(token);
     school.setName("Escola Teste");
-    school.setCnpj("11222333000181");
-    school.setPhone("11999990000");
-    school.setEmail("contato@escolateste.com.br");
     return school;
   }
 
   private SchoolResponseDTO responseFor(String token) {
     return new SchoolResponseDTO(
-        token,
-        "Escola Teste",
-        "11222333000181",
-        "11999990000",
-        "contato@escolateste.com.br",
-        null,
-        true,
-        null);
+        token, "Escola Teste", null, null, null, null, null, null, true, null);
   }
 
-  private SchoolRequestDTO requestFor(String name, String cnpj) {
-    return new SchoolRequestDTO(name, cnpj, null, null, null);
+  private SchoolRequestDTO requestFor(String name) {
+    return new SchoolRequestDTO(name, null);
   }
 
   private AddressRequestDTO addressRequest() {
-    return new AddressRequestDTO(
-        "city-campinas", "13015904", "Rua da Escola", "1481", null, "Centro");
+    return new AddressRequestDTO("city-campinas", "13015904", "Rua da Escola", "1481", null);
   }
 
   private AddressResponseDTO addressResponse() {
@@ -106,21 +94,12 @@ class SchoolServiceTest {
   }
 
   private SchoolUpdateRequestDTO patch(
-      JsonNullable<String> name,
-      JsonNullable<String> cnpj,
-      JsonNullable<String> phone,
-      JsonNullable<String> email,
-      JsonNullable<AddressRequestDTO> address) {
-    return new SchoolUpdateRequestDTO(name, cnpj, phone, email, address);
+      JsonNullable<String> name, JsonNullable<AddressRequestDTO> address) {
+    return new SchoolUpdateRequestDTO(name, address);
   }
 
   private SchoolUpdateRequestDTO nameOnly(String name) {
-    return patch(
-        JsonNullable.of(name),
-        JsonNullable.undefined(),
-        JsonNullable.undefined(),
-        JsonNullable.undefined(),
-        JsonNullable.undefined());
+    return patch(JsonNullable.of(name), JsonNullable.undefined());
   }
 
   @Test
@@ -156,10 +135,9 @@ class SchoolServiceTest {
 
   @Test
   void createPersistsSchool() {
-    SchoolRequestDTO request = requestFor("Escola Teste", "11222333000181");
+    SchoolRequestDTO request = requestFor("Escola Teste");
     SchoolModel saved = schoolWithToken(TOKEN);
     SchoolResponseDTO response = responseFor(TOKEN);
-    when(repository.existsByCnpj("11222333000181")).thenReturn(false);
     when(repository.save(any(SchoolModel.class))).thenReturn(saved);
     when(mapper.toResponse(saved, null)).thenReturn(response);
 
@@ -173,7 +151,7 @@ class SchoolServiceTest {
   @Test
   void createWithAddressUpsertsAfterPersist() {
     AddressRequestDTO address = addressRequest();
-    SchoolRequestDTO request = new SchoolRequestDTO("Escola Teste", null, null, null, address);
+    SchoolRequestDTO request = new SchoolRequestDTO("Escola Teste", address);
     SchoolModel saved = schoolWithToken(TOKEN);
     SchoolResponseDTO response = responseFor(TOKEN);
     when(repository.save(any(SchoolModel.class))).thenReturn(saved);
@@ -187,29 +165,6 @@ class SchoolServiceTest {
     InOrder order = inOrder(repository, addressService);
     order.verify(repository).save(any(SchoolModel.class));
     order.verify(addressService).upsertForSchool(SCHOOL_ID, address);
-  }
-
-  @Test
-  void createThrows409WhenCnpjDuplicated() {
-    when(repository.existsByCnpj("11222333000181")).thenReturn(true);
-
-    assertThatThrownBy(() -> service.create(requestFor("Escola Teste", "11222333000181")))
-        .isInstanceOf(ResponseStatusException.class)
-        .hasMessageContaining("409");
-    verify(repository, never()).save(any(SchoolModel.class));
-  }
-
-  @Test
-  void createAllowsNullCnpj() {
-    SchoolModel saved = schoolWithToken(TOKEN);
-    SchoolResponseDTO response = responseFor(TOKEN);
-    when(repository.save(any(SchoolModel.class))).thenReturn(saved);
-    when(mapper.toResponse(saved, null)).thenReturn(response);
-
-    SchoolResponseDTO result = service.create(requestFor("Escola Sem CNPJ", null));
-
-    assertThat(result).isEqualTo(response);
-    verify(repository, never()).existsByCnpj(any());
   }
 
   @Test
@@ -227,49 +182,6 @@ class SchoolServiceTest {
   }
 
   @Test
-  void updateNameOnlyDoesNotTouchCnpjPhoneEmailOrAddress() {
-    SchoolModel school = schoolWithToken(TOKEN);
-    school.setAddressId(10L);
-    SchoolResponseDTO response = responseFor(TOKEN);
-    when(repository.findByToken(TOKEN)).thenReturn(Optional.of(school));
-    when(repository.save(school)).thenReturn(school);
-    when(addressService.toResponseOrNull(10L)).thenReturn(addressResponse());
-    when(mapper.toResponse(eq(school), any())).thenReturn(response);
-
-    service.update(TOKEN, nameOnly("Novo"));
-
-    assertThat(school.getName()).isEqualTo("Novo");
-    assertThat(school.getCnpj()).isEqualTo("11222333000181");
-    assertThat(school.getPhone()).isEqualTo("11999990000");
-    assertThat(school.getEmail()).isEqualTo("contato@escolateste.com.br");
-    assertThat(school.getAddressId()).isEqualTo(10L);
-    verify(addressService, never()).upsertForSchool(any(), any());
-    verify(addressService, never()).clearForSchool(any());
-  }
-
-  @Test
-  void updatePresentNullCnpjClearsCnpj() {
-    SchoolModel school = schoolWithToken(TOKEN);
-    SchoolResponseDTO response = responseFor(TOKEN);
-    when(repository.findByToken(TOKEN)).thenReturn(Optional.of(school));
-    when(repository.save(school)).thenReturn(school);
-    when(mapper.toResponse(school, null)).thenReturn(response);
-
-    service.update(
-        TOKEN,
-        patch(
-            JsonNullable.undefined(),
-            JsonNullable.of(null),
-            JsonNullable.undefined(),
-            JsonNullable.undefined(),
-            JsonNullable.undefined()));
-
-    assertThat(school.getCnpj()).isNull();
-    assertThat(school.getPhone()).isEqualTo("11999990000");
-    assertThat(school.getEmail()).isEqualTo("contato@escolateste.com.br");
-  }
-
-  @Test
   void updatePresentNullAddressClearsAddress() {
     SchoolModel school = schoolWithToken(TOKEN);
     school.setAddressId(10L);
@@ -278,14 +190,7 @@ class SchoolServiceTest {
     when(repository.findById(SCHOOL_ID)).thenReturn(Optional.of(school));
     when(mapper.toResponse(eq(school), isNull())).thenReturn(responseFor(TOKEN));
 
-    service.update(
-        TOKEN,
-        patch(
-            JsonNullable.undefined(),
-            JsonNullable.undefined(),
-            JsonNullable.undefined(),
-            JsonNullable.undefined(),
-            JsonNullable.of(null)));
+    service.update(TOKEN, patch(JsonNullable.undefined(), JsonNullable.of(null)));
 
     verify(addressService).clearForSchool(SCHOOL_ID);
     verify(addressService, never()).upsertForSchool(any(), any());
@@ -301,14 +206,7 @@ class SchoolServiceTest {
     when(repository.findById(SCHOOL_ID)).thenReturn(Optional.of(school));
     when(mapper.toResponse(eq(school), isNull())).thenReturn(responseFor(TOKEN));
 
-    service.update(
-        TOKEN,
-        patch(
-            JsonNullable.undefined(),
-            JsonNullable.undefined(),
-            JsonNullable.undefined(),
-            JsonNullable.undefined(),
-            JsonNullable.of(request)));
+    service.update(TOKEN, patch(JsonNullable.undefined(), JsonNullable.of(request)));
 
     verify(addressService).upsertForSchool(SCHOOL_ID, request);
   }
@@ -345,61 +243,9 @@ class SchoolServiceTest {
     when(repository.save(school)).thenReturn(school);
     when(mapper.toResponse(school, null)).thenReturn(response);
 
-    service.update(
-        TOKEN,
-        patch(
-            JsonNullable.undefined(),
-            JsonNullable.of("99888777000166"),
-            JsonNullable.undefined(),
-            JsonNullable.undefined(),
-            JsonNullable.undefined()));
+    service.update(TOKEN, patch(JsonNullable.undefined(), JsonNullable.undefined()));
 
     assertThat(school.getName()).isEqualTo("Escola Teste");
-    assertThat(school.getCnpj()).isEqualTo("99888777000166");
-  }
-
-  @Test
-  void updateThrows409WhenCnpjBelongsToAnotherSchool() {
-    SchoolModel school = schoolWithToken(TOKEN);
-    when(repository.findByToken(TOKEN)).thenReturn(Optional.of(school));
-    when(repository.existsByCnpjAndTokenNot("99888777000166", TOKEN)).thenReturn(true);
-
-    assertThatThrownBy(
-            () ->
-                service.update(
-                    TOKEN,
-                    patch(
-                        JsonNullable.undefined(),
-                        JsonNullable.of("99888777000166"),
-                        JsonNullable.undefined(),
-                        JsonNullable.undefined(),
-                        JsonNullable.undefined())))
-        .isInstanceOf(ResponseStatusException.class)
-        .hasMessageContaining("409");
-    assertThat(school.getCnpj()).isEqualTo("11222333000181");
-    verify(repository, never()).save(any(SchoolModel.class));
-  }
-
-  @Test
-  void updateKeepsSameCnpjWithoutConflict() {
-    SchoolModel school = schoolWithToken(TOKEN);
-    SchoolResponseDTO response = responseFor(TOKEN);
-    when(repository.findByToken(TOKEN)).thenReturn(Optional.of(school));
-    when(repository.save(school)).thenReturn(school);
-    when(mapper.toResponse(school, null)).thenReturn(response);
-
-    SchoolResponseDTO result =
-        service.update(
-            TOKEN,
-            patch(
-                JsonNullable.undefined(),
-                JsonNullable.of("11222333000181"),
-                JsonNullable.undefined(),
-                JsonNullable.undefined(),
-                JsonNullable.undefined()));
-
-    assertThat(result).isEqualTo(response);
-    verify(repository, never()).existsByCnpjAndTokenNot(any(), any());
   }
 
   @Test

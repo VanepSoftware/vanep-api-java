@@ -32,7 +32,6 @@ import org.springframework.web.context.WebApplicationContext;
 @ActiveProfiles("test")
 @Sql(scripts = "/db/clean.sql", executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
 class RegistrationControllerTest {
-
   private static final String VALID_CPF_ANA = "39053344705";
   private static final String VALID_CPF_BRUNO = "52998224725";
   private static final String VALID_CPF_CARLA = "11144477735";
@@ -108,7 +107,6 @@ class RegistrationControllerTest {
                 .param("email", "bruno@vanep.com")
                 .param("password", "secret1")
                 .param("document", VALID_CPF_BRUNO)
-                .param("city", "Taguatinga")
                 .param("basePrice", "120.00")
                 .param("acceptTerms", "true"))
         .andExpect(status().is3xxRedirection())

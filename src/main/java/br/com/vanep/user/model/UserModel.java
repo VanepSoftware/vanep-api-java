@@ -27,7 +27,6 @@ import org.hibernate.annotations.UpdateTimestamp;
 @Getter
 @Setter
 public class UserModel {
-
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;
@@ -44,6 +43,9 @@ public class UserModel {
 
   @Column(name = "country_id")
   private Long countryId;
+
+  @Column(name = "address_id")
+  private Long addressId;
 
   @Column(nullable = false)
   private String name;

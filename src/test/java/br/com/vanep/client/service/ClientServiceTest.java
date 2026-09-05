@@ -3,13 +3,9 @@ package br.com.vanep.client.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import br.com.vanep.address.dto.AddressRequestDTO;
 import br.com.vanep.address.dto.AddressResponseDTO;
 import br.com.vanep.address.service.AddressService;
 import br.com.vanep.client.dto.ClientMeSummaryResponseDTO;
@@ -28,7 +24,6 @@ import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.MessageSource;
@@ -39,7 +34,6 @@ import org.springframework.web.server.ResponseStatusException;
 
 @ExtendWith(MockitoExtension.class)
 class ClientServiceTest {
-
   @Mock private ClientRepository repository;
   @Mock private ClientMapper mapper;
   @Mock private UserService userService;
@@ -98,18 +92,14 @@ class ClientServiceTest {
         null,
         null,
         null,
+        null,
         null);
-  }
-
-  private AddressRequestDTO addressRequest() {
-    return new AddressRequestDTO(
-        "city-campinas", "13015904", "Rua Barão de Jaguara", "1481", null, "Centro");
   }
 
   @Test
   void findAllReturnsPagedResponsesWithNestedAddress() {
     ClientModel client = clientWithToken("abc");
-    client.setAddressId(10L);
+    client.getUser().setAddressId(10L);
     AddressResponseDTO address = addressResponse("addr-tok");
     ClientResponseDTO response =
         new ClientResponseDTO("abc", "Test", "t@t.com", null, null, address, true, null);
@@ -140,7 +130,7 @@ class ClientServiceTest {
   @Test
   void findByTokenReturnsNestedAddress() {
     ClientModel client = clientWithToken("tok");
-    client.setAddressId(10L);
+    client.getUser().setAddressId(10L);
     AddressResponseDTO address = addressResponse("addr-tok");
     ClientResponseDTO response =
         new ClientResponseDTO("tok", "Name", "e@e.com", null, null, address, true, null);
@@ -165,7 +155,7 @@ class ClientServiceTest {
   @Test
   void updatePersistsPhotoWithoutTouchingAddress() {
     ClientModel client = clientWithToken("tok");
-    client.setAddressId(5L);
+    client.getUser().setAddressId(5L);
     AddressResponseDTO address = addressResponse("addr-tok");
     ClientResponseDTO response =
         new ClientResponseDTO("tok", "Name", "e@e.com", "photo.jpg", null, address, true, null);
@@ -178,8 +168,7 @@ class ClientServiceTest {
 
     assertThat(result).isEqualTo(response);
     assertThat(client.getPhoto()).isEqualTo("photo.jpg");
-    assertThat(client.getAddressId()).isEqualTo(5L);
-    verify(addressService, never()).upsertForClient(any(), any());
+    assertThat(client.getUser().getAddressId()).isEqualTo(5L);
   }
 
   @Test
@@ -190,18 +179,6 @@ class ClientServiceTest {
         .isInstanceOf(ResponseStatusException.class)
         .extracting(ex -> ((ResponseStatusException) ex).getStatusCode().value())
         .isEqualTo(404);
-  }
-
-  @Test
-  void deleteClearsAddressBeforeDeletingClient() {
-    ClientModel client = clientWithToken("tok");
-    when(repository.findByToken("tok")).thenReturn(Optional.of(client));
-
-    service.delete("tok");
-
-    InOrder order = inOrder(addressService, repository);
-    order.verify(addressService).clearForClient(7L);
-    order.verify(repository).delete(client);
   }
 
   @Test
@@ -246,7 +223,7 @@ class ClientServiceTest {
   @Test
   void getMyProfileReturnsNestedAddressWhenLinked() {
     ClientModel client = clientWithToken("client-tok");
-    client.setAddressId(10L);
+    client.getUser().setAddressId(10L);
     UserModel user = client.getUser();
     AddressResponseDTO address = addressResponse("addr-tok");
     var summary = new ClientMeSummaryResponseDTO("client-tok", null, null, true, userMe(), address);
@@ -261,56 +238,5 @@ class ClientServiceTest {
     assertThat(result.address()).isEqualTo(address);
     assertThat(result.address().cityToken()).isEqualTo("city-campinas");
     assertThat(result.address().stateUf()).isEqualTo("SP");
-  }
-
-  @Test
-  void upsertMyAddressDelegatesToAddressService() {
-    ClientModel client = clientWithToken("client-tok");
-    UserModel user = client.getUser();
-    AddressRequestDTO request = addressRequest();
-    AddressResponseDTO response = addressResponse("addr-tok");
-    when(userService.requireByTokenAndType("owner-uid", UserType.CLIENT)).thenReturn(user);
-    when(repository.findByUserId(1L)).thenReturn(Optional.of(client));
-    when(addressService.upsertForClient(7L, request)).thenReturn(response);
-
-    assertThat(service.upsertMyAddress("owner-uid", request)).isEqualTo(response);
-    verify(addressService).upsertForClient(7L, request);
-  }
-
-  @Test
-  void upsertMyAddressThrows403WhenUserTypeMismatch() {
-    AddressRequestDTO request = addressRequest();
-    when(userService.requireByTokenAndType("driver-uid", UserType.CLIENT))
-        .thenThrow(new ResponseStatusException(HttpStatus.FORBIDDEN, "forbidden"));
-
-    assertThatThrownBy(() -> service.upsertMyAddress("driver-uid", request))
-        .isInstanceOf(ResponseStatusException.class)
-        .extracting(ex -> ((ResponseStatusException) ex).getStatusCode().value())
-        .isEqualTo(403);
-    verify(addressService, never()).upsertForClient(any(), any());
-  }
-
-  @Test
-  void clearMyAddressDelegatesToAddressService() {
-    ClientModel client = clientWithToken("client-tok");
-    UserModel user = client.getUser();
-    when(userService.requireByTokenAndType("owner-uid", UserType.CLIENT)).thenReturn(user);
-    when(repository.findByUserId(1L)).thenReturn(Optional.of(client));
-
-    service.clearMyAddress("owner-uid");
-
-    verify(addressService).clearForClient(7L);
-  }
-
-  @Test
-  void clearMyAddressThrows403WhenUserTypeMismatch() {
-    when(userService.requireByTokenAndType("driver-uid", UserType.CLIENT))
-        .thenThrow(new ResponseStatusException(HttpStatus.FORBIDDEN, "forbidden"));
-
-    assertThatThrownBy(() -> service.clearMyAddress("driver-uid"))
-        .isInstanceOf(ResponseStatusException.class)
-        .extracting(ex -> ((ResponseStatusException) ex).getStatusCode().value())
-        .isEqualTo(403);
-    verify(addressService, never()).clearForClient(any());
   }
 }

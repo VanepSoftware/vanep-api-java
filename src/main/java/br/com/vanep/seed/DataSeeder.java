@@ -1,9 +1,7 @@
 package br.com.vanep.seed;
 
-import br.com.vanep.address.seed.AddressSeeder;
 import br.com.vanep.auth.security.PermissionEnum;
 import br.com.vanep.auth.security.PermissionRegistry;
-import br.com.vanep.city.seed.CitySeeder;
 import br.com.vanep.client.model.ClientModel;
 import br.com.vanep.client.repository.ClientRepository;
 import br.com.vanep.country.seed.CountrySeeder;
@@ -19,7 +17,6 @@ import br.com.vanep.role.model.RoleModel;
 import br.com.vanep.role.repository.RoleRepository;
 import br.com.vanep.rolepermission.model.RolePermissionModel;
 import br.com.vanep.rolepermission.repository.RolePermissionRepository;
-import br.com.vanep.school.seed.SchoolSeeder;
 import br.com.vanep.state.seed.StateSeeder;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
@@ -38,7 +35,6 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class DataSeeder implements ApplicationRunner {
-
   private static final Logger log = LoggerFactory.getLogger(DataSeeder.class);
   private static final String ADMIN_BUNDLE_NAME = "ADMIN";
   private static final String CLIENT_BUNDLE_NAME = "CLIENT";
@@ -53,11 +49,8 @@ public class DataSeeder implements ApplicationRunner {
   private final DependentSeeder dependentSeeder;
   private final DriverCnhSeeder driverCnhSeeder;
   private final DriverDocumentSeeder driverDocumentSeeder;
-  private final SchoolSeeder schoolSeeder;
   private final CountrySeeder countrySeeder;
   private final StateSeeder stateSeeder;
-  private final CitySeeder citySeeder;
-  private final AddressSeeder addressSeeder;
   private final DriverRatingSeeder driverRatingSeeder;
   private final PasswordEncoder passwordEncoder;
 
@@ -85,11 +78,8 @@ public class DataSeeder implements ApplicationRunner {
       DependentSeeder dependentSeeder,
       DriverCnhSeeder driverCnhSeeder,
       DriverDocumentSeeder driverDocumentSeeder,
-      SchoolSeeder schoolSeeder,
       CountrySeeder countrySeeder,
       StateSeeder stateSeeder,
-      CitySeeder citySeeder,
-      AddressSeeder addressSeeder,
       DriverRatingSeeder driverRatingSeeder,
       PasswordEncoder passwordEncoder) {
     this.users = users;
@@ -100,11 +90,8 @@ public class DataSeeder implements ApplicationRunner {
     this.dependentSeeder = dependentSeeder;
     this.driverCnhSeeder = driverCnhSeeder;
     this.driverDocumentSeeder = driverDocumentSeeder;
-    this.schoolSeeder = schoolSeeder;
     this.countrySeeder = countrySeeder;
     this.stateSeeder = stateSeeder;
-    this.citySeeder = citySeeder;
-    this.addressSeeder = addressSeeder;
     this.driverRatingSeeder = driverRatingSeeder;
     this.passwordEncoder = passwordEncoder;
   }
@@ -125,11 +112,9 @@ public class DataSeeder implements ApplicationRunner {
     dependentSeeder.seed();
     driverCnhSeeder.seed();
     driverDocumentSeeder.seed();
-    schoolSeeder.seed();
     countrySeeder.seed();
+
     stateSeeder.seed();
-    citySeeder.seed();
-    addressSeeder.seed();
     driverRatingSeeder.seed();
     if (seedOnly) {
       log.info("Seed-only: data seeded; the application will shut down.");
@@ -187,12 +172,19 @@ public class DataSeeder implements ApplicationRunner {
     if (clientRole.getRolePermission() == null) {
       RolePermissionModel bundle = new RolePermissionModel();
       bundle.setName(CLIENT_BUNDLE_NAME);
-      bundle.setPermissions(List.copyOf(PermissionEnum.crudFor("dependents")));
+      bundle.setPermissions(clientPermissions());
       bundle = rolePermissions.save(bundle);
       clientRole.setRolePermission(bundle);
       roles.save(clientRole);
-      log.info("Seed: CLIENT bundle created with dependents permissions.");
+      log.info("Seed: CLIENT bundle created with dependents and driver read permissions.");
     }
+  }
+
+  static List<String> clientPermissions() {
+    List<String> permissions = new java.util.ArrayList<>(PermissionEnum.crudFor("dependents"));
+    permissions.add(PermissionEnum.LIST_DRIVERS.value());
+    permissions.add(PermissionEnum.SHOW_DRIVER.value());
+    return List.copyOf(permissions);
   }
 
   private void seedAssistantPermissions() {

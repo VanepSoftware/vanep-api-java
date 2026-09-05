@@ -7,8 +7,6 @@ import br.com.vanep.address.model.AddressModel;
 import br.com.vanep.address.repository.AddressRepository;
 import br.com.vanep.city.model.CityModel;
 import br.com.vanep.city.repository.CityRepository;
-import br.com.vanep.client.model.ClientModel;
-import br.com.vanep.client.repository.ClientRepository;
 import br.com.vanep.dependent.model.DependentModel;
 import br.com.vanep.dependent.repository.DependentRepository;
 import br.com.vanep.school.model.SchoolModel;
@@ -26,12 +24,10 @@ import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class AddressService {
-
   private final AddressRepository addressRepository;
   private final CityRepository cityRepository;
   private final AddressMapper mapper;
   private final MessageSource messages;
-  private final ClientRepository clients;
   private final DependentRepository dependents;
   private final SchoolRepository schools;
 
@@ -40,14 +36,12 @@ public class AddressService {
       CityRepository cityRepository,
       AddressMapper mapper,
       MessageSource messages,
-      ClientRepository clients,
       DependentRepository dependents,
       SchoolRepository schools) {
     this.addressRepository = addressRepository;
     this.cityRepository = cityRepository;
     this.mapper = mapper;
     this.messages = messages;
-    this.clients = clients;
     this.dependents = dependents;
     this.schools = schools;
   }
@@ -72,23 +66,6 @@ public class AddressService {
   }
 
   @Transactional
-  public AddressResponseDTO upsertForClient(Long clientId, AddressRequestDTO request) {
-    ClientModel client = requireClient(clientId);
-    return upsertOwnedAddress(
-        client.getAddressId(),
-        request,
-        () ->
-            rejectIfOwnedByAnotherActiveOwner(
-                clients.countByAddressIdAndIdNot(client.getAddressId(), client.getId()),
-                dependents.countByAddressId(client.getAddressId()),
-                schools.countByAddressId(client.getAddressId())),
-        savedId -> {
-          client.setAddressId(savedId);
-          clients.save(client);
-        });
-  }
-
-  @Transactional
   public AddressResponseDTO upsertForDependent(Long dependentId, AddressRequestDTO request) {
     DependentModel dependent = requireDependent(dependentId);
     return upsertOwnedAddress(
@@ -96,7 +73,6 @@ public class AddressService {
         request,
         () ->
             rejectIfOwnedByAnotherActiveOwner(
-                clients.countByAddressId(dependent.getAddressId()),
                 dependents.countByAddressIdAndIdNot(dependent.getAddressId(), dependent.getId()),
                 schools.countByAddressId(dependent.getAddressId())),
         savedId -> {
@@ -113,23 +89,12 @@ public class AddressService {
         request,
         () ->
             rejectIfOwnedByAnotherActiveOwner(
-                clients.countByAddressId(school.getAddressId()),
                 dependents.countByAddressId(school.getAddressId()),
                 schools.countByAddressIdAndIdNot(school.getAddressId(), school.getId())),
         savedId -> {
           school.setAddressId(savedId);
           schools.save(school);
         });
-  }
-
-  @Transactional
-  public void clearForClient(Long clientId) {
-    ClientModel client = requireClient(clientId);
-    softDeleteOwnedAddress(client.getAddressId());
-    if (client.getAddressId() != null) {
-      client.setAddressId(null);
-      clients.save(client);
-    }
   }
 
   @Transactional
@@ -184,20 +149,10 @@ public class AddressService {
     addressRepository.findById(addressId).ifPresent(addressRepository::delete);
   }
 
-  private void rejectIfOwnedByAnotherActiveOwner(
-      long clientCount, long dependentCount, long schoolCount) {
-    if (clientCount + dependentCount + schoolCount > 0) {
+  private void rejectIfOwnedByAnotherActiveOwner(long dependentCount, long schoolCount) {
+    if (dependentCount + schoolCount > 0) {
       throw new ResponseStatusException(HttpStatus.CONFLICT, message("address.already_owned"));
     }
-  }
-
-  private ClientModel requireClient(Long clientId) {
-    return clients
-        .findById(clientId)
-        .orElseThrow(
-            () ->
-                new ResponseStatusException(
-                    HttpStatus.NOT_FOUND, message("client.profile.not_found")));
   }
 
   private DependentModel requireDependent(Long dependentId) {
@@ -221,7 +176,6 @@ public class AddressService {
     address.setStreet(request.street());
     address.setNumber(request.number());
     address.setComplement(request.complement());
-    address.setDistrict(request.district());
   }
 
   private CityModel requireCityByToken(String cityToken) {

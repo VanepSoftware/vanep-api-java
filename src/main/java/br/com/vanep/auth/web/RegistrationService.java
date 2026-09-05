@@ -20,7 +20,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class RegistrationService {
-
   private final UserRepository users;
   private final ClientRepository clients;
   private final DriverRepository drivers;
@@ -63,7 +62,6 @@ public class RegistrationService {
     driver.setUser(user);
     driver.setCnpj(form.getCnpj());
     driver.setExperienceYears(form.getExperienceYears());
-    driver.setCity(form.getCity());
     driver.setBasePrice(form.getBasePrice());
     driver.setApprovalStatus(DriverApprovalStatus.PENDING);
     drivers.save(driver);

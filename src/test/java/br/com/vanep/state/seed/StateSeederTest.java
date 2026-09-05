@@ -22,7 +22,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
 class StateSeederTest {
-
   @Mock private StateRepository states;
   @Mock private CountryRepository countries;
 
@@ -36,7 +35,7 @@ class StateSeederTest {
 
   @Test
   void createsAll27BrazilianStatesWhenMissing() {
-    when(states.existsByUf(anyString())).thenReturn(false);
+    when(states.findByUf(anyString())).thenReturn(Optional.empty());
 
     seeder.seed();
 
@@ -49,11 +48,54 @@ class StateSeederTest {
   }
 
   @Test
-  void skipsStatesThatAlreadyExist() {
-    when(states.existsByUf(anyString())).thenReturn(true);
+  void marksOnlyTheStatesWhoseCitiesAreTooCoarseToDeclareWhole() {
+    when(states.findByUf(anyString())).thenReturn(Optional.empty());
+
+    seeder.seed();
+
+    ArgumentCaptor<StateModel> captor = ArgumentCaptor.forClass(StateModel.class);
+    verify(states, times(27)).save(captor.capture());
+    assertThat(captor.getAllValues())
+        .filteredOn(state -> state.isRequiresDistrict())
+        .extracting(state -> state.getUf())
+        .containsExactlyInAnyOrder("DF", "SP");
+  }
+
+  @Test
+  void skipsStatesThatAlreadyCarryTheCuratedFlag() {
+    when(states.findByUf(anyString()))
+        .thenAnswer(
+            invocation -> {
+              StateModel existing = new StateModel();
+              existing.setUf(invocation.getArgument(0));
+              existing.setRequiresDistrict(
+                  "DF".equals(existing.getUf()) || "SP".equals(existing.getUf()));
+              return Optional.of(existing);
+            });
 
     seeder.seed();
 
     verify(states, never()).save(any(StateModel.class));
+  }
+
+  @Test
+  void reassertsTheCuratedFlagOnAStateThatDriftedFromIt() {
+    when(states.findByUf(anyString()))
+        .thenAnswer(
+            invocation -> {
+              StateModel existing = new StateModel();
+              existing.setUf(invocation.getArgument(0));
+              existing.setRequiresDistrict(false);
+              return Optional.of(existing);
+            });
+
+    seeder.seed();
+
+    ArgumentCaptor<StateModel> captor = ArgumentCaptor.forClass(StateModel.class);
+    verify(states, times(2)).save(captor.capture());
+    assertThat(captor.getAllValues())
+        .allMatch(state -> state.isRequiresDistrict())
+        .extracting(state -> state.getUf())
+        .containsExactlyInAnyOrder("DF", "SP");
   }
 }

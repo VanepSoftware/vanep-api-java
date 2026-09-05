@@ -3,7 +3,9 @@ package br.com.vanep.driver.controller;
 import br.com.vanep.auth.security.SecurityHelper;
 import br.com.vanep.driver.dto.DriverMeSummaryResponseDTO;
 import br.com.vanep.driver.dto.DriverResponseDTO;
+import br.com.vanep.driver.dto.DriverSearchResponseDTO;
 import br.com.vanep.driver.dto.DriverUpdateRequestDTO;
+import br.com.vanep.driver.service.DriverSearchService;
 import br.com.vanep.driver.service.DriverService;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
@@ -19,17 +21,30 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/drivers")
 public class DriverController {
-
   private final DriverService service;
+  private final DriverSearchService searchService;
 
-  public DriverController(DriverService service) {
+  public DriverController(DriverService service, DriverSearchService searchService) {
     this.service = service;
+    this.searchService = searchService;
+  }
+
+  @GetMapping("/search")
+  @PreAuthorize("isAuthenticated()")
+  public Page<DriverSearchResponseDTO> search(
+      Authentication authentication,
+      @RequestParam String placeId,
+      @RequestParam(required = false) String sessionToken,
+      @PageableDefault(size = 20) Pageable pageable) {
+    return searchService.search(
+        SecurityHelper.requireCallerUid(authentication), placeId, sessionToken, pageable);
   }
 
   @GetMapping("/me")

@@ -20,7 +20,6 @@ import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class DriverService {
-
   private final DriverRepository driverRepository;
   private final DriverMapper mapper;
   private final UserService userService;
@@ -90,13 +89,11 @@ public class DriverService {
     driver.setBio(request.bio());
     driver.setCnpj(request.cnpj());
     driver.setExperienceYears(request.experienceYears());
-    driver.setCity(request.city());
     driver.setBasePrice(request.basePrice());
     driver.setWorkStartTime(request.workStartTime());
     driver.setWorkEndTime(request.workEndTime());
     driver.setWorkDays(request.workDays());
     driver.setWaitToleranceMinutes(request.waitToleranceMinutes());
-    driver.setServiceAreas(request.serviceAreas());
     driver.setAvailable(request.available());
   }
 

@@ -32,7 +32,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 
 @ExtendWith(MockitoExtension.class)
 class RegistrationServiceTest {
-
   @Mock private UserRepository users;
   @Mock private ClientRepository clients;
   @Mock private DriverRepository drivers;
@@ -90,7 +89,6 @@ class RegistrationServiceTest {
     form.setEmail("bruno@vanep.com");
     form.setPassword("secret1");
     form.setDocument("52998224725");
-    form.setCity("Taguatinga");
     form.setBasePrice(new BigDecimal("120.00"));
     form.setExperienceYears(5);
     form.setAcceptTerms(true);
@@ -104,7 +102,6 @@ class RegistrationServiceTest {
     verify(drivers).save(driver.capture());
     assertThat(driver.getValue().getApprovalStatus()).isEqualTo(DriverApprovalStatus.PENDING);
     assertThat(driver.getValue().getBasePrice()).isEqualByComparingTo("120.00");
-    assertThat(driver.getValue().getCity()).isEqualTo("Taguatinga");
   }
 
   @Test

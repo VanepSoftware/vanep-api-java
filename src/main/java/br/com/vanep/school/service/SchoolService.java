@@ -9,7 +9,6 @@ import br.com.vanep.school.mapper.SchoolMapper;
 import br.com.vanep.school.model.SchoolModel;
 import br.com.vanep.school.repository.SchoolRepository;
 import java.util.Objects;
-import java.util.function.Consumer;
 import org.openapitools.jackson.nullable.JsonNullable;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
@@ -22,7 +21,6 @@ import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class SchoolService {
-
   private final SchoolRepository schoolRepository;
   private final SchoolMapper mapper;
   private final AddressService addressService;
@@ -65,10 +63,6 @@ public class SchoolService {
 
   @Transactional
   public SchoolResponseDTO create(SchoolRequestDTO request) {
-    if (request.cnpj() != null && schoolRepository.existsByCnpj(request.cnpj())) {
-      throw new ResponseStatusException(HttpStatus.CONFLICT, message("school.cnpj.duplicate"));
-    }
-
     SchoolModel school = new SchoolModel();
     applyRequest(school, request);
     SchoolModel saved = schoolRepository.save(school);
@@ -114,16 +108,10 @@ public class SchoolService {
 
   private void applyRequest(SchoolModel school, SchoolRequestDTO request) {
     school.setName(request.name());
-    school.setCnpj(request.cnpj());
-    school.setPhone(request.phone());
-    school.setEmail(request.email());
   }
 
   private void applyScalarMerge(SchoolUpdateRequestDTO request, SchoolModel school) {
     applyName(request.name(), school);
-    applyCnpj(request.cnpj(), school);
-    applyNullable(request.phone(), school::setPhone);
-    applyNullable(request.email(), school::setEmail);
   }
 
   private void applyAddressMerge(Long schoolId, AddressRequestDTO address) {
@@ -143,25 +131,6 @@ public class SchoolService {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, message("school.name.blank"));
     }
     school.setName(name);
-  }
-
-  private void applyCnpj(JsonNullable<String> cnpjField, SchoolModel school) {
-    if (!cnpjField.isPresent()) {
-      return;
-    }
-    String cnpj = cnpjField.get();
-    if (cnpj != null && !Objects.equals(cnpj, school.getCnpj())) {
-      if (schoolRepository.existsByCnpjAndTokenNot(cnpj, school.getToken())) {
-        throw new ResponseStatusException(HttpStatus.CONFLICT, message("school.cnpj.duplicate"));
-      }
-    }
-    school.setCnpj(cnpj);
-  }
-
-  private <T> void applyNullable(JsonNullable<T> field, Consumer<T> setter) {
-    if (field.isPresent()) {
-      setter.accept(field.get());
-    }
   }
 
   private SchoolResponseDTO toResponse(SchoolModel school) {

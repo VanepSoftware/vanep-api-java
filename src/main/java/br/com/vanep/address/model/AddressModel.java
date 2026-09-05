@@ -1,6 +1,7 @@
 package br.com.vanep.address.model;
 
 import br.com.vanep.city.model.CityModel;
+import br.com.vanep.district.model.DistrictModel;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -26,7 +27,6 @@ import org.hibernate.annotations.UpdateTimestamp;
 @Getter
 @Setter
 public class AddressModel {
-
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;
@@ -38,7 +38,7 @@ public class AddressModel {
   @JoinColumn(name = "city_id", nullable = false)
   private CityModel city;
 
-  @Column(name = "zip_code", nullable = false, length = 8)
+  @Column(name = "zip_code", length = 8)
   private String zipCode;
 
   @Column(nullable = false, length = 255)
@@ -50,8 +50,12 @@ public class AddressModel {
   @Column(length = 128)
   private String complement;
 
-  @Column(length = 128)
-  private String district;
+  @ManyToOne(fetch = FetchType.EAGER)
+  @JoinColumn(name = "district_id")
+  private DistrictModel district;
+
+  @Column(name = "google_place_id", length = 255)
+  private String googlePlaceId;
 
   @Column(name = "is_active", nullable = false)
   private boolean active = true;

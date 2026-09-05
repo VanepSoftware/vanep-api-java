@@ -8,10 +8,11 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface CountryRepository extends JpaRepository<CountryModel, Long> {
-
   Optional<CountryModel> findByToken(String token);
 
   Optional<CountryModel> findByName(String name);
+
+  Optional<CountryModel> findByIsoCodeIgnoreCase(String isoCode);
 
   boolean existsByName(String name);
 

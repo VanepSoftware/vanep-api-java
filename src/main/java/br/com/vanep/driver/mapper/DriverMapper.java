@@ -8,7 +8,6 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class DriverMapper {
-
   public DriverResponseDTO toResponse(DriverModel driver) {
     return new DriverResponseDTO(
         driver.getToken(),
@@ -21,13 +20,11 @@ public class DriverMapper {
         driver.getBio(),
         driver.getCnpj(),
         driver.getExperienceYears(),
-        driver.getCity(),
         driver.getBasePrice(),
         driver.getWorkStartTime(),
         driver.getWorkEndTime(),
         driver.getWorkDays(),
         driver.getWaitToleranceMinutes(),
-        driver.getServiceAreas(),
         driver.getApprovalStatus(),
         driver.isActive(),
         driver.isAvailable(),
@@ -40,7 +37,6 @@ public class DriverMapper {
         driver.getToken(),
         driver.getPhoto(),
         driver.getRating(),
-        driver.getCity(),
         driver.getApprovalStatus(),
         driver.isAvailable(),
         driver.isActive(),

@@ -40,7 +40,6 @@ import org.springframework.web.context.WebApplicationContext;
 @ActiveProfiles("test")
 @Sql(scripts = "/db/clean.sql", executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
 class SchoolControllerTest {
-
   @Autowired private WebApplicationContext context;
   @Autowired private SchoolRepository schools;
   @Autowired private AddressRepository addresses;
@@ -78,9 +77,6 @@ class SchoolControllerTest {
 
     SchoolModel school = new SchoolModel();
     school.setName("Escola Teste");
-    school.setCnpj("11222333000181");
-    school.setPhone("11999990000");
-    school.setEmail("contato@escolateste.com.br");
     school = schools.save(school);
     schoolToken = school.getToken();
   }
@@ -119,7 +115,6 @@ class SchoolControllerTest {
     address.setZipCode("13015904");
     address.setStreet(street);
     address.setNumber(number);
-    address.setDistrict("Centro");
     address = addresses.save(address);
     school.setAddressId(address.getId());
     schools.save(school);
@@ -167,7 +162,7 @@ class SchoolControllerTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.token").value(schoolToken))
         .andExpect(jsonPath("$.name").value("Escola Teste"))
-        .andExpect(jsonPath("$.cnpj").value("11222333000181"))
+        .andExpect(jsonPath("$.cnpj").doesNotExist())
         .andExpect(jsonPath("$.address").value(nullValue()))
         .andExpect(jsonPath("$.addressId").doesNotExist());
   }
@@ -209,10 +204,7 @@ class SchoolControllerTest {
     String body =
         """
         {
-          "name": "Nova Escola",
-          "cnpj": "44555666000172",
-          "phone": "11988887777",
-          "email": "contato@novaescola.com.br"
+          "name": "Nova Escola"
         }
         """;
     mockMvc
@@ -224,7 +216,7 @@ class SchoolControllerTest {
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.token").isNotEmpty())
         .andExpect(jsonPath("$.name").value("Nova Escola"))
-        .andExpect(jsonPath("$.cnpj").value("44555666000172"))
+        .andExpect(jsonPath("$.cnpj").doesNotExist())
         .andExpect(jsonPath("$.address").value(nullValue()))
         .andExpect(jsonPath("$.addressId").doesNotExist());
   }
@@ -284,28 +276,6 @@ class SchoolControllerTest {
   }
 
   @Test
-  void createReturns400WhenCnpjInvalid() throws Exception {
-    mockMvc
-        .perform(
-            post("/api/schools")
-                .with(adminJwt())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"name\":\"Nova Escola\",\"cnpj\":\"123\"}"))
-        .andExpect(status().isBadRequest());
-  }
-
-  @Test
-  void createReturns409WhenCnpjDuplicated() throws Exception {
-    mockMvc
-        .perform(
-            post("/api/schools")
-                .with(adminJwt())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"name\":\"Outra Escola\",\"cnpj\":\"11222333000181\"}"))
-        .andExpect(status().isConflict());
-  }
-
-  @Test
   void updateReturns200ForAdmin() throws Exception {
     mockMvc
         .perform(
@@ -315,7 +285,7 @@ class SchoolControllerTest {
                 .content("{\"name\":\"Escola Atualizada\"}"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.name").value("Escola Atualizada"))
-        .andExpect(jsonPath("$.cnpj").value("11222333000181"))
+        .andExpect(jsonPath("$.cnpj").doesNotExist())
         .andExpect(jsonPath("$.addressId").doesNotExist());
   }
 
@@ -391,20 +361,6 @@ class SchoolControllerTest {
   }
 
   @Test
-  void patchNullCnpjClearsCnpj() throws Exception {
-    mockMvc
-        .perform(
-            patch("/api/schools/" + schoolToken)
-                .with(adminJwt())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"cnpj\":null}"))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.cnpj").value(nullValue()));
-
-    assertThat(schools.findByToken(schoolToken).orElseThrow().getCnpj()).isNull();
-  }
-
-  @Test
   void patchPresentBlankNameReturns400AndLeavesStoredName() throws Exception {
     mockMvc
         .perform(
@@ -428,64 +384,6 @@ class SchoolControllerTest {
         .andExpect(status().isBadRequest());
 
     assertThat(schools.findByToken(schoolToken).orElseThrow().getName()).isEqualTo("Escola Teste");
-  }
-
-  @Test
-  void patchDuplicateCnpjOnAnotherSchoolReturns409() throws Exception {
-    SchoolModel other = new SchoolModel();
-    other.setName("Outra Escola");
-    other.setCnpj("99888777000166");
-    other = schools.save(other);
-
-    mockMvc
-        .perform(
-            patch("/api/schools/" + other.getToken())
-                .with(adminJwt())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"cnpj\":\"11222333000181\"}"))
-        .andExpect(status().isConflict());
-
-    assertThat(schools.findByToken(other.getToken()).orElseThrow().getCnpj())
-        .isEqualTo("99888777000166");
-  }
-
-  @Test
-  void patchSameCnpjResentReturns200() throws Exception {
-    mockMvc
-        .perform(
-            patch("/api/schools/" + schoolToken)
-                .with(adminJwt())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"cnpj\":\"11222333000181\"}"))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.cnpj").value("11222333000181"));
-  }
-
-  @Test
-  void patchNameOnlyLeavesCnpjPhoneEmailAndAddressUnchanged() throws Exception {
-    SchoolModel school = schools.findByToken(schoolToken).orElseThrow();
-    AddressModel owned = persistSchoolAddress(school, "Rua da Escola", "1481");
-
-    mockMvc
-        .perform(
-            patch("/api/schools/" + schoolToken)
-                .with(adminJwt())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"name\":\"Novo\"}"))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.name").value("Novo"))
-        .andExpect(jsonPath("$.cnpj").value("11222333000181"))
-        .andExpect(jsonPath("$.phone").value("11999990000"))
-        .andExpect(jsonPath("$.email").value("contato@escolateste.com.br"))
-        .andExpect(jsonPath("$.address.token").value(owned.getToken()))
-        .andExpect(jsonPath("$.address.number").value("1481"))
-        .andExpect(jsonPath("$.addressId").doesNotExist());
-
-    SchoolModel reloaded = schools.findByToken(schoolToken).orElseThrow();
-    assertThat(reloaded.getCnpj()).isEqualTo("11222333000181");
-    assertThat(reloaded.getPhone()).isEqualTo("11999990000");
-    assertThat(reloaded.getEmail()).isEqualTo("contato@escolateste.com.br");
-    assertThat(reloaded.getAddressId()).isEqualTo(owned.getId());
   }
 
   @Test

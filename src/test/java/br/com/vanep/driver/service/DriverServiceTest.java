@@ -33,7 +33,6 @@ import org.springframework.web.server.ResponseStatusException;
 
 @ExtendWith(MockitoExtension.class)
 class DriverServiceTest {
-
   @Mock private DriverRepository repository;
   @Mock private DriverMapper mapper;
   @Mock private UserService userService;
@@ -72,7 +71,7 @@ class DriverServiceTest {
     DriverResponseDTO response =
         new DriverResponseDTO(
             "abc", "Test", "t@t.com", null, null, null, null, null, null, null, null, null, null,
-            null, null, null, null, null, true, false, null, null);
+            null, null, null, true, false, null, null);
     when(repository.findAll(any(Pageable.class))).thenReturn(new PageImpl<>(List.of(driver)));
     when(mapper.toResponse(driver)).thenReturn(response);
 
@@ -87,7 +86,7 @@ class DriverServiceTest {
     DriverResponseDTO response =
         new DriverResponseDTO(
             "tok", "Test", "t@t.com", null, null, null, null, null, null, null, null, null, null,
-            null, null, null, null, null, true, false, null, null);
+            null, null, null, true, false, null, null);
     when(repository.findByToken("tok")).thenReturn(Optional.of(driver));
     when(mapper.toResponse(driver)).thenReturn(response);
 
@@ -119,13 +118,11 @@ class DriverServiceTest {
             "bio text",
             "123",
             5,
-            "city",
             BigDecimal.valueOf(100),
             LocalTime.of(8, 0),
             LocalTime.of(18, 0),
             List.of("Mon"),
             10,
-            List.of("Area"),
             DriverApprovalStatus.APPROVED,
             true,
             true,
@@ -141,13 +138,11 @@ class DriverServiceTest {
             "bio text",
             "123",
             5,
-            "city",
             BigDecimal.valueOf(100),
             LocalTime.of(8, 0),
             LocalTime.of(18, 0),
             List.of("Mon"),
             10,
-            List.of("Area"),
             true);
     DriverResponseDTO result = service.update("tok", req);
 
@@ -156,13 +151,11 @@ class DriverServiceTest {
     assertThat(driver.getBio()).isEqualTo("bio text");
     assertThat(driver.getCnpj()).isEqualTo("123");
     assertThat(driver.getExperienceYears()).isEqualTo(5);
-    assertThat(driver.getCity()).isEqualTo("city");
     assertThat(driver.getBasePrice()).isEqualTo(BigDecimal.valueOf(100));
     assertThat(driver.getWorkStartTime()).isEqualTo(LocalTime.of(8, 0));
     assertThat(driver.getWorkEndTime()).isEqualTo(LocalTime.of(18, 0));
     assertThat(driver.getWorkDays()).containsExactly("Mon");
     assertThat(driver.getWaitToleranceMinutes()).isEqualTo(10);
-    assertThat(driver.getServiceAreas()).containsExactly("Area");
     assertThat(driver.isAvailable()).isTrue();
   }
 
@@ -182,7 +175,7 @@ class DriverServiceTest {
     DriverResponseDTO response =
         new DriverResponseDTO(
             "tok", "Test", "t@t.com", null, null, null, null, null, null, null, null, null, null,
-            null, null, null, null, null, true, false, null, null);
+            null, null, null, true, false, null, null);
     when(repository.existsDeletedByToken("tok")).thenReturn(true);
     when(repository.findByToken("tok")).thenReturn(Optional.of(driver));
     when(mapper.toResponse(driver)).thenReturn(response);

@@ -1,0 +1,80 @@
+{
+    "id": "ChIJNYlBf5PMW5MR66NujQxNWig",
+    "types": [
+        "school",
+        "educational_institution",
+        "point_of_interest",
+        "establishment"
+    ],
+    "formattedAddress": "Q1 21 LOTE 18 A 26 - Taguatinga Norte QI 21 - Taguatinga, Bras\u00edlia - DF, 72145-450, Brazil",
+    "addressComponents": [
+        {
+            "longText": "Q1 21 LOTE 18 A 26",
+            "languageCode": "pt"
+        },
+        {
+            "longText": "Taguatinga Norte",
+            "shortText": "Taguatinga Norte",
+            "types": [
+                "sublocality_level_2",
+                "sublocality",
+                "political"
+            ],
+            "languageCode": "pt"
+        },
+        {
+            "longText": "QI 21",
+            "shortText": "QI 21",
+            "types": [
+                "sublocality_level_3",
+                "sublocality",
+                "political"
+            ],
+            "languageCode": "pt"
+        },
+        {
+            "longText": "Taguatinga",
+            "shortText": "Taguatinga",
+            "types": [
+                "administrative_area_level_4",
+                "political"
+            ],
+            "languageCode": "pt"
+        },
+        {
+            "longText": "Bras\u00edlia",
+            "shortText": "Bras\u00edlia",
+            "types": [
+                "administrative_area_level_2",
+                "political"
+            ],
+            "languageCode": "pt"
+        },
+        {
+            "longText": "Distrito Federal",
+            "shortText": "DF",
+            "types": [
+                "administrative_area_level_1",
+                "political"
+            ],
+            "languageCode": "pt"
+        },
+        {
+            "longText": "Brazil",
+            "shortText": "BR",
+            "types": [
+                "country",
+                "political"
+            ],
+            "languageCode": "en"
+        },
+        {
+            "longText": "72145-450",
+            "shortText": "72145-450",
+            "types": [
+                "postal_code"
+            ],
+            "languageCode": "en-US"
+        }
+    ]
+}

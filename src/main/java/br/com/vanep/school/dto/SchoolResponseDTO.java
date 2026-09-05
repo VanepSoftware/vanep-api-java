@@ -6,9 +6,11 @@ import java.time.Instant;
 public record SchoolResponseDTO(
     String token,
     String name,
-    String cnpj,
-    String phone,
-    String email,
+    String googlePlaceId,
+    String cityName,
+    String cityToken,
+    String districtName,
+    String districtToken,
     AddressResponseDTO address,
     boolean active,
     Instant createdAt) {}
