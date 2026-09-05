@@ -44,7 +44,6 @@ import org.springframework.web.server.ResponseStatusException;
 
 @ExtendWith(MockitoExtension.class)
 class DependentServiceTest {
-
   private static final String CLIENT_EMAIL = "ana.souza@vanep.com";
   private static final Long CLIENT_ID = 100L;
   private static final Long DEPENDENT_ID = 55L;

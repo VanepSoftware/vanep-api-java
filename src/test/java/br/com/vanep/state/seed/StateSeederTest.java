@@ -22,7 +22,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
 class StateSeederTest {
-
   @Mock private StateRepository states;
   @Mock private CountryRepository countries;
 
@@ -43,12 +42,11 @@ class StateSeederTest {
     ArgumentCaptor<StateModel> captor = ArgumentCaptor.forClass(StateModel.class);
     verify(states, times(27)).save(captor.capture());
     assertThat(captor.getAllValues())
-        .extracting(StateModel::getUf)
+        .extracting(state -> state.getUf())
         .doesNotHaveDuplicates()
         .contains("SP", "RJ", "MG", "DF", "AC", "TO");
   }
 
-  /** D8 is curated data, and the seed is the only place it lives. */
   @Test
   void marksOnlyTheStatesWhoseCitiesAreTooCoarseToDeclareWhole() {
     when(states.findByUf(anyString())).thenReturn(Optional.empty());
@@ -58,8 +56,8 @@ class StateSeederTest {
     ArgumentCaptor<StateModel> captor = ArgumentCaptor.forClass(StateModel.class);
     verify(states, times(27)).save(captor.capture());
     assertThat(captor.getAllValues())
-        .filteredOn(StateModel::isRequiresDistrict)
-        .extracting(StateModel::getUf)
+        .filteredOn(state -> state.isRequiresDistrict())
+        .extracting(state -> state.getUf())
         .containsExactlyInAnyOrder("DF", "SP");
   }
 
@@ -80,11 +78,6 @@ class StateSeederTest {
     verify(states, never()).save(any(StateModel.class));
   }
 
-  /**
-   * The migration that created the column only reaches rows that already existed. A state row born
-   * after it — from an older seed run — would keep the wrong flag forever if the seed just skipped
-   * every state it already knows.
-   */
   @Test
   void reassertsTheCuratedFlagOnAStateThatDriftedFromIt() {
     when(states.findByUf(anyString()))
@@ -101,8 +94,8 @@ class StateSeederTest {
     ArgumentCaptor<StateModel> captor = ArgumentCaptor.forClass(StateModel.class);
     verify(states, times(2)).save(captor.capture());
     assertThat(captor.getAllValues())
-        .allMatch(StateModel::isRequiresDistrict)
-        .extracting(StateModel::getUf)
+        .allMatch(state -> state.isRequiresDistrict())
+        .extracting(state -> state.getUf())
         .containsExactlyInAnyOrder("DF", "SP");
   }
 }

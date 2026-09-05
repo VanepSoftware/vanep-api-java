@@ -39,7 +39,6 @@ import org.springframework.web.server.ResponseStatusException;
 
 @ExtendWith(MockitoExtension.class)
 class SchoolServiceTest {
-
   private static final Long SCHOOL_ID = 7L;
   private static final String TOKEN = "tok";
 

@@ -28,7 +28,6 @@ import org.hibernate.annotations.UpdateTimestamp;
 @Getter
 @Setter
 public class CityModel {
-
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;
@@ -49,10 +48,6 @@ public class CityModel {
   @Column(name = "google_place_id", length = 255)
   private String googlePlaceId;
 
-  /**
-   * Override do flag do estado. {@code null} significa "herda de {@code state.requiresDistrict}" —
-   * por isso é {@code Boolean} e não {@code boolean}. Ver D8.
-   */
   @Column(name = "requires_district")
   private Boolean requiresDistrict;
 

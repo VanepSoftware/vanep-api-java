@@ -16,7 +16,6 @@ import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class UserService {
-
   private final UserRepository users;
   private final MessageSource messages;
   private final EmailVerificationTokenRepository verificationTokens;

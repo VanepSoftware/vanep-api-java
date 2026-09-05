@@ -14,17 +14,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * Regiões de atuação do motorista autenticado.
- *
- * <p>Não há checagem de dono por token aqui porque o recurso é sempre "o meu": o motorista é
- * derivado do próprio {@code Authentication}, não de um id na URL. Por isso não foi preciso
- * acrescentar nada ao {@code @sec}.
- */
 @RestController
 @RequestMapping("/api/drivers/me/service-areas")
 public class DriverServiceAreaController {
-
   private final DriverServiceAreaService service;
 
   public DriverServiceAreaController(DriverServiceAreaService service) {

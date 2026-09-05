@@ -20,10 +20,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-/** Cria e lê o endereço residencial do chamador, ligando-o à árvore geográfica. */
 @Service
 public class PersonalAddressService {
-
   private final PlacesClient places;
   private final LocationResolverService resolver;
   private final AddressRepository addresses;
@@ -66,8 +64,7 @@ public class PersonalAddressService {
     address.setGooglePlaceId(details.id());
     address.setStreet(street);
     address.setZipCode(StreetAddressExtractor.findZipCode(details).orElse(null));
-    // O número do usuário manda: o Google costuma não ter, e quando tem pode ser
-    // o do lote e não o da unidade.
+
     address.setNumber(
         Optional.ofNullable(request.number())
             .filter(value -> !value.isBlank())

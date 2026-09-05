@@ -33,7 +33,6 @@ import org.springframework.web.server.ResponseStatusException;
 
 @ExtendWith(MockitoExtension.class)
 class DriverServiceTest {
-
   @Mock private DriverRepository repository;
   @Mock private DriverMapper mapper;
   @Mock private UserService userService;

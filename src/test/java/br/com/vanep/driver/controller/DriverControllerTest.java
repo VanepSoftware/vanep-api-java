@@ -35,7 +35,6 @@ import org.springframework.web.context.WebApplicationContext;
 @ActiveProfiles("test")
 @Sql(scripts = "/db/clean.sql", executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
 class DriverControllerTest {
-
   @Autowired private WebApplicationContext context;
   @Autowired private UserRepository users;
   @Autowired private DriverRepository drivers;
@@ -293,12 +292,10 @@ class DriverControllerTest {
 
   @Test
   void restoreReturns200ForAdmin() throws Exception {
-    // Delete first
     mockMvc
         .perform(delete("/api/drivers/" + driverToken).with(adminJwt()))
         .andExpect(status().isNoContent());
 
-    // Restore
     mockMvc
         .perform(post("/api/drivers/" + driverToken + "/restore").with(adminJwt()))
         .andExpect(status().isOk())

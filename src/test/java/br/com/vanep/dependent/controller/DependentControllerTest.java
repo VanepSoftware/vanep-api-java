@@ -48,7 +48,6 @@ import org.springframework.web.context.WebApplicationContext;
 @ActiveProfiles("test")
 @Sql(scripts = "/db/clean.sql", executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
 class DependentControllerTest {
-
   private static final String OWNER_EMAIL = "owner@vanep.com";
   private static final String OTHER_EMAIL = "other@vanep.com";
   private static final String ADMIN_EMAIL = "admin@vanep.com";

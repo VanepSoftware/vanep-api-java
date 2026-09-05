@@ -22,7 +22,6 @@ import org.springframework.test.context.jdbc.Sql;
 @ActiveProfiles("test")
 @Sql(scripts = "/db/clean.sql", executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
 class DistrictRepositoryTest {
-
   @Autowired private DistrictRepository repository;
   @Autowired private CityRepository cities;
   @Autowired private StateRepository states;
@@ -116,7 +115,7 @@ class DistrictRepositoryTest {
             repository.findByCityIdAndParentIsNullAndNormalizedName(
                 brasilia.getId(), "aguas claras"))
         .get()
-        .extracting(DistrictModel::getId)
+        .extracting(district -> district.getId())
         .isEqualTo(saved.getId());
   }
 

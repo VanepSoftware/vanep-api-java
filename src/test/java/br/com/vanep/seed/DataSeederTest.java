@@ -43,7 +43,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 
 @ExtendWith(MockitoExtension.class)
 class DataSeederTest {
-
   @Mock private UserRepository users;
   @Mock private ClientRepository clients;
   @Mock private DriverRepository drivers;

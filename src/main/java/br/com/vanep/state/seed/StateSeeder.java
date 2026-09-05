@@ -9,28 +9,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
-/**
- * The 27 Brazilian federative units, curated in one place.
- *
- * <p>This list is the single source of truth for {@code requires_district} (D8) as well. It used to
- * live in two places — an {@code UPDATE} inside the district migration and a {@code Set.of("DF",
- * "SP")} in the resolver — which disagreed by construction: the migration only reaches rows that
- * already exist, so a state row created after it ran was born with the flag false. The migration
- * now only creates the columns; the values come from here.
- *
- * <p>Opening a new market is a one-line change here, and it applies to existing rows too — the seed
- * re-asserts the curated flag on every run instead of skipping states it has already created.
- */
 @Component
 public class StateSeeder {
-
   private static final Logger log = LoggerFactory.getLogger(StateSeeder.class);
 
-  /**
-   * @param requiresDistrict D8: the city level is useless in this UF, so a driver's service area
-   *     has to be declared below it. True for the Distrito Federal (a single municipality covering
-   *     5,800 km², from Gama to Sobradinho) and for São Paulo.
-   */
   private record CuratedState(String uf, String name, boolean requiresDistrict) {}
 
   private static final List<CuratedState> BRAZILIAN_STATES =

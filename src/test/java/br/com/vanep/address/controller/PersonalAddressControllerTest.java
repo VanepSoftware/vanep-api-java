@@ -40,15 +40,10 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
-/**
- * O {@link PlacesClient} é mockado: nenhum teste chama a API real (regra 50). As respostas vêm das
- * fixtures da fase 1.
- */
 @SpringBootTest
 @ActiveProfiles("test")
 @Sql(scripts = "/db/clean.sql", executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
 class PersonalAddressControllerTest {
-
   private static final ObjectMapper MAPPER = new ObjectMapper();
 
   @Autowired private WebApplicationContext context;
@@ -73,7 +68,7 @@ class PersonalAddressControllerTest {
     brasil.setPhoneCode("+55");
     brasil.setCurrency("BRL");
     countries.save(brasil);
-    // Country and state are curated: the resolver reads them, never creates them.
+
     stateSeeder.seed();
 
     UserModel user = new UserModel();
@@ -97,7 +92,6 @@ class PersonalAddressControllerTest {
     return new AddressComponentDTO(longText, shortText, List.of(types));
   }
 
-  /** Um place que para na RA: cidade e Águas Claras, e nada abaixo disso. */
   private PlaceDetailsResponseDTO administrativeRegionOnly() {
     return new PlaceDetailsResponseDTO(
         "ra-inteira",
@@ -187,7 +181,6 @@ class PersonalAddressControllerTest {
         .andExpect(jsonPath("$.complement").value("Bloco B apto 101"));
   }
 
-  /** O cliente manda só o placeId; qualquer componente que ele enviar é ignorado. */
   @Test
   void ignoresAddressComponentsSuppliedByTheClient() throws Exception {
     BDDMockito.given(places.findPlaceDetails("place-taguatinga", null))
@@ -237,10 +230,6 @@ class PersonalAddressControllerTest {
         .andExpect(status().isBadRequest());
   }
 
-  /**
-   * A recusa é de place que para na região, não de place sem {@code route}. Esta fixture sintética
-   * tem cidade e RA e nada abaixo: descreve Águas Claras inteira, não uma casa dentro dela.
-   */
   @Test
   void rejectsAPlaceThatStopsAtTheAdministrativeRegion() throws Exception {
     BDDMockito.given(places.findPlaceDetails("ra-inteira", null))
@@ -257,11 +246,6 @@ class PersonalAddressControllerTest {
     assertThat(addresses.count()).isZero();
   }
 
-  /**
-   * O contra-exemplo que o 400 anterior escondia: a fixture df-ceilandia é a QNM 17, um pin
-   * legítimo, e o Google não lhe deu {@code route} nenhum — a quadra veio como {@code
-   * sublocality_level_3}. Antes virava 400; agora o logradouro sai da própria quadra.
-   */
   @Test
   void acceptsABlockAddressThatTheGoogleDidNotLabelAsRoute() throws Exception {
     BDDMockito.given(places.findPlaceDetails("qnm-17", null)).willReturn(fixture("df-ceilandia"));

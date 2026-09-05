@@ -35,7 +35,6 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class DataSeeder implements ApplicationRunner {
-
   private static final Logger log = LoggerFactory.getLogger(DataSeeder.class);
   private static final String ADMIN_BUNDLE_NAME = "ADMIN";
   private static final String CLIENT_BUNDLE_NAME = "CLIENT";
@@ -114,8 +113,7 @@ public class DataSeeder implements ApplicationRunner {
     driverCnhSeeder.seed();
     driverDocumentSeeder.seed();
     countrySeeder.seed();
-    // Country and state are the curated levels of the tree; city and district are
-    // born from Google Places. The resolver reads states, so they have to exist.
+
     stateSeeder.seed();
     driverRatingSeeder.seed();
     if (seedOnly) {
@@ -182,10 +180,6 @@ public class DataSeeder implements ApplicationRunner {
     }
   }
 
-  /**
-   * Cliente precisa enxergar motorista: é o produto. A leitura é só de listagem e detalhe — nada de
-   * criar, editar ou remover, que continuam do admin e do próprio motorista.
-   */
   static List<String> clientPermissions() {
     List<String> permissions = new java.util.ArrayList<>(PermissionEnum.crudFor("dependents"));
     permissions.add(PermissionEnum.LIST_DRIVERS.value());

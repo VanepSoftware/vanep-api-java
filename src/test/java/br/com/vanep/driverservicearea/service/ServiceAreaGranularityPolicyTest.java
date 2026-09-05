@@ -10,13 +10,7 @@ import br.com.vanep.state.model.StateModel;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
-/**
- * Sem Spring, sem banco, sem servlet: a policy do D8 recebe a cadeia pronta. Se estes testes
- * precisassem preparar estado no banco, a regra estaria dependendo dele — que é exatamente o
- * defeito que o D8 existe para corrigir.
- */
 class ServiceAreaGranularityPolicyTest {
-
   private CityModel city(String name, String uf, boolean stateRequires, Boolean cityOverride) {
     CountryModel country = new CountryModel();
     country.setIsoCode("BR");
@@ -85,12 +79,6 @@ class ServiceAreaGranularityPolicyTest {
         .isTrue();
   }
 
-  /**
-   * O furo temporal do D8: a decisão não pode depender de quantos distritos existem na árvore. Aqui
-   * não há árvore alguma — a policy nem tem como consultá-la — e a cadeia continua sendo rejeitada.
-   * A formulação antiga aceitaria este cadastro, e o motorista apareceria em toda busca do DF para
-   * sempre.
-   */
   @Test
   void rejectsWholeCityEvenWhenNoDistrictExistsAnywhereYet() {
     CityModel brasiliaEmptyTree = city("Brasília", "DF", true, null);

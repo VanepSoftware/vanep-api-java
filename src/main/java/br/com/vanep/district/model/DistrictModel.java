@@ -23,14 +23,6 @@ import org.hibernate.annotations.SoftDelete;
 import org.hibernate.annotations.SoftDeleteType;
 import org.hibernate.annotations.UpdateTimestamp;
 
-/**
- * Subdivisão de uma cidade, de profundidade variável via auto-FK: Taguatinga tem {@code parent}
- * nulo (filha direta de Brasília), QNL 5 tem Taguatinga como pai, Conjunto J tem QNL 5.
- *
- * <p>A restrição de unicidade declarada aqui existe para o schema gerado nos testes (H2). Em
- * produção quem manda é o índice parcial da migration {@code V21}, que também trata {@code
- * parent_id} nulo — ver o risco R2 do design.
- */
 @Entity
 @Table(
     name = "district",
@@ -42,7 +34,6 @@ import org.hibernate.annotations.UpdateTimestamp;
 @Getter
 @Setter
 public class DistrictModel {
-
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;
@@ -54,15 +45,6 @@ public class DistrictModel {
   @JoinColumn(name = "city_id", nullable = false)
   private CityModel city;
 
-  /**
-   * Nulo quando o distrito é filho direto da cidade.
-   *
-   * <p>{@code EAGER} não é escolha de performance: o Hibernate recusa {@code LAZY} em associação
-   * to-one cujo alvo declara {@code @SoftDelete}, e a regra 19 da constituição exige soft delete em
-   * todo model removível. Efeito prático: carregar um distrito carrega a cadeia de ancestrais
-   * junto. Isso é aceitável porque a profundidade é limitada (a maior observada nas fixtures é 3) e
-   * porque é exatamente a cadeia que a busca por contenção precisa — ver D4 e D7.
-   */
   @ManyToOne(fetch = FetchType.EAGER)
   @JoinColumn(name = "parent_id")
   private DistrictModel parent;
@@ -100,11 +82,6 @@ public class DistrictModel {
     syncNormalizedName();
   }
 
-  /**
-   * {@code normalized_name} é coluna derivada de {@code name}, não um campo que o chamador escolhe.
-   * Mantê-la em sincronia aqui, e não em cada ponto de criação, é o que impede um nó de nascer com
-   * a normalização errada — e um nó assim nunca casaria com nada, em silêncio (risco R2).
-   */
   private void syncNormalizedName() {
     normalizedName = LocationNameNormalizer.normalize(name);
   }

@@ -15,8 +15,6 @@ import br.com.vanep.address.model.AddressModel;
 import br.com.vanep.address.repository.AddressRepository;
 import br.com.vanep.city.model.CityModel;
 import br.com.vanep.city.repository.CityRepository;
-import br.com.vanep.client.model.ClientModel;
-import br.com.vanep.client.repository.ClientRepository;
 import br.com.vanep.country.model.CountryModel;
 import br.com.vanep.dependent.model.DependentModel;
 import br.com.vanep.dependent.repository.DependentRepository;
@@ -35,12 +33,10 @@ import org.springframework.context.MessageSource;
 
 @ExtendWith(MockitoExtension.class)
 class AddressServiceTest {
-
   @Mock private AddressRepository addressRepository;
   @Mock private CityRepository cityRepository;
   @Mock private AddressMapper mapper;
   @Mock private MessageSource messages;
-  @Mock private ClientRepository clients;
   @Mock private DependentRepository dependents;
   @Mock private SchoolRepository schools;
 
@@ -50,7 +46,7 @@ class AddressServiceTest {
   void setUp() {
     service =
         new AddressService(
-            addressRepository, cityRepository, mapper, messages, clients, dependents, schools);
+            addressRepository, cityRepository, mapper, messages, dependents, schools);
     lenient().when(messages.getMessage(any(), any(), any())).thenAnswer(inv -> inv.getArgument(0));
     lenient().when(dependents.countByAddressId(anyLong())).thenReturn(0L);
     lenient().when(dependents.countByAddressIdAndIdNot(anyLong(), anyLong())).thenReturn(0L);
@@ -261,12 +257,6 @@ class AddressServiceTest {
     verify(addressRepository).delete(existing);
     assertThat(school.getAddressId()).isNull();
     verify(schools).save(school);
-  }
-
-  private ClientModel clientWithId(Long id) {
-    ClientModel client = new ClientModel();
-    client.setId(id);
-    return client;
   }
 
   private DependentModel dependentWithId(Long id) {

@@ -12,15 +12,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
-/**
- * Leitura de cidades. Só leitura: a cidade nasce do Google Places, pelo resolver.
- *
- * <p>Um CRUD manual em paralelo criaria linhas que nunca casariam com as resolvidas pelo Google — o
- * R2 por outro caminho.
- */
 @Service
 public class CityService {
-
   private final CityRepository cityRepository;
   private final CityMapper mapper;
   private final MessageSource messages;

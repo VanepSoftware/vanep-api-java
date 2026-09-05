@@ -34,7 +34,6 @@ import org.hibernate.type.SqlTypes;
 @Getter
 @Setter
 public class DriverModel {
-
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;

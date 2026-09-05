@@ -9,7 +9,6 @@ import lombok.Setter;
 @Getter
 @Setter
 public class DriverSignupForm extends AccountSignupForm {
-
   private String cnpj;
 
   private Integer experienceYears;

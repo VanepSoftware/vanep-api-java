@@ -6,7 +6,6 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class AddressMapper {
-
   public AddressResponseDTO toResponse(AddressModel address) {
     return new AddressResponseDTO(
         address.getToken(),

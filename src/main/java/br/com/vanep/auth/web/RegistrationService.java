@@ -20,7 +20,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class RegistrationService {
-
   private final UserRepository users;
   private final ClientRepository clients;
   private final DriverRepository drivers;

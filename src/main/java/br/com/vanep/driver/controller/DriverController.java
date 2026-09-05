@@ -28,7 +28,6 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/drivers")
 public class DriverController {
-
   private final DriverService service;
   private final DriverSearchService searchService;
 
@@ -37,10 +36,6 @@ public class DriverController {
     this.searchService = searchService;
   }
 
-  /**
-   * Busca por um lugar. Continua {@code GET} porque é genuinamente read-only: resolve a âncora sem
-   * escrever na árvore (D3). O resultado vem ordenado do mais específico para o mais amplo.
-   */
   @GetMapping("/search")
   @PreAuthorize("isAuthenticated()")
   public Page<DriverSearchResponseDTO> search(

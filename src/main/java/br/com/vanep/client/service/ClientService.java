@@ -22,7 +22,6 @@ import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class ClientService {
-
   private final ClientRepository clients;
   private final ClientMapper mapper;
   private final UserService userService;
@@ -70,7 +69,6 @@ public class ClientService {
 
   @Transactional(readOnly = true)
   public ClientMeSummaryResponseDTO getMyProfile(String uid) {
-    // uid (JWT) -> users.token, then client.user_id FK — two lookups for correct 403 vs 404.
     UserModel user = userService.requireByTokenAndType(uid, UserType.CLIENT);
     ClientModel client = requireByUserId(user.getId());
     return mapper.toMeSummary(
@@ -97,11 +95,6 @@ public class ClientService {
   private ClientResponseDTO toListResponse(ClientModel client) {
     return mapper.toResponse(
         client, addressService.toResponseOrNull(client.getUser().getAddressId()));
-  }
-
-  private ClientModel requireOwnClient(String uid) {
-    UserModel user = userService.requireByTokenAndType(uid, UserType.CLIENT);
-    return requireByUserId(user.getId());
   }
 
   private ClientModel requireByUserId(Long userId) {

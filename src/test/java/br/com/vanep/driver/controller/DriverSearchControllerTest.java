@@ -52,7 +52,6 @@ import org.springframework.web.context.WebApplicationContext;
 @ActiveProfiles("test")
 @Sql(scripts = "/db/clean.sql", executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
 class DriverSearchControllerTest {
-
   private static final ObjectMapper MAPPER = new ObjectMapper();
 
   @Autowired private WebApplicationContext context;
@@ -81,7 +80,7 @@ class DriverSearchControllerTest {
     brasil.setPhoneCode("+55");
     brasil.setCurrency("BRL");
     countries.save(brasil);
-    // Country and state are curated: the resolver reads them, never creates them.
+
     stateSeeder.seed();
 
     UserModel client = new UserModel();
@@ -126,7 +125,6 @@ class DriverSearchControllerTest {
     return drivers.save(driver);
   }
 
-  /** Cadastra pelo endpoint real, que é quem popula a árvore a partir do place. */
   private String createDriverWithAreas(String email, String... placeIds) throws Exception {
     return createDriverWithAreas(email, DriverApprovalStatus.APPROVED, placeIds);
   }
@@ -154,18 +152,6 @@ class DriverSearchControllerTest {
     return driver.getUser().getToken();
   }
 
-  /**
-   * Área ligada direto ao nó, sem passar pelo endpoint. Necessário para montar níveis que a policy
-   * D8 recusaria — cidade inteira no DF, por exemplo — em um teste que é sobre ordenação, não sobre
-   * aquela regra.
-   */
-  /**
-   * Popula a árvore a partir das fixtures, sem criar motorista.
-   *
-   * <p>Os testes de ranking precisam de nós de vários níveis (QNL 5, Setor L Norte, Taguatinga)
-   * para atribuir áreas explicitamente. Eles não podem nascer do endpoint de áreas: ele registra a
-   * RA, não a quadra, que é justamente a regra da fase 6.
-   */
   private void seedTree(String... placeIds) throws IOException {
     for (String placeId : placeIds) {
       resolver.resolveAndPersist(fixture(placeId));
@@ -189,7 +175,6 @@ class DriverSearchControllerTest {
         .orElseThrow();
   }
 
-  /** Um place que para na cidade: Brasília, sem componente de bairro nenhum. */
   private PlaceDetailsResponseDTO cityOnly() throws IOException {
     return new PlaceDetailsResponseDTO(
         "brasilia",
@@ -232,12 +217,6 @@ class DriverSearchControllerTest {
         .andExpect(status().isUnauthorized());
   }
 
-  /**
-   * Buscar a cidade inteira tem de achar quem atende uma parte dela. O mapa de distâncias vem vazio
-   * — não há bairro no pedido para medir distância —, e tratar isso como "não casou" fazia a busca
-   * por "Brasília" devolver zero enquanto a busca por "Taguatinga" achava o mesmo motorista. Como o
-   * D8 proíbe declarar o DF inteiro, era o caso comum, não a exceção.
-   */
   @Test
   void findsDriverOfADistrictWhenTheSearchIsTheWholeCity() throws Exception {
     stubPlaces();
@@ -250,10 +229,6 @@ class DriverSearchControllerTest {
         .andExpect(jsonPath("$.content[0].name").value("Motorista taguatinga@vanep.com"));
   }
 
-  /**
-   * O default do model é PENDING: quem acabou de se cadastrar e declarou as áreas apareceria na
-   * vitrine sem ninguém ter aprovado, e um REJECTED continuaria aparecendo para sempre.
-   */
   @Test
   void excludesDriverWhoIsNotApprovedYet() throws Exception {
     stubPlaces();
@@ -299,10 +274,6 @@ class DriverSearchControllerTest {
         .andExpect(jsonPath("$.content.length()").value(0));
   }
 
-  /**
-   * O requisito central: quanto mais perto do ponto, mais cedo aparece. Os quatro níveis são
-   * montados explicitamente porque com árvore rasa a ordenação pareceria funcionar mesmo quebrada.
-   */
   @Test
   void ranksFromTheMostSpecificAreaToTheWholeCity() throws Exception {
     stubPlaces();
@@ -340,7 +311,6 @@ class DriverSearchControllerTest {
         .andExpect(jsonPath("$.content[1].name").value("Motorista cidade@vanep.com"));
   }
 
-  /** Quem cadastrou o nó exato e também a cidade inteira merece a posição do nó exato. */
   @Test
   void driverKeepsTheBestRankAmongTheirAreas() throws Exception {
     stubPlaces();
@@ -360,8 +330,6 @@ class DriverSearchControllerTest {
         .andExpect(jsonPath("$.content[0].name").value("Motorista " + email));
   }
 
-  /// As regiões atendidas são dado público (nós da árvore, sem logradouro) e o app
-  /// as mostra abaixo do nome do motorista.
   @Test
   void returnsTheRegionsTheDriverCovers() throws Exception {
     stubPlaces();
@@ -371,7 +339,6 @@ class DriverSearchControllerTest {
         .perform(get("/api/drivers/search").with(as(clientUid)).param("placeId", "taguatinga"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.content[0].serviceAreas.length()").value(2))
-        // A área declarada é a RA, não a quadra dentro dela (fase 6).
         .andExpect(jsonPath("$.content[0].serviceAreas", hasItems("Taguatinga", "Águas Claras")));
   }
 
@@ -430,11 +397,6 @@ class DriverSearchControllerTest {
         .andExpect(jsonPath("$.content[0].name").value("Motorista cidade@vanep.com"));
   }
 
-  /**
-   * Escola entra na mesma caixa que endereço. O motorista precisa cobrir Taguatinga, e não QNL 5:
-   * registrar o place "taguatinga" o coloca no nó mais fundo daquela cadeia (D2), que é irmão do
-   * ramo da escola.
-   */
   @Test
   void acceptsASchoolAsTheSearchedPlace() throws Exception {
     stubPlaces();
@@ -448,8 +410,6 @@ class DriverSearchControllerTest {
         .andExpect(jsonPath("$.content[0].name").value("Motorista taguatinga@vanep.com"));
   }
 
-  /// Buscar uma região ampla tem de encontrar quem trabalha dentro dela: sumir
-  /// faria a busca genérica devolver menos gente que a específica.
   @Test
   void findsDriversWorkingInsideTheSearchedRegion() throws Exception {
     stubPlaces();
@@ -489,7 +449,6 @@ class DriverSearchControllerTest {
         .andExpect(status().isBadRequest());
   }
 
-  /** D3: a busca é read-only. Nem o place mais fundo pode fazer a árvore crescer. */
   @Test
   void createsNoTreeNodesWhileSearching() throws Exception {
     stubPlaces();

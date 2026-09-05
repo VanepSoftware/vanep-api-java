@@ -7,8 +7,6 @@ import br.com.vanep.address.model.AddressModel;
 import br.com.vanep.address.repository.AddressRepository;
 import br.com.vanep.city.model.CityModel;
 import br.com.vanep.city.repository.CityRepository;
-import br.com.vanep.client.model.ClientModel;
-import br.com.vanep.client.repository.ClientRepository;
 import br.com.vanep.dependent.model.DependentModel;
 import br.com.vanep.dependent.repository.DependentRepository;
 import br.com.vanep.school.model.SchoolModel;
@@ -26,12 +24,10 @@ import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class AddressService {
-
   private final AddressRepository addressRepository;
   private final CityRepository cityRepository;
   private final AddressMapper mapper;
   private final MessageSource messages;
-  private final ClientRepository clients;
   private final DependentRepository dependents;
   private final SchoolRepository schools;
 
@@ -40,14 +36,12 @@ public class AddressService {
       CityRepository cityRepository,
       AddressMapper mapper,
       MessageSource messages,
-      ClientRepository clients,
       DependentRepository dependents,
       SchoolRepository schools) {
     this.addressRepository = addressRepository;
     this.cityRepository = cityRepository;
     this.mapper = mapper;
     this.messages = messages;
-    this.clients = clients;
     this.dependents = dependents;
     this.schools = schools;
   }
@@ -155,23 +149,10 @@ public class AddressService {
     addressRepository.findById(addressId).ifPresent(addressRepository::delete);
   }
 
-  /**
-   * O cliente saiu da conta: o endereço residencial dele mora em {@code users.address_id} desde a
-   * fase 5 e não disputa mais a posse de uma linha de {@code address} com dependente e escola.
-   */
   private void rejectIfOwnedByAnotherActiveOwner(long dependentCount, long schoolCount) {
     if (dependentCount + schoolCount > 0) {
       throw new ResponseStatusException(HttpStatus.CONFLICT, message("address.already_owned"));
     }
-  }
-
-  private ClientModel requireClient(Long clientId) {
-    return clients
-        .findById(clientId)
-        .orElseThrow(
-            () ->
-                new ResponseStatusException(
-                    HttpStatus.NOT_FOUND, message("client.profile.not_found")));
   }
 
   private DependentModel requireDependent(Long dependentId) {

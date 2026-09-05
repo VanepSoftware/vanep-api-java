@@ -9,17 +9,8 @@ import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-/**
- * Traduz as falhas de resolução de lugar em respostas HTTP, com mensagem pt-BR via MessageSource
- * (regra 46).
- *
- * <p>A separação entre 4xx e 5xx segue a origem do problema, não o código que o Google devolveu:
- * {@code placeId} ruim é culpa do dado que o cliente enviou; credencial, quota ou fornecedor fora
- * do ar é problema nosso, e mentir sobre isso mandaria o usuário caçar um erro que não é dele.
- */
 @RestControllerAdvice
 public class LocationErrorAdvice {
-
   private final MessageSource messages;
 
   public LocationErrorAdvice(MessageSource messages) {

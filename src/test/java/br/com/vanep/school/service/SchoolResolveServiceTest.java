@@ -23,14 +23,7 @@ import org.mockito.ArgumentMatchers;
 import org.springframework.context.support.StaticMessageSource;
 import org.springframework.web.server.ResponseStatusException;
 
-/**
- * O limite do R6 é testado aqui, e não no slice: assim o teste escolhe a capacidade em vez de
- * depender do profile, e consegue afirmar o que realmente importa — que o Google <b>não</b> é
- * chamado quando o limite estoura. É o ponto do R6: quem varre {@code placeId}s gasta dinheiro
- * nosso, então a barreira tem de vir antes da chamada paga.
- */
 class SchoolResolveServiceTest {
-
   private final PlacesClient places = mock(PlacesClient.class);
   private final LocationResolverService resolver = mock(LocationResolverService.class);
   private final SchoolRepository schools = mock(SchoolRepository.class);
@@ -81,16 +74,11 @@ class SchoolResolveServiceTest {
 
     assertThatThrownBy(() -> service.resolve("user-1", request("x")))
         .isInstanceOf(IllegalStateException.class);
-    // Outro usuário tem balde próprio: o limite protege a fatura, não pune quem
-    // não gastou.
+
     assertThatThrownBy(() -> service.resolve("user-2", request("x")))
         .isInstanceOf(IllegalStateException.class);
   }
 
-  /**
-   * A Q6 trancou o nome para ninguém plantar texto na listagem compartilhada. O id ficou aberto:
-   * sem olhar types, um shopping entrava no catálogo com o nome oficial do Google.
-   */
   @Test
   void refusesAPlaceThatIsNotASchool() {
     SchoolResolveService service = serviceWithLimit(10);
@@ -110,11 +98,6 @@ class SchoolResolveServiceTest {
     verifyNoInteractions(resolver);
   }
 
-  /**
-   * O caso comum é o pai reabrindo o mesmo colégio. Perguntar ao Google antes de olhar a tabela
-   * pagava um SKU Pro por um dado já salvo — e consumia o limite do R6, o que dava 429 a quem não
-   * gastou nada.
-   */
   @Test
   void servesAKnownSchoolWithoutPayingForTheProLookup() {
     SchoolResolveService service = serviceWithLimit(10);
@@ -129,11 +112,6 @@ class SchoolResolveServiceTest {
     verifyNoInteractions(resolver);
   }
 
-  /**
-   * Servir do banco não pode deixar a sessão de autocomplete aberta: sem encerrá-la, cada tecla
-   * digitada na busca vira cobrança avulsa em vez de entrar no SKU de sessão (D5). O id sozinho é
-   * gratuito.
-   */
   @Test
   void closesTheAutocompleteSessionEvenWhenTheAnswerCameFromTheDatabase() {
     SchoolResolveService service = serviceWithLimit(10);

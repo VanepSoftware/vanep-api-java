@@ -3,17 +3,7 @@ package br.com.vanep.location;
 import java.text.Normalizer;
 import java.util.Locale;
 
-/**
- * Normaliza nomes de lugares para a forma usada em comparações e índices únicos da árvore
- * geográfica.
- *
- * <p>É o que faz o nó escolhido pelo motorista e o nó derivado do endereço do cliente caírem na
- * mesma linha: os dois lados atravessam esta normalização antes de qualquer busca ou gravação.
- * Divergência de grafia vinda do Google ("Águas Claras" x "AGUAS CLARAS") criaria nós irmãos
- * duplicados sem ela.
- */
 public final class LocationNameNormalizer {
-
   private static final java.util.regex.Pattern COMBINING_MARKS =
       java.util.regex.Pattern.compile("\\p{M}+");
 

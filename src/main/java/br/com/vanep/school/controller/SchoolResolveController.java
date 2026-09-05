@@ -15,18 +15,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * Resolve um place do Google em uma escola persistida.
- *
- * <p>{@code POST} e não {@code GET} porque a operação faz {@code findOrCreate} — é escrita. Um
- * {@code GET} é definido como safe e é pré-buscável por intermediários: prefetch de browser criaria
- * escola (D9). Segue idempotente por {@code google_place_id}: repetir devolve a mesma linha, com
- * {@code 200} em vez de {@code 201}.
- */
 @RestController
 @RequestMapping("/api/schools")
 public class SchoolResolveController {
-
   private final SchoolResolveService service;
   private final SchoolMapper mapper;
 

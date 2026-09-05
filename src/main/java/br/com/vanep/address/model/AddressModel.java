@@ -27,7 +27,6 @@ import org.hibernate.annotations.UpdateTimestamp;
 @Getter
 @Setter
 public class AddressModel {
-
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;
@@ -39,7 +38,6 @@ public class AddressModel {
   @JoinColumn(name = "city_id", nullable = false)
   private CityModel city;
 
-  /** Nulo é legítimo: places reais do DF vêm sem {@code postal_code} (fixture df-ceilandia). */
   @Column(name = "zip_code", length = 8)
   private String zipCode;
 
@@ -52,10 +50,6 @@ public class AddressModel {
   @Column(length = 128)
   private String complement;
 
-  /**
-   * Nó da árvore em que este endereço está. Substitui o antigo {@code district varchar}: texto
-   * livre nunca casaria com o nó que o motorista escolheu como área de atuação.
-   */
   @ManyToOne(fetch = FetchType.EAGER)
   @JoinColumn(name = "district_id")
   private DistrictModel district;

@@ -11,22 +11,10 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface DriverRepository extends JpaRepository<DriverModel, Long> {
-
   Optional<DriverModel> findByUserId(Long userId);
 
   Optional<DriverModel> findByToken(String token);
 
-  /**
-   * Motoristas visíveis na busca, por id, já com o usuário carregado.
-   *
-   * <p>O fetch join existe para a busca: sem ele, ler o nome de cada motorista da página dispararia
-   * uma query por linha (regra 17).
-   *
-   * <p>Filtra {@code approvalStatus} além de {@code active}. O default do model é {@code PENDING},
-   * então quem se cadastrou e declarou área de atuação apareceria na vitrine antes de ser aprovado
-   * — e um {@code REJECTED} continuaria aparecendo para sempre. A busca é o marketplace: só entra
-   * quem está aprovado.
-   */
   @Query(
       value =
           """

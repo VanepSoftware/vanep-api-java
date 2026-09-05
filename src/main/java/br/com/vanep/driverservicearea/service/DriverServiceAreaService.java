@@ -24,10 +24,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-/** Regiões de atuação do motorista autenticado. */
 @Service
 public class DriverServiceAreaService {
-
   private final PlacesClient places;
   private final LocationResolverService resolver;
   private final DriverServiceAreaRepository areas;
@@ -57,17 +55,11 @@ public class DriverServiceAreaService {
         .toList();
   }
 
-  /**
-   * Substitui o conjunto inteiro. Substituição e não merge porque "onde eu atendo" é uma declaração
-   * completa: remover uma região tem de ser possível sem endpoint de exclusão por item.
-   */
   @Transactional
   public List<DriverServiceAreaResponseDTO> replaceMyAreas(
       String callerUid, DriverServiceAreaRequestDTO request) {
     DriverModel driver = requireDriver(callerUid);
 
-    // Resolve tudo antes de apagar qualquer coisa: se um place da lista for
-    // recusado, o motorista não pode terminar sem região nenhuma.
     Map<String, DriverServiceAreaModel> current = new LinkedHashMap<>();
     for (DriverServiceAreaModel existing : areas.findByDriverId(driver.getId())) {
       current.put(existing.getToken(), existing);
@@ -99,10 +91,9 @@ public class DriverServiceAreaService {
       }
 
       area.setCity(chain.city());
-      // A praça declarada é a RA, não a quadra dentro dela: ver shallowestDistrict.
+
       area.setDistrict(chain.shallowestDistrict().orElse(null));
-      // Dois places distintos podem resolver para o mesmo nó (D2). Deduplicar aqui
-      // evita esbarrar no índice único e devolver 500 para um pedido legítimo.
+
       resolved.putIfAbsent(dedupeKey(area), area);
     }
 

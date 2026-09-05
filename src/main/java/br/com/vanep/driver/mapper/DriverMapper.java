@@ -8,7 +8,6 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class DriverMapper {
-
   public DriverResponseDTO toResponse(DriverModel driver) {
     return new DriverResponseDTO(
         driver.getToken(),

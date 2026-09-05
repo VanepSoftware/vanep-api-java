@@ -5,7 +5,6 @@ import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface StateRepository extends JpaRepository<StateModel, Long> {
-
   Optional<StateModel> findByToken(String token);
 
   Optional<StateModel> findByUf(String uf);

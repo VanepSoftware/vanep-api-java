@@ -7,7 +7,6 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class SchoolMapper {
-
   public SchoolResponseDTO toResponse(SchoolModel school) {
     return toResponse(school, null);
   }

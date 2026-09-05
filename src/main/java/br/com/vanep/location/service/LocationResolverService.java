@@ -23,17 +23,8 @@ import java.util.Optional;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Converte um place do Google no nó correspondente da árvore geográfica, nos dois modos previstos
- * pelo D3.
- *
- * <p>A distinção entre os modos é o que mantém a busca barata e a árvore limpa: cadastro escreve,
- * busca não. Uma busca por "qnl 5 conjunto j" não pode criar nó nenhum — se criasse, a árvore
- * cresceria com termos de busca e o índice do R2 perderia sentido.
- */
 @Service
 public class LocationResolverService {
-
   private final CountryRepository countries;
   private final StateRepository states;
   private final CityRepository cities;
@@ -50,10 +41,6 @@ public class LocationResolverService {
     this.districts = districts;
   }
 
-  /**
-   * Modo escrita: garante a cadeia inteira, criando o que faltar. Idempotente — chamar duas vezes
-   * com o mesmo place devolve os mesmos nós.
-   */
   @Transactional
   public ResolvedLocationChainDTO resolveAndPersist(PlaceDetailsResponseDTO details) {
     List<LocationComponentDTO> components = classify(details);
@@ -75,13 +62,6 @@ public class LocationResolverService {
         country, state, city, chain, AddressComponentClassifier.hasDistrictComponent(components));
   }
 
-  /**
-   * Modo leitura: desce a cadeia até o nó mais profundo que <b>já existe</b> e para. Não escreve
-   * nada.
-   *
-   * <p>Basta para a busca porque o motorista só pôde ter cadastrado um nó existente: um componente
-   * que não está na árvore não é área de atuação de ninguém.
-   */
   @Transactional(readOnly = true)
   public Optional<ResolvedLocationChainDTO> resolveAnchor(PlaceDetailsResponseDTO details) {
     List<LocationComponentDTO> components = classify(details);
@@ -126,10 +106,6 @@ public class LocationResolverService {
             AddressComponentClassifier.hasDistrictComponent(components)));
   }
 
-  /**
-   * O distrito e seus ancestrais, do fundo para o raso. É o conjunto que a busca por contenção
-   * compara contra {@code driver_service_area.district_id} (D4).
-   */
   @Transactional(readOnly = true)
   public List<DistrictModel> findAncestors(DistrictModel district) {
     List<DistrictModel> ancestors = new ArrayList<>();
@@ -150,7 +126,6 @@ public class LocationResolverService {
     return countries.findByIsoCodeIgnoreCase(component.shortName());
   }
 
-  /** País é curado: ausente significa "não atendemos aqui", não "criar agora". */
   private CountryModel requireSupportedCountry(List<LocationComponentDTO> components) {
     LocationComponentDTO component = requireComponent(components, LocationLevel.COUNTRY);
     return countries
@@ -158,12 +133,6 @@ public class LocationResolverService {
         .orElseThrow(() -> new UnsupportedCountryException(component.shortName()));
   }
 
-  /**
-   * Estado é curado pelo mesmo motivo que o país, e por um a mais: {@code requires_district} (D8) é
-   * decisão de produto por UF. Criar a linha aqui significaria escolher esse flag em código — foi o
-   * que existiu como {@code Set.of("DF", "SP")} no resolver, duplicando a lista do seed. O Brasil
-   * tem 27 unidades e elas são semeadas de uma vez; UF fora disso é lugar que não atendemos.
-   */
   private StateModel requireSupportedState(CountryModel country, LocationComponentDTO component) {
     return states
         .findByCountryIdAndUfIgnoreCase(country.getId(), component.shortName())

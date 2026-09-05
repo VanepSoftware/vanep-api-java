@@ -14,13 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/cities")
-/**
- * Leitura de cidades. A escrita saiu: a fonte da árvore geográfica passou a ser o Google Places, e
- * cidade nasce sob demanda pelo resolver. Um CRUD manual em paralelo criaria linhas que nunca
- * casariam com as resolvidas, que é o R2 por outro caminho.
- */
 public class CityController {
-
   private final CityService service;
 
   public CityController(CityService service) {

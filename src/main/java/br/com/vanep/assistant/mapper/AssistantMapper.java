@@ -13,7 +13,6 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class AssistantMapper {
-
   public AssistantInviteResponseDTO toInviteResponse(AssistantInviteModel invite) {
     return new AssistantInviteResponseDTO(
         invite.getToken(),

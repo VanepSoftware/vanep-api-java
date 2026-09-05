@@ -27,7 +27,6 @@ import org.hibernate.annotations.UpdateTimestamp;
 @Getter
 @Setter
 public class ClientModel {
-
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;

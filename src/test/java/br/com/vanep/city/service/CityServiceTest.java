@@ -25,7 +25,6 @@ import org.springframework.web.server.ResponseStatusException;
 
 @ExtendWith(MockitoExtension.class)
 class CityServiceTest {
-
   @Mock private CityRepository cityRepository;
   @Mock private CityMapper mapper;
   @Mock private MessageSource messages;

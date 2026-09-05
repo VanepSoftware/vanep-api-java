@@ -27,18 +27,10 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.jdbc.Sql;
 
-/**
- * A query de contenção do D4, exercitada contra o H2.
- *
- * <p>O fato de estes testes rodarem é a evidência de que o desenho evitou PostGIS: são joins e
- * {@code IN} comuns. Se a decisão tivesse ido para geometria ou {@code ltree}, a suíte precisaria
- * de Testcontainers e a regra 25 da constituição cairia junto.
- */
 @SpringBootTest
 @ActiveProfiles("test")
 @Sql(scripts = "/db/clean.sql", executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
 class DriverServiceAreaContainmentTest {
-
   @Autowired private DriverServiceAreaRepository areas;
   @Autowired private DistrictRepository districts;
   @Autowired private CityRepository cities;
@@ -124,7 +116,6 @@ class DriverServiceAreaContainmentTest {
     areas.save(area);
   }
 
-  /** Ancestrais do ponto, do fundo para o raso — o que a busca passa para a query. */
   private List<Long> ancestorsOf(DistrictModel deepest) {
     List<Long> ids = new java.util.ArrayList<>();
     DistrictModel current = deepest;
@@ -170,7 +161,6 @@ class DriverServiceAreaContainmentTest {
     assertThat(areas.findDriverIdsCoveringPoint(brasilia.getId(), ancestorsOf(qnl5))).isEmpty();
   }
 
-  /** O contrário do ancestral: quem declarou um ponto fundo não cobre a região inteira. */
   @Test
   void descendantDistrictDoesNotCoverAShallowerPoint() {
     DriverModel driver = saveDriver("conjunto@vanep.com");
@@ -188,7 +178,6 @@ class DriverServiceAreaContainmentTest {
     assertThat(areas.findDriverIdsCoveringPoint(brasilia.getId(), ancestorsOf(qnl5))).isEmpty();
   }
 
-  /** Busca ampla por cidade devolve todo mundo, inclusive quem declarou só um distrito. */
   @Test
   void cityWideSearchReturnsDistrictLevelDriversToo() {
     DriverModel emTaguatinga = saveDriver("t@vanep.com");

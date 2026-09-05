@@ -44,7 +44,6 @@ import org.springframework.web.context.WebApplicationContext;
 @ActiveProfiles("test")
 @Sql(scripts = "/db/clean.sql", executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
 class ClientControllerTest {
-
   @Autowired private WebApplicationContext context;
   @Autowired private UserRepository users;
   @Autowired private ClientRepository clients;
@@ -130,21 +129,9 @@ class ClientControllerTest {
         .authorities(new SimpleGrantedAuthority("ROLE_DRIVER"));
   }
 
-  private String addressBody(String street, String complement) {
-    String complementJson = complement == null ? "null" : "\"" + complement + "\"";
-    return "{\"cityToken\":\""
-        + cityToken
-        + "\",\"zipCode\":\"13015904\",\"street\":\""
-        + street
-        + "\",\"number\":\"1481\",\"complement\":"
-        + complementJson
-        + ",\"district\":\"Centro\"}";
-  }
-
   private AddressModel persistLinkedHomeAddress() {
     CityModel city = cities.findByToken(cityToken).orElseThrow();
 
-    // O bairro agora é nó da árvore, não texto livre: a resposta expõe o nome do nó.
     DistrictModel centro = new DistrictModel();
     centro.setCity(city);
     centro.setName("Centro");
@@ -159,7 +146,6 @@ class ClientControllerTest {
     address.setComplement("Apto 12");
     address = addresses.save(address);
 
-    // O endereço residencial mora em users.address_id desde a fase 5.
     UserModel owner = users.findByToken(ownerUid).orElseThrow();
     owner.setAddressId(address.getId());
     users.save(owner);
@@ -377,10 +363,6 @@ class ClientControllerTest {
   }
 
   @Test
-  /**
-   * Apagar o perfil de cliente não apaga mais o endereço residencial: ele é do usuário, e o mesmo
-   * ser humano pode continuar na plataforma com outro papel.
-   */
   void deleteKeepsTheUserHomeAddress() throws Exception {
     AddressModel address = persistLinkedHomeAddress();
     String addressToken = address.getToken();

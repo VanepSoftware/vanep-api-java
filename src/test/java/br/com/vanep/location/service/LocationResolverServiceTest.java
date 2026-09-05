@@ -33,7 +33,6 @@ import org.springframework.test.context.jdbc.Sql;
 @ActiveProfiles("test")
 @Sql(scripts = "/db/clean.sql", executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
 class LocationResolverServiceTest {
-
   private static final ObjectMapper MAPPER = new ObjectMapper();
 
   @Autowired private LocationResolverService resolver;
@@ -43,11 +42,6 @@ class LocationResolverServiceTest {
   @Autowired private DistrictRepository districts;
   @Autowired private StateSeeder stateSeeder;
 
-  /**
-   * Country and state are the curated levels: the resolver reads them, never creates them. The
-   * suite runs with {@code flyway.enabled=false}, so the seed has to be invoked explicitly here —
-   * and invoking the real seeder is what keeps this test honest about the curated data shipped.
-   */
   @BeforeEach
   void seedCuratedGeography() {
     CountryModel brasil = new CountryModel();
@@ -82,8 +76,6 @@ class LocationResolverServiceTest {
         component("Taguatinga", "Taguatinga", "administrative_area_level_4", "political"));
   }
 
-  // --- resolveAndPersist ---------------------------------------------------
-
   @Test
   void createsTheWholeChainOnFirstResolution() throws IOException {
     ResolvedLocationChainDTO chain = resolver.resolveAndPersist(fixture("df-taguatinga-qnl5"));
@@ -92,7 +84,7 @@ class LocationResolverServiceTest {
     assertThat(chain.state().getUf()).isEqualTo("DF");
     assertThat(chain.city().getName()).isEqualTo("Brasília");
     assertThat(chain.districts())
-        .extracting(DistrictModel::getName)
+        .extracting(district -> district.getName())
         .containsExactly("Taguatinga", "Setor L Norte", "QNL 5");
   }
 
@@ -113,8 +105,8 @@ class LocationResolverServiceTest {
 
     assertThat(second.city().getId()).isEqualTo(first.city().getId());
     assertThat(second.districts())
-        .extracting(DistrictModel::getId)
-        .isEqualTo(first.districts().stream().map(DistrictModel::getId).toList());
+        .extracting(district -> district.getId())
+        .isEqualTo(first.districts().stream().map(district -> district.getId()).toList());
     assertThat(districts.count()).isEqualTo(3);
     assertThat(cities.count()).isEqualTo(1);
   }
@@ -125,7 +117,7 @@ class LocationResolverServiceTest {
     ResolvedLocationChainDTO other = resolver.resolveAndPersist(fixture("df-escola-objetivo"));
 
     assertThat(other.districts().get(0).getName()).isEqualTo("Taguatinga");
-    // Taguatinga é compartilhada; só Taguatinga Norte e QI 21 nascem.
+
     assertThat(districts.count()).isEqualTo(5);
     assertThat(cities.count()).isEqualTo(1);
   }
@@ -152,10 +144,6 @@ class LocationResolverServiceTest {
     assertThat(cities.count()).isZero();
   }
 
-  /**
-   * A UF outside the 27 seeded ones is a place we do not serve, exactly like an unsupported
-   * country. Creating the row here was what forced {@code requires_district} to be decided in Java.
-   */
   @Test
   void rejectsAPlaceWhoseStateIsNotSeeded() {
     PlaceDetailsResponseDTO unknownUf =
@@ -179,8 +167,6 @@ class LocationResolverServiceTest {
     assertThat(states.findByUf("GO")).get().extracting("requiresDistrict").isEqualTo(false);
   }
 
-  // --- D2: o nó vem dos componentes, nunca do place escolhido --------------
-
   @Test
   void anchorsOnTheComponentChainAndIgnoresThePlaceLabel() {
     PlaceDetailsResponseDTO chosenTaguatingaNorte =
@@ -191,13 +177,13 @@ class LocationResolverServiceTest {
 
     ResolvedLocationChainDTO chain = resolver.resolveAndPersist(chosenTaguatingaNorte);
 
-    assertThat(chain.districts()).extracting(DistrictModel::getName).containsExactly("Taguatinga");
+    assertThat(chain.districts())
+        .extracting(district -> district.getName())
+        .containsExactly("Taguatinga");
     assertThat(districts.findAll())
-        .extracting(DistrictModel::getName)
+        .extracting(district -> district.getName())
         .doesNotContain("Taguatinga Norte");
   }
-
-  // --- resolveAnchor: leitura pura ----------------------------------------
 
   @Test
   void anchorStopsAtTheDeepestExistingNodeWithoutWriting() throws IOException {
@@ -207,10 +193,12 @@ class LocationResolverServiceTest {
     ResolvedLocationChainDTO anchor =
         resolver.resolveAnchor(fixture("df-taguatinga-qnl5")).orElseThrow();
 
-    assertThat(anchor.districts()).extracting(DistrictModel::getName).containsExactly("Taguatinga");
+    assertThat(anchor.districts())
+        .extracting(district -> district.getName())
+        .containsExactly("Taguatinga");
     assertThat(anchor.deepestDistrict())
         .get()
-        .extracting(DistrictModel::getName)
+        .extracting(district -> district.getName())
         .isEqualTo("Taguatinga");
     assertThat(districts.count()).isEqualTo(districtsBefore);
   }
@@ -226,7 +214,6 @@ class LocationResolverServiceTest {
 
   @Test
   void anchorReportsThatThePlaceCarriedDistrictComponentsTheTreeDoesNotHave() throws IOException {
-    // Cidade existe, nenhum distrito existe.
     resolver.resolveAndPersist(
         place(
             component("Brazil", "BR", "country", "political"),
@@ -251,14 +238,12 @@ class LocationResolverServiceTest {
         .isEqualTo(written.deepestDistrict().orElseThrow().getId());
   }
 
-  // --- ancestrais ----------------------------------------------------------
-
   @Test
   void listsAncestorsFromDeepestToShallowest() throws IOException {
     ResolvedLocationChainDTO chain = resolver.resolveAndPersist(fixture("df-taguatinga-qnl5"));
 
     assertThat(resolver.findAncestors(chain.deepestDistrict().orElseThrow()))
-        .extracting(DistrictModel::getName)
+        .extracting(district -> district.getName())
         .containsExactly("QNL 5", "Setor L Norte", "Taguatinga");
   }
 
@@ -267,11 +252,9 @@ class LocationResolverServiceTest {
     ResolvedLocationChainDTO chain = resolver.resolveAndPersist(taguatingaOnly());
 
     assertThat(resolver.findAncestors(chain.deepestDistrict().orElseThrow()))
-        .extracting(DistrictModel::getName)
+        .extracting(district -> district.getName())
         .containsExactly("Taguatinga");
   }
-
-  // --- R1: falhar alto -----------------------------------------------------
 
   @Test
   void failsLoudOnUnmappedTypeAndPersistsNothing() {
@@ -304,7 +287,9 @@ class LocationResolverServiceTest {
     ResolvedLocationChainDTO chain = resolver.resolveAndPersist(fixture("sp-capital-pinheiros"));
 
     assertThat(chain.city().getName()).isEqualTo("São Paulo");
-    assertThat(chain.districts()).extracting(DistrictModel::getName).containsExactly("Pinheiros");
+    assertThat(chain.districts())
+        .extracting(district -> district.getName())
+        .containsExactly("Pinheiros");
     assertThat(chain.districts().get(0).getParent()).isNull();
   }
 

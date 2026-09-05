@@ -8,7 +8,6 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface SchoolRepository extends JpaRepository<SchoolModel, Long> {
-
   Optional<SchoolModel> findByToken(String token);
 
   Optional<SchoolModel> findByGooglePlaceId(String googlePlaceId);

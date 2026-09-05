@@ -15,9 +15,7 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.ClassPathResource;
 
-/** Exercita a tabela D11 contra as 10 fixtures reais coletadas na fase 1. */
 class AddressComponentClassifierTest {
-
   private static final ObjectMapper MAPPER = new ObjectMapper();
 
   private List<LocationComponentDTO> classifyFixture(String name) throws IOException {
@@ -30,7 +28,7 @@ class AddressComponentClassifierTest {
 
   private String nameOfLevel(List<LocationComponentDTO> components, LocationLevel level) {
     return AddressComponentClassifier.findFirstOfLevel(components, level)
-        .map(LocationComponentDTO::name)
+        .map(component -> component.name())
         .orElse(null);
   }
 
@@ -59,7 +57,7 @@ class AddressComponentClassifierTest {
     assertThat(nameOfLevel(components, LocationLevel.CITY)).isEqualTo("Brasília");
     assertThat(AddressComponentClassifier.findCity(components))
         .get()
-        .extracting(LocationComponentDTO::sourceType)
+        .extracting(component -> component.sourceType())
         .isEqualTo(AddressComponentClassifier.CITY_TYPE);
   }
 
@@ -69,7 +67,7 @@ class AddressComponentClassifierTest {
 
     assertThat(AddressComponentClassifier.findCity(components))
         .get()
-        .extracting(LocationComponentDTO::sourceType)
+        .extracting(component -> component.sourceType())
         .isEqualTo(AddressComponentClassifier.CITY_TYPE);
     assertThat(components).filteredOn(c -> c.level() == LocationLevel.CITY).hasSize(1);
   }
@@ -112,21 +110,15 @@ class AddressComponentClassifierTest {
             });
   }
 
-  /**
-   * A fixture destino-nao-escola traz "Lago Norte" duas vezes: em {@code
-   * administrative_area_level_4} e em {@code sublocality_level_2}. A cidade é Brasília, então
-   * nenhuma das duas é descartada por repetir o nome da cidade — só por repetir o nome do pai.
-   */
   @Test
   void dropsDistrictThatOnlyRepeatsItsParentName() throws IOException {
     assertThat(
             AddressComponentClassifier.districtsFromShallowToDeep(
                 classifyFixture("destino-nao-escola")))
-        .extracting(LocationComponentDTO::name)
+        .extracting(component -> component.name())
         .containsExactly("Lago Norte", "CA 4");
   }
 
-  /** O mesmo descarte um nível acima: distrito que repete o nome da cidade não entra na árvore. */
   @Test
   void dropsDistrictNamedAfterItsCity() throws IOException {
     assertThat(
@@ -135,22 +127,18 @@ class AddressComponentClassifierTest {
         .isEmpty();
   }
 
-  /**
-   * As duas fixtures do DF trazem os mesmos níveis em ordens opostas no array. Ordenar pela
-   * profundidade declarada é o que impede a hierarquia de sair invertida em uma delas.
-   */
   @Test
   void ordersDistrictsByDeclaredDepthNotByArrayPosition() throws IOException {
     assertThat(
             AddressComponentClassifier.districtsFromShallowToDeep(
                 classifyFixture("df-taguatinga-qnl5")))
-        .extracting(LocationComponentDTO::name)
+        .extracting(component -> component.name())
         .containsExactly("Taguatinga", "Setor L Norte", "QNL 5");
 
     assertThat(
             AddressComponentClassifier.districtsFromShallowToDeep(
                 classifyFixture("df-escola-objetivo")))
-        .extracting(LocationComponentDTO::name)
+        .extracting(component -> component.name())
         .containsExactly("Taguatinga", "Taguatinga Norte", "QI 21");
   }
 
@@ -167,7 +155,7 @@ class AddressComponentClassifierTest {
     List<LocationComponentDTO> components = classifyFixture("sp-escola-bandeirantes");
 
     assertThat(components)
-        .extracting(LocationComponentDTO::name)
+        .extracting(component -> component.name())
         .doesNotContain("268", "Rua Estela", "04011-001");
   }
 

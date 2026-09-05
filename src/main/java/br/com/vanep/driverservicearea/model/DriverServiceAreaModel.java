@@ -22,20 +22,12 @@ import org.hibernate.annotations.SoftDelete;
 import org.hibernate.annotations.SoftDeleteType;
 import org.hibernate.annotations.UpdateTimestamp;
 
-/**
- * Região atendida por um motorista — dado público, exposto na busca do cliente.
- *
- * <p>Não tem, e não deve ganhar, campo de logradouro. A separação entre o que é público (a região)
- * e o que é privado (o endereço residencial) é garantida pelo schema, não por disciplina: se a
- * coluna não existe, não há como vazar por engano (D1).
- */
 @Entity
 @Table(name = "driver_service_area")
 @SoftDelete(columnName = "deleted_at", strategy = SoftDeleteType.TIMESTAMP)
 @Getter
 @Setter
 public class DriverServiceAreaModel {
-
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;
@@ -51,7 +43,6 @@ public class DriverServiceAreaModel {
   @JoinColumn(name = "city_id", nullable = false)
   private CityModel city;
 
-  /** Nulo significa "a cidade inteira". A policy D8 decide quando isso é aceitável. */
   @ManyToOne(fetch = FetchType.EAGER)
   @JoinColumn(name = "district_id")
   private DistrictModel district;

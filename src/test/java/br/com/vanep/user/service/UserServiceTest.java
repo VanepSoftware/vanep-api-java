@@ -28,7 +28,6 @@ import org.springframework.web.server.ResponseStatusException;
 
 @ExtendWith(MockitoExtension.class)
 class UserServiceTest {
-
   private static final int COOLDOWN_DAYS = 30;
 
   @Mock private UserRepository users;

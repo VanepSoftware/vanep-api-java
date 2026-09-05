@@ -39,7 +39,6 @@ import org.springframework.web.context.WebApplicationContext;
 @ActiveProfiles("test")
 @Sql(scripts = "/db/clean.sql", executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
 class SchoolResolveControllerTest {
-
   private static final ObjectMapper MAPPER = new ObjectMapper();
 
   @Autowired private WebApplicationContext context;
@@ -63,7 +62,7 @@ class SchoolResolveControllerTest {
     brasil.setPhoneCode("+55");
     brasil.setCurrency("BRL");
     countries.save(brasil);
-    // Country and state are curated: the resolver reads them, never creates them.
+
     stateSeeder.seed();
 
     UserModel user = new UserModel();
@@ -81,8 +80,7 @@ class SchoolResolveControllerTest {
         new ClassPathResource("fixtures/places/df-escola-objetivo.json")
             .getContentAsString(StandardCharsets.UTF_8);
     PlaceDetailsResponseDTO base = MAPPER.readValue(json, PlaceDetailsResponseDTO.class);
-    // O mask de escola pede displayName (SKU Pro) — a fixture foi coletada com o
-    // mask estreito, então o nome é acrescentado aqui.
+
     return new PlaceDetailsResponseDTO(
         base.id(),
         base.formattedAddress(),

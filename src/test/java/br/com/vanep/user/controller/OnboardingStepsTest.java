@@ -38,12 +38,10 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
-/** D10: o mobile só percorre {@code onboarding.pendingSteps} e mostra a tela correspondente. */
 @SpringBootTest
 @ActiveProfiles("test")
 @Sql(scripts = "/db/clean.sql", executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
 class OnboardingStepsTest {
-
   private static final ObjectMapper MAPPER = new ObjectMapper();
 
   @Autowired private WebApplicationContext context;
@@ -66,7 +64,7 @@ class OnboardingStepsTest {
     brasil.setPhoneCode("+55");
     brasil.setCurrency("BRL");
     countries.save(brasil);
-    // Country and state are curated: the resolver reads them, never creates them.
+
     stateSeeder.seed();
 
     BDDMockito.given(places.findPlaceDetails("taguatinga", null))
@@ -149,7 +147,6 @@ class OnboardingStepsTest {
         .andExpect(jsonPath("$.onboarding.pendingSteps[0]").value("SERVICE_AREA"));
   }
 
-  /** SERVICE_AREA não se aplica a cliente — a pergunta não existe para ele. */
   @Test
   void clientWithoutAddressIsMissingOnlyThePersonalAddress() throws Exception {
     String uid = saveUser(UserType.CLIENT, "cliente@vanep.com", "33333333333").getToken();

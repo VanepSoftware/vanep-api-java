@@ -45,7 +45,6 @@ import org.springframework.web.context.WebApplicationContext;
 @ActiveProfiles("test")
 @Sql(scripts = "/db/clean.sql", executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
 class DriverServiceAreaControllerTest {
-
   private static final ObjectMapper MAPPER = new ObjectMapper();
 
   @Autowired private WebApplicationContext context;
@@ -71,7 +70,7 @@ class DriverServiceAreaControllerTest {
     brasil.setPhoneCode("+55");
     brasil.setCurrency("BRL");
     countries.save(brasil);
-    // Country and state are curated: the resolver reads them, never creates them.
+
     stateSeeder.seed();
 
     UserModel driverUser = new UserModel();
@@ -137,11 +136,6 @@ class DriverServiceAreaControllerTest {
         .andExpect(status().isForbidden());
   }
 
-  /**
-   * A fixture é um endereço de rua, que é o que o autocomplete devolve na prática: ela traz a
-   * cadeia inteira (Taguatinga → Setor L Norte → QNL 5). A praça declarada tem de ser a RA. Guardar
-   * a quadra faria o motorista sumir do resto de Taguatinga na busca, que casa por ancestrais (D4).
-   */
   @Test
   void registersTheAdministrativeRegionAsServiceAreaNotTheBlockInsideIt() throws Exception {
     BDDMockito.given(places.findPlaceDetails("taguatinga", null))
@@ -160,10 +154,6 @@ class DriverServiceAreaControllerTest {
         .andExpect(jsonPath("$[0].token").isNotEmpty());
   }
 
-  /**
-   * Dois endereços de quadras diferentes da mesma RA declaram a mesma praça. Sem o achatamento
-   * seriam duas linhas; com ele, uma — e é a deduplicação por nó que já existia que resolve.
-   */
   @Test
   void collapsesTwoAddressesOfTheSameRegionIntoOneArea() throws Exception {
     BDDMockito.given(places.findPlaceDetails("qnl5", null))
@@ -182,7 +172,6 @@ class DriverServiceAreaControllerTest {
         .andExpect(jsonPath("$[0].name").value("Taguatinga"));
   }
 
-  /** Cada item da lista é um Place Details pago disparado na mesma requisição. */
   @Test
   void rejectsMoreAreasThanTheCap() throws Exception {
     String tooMany =
@@ -218,7 +207,6 @@ class DriverServiceAreaControllerTest {
         .andExpect(jsonPath("$[0].number").doesNotExist());
   }
 
-  /** D8: no DF a cidade inteira são 5.800 km². */
   @Test
   void rejectsWholeCityInADistrictRequiringState() throws Exception {
     BDDMockito.given(places.findPlaceDetails("brasilia-inteira", null))
@@ -291,7 +279,6 @@ class DriverServiceAreaControllerTest {
     assertThat(areas.count()).isEqualTo(1);
   }
 
-  /** Dois places distintos podem resolver para o mesmo nó (D2); isso não pode virar 500. */
   @Test
   void deduplicatesPlacesThatResolveToTheSameNode() throws Exception {
     BDDMockito.given(places.findPlaceDetails("um", null)).willReturn(fixture("df-aguas-claras"));
@@ -381,8 +368,6 @@ class DriverServiceAreaControllerTest {
         .andExpect(jsonPath("$[0].stateUf").value("DF"));
   }
 
-  /// Reenviar uma região já salva não pode custar um Place Details: ela já foi
-  /// resolvida uma vez e chegaria exatamente no mesmo nó.
   @Test
   void keepsAnExistingAreaWithoutAskingGoogleAgain() throws Exception {
     BDDMockito.given(places.findPlaceDetails("taguatinga", null))

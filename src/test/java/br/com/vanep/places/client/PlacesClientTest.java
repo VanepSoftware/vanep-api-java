@@ -9,7 +9,6 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
-import br.com.vanep.places.dto.AddressComponentDTO;
 import br.com.vanep.places.dto.PlaceDetailsResponseDTO;
 import br.com.vanep.places.exception.PlaceLookupException;
 import br.com.vanep.places.exception.PlaceNotFoundException;
@@ -25,12 +24,7 @@ import org.springframework.test.web.client.ExpectedCount;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
-/**
- * Nenhum destes testes toca a rede: o {@code MockRestServiceServer} intercepta a fábrica de
- * requisições (constituição, regra 50). As respostas vêm das fixtures coletadas na fase 1.
- */
 class PlacesClientTest {
-
   private static final String BASE_URL = "https://places.test.invalid";
   private static final String PLACE_ID = "ChIJiQLoU9TMW5MRbx2OMMN5r-o";
   private static final String DETAILS_URL = BASE_URL + "/v1/places/" + PLACE_ID;
@@ -67,7 +61,7 @@ class PlacesClientTest {
         new ObjectMapper().readTree(fixture("df-taguatinga-qnl5")).get("id").asText();
     assertThat(details.id()).isEqualTo(idInFixture);
     assertThat(details.addressComponents())
-        .extracting(AddressComponentDTO::longText)
+        .extracting(component -> component.longText())
         .contains("Taguatinga", "Brasília", "Distrito Federal", "Brazil");
     server.verify();
   }
@@ -78,18 +72,13 @@ class PlacesClientTest {
 
     PlaceDetailsResponseDTO details = client.findPlaceDetails(PLACE_ID);
 
-    assertThat(details.addressComponents()).anyMatch(AddressComponentDTO::hasNoTypes);
+    assertThat(details.addressComponents()).anyMatch(component -> component.hasNoTypes());
     assertThat(details.addressComponents())
-        .filteredOn(AddressComponentDTO::hasNoTypes)
+        .filteredOn(component -> component.hasNoTypes())
         .allSatisfy(component -> assertThat(component.types()).isNotNull().isEmpty());
     server.verify();
   }
 
-  /**
-   * O mask decide o SKU. Os quatro campos ficam em <i>Place Details Essentials</i>, uma cobrança só
-   * — {@code types} inclusive, que é o que permite recusar um shopping antes de ele virar escola
-   * sem subir a fatura. Campo novo aqui exige conferir o SKU antes.
-   */
   @Test
   void requestsOnlyTheEssentialsFieldMask() throws IOException {
     expectSuccessOnce("df-aguas-claras");
@@ -100,7 +89,6 @@ class PlacesClientTest {
     server.verify();
   }
 
-  /** Encerrar a sessão não pode custar mais que o SKU gratuito de id. */
   @Test
   void closesTheAutocompleteSessionWithTheFreeIdOnlyMask() throws IOException {
     server
@@ -114,7 +102,6 @@ class PlacesClientTest {
     server.verify();
   }
 
-  /** Sem token não há sessão a encerrar, e uma chamada a mais seria dinheiro fora. */
   @Test
   void doesNotCallGoogleToCloseASessionThatDoesNotExist() {
     client.closeAutocompleteSession(PLACE_ID, null);
@@ -169,11 +156,6 @@ class PlacesClientTest {
     server.verify();
   }
 
-  /**
-   * A chamada com sessão popula o cache, então a chamada seguinte sem token não volta ao Google —
-   * uma requisição no total, não duas. É o que faz o cache valer para o caso de maior repetição (o
-   * {@code placeId} já persistido, reusado a cada busca).
-   */
   @Test
   void refreshesCacheWithTheSessionResponse() throws IOException {
     server

@@ -28,16 +28,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-/**
- * Busca motoristas que atendem <b>um</b> lugar, ordenados por quão específica é a cobertura.
- *
- * <p>Read-only por construção (D3): usa {@code resolveAnchor}, que nunca escreve. Se a busca
- * criasse nós, a árvore cresceria com termos de busca e um {@code GET} que escreve seria
- * pré-buscável por intermediários.
- */
 @Service
 public class DriverSearchService {
-
   private final PlacesClient places;
   private final LocationResolverService resolver;
   private final DriverServiceAreaRepository areas;
@@ -66,8 +58,6 @@ public class DriverSearchService {
   @Transactional(readOnly = true)
   public Page<DriverSearchResponseDTO> search(
       String callerUid, String placeId, String sessionToken, Pageable pageable) {
-
-    // Antes de qualquer chamada paga: o placeId vem do cliente (R6).
     if (!rateLimiter.tryAcquire("driver-search:" + callerUid)) {
       throw new ResponseStatusException(
           HttpStatus.TOO_MANY_REQUESTS, message("location.place.rate_limited"));
@@ -76,8 +66,6 @@ public class DriverSearchService {
     Optional<ResolvedLocationChainDTO> anchor =
         resolver.resolveAnchor(places.findPlaceDetails(placeId, sessionToken));
 
-    // Âncora vazia significa que nem a cidade existe na árvore. Ninguém pode ter
-    // cadastrado ali, então o resultado é vazio — não é erro.
     if (anchor.isEmpty()) {
       return Page.empty(pageable);
     }
@@ -89,22 +77,10 @@ public class DriverSearchService {
     return pageInRankOrder(ranked, pageable);
   }
 
-  /**
-   * Ids de motorista do mais específico para o mais amplo.
-   *
-   * <p>O rank de uma área é a posição do distrito dela na lista de ancestrais do ponto: 0 é o
-   * próprio nó buscado, 1 o pai, e assim por diante. Área de cidade inteira recebe o rank seguinte
-   * ao último ancestral, de modo que sempre ordena por último — presente, mas fora de prioridade.
-   *
-   * <p>Um motorista com várias áreas casando fica com o <b>melhor</b> rank: quem cadastrou QNL 5 e
-   * também Brasília inteira merece a posição de quem cadastrou QNL 5.
-   */
   List<Long> rankDriverIds(ResolvedLocationChainDTO anchor) {
     Map<Long, Integer> distanceByDistrict = distanceByDistrict(anchor);
     int wholeCityRank = Integer.MAX_VALUE;
 
-    // Busca pela cidade inteira: o cliente digitou "Brasília" e não há bairro no
-    // pedido, então não existe ramo contra o qual medir distância.
     boolean anchoredOnTheWholeCity =
         anchor.deepestDistrict().isEmpty() && !anchor.anchoredAboveTheDistrictComponents();
 
@@ -123,29 +99,16 @@ public class DriverSearchService {
       if (distance == null) {
         continue;
       }
-      bestRankByDriver.merge(driverId, distance, Math::min);
+      bestRankByDriver.merge(driverId, distance, (a, b) -> Math.min(a, b));
     }
 
-    // Desempate por id para a ordem ser determinística entre requisições iguais.
     return bestRankByDriver.entrySet().stream()
         .sorted(
             Map.Entry.<Long, Integer>comparingByValue().thenComparing(Map.Entry.comparingByKey()))
-        .map(Map.Entry::getKey)
+        .map(entry -> entry.getKey())
         .toList();
   }
 
-  /**
-   * O rank de uma área, ou {@code null} quando ela não atende o ponto.
-   *
-   * <p>Numa busca por bairro, o rank é a distância no mapa e um distrito fora do ramo não casa: um
-   * irmão não atende o ponto.
-   *
-   * <p>Numa busca pela cidade inteira o mapa está vazio — não há bairro no pedido para medir
-   * distância. Tratar isso como "não casou" era o furo: o motorista de Taguatinga sumia da busca
-   * por "Brasília", e como o D8 proíbe declarar o DF inteiro, a busca mais genérica devolvia zero
-   * enquanto a específica achava. Aqui qualquer região da cidade casa, com rank 0 — quem declarou
-   * uma região é mais específico que quem declarou a cidade toda, que continua por último.
-   */
   Integer rankOf(
       Long districtId,
       Map<Long, Integer> distanceByDistrict,
@@ -157,11 +120,6 @@ public class DriverSearchService {
     return anchoredOnTheWholeCity ? 0 : distanceByDistrict.get(districtId);
   }
 
-  /**
-   * Distância em níveis entre cada distrito relevante e o ponto buscado: o próprio nó é 0, os
-   * ancestrais sobem, os descendentes descem. Distritos fora do ramo não entram no mapa e por isso
-   * não casam — um irmão não atende o ponto.
-   */
   Map<Long, Integer> distanceByDistrict(ResolvedLocationChainDTO anchor) {
     Map<Long, Integer> distances = new HashMap<>();
     Optional<DistrictModel> deepest = anchor.deepestDistrict();
@@ -189,23 +147,15 @@ public class DriverSearchService {
       Map<Long, List<DistrictModel>> childrenByParent,
       Map<Long, Integer> distances) {
     for (DistrictModel child : childrenByParent.getOrDefault(parentId, List.of())) {
-      distances.merge(child.getId(), distance, Math::min);
+      distances.merge(child.getId(), distance, (a, b) -> Math.min(a, b));
       collectDescendants(child.getId(), distance + 1, childrenByParent, distances);
     }
   }
 
-  /** {@code in ()} vazio não é válido em JPQL; o sentinela nunca casa com id real. */
   List<Long> sentinelIfEmpty(List<Long> ancestorIds) {
     return ancestorIds.isEmpty() ? List.of(-1L) : ancestorIds;
   }
 
-  /**
-   * Pagina preservando a ordem do ranking.
-   *
-   * <p>O banco não sabe ordenar por especificidade, então o recorte da página acontece sobre a
-   * lista já ordenada e os motoristas são reordenados depois da busca — ordenar só o que o
-   * repositório devolvesse embaralharia o ranking a cada página.
-   */
   Page<DriverSearchResponseDTO> pageInRankOrder(List<Long> ranked, Pageable pageable) {
     int from = (int) Math.min(pageable.getOffset(), ranked.size());
     int to = Math.min(from + pageable.getPageSize(), ranked.size());
@@ -228,10 +178,6 @@ public class DriverSearchService {
     return new PageImpl<>(content, pageable, ranked.size());
   }
 
-  /**
-   * Nomes das regiões por motorista, em uma consulta só para a página inteira. Buscar por motorista
-   * dentro do laço seria uma query por linha (regra 17).
-   */
   Map<Long, List<String>> findAreaNames(List<Long> driverIds) {
     Map<Long, List<String>> namesByDriver = new HashMap<>();
     for (DriverServiceAreaModel area : areas.findByDriverIds(driverIds)) {

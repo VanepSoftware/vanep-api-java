@@ -40,7 +40,6 @@ import org.springframework.web.context.WebApplicationContext;
 @ActiveProfiles("test")
 @Sql(scripts = "/db/clean.sql", executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
 class SchoolControllerTest {
-
   @Autowired private WebApplicationContext context;
   @Autowired private SchoolRepository schools;
   @Autowired private AddressRepository addresses;

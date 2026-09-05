@@ -21,7 +21,6 @@ import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class SchoolService {
-
   private final SchoolRepository schoolRepository;
   private final SchoolMapper mapper;
   private final AddressService addressService;

@@ -11,15 +11,8 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Calcula o que falta no cadastro do usuário (D10).
- *
- * <p>Sem N+1 (regra 17): no máximo duas consultas, e só para motorista. Para os demais papéis o
- * cálculo é o campo {@code addressId} que já veio carregado com o usuário — zero query extra.
- */
 @Service
 public class OnboardingService {
-
   private final DriverRepository drivers;
   private final DriverServiceAreaRepository areas;
 
@@ -36,8 +29,6 @@ public class OnboardingService {
       pending.add(OnboardingStep.PERSONAL_ADDRESS);
     }
 
-    // SERVICE_AREA só existe para motorista. Um cliente sem áreas não está com
-    // cadastro incompleto — a pergunta não se aplica a ele.
     if (user.getType() == UserType.DRIVER && !hasServiceArea(user)) {
       pending.add(OnboardingStep.SERVICE_AREA);
     }

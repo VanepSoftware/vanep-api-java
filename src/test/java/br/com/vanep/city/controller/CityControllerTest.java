@@ -29,7 +29,6 @@ import org.springframework.web.context.WebApplicationContext;
 @ActiveProfiles("test")
 @Sql(scripts = "/db/clean.sql", executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
 class CityControllerTest {
-
   @Autowired private WebApplicationContext context;
   @Autowired private CityRepository cities;
   @Autowired private StateRepository states;

@@ -20,7 +20,6 @@ import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class DriverService {
-
   private final DriverRepository driverRepository;
   private final DriverMapper mapper;
   private final UserService userService;

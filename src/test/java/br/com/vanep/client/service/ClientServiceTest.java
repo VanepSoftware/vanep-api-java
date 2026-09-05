@@ -6,7 +6,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
-import br.com.vanep.address.dto.AddressRequestDTO;
 import br.com.vanep.address.dto.AddressResponseDTO;
 import br.com.vanep.address.service.AddressService;
 import br.com.vanep.client.dto.ClientMeSummaryResponseDTO;
@@ -35,7 +34,6 @@ import org.springframework.web.server.ResponseStatusException;
 
 @ExtendWith(MockitoExtension.class)
 class ClientServiceTest {
-
   @Mock private ClientRepository repository;
   @Mock private ClientMapper mapper;
   @Mock private UserService userService;
@@ -96,10 +94,6 @@ class ClientServiceTest {
         null,
         null,
         null);
-  }
-
-  private AddressRequestDTO addressRequest() {
-    return new AddressRequestDTO("city-campinas", "13015904", "Rua Barão de Jaguara", "1481", null);
   }
 
   @Test

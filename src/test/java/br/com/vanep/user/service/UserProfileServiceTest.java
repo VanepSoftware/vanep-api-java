@@ -37,7 +37,6 @@ import org.springframework.http.HttpStatus;
 
 @ExtendWith(MockitoExtension.class)
 class UserProfileServiceTest {
-
   @Mock private UserService userService;
   @Mock private UserRepository users;
   @Mock private MessageSource messages;

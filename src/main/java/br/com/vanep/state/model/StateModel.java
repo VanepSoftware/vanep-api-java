@@ -28,7 +28,6 @@ import org.hibernate.annotations.UpdateTimestamp;
 @Getter
 @Setter
 public class StateModel {
-
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;
@@ -52,10 +51,6 @@ public class StateModel {
   @Column(name = "google_place_id", length = 255)
   private String googlePlaceId;
 
-  /**
-   * Curado: as cidades deste estado exigem granularidade abaixo da cidade na área de atuação do
-   * motorista. Ver D8 — a pergunta não é derivável do Google.
-   */
   @Column(name = "requires_district", nullable = false)
   private boolean requiresDistrict = false;
 

@@ -9,7 +9,6 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface CityRepository extends JpaRepository<CityModel, Long> {
-
   Optional<CityModel> findByToken(String token);
 
   Optional<CityModel> findFirstByNameIgnoreCase(String name);
