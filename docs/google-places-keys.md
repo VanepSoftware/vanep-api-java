@@ -49,6 +49,8 @@ Confirme duas coisas antes de seguir, senão nada funciona:
 
 ## Passo 1 — Chave de servidor (backend)
 
+> **Hoje o time usa uma chave de dev só, sem restrição de aplicação.** Peça a chave ao Joao (gerenciador de senhas, nunca por chat), coloque no `.env` e pule para o teste. O resto deste passo é para quando existir servidor de dev — leia se quiser entender a decisão, ou se for criar a chave de produção.
+
 `APIs & Services → Credentials → Create credentials → API key`. Renomeie para algo como `vanep-server-SEUNOME`.
 
 **Restrições de aplicação → `Endereços IP`.** Descubra os seus:
@@ -60,12 +62,14 @@ echo "IPv6: $(curl -s -6 ifconfig.me)"
 
 Coloque **os dois**. Se você tem IPv6, a chamada para o Google normalmente sai por ele — restringir só ao IPv4 dá `403` com tudo o mais certo.
 
-No IPv6, use só o **prefixo `/64`**, não o endereço completo:
+No IPv6, use o **prefixo `/48`**, não o endereço completo nem `/64`:
 
 ```
 189.10.20.30
-2804:214:3c:2c6f::/64      ← os últimos blocos rotacionam por privacidade
+2804:214:3c::/48      ← nem o /64 é estável; ver abaixo
 ```
+
+O `/64` não basta, e isso já mordeu aqui: a chave de um dev tinha `2804:214:3c:2c6f::/64` cadastrado e passou a dar `403` sozinha, com o IP de origem em `2804:214:3c:b1e:…`. O quarto bloco muda quando o provedor renova a delegação — só os três primeiros seguraram. Compare os seus dois `/64` ao longo de alguns dias antes de escolher; se o quarto bloco mudar, é `/48`.
 
 **Restrições de API → `Restrict key` → `Places API (New)`.**
 
@@ -184,9 +188,13 @@ Esperado: `200` com os headers, `403` sem eles.
 
 ## Passo 4 — Quota diária
 
-Para cada chave: `APIs & Services → Places API (New) → Quotas`, defina um teto diário.
+`APIs & Services → Places API (New) → Quotas`, defina um teto diário.
 
-**300/dia** é uma boa referência: a cota gratuita é de 10.000/mês por SKU, e 10.000 ÷ 30 ≈ 333. Ficar abaixo disso te tranca dentro do gratuito **por construção** — se algo entrar em loop, o sintoma é erro de quota, não boleto.
+**A quota é por projeto, não por chave.** Isso muda a conta: as quatro chaves suas, mais as de todo mundo, mais produção, dividem **um** teto — não é um teto cada. Um `for` errado na máquina de alguém tranca o time inteiro até a meia-noite do Pacífico, que é quando o contador zera.
+
+**300/dia** é uma boa referência: a cota gratuita é de 10.000/mês por SKU, e 10.000 ÷ 30 ≈ 333. Ficar abaixo disso tranca o projeto dentro do gratuito **por construção** — se algo entrar em loop, o sintoma é erro de quota, não boleto.
+
+Como o teto é por projeto, separar chave de dev de chave de produção só é real com **projetos Cloud separados**. Enquanto forem o mesmo projeto (hoje é o do Firebase), o desperdício de dev sai da quota de produção.
 
 ---
 
@@ -210,7 +218,7 @@ curl -s "https://places.googleapis.com/v1/places/ChIJiQLoU9TMW5MRbx2OMMN5r-o" \
 
 | `reason` | Causa | O que fazer |
 |---|---|---|
-| `API_KEY_IP_ADDRESS_BLOCKED` | seu IP mudou, ou falta o IPv6 | atualize os IPs na chave |
+| `API_KEY_IP_ADDRESS_BLOCKED` | seu IP mudou, ou falta o IPv6 | compare o IP da mensagem com o cadastrado — se só o quarto bloco do IPv6 mudou, troque o `/64` por `/48` |
 | `API_KEY_ANDROID_APP_BLOCKED` | faltam os headers de identidade do app | confira as 3 variáveis do passo 3 |
 | `API_KEY_IOS_APP_BLOCKED` | idem, bundle id | idem |
 | `API_KEY_HTTP_REFERRER_BLOCKED` | referrer fora da lista | adicione a origem na chave web |
@@ -223,7 +231,11 @@ Nenhum desses é bug de código. Vale checar sempre antes de abrir issue.
 
 ## Nunca commite as chaves
 
-Os `.env` estão no `.gitignore` dos três repositórios. Cada pessoa cria as suas — não compartilhe por chat nem reuse a chave de outra pessoa: a restrição dela é do IP/keystore **dela** e não vai funcionar na sua máquina de qualquer forma.
+Os `.env` estão no `.gitignore` dos três repositórios.
+
+As chaves **web, Android e iOS** cada pessoa cria as suas: reusar a de outra pessoa não funciona, porque a restrição é do referrer/keystore **dela**.
+
+A chave de **servidor** hoje é uma só, compartilhada, e está sem restrição de aplicação — quem tiver a string usa. Ela circula pelo gerenciador de senhas do time e não por chat, e some do fluxo assim que existir servidor de dev (passo 1).
 
 ---
 

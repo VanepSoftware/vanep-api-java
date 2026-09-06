@@ -356,7 +356,7 @@ Desde 1º de março de 2025 não há mais crédito mensal fixo: a cota gratuita 
 
 O *field mask* decide o SKU. O mask padrão (`id,formattedAddress,addressComponents`) cai inteiro em *Place Details Essentials* — uma cobrança só. **Não acrescente campo sem conferir em qual SKU ele cai**: `displayName`, por exemplo, é Pro e é cobrado por cima.
 
-Na prática: 1 busca = 2 eventos, 1 endereço salvo = 1, 1 escola resolvida = 1 (+ o SKU Pro do nome). Uma quota diária por chave no console é o freio contra fatura surpresa.
+Na prática: 1 busca = 2 eventos, 1 endereço salvo = 1, 1 escola resolvida = 1 (+ o SKU Pro do nome). Uma quota diária no console é o freio contra fatura surpresa — e ela é **por projeto**, não por chave: dev e produção dividem o mesmo teto enquanto estiverem no mesmo projeto Cloud.
 
 ### Erros: de quem é a culpa
 
@@ -367,7 +367,9 @@ A distinção não é cosmética — define se o usuário deve agir ou esperar:
 | `400`, `404` do Google | `400` | o `placeId` do cliente não presta |
 | `401`, `403`, `429`, `5xx` | `503` | credencial, quota ou fornecedor fora do ar — problema nosso |
 
-Um `403` costuma ser **o IP**, não o código. IP residencial é dinâmico: quando ele muda, a chave de servidor para de funcionar sozinha e o sintoma chega como "algo deu errado". Confira `error.details[].reason` antes de qualquer outra hipótese — `API_KEY_IP_ADDRESS_BLOCKED`, `SERVICE_DISABLED` e estouro de quota são coisas diferentes.
+Um `403` costuma ser **a chave**, não o código. Confira `error.details[].reason` antes de qualquer outra hipótese — `API_KEY_IP_ADDRESS_BLOCKED`, `SERVICE_DISABLED` e estouro de quota são coisas diferentes.
+
+Foi restringir a chave de servidor por IP que motivou a chave de dev compartilhada de hoje: IP residencial é dinâmico, então a chave morria sozinha e o sintoma chegava como "algo deu errado". Os porquês e o rumo estão em [`docs/google-places-keys.md`](docs/google-places-keys.md) e no `.env.example`.
 
 ### Nenhum teste chama a API real
 
