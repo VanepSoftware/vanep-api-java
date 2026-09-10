@@ -5,8 +5,8 @@ import br.com.vanep.dependent.dto.DependentClientDTO;
 import br.com.vanep.dependent.dto.DependentCreateDTO;
 import br.com.vanep.dependent.dto.DependentResponseDTO;
 import br.com.vanep.dependent.dto.DependentSchoolDTO;
-import br.com.vanep.dependent.enums.Shift;
 import br.com.vanep.dependent.model.DependentModel;
+import br.com.vanep.shared.enums.Shift;
 import org.springframework.stereotype.Component;
 
 @Component
