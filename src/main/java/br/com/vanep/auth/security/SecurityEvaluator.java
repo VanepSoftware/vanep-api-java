@@ -5,6 +5,7 @@ import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.drivercnh.repository.DriverCnhRepository;
 import br.com.vanep.driverdocument.repository.DriverDocumentRepository;
 import br.com.vanep.driverrating.repository.DriverRatingRepository;
+import br.com.vanep.trip.repository.TripRepository;
 import br.com.vanep.vehicle.repository.VehicleRepository;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
@@ -18,6 +19,7 @@ public class SecurityEvaluator {
   private final DriverCnhRepository cnhRepository;
   private final DriverRatingRepository driverRatingRepository;
   private final DriverDocumentRepository driverDocumentRepository;
+  private final TripRepository tripRepository;
 
   public SecurityEvaluator(
       DriverRepository driverRepository,
@@ -25,13 +27,15 @@ public class SecurityEvaluator {
       VehicleRepository vehicleRepository,
       DriverCnhRepository cnhRepository,
       DriverRatingRepository driverRatingRepository,
-      DriverDocumentRepository driverDocumentRepository) {
+      DriverDocumentRepository driverDocumentRepository,
+      TripRepository tripRepository) {
     this.driverRepository = driverRepository;
     this.clientRepository = clientRepository;
     this.vehicleRepository = vehicleRepository;
     this.cnhRepository = cnhRepository;
     this.driverRatingRepository = driverRatingRepository;
     this.driverDocumentRepository = driverDocumentRepository;
+    this.tripRepository = tripRepository;
   }
 
   public boolean isDriverOwner(String token, Authentication authentication) {
@@ -90,6 +94,16 @@ public class SecurityEvaluator {
             uid ->
                 driverDocumentRepository
                     .findDriverUserTokenByDocumentToken(token)
+                    .map(driverUserToken -> driverUserToken.equals(uid)))
+        .orElse(false);
+  }
+
+  public boolean isTripOwner(String token, Authentication authentication) {
+    return SecurityHelper.getCallerUid(authentication)
+        .flatMap(
+            uid ->
+                tripRepository
+                    .findDriverUserTokenByTripToken(token)
                     .map(driverUserToken -> driverUserToken.equals(uid)))
         .orElse(false);
   }

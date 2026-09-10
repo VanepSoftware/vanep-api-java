@@ -4,7 +4,10 @@ import br.com.vanep.driver.DriverApprovalStatus;
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.shared.enums.Shift;
+import br.com.vanep.trip.dto.TripCreateRequestDTO;
 import br.com.vanep.trip.dto.TripResponseDTO;
+import br.com.vanep.trip.dto.TripUpdateRequestDTO;
+import br.com.vanep.trip.enums.TripCoherenceViolation;
 import br.com.vanep.trip.enums.TripStatus;
 import br.com.vanep.trip.mapper.TripMapper;
 import br.com.vanep.trip.model.TripModel;
@@ -20,6 +23,8 @@ import java.util.List;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,6 +40,7 @@ public class TripService {
   private final UserService users;
   private final TripMapper mapper;
   private final TripTransitionPolicy transitions;
+  private final TripCoherencePolicy coherence;
   private final WorkWindowPolicy workWindow;
   private final MessageSource messages;
 
@@ -44,6 +50,7 @@ public class TripService {
       UserService users,
       TripMapper mapper,
       TripTransitionPolicy transitions,
+      TripCoherencePolicy coherence,
       WorkWindowPolicy workWindow,
       MessageSource messages) {
     this.trips = trips;
@@ -51,6 +58,7 @@ public class TripService {
     this.users = users;
     this.mapper = mapper;
     this.transitions = transitions;
+    this.coherence = coherence;
     this.workWindow = workWindow;
     this.messages = messages;
   }
@@ -105,6 +113,98 @@ public class TripService {
         .toList();
   }
 
+  @Transactional
+  public TripResponseDTO create(TripCreateRequestDTO request) {
+    DriverModel driver =
+        drivers.findByToken(request.driverToken()).orElseThrow(() -> notFound("driver.not_found"));
+
+    trips
+        .findByDriverAndServiceDateAndShift(driver.getId(), request.serviceDate(), request.shift())
+        .ifPresent(
+            existing -> {
+              throw conflict("trip.duplicate_slot");
+            });
+
+    TripStatus status = request.status() != null ? request.status() : TripStatus.SCHEDULED;
+    requireCoherent(status, request.startedAt(), request.finishedAt());
+
+    TripModel trip = new TripModel();
+    trip.setDriver(driver);
+    trip.setServiceDate(request.serviceDate());
+    trip.setShift(request.shift());
+    trip.setStatus(status);
+    trip.setStartedAt(request.startedAt());
+    trip.setFinishedAt(request.finishedAt());
+    return response(trips.save(trip));
+  }
+
+  @Transactional(readOnly = true)
+  public Page<TripResponseDTO> findAll(String driverToken, Pageable pageable) {
+    Long driverId =
+        driverToken == null || driverToken.isBlank()
+            ? null
+            : drivers.findByToken(driverToken).map(DriverModel::getId).orElse(-1L);
+    return trips.findPage(driverId, pageable).map(this::response);
+  }
+
+  @Transactional(readOnly = true)
+  public TripResponseDTO findByToken(String token) {
+    return response(requireTrip(token));
+  }
+
+  @Transactional
+  public TripResponseDTO update(String token, TripUpdateRequestDTO request) {
+    TripModel trip = requireTrip(token);
+
+    if (request.shift().isPresent()) {
+      Shift shift = request.shift().get();
+      if (shift == null) {
+        throw badRequest("trip.field.null");
+      }
+      trip.setShift(shift);
+    }
+    if (request.status().isPresent()) {
+      TripStatus status = request.status().get();
+      if (status == null) {
+        throw badRequest("trip.field.null");
+      }
+      trip.setStatus(status);
+    }
+    if (request.startedAt().isPresent()) {
+      trip.setStartedAt(request.startedAt().get());
+    }
+    if (request.finishedAt().isPresent()) {
+      trip.setFinishedAt(request.finishedAt().get());
+    }
+
+    requireCoherent(trip.getStatus(), trip.getStartedAt(), trip.getFinishedAt());
+    return response(trips.save(trip));
+  }
+
+  @Transactional
+  public void delete(String token) {
+    trips.delete(requireTrip(token));
+  }
+
+  @Transactional
+  public TripResponseDTO restore(String token) {
+    if (!trips.existsDeletedByToken(token)) {
+      throw notFound("trip.not_found");
+    }
+    trips.restoreByToken(token);
+    return response(requireTrip(token));
+  }
+
+  private void requireCoherent(TripStatus status, Instant startedAt, Instant finishedAt) {
+    coherence
+        .validate(status, startedAt, finishedAt)
+        .map(TripCoherenceViolation::messageKey)
+        .ifPresent(
+            key -> {
+              throw badRequest(key);
+            });
+  }
+
   TripModel insertOrReread(DriverModel driver, LocalDate serviceDate, Shift shift) {
     TripModel trip = new TripModel();
     trip.setDriver(driver);
@@ -119,23 +219,27 @@ public class TripService {
     }
   }
 
-  TripResponseDTO response(TripModel trip) {
-    DriverModel owner = trip.getDriver();
+  LocalDate today() {
+    return LocalDate.now(SERVICE_ZONE);
+  }
+
+  private TripResponseDTO response(TripModel trip) {
+    DriverModel driver = trip.getDriver();
     LocalDateTime startedAt =
         trip.getStartedAt() == null
             ? null
             : LocalDateTime.ofInstant(trip.getStartedAt(), SERVICE_ZONE);
     boolean outside =
         workWindow.isOutsideWorkWindow(
-            owner.getWorkDays(), owner.getWorkStartTime(), owner.getWorkEndTime(), startedAt);
+            driver.getWorkDays(), driver.getWorkStartTime(), driver.getWorkEndTime(), startedAt);
     return mapper.toResponse(trip, outside);
   }
 
-  LocalDate today() {
-    return LocalDate.now(SERVICE_ZONE);
+  private TripModel requireTrip(String token) {
+    return trips.findByToken(token).orElseThrow(() -> notFound("trip.not_found"));
   }
 
-  DriverModel requireApprovedDriver(String callerUid) {
+  private DriverModel requireApprovedDriver(String callerUid) {
     UserModel user = users.requireByTokenAndType(callerUid, UserType.DRIVER);
     DriverModel driver =
         drivers
@@ -147,15 +251,19 @@ public class TripService {
     return driver;
   }
 
-  ResponseStatusException conflict(String key) {
+  private ResponseStatusException conflict(String key) {
     return new ResponseStatusException(HttpStatus.CONFLICT, message(key));
   }
 
-  ResponseStatusException notFound(String key) {
+  private ResponseStatusException notFound(String key) {
     return new ResponseStatusException(HttpStatus.NOT_FOUND, message(key));
   }
 
-  String message(String key) {
+  private ResponseStatusException badRequest(String key) {
+    return new ResponseStatusException(HttpStatus.BAD_REQUEST, message(key));
+  }
+
+  private String message(String key) {
     return messages.getMessage(key, null, LocaleContextHolder.getLocale());
   }
 }
