@@ -12,7 +12,9 @@ import br.com.vanep.driver.DriverApprovalStatus;
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.shared.enums.Shift;
+import br.com.vanep.trip.dto.TripResponseDTO;
 import br.com.vanep.trip.enums.TripStatus;
+import br.com.vanep.trip.mapper.TripMapper;
 import br.com.vanep.trip.model.TripModel;
 import br.com.vanep.trip.repository.TripRepository;
 import br.com.vanep.user.enums.UserType;
@@ -49,7 +51,15 @@ class TripServiceTest {
 
   @BeforeEach
   void setUp() {
-    service = new TripService(trips, drivers, users, new TripTransitionPolicy(), messages);
+    service =
+        new TripService(
+            trips,
+            drivers,
+            users,
+            new TripMapper(),
+            new TripTransitionPolicy(),
+            new WorkWindowPolicy(),
+            messages);
 
     UserModel user = new UserModel();
     user.setId(1L);
@@ -73,6 +83,7 @@ class TripServiceTest {
     trip.setServiceDate(LocalDate.now(TripService.SERVICE_ZONE));
     trip.setShift(Shift.MORNING);
     trip.setStatus(status);
+    trip.setToken("trip-token");
     return trip;
   }
 
@@ -81,10 +92,10 @@ class TripServiceTest {
     when(trips.findByDriverAndServiceDateAndShift(any(), any(), any()))
         .thenReturn(Optional.empty());
 
-    TripModel started = service.startToday(CALLER, Shift.MORNING);
+    TripResponseDTO started = service.startToday(CALLER, Shift.MORNING);
 
-    assertThat(started.getStatus()).isEqualTo(TripStatus.IN_PROGRESS);
-    assertThat(started.getStartedAt()).isNotNull();
+    assertThat(started.status()).isEqualTo(TripStatus.IN_PROGRESS);
+    assertThat(started.startedAt()).isNotNull();
   }
 
   @Test
@@ -95,9 +106,9 @@ class TripServiceTest {
     when(trips.findByDriverAndServiceDateAndShift(any(), any(), any()))
         .thenReturn(Optional.of(running));
 
-    TripModel again = service.startToday(CALLER, Shift.MORNING);
+    TripResponseDTO again = service.startToday(CALLER, Shift.MORNING);
 
-    assertThat(again.getStartedAt()).isEqualTo(original);
+    assertThat(again.startedAt()).isEqualTo(original);
     verify(trips, never()).save(any(TripModel.class));
   }
 
@@ -119,10 +130,10 @@ class TripServiceTest {
     when(trips.saveAndFlush(any(TripModel.class)))
         .thenThrow(new DataIntegrityViolationException("slot ocupado"));
 
-    TripModel started = service.startToday(CALLER, Shift.MORNING);
+    TripResponseDTO started = service.startToday(CALLER, Shift.MORNING);
 
-    assertThat(started).isSameAs(winner);
-    assertThat(started.getStatus()).isEqualTo(TripStatus.IN_PROGRESS);
+    assertThat(started.token()).isEqualTo(winner.getToken());
+    assertThat(started.status()).isEqualTo(TripStatus.IN_PROGRESS);
   }
 
   @Test
@@ -142,7 +153,7 @@ class TripServiceTest {
     when(trips.findByDriverAndServiceDateAndShift(any(), any(), any()))
         .thenReturn(Optional.of(completed));
 
-    assertThat(service.finishToday(CALLER, Shift.MORNING).getFinishedAt()).isEqualTo(original);
+    assertThat(service.finishToday(CALLER, Shift.MORNING).finishedAt()).isEqualTo(original);
     verify(trips, never()).save(any(TripModel.class));
   }
 

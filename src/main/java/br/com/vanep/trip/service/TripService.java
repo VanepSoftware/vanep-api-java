@@ -4,7 +4,9 @@ import br.com.vanep.driver.DriverApprovalStatus;
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.shared.enums.Shift;
+import br.com.vanep.trip.dto.TripResponseDTO;
 import br.com.vanep.trip.enums.TripStatus;
+import br.com.vanep.trip.mapper.TripMapper;
 import br.com.vanep.trip.model.TripModel;
 import br.com.vanep.trip.repository.TripRepository;
 import br.com.vanep.user.enums.UserType;
@@ -12,6 +14,7 @@ import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.service.UserService;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
 import org.springframework.context.MessageSource;
@@ -30,24 +33,30 @@ public class TripService {
   private final TripRepository trips;
   private final DriverRepository drivers;
   private final UserService users;
+  private final TripMapper mapper;
   private final TripTransitionPolicy transitions;
+  private final WorkWindowPolicy workWindow;
   private final MessageSource messages;
 
   public TripService(
       TripRepository trips,
       DriverRepository drivers,
       UserService users,
+      TripMapper mapper,
       TripTransitionPolicy transitions,
+      WorkWindowPolicy workWindow,
       MessageSource messages) {
     this.trips = trips;
     this.drivers = drivers;
     this.users = users;
+    this.mapper = mapper;
     this.transitions = transitions;
+    this.workWindow = workWindow;
     this.messages = messages;
   }
 
   @Transactional
-  public TripModel startToday(String callerUid, Shift shift) {
+  public TripResponseDTO startToday(String callerUid, Shift shift) {
     DriverModel driver = requireApprovedDriver(callerUid);
     LocalDate serviceDate = today();
 
@@ -57,7 +66,7 @@ public class TripService {
             .orElseGet(() -> insertOrReread(driver, serviceDate, shift));
 
     if (trip.getStatus() == TripStatus.IN_PROGRESS) {
-      return trip;
+      return response(trip);
     }
     if (!transitions.canStart(trip.getStatus())) {
       throw conflict("trip.already_completed");
@@ -65,11 +74,11 @@ public class TripService {
 
     trip.setStatus(TripStatus.IN_PROGRESS);
     trip.setStartedAt(Instant.now());
-    return trips.save(trip);
+    return response(trips.save(trip));
   }
 
   @Transactional
-  public TripModel finishToday(String callerUid, Shift shift) {
+  public TripResponseDTO finishToday(String callerUid, Shift shift) {
     DriverModel driver = requireApprovedDriver(callerUid);
     TripModel trip =
         trips
@@ -77,7 +86,7 @@ public class TripService {
             .orElseThrow(() -> conflict("trip.not_started"));
 
     if (trip.getStatus() == TripStatus.COMPLETED) {
-      return trip;
+      return response(trip);
     }
     if (!transitions.canFinish(trip.getStatus())) {
       throw conflict("trip.not_started");
@@ -85,13 +94,15 @@ public class TripService {
 
     trip.setStatus(TripStatus.COMPLETED);
     trip.setFinishedAt(Instant.now());
-    return trips.save(trip);
+    return response(trips.save(trip));
   }
 
   @Transactional(readOnly = true)
-  public List<TripModel> findToday(String callerUid) {
+  public List<TripResponseDTO> findToday(String callerUid) {
     DriverModel driver = requireApprovedDriver(callerUid);
-    return trips.findByDriverAndServiceDate(driver.getId(), today());
+    return trips.findByDriverAndServiceDate(driver.getId(), today()).stream()
+        .map(this::response)
+        .toList();
   }
 
   TripModel insertOrReread(DriverModel driver, LocalDate serviceDate, Shift shift) {
@@ -106,6 +117,18 @@ public class TripService {
           .findByDriverAndServiceDateAndShift(driver.getId(), serviceDate, shift)
           .orElseThrow(() -> conflict("trip.duplicate_slot"));
     }
+  }
+
+  TripResponseDTO response(TripModel trip) {
+    DriverModel owner = trip.getDriver();
+    LocalDateTime startedAt =
+        trip.getStartedAt() == null
+            ? null
+            : LocalDateTime.ofInstant(trip.getStartedAt(), SERVICE_ZONE);
+    boolean outside =
+        workWindow.isOutsideWorkWindow(
+            owner.getWorkDays(), owner.getWorkStartTime(), owner.getWorkEndTime(), startedAt);
+    return mapper.toResponse(trip, outside);
   }
 
   LocalDate today() {
