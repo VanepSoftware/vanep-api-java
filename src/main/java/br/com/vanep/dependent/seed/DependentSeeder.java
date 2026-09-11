@@ -1,9 +1,9 @@
 package br.com.vanep.dependent.seed;
 
 import br.com.vanep.client.repository.ClientRepository;
-import br.com.vanep.dependent.enums.Shift;
 import br.com.vanep.dependent.model.DependentModel;
 import br.com.vanep.dependent.repository.DependentRepository;
+import br.com.vanep.shared.enums.Shift;
 import br.com.vanep.user.repository.UserRepository;
 import java.util.Optional;
 import org.slf4j.Logger;

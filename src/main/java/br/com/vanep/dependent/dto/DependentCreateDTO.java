@@ -1,7 +1,7 @@
 package br.com.vanep.dependent.dto;
 
 import br.com.vanep.address.dto.AddressRequestDTO;
-import br.com.vanep.dependent.enums.Shift;
+import br.com.vanep.shared.enums.Shift;
 import br.com.vanep.user.enums.Gender;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;

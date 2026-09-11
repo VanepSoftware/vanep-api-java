@@ -1,14 +1,18 @@
-package br.com.vanep.dependent.model;
+package br.com.vanep.trip.model;
 
+import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.shared.enums.Shift;
-import br.com.vanep.user.enums.Gender;
+import br.com.vanep.trip.enums.TripStatus;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import java.time.Instant;
@@ -22,12 +26,11 @@ import org.hibernate.annotations.SoftDeleteType;
 import org.hibernate.annotations.UpdateTimestamp;
 
 @Entity
-@Table(name = "dependent")
+@Table(name = "trip")
 @SoftDelete(columnName = "deleted_at", strategy = SoftDeleteType.TIMESTAMP)
 @Getter
 @Setter
-public class DependentModel {
-
+public class TripModel {
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;
@@ -35,42 +38,26 @@ public class DependentModel {
   @Column(nullable = false, length = 32)
   private String token;
 
-  @Column(name = "client_id", nullable = false)
-  private Long clientId;
+  @ManyToOne(fetch = FetchType.EAGER, optional = false)
+  @JoinColumn(name = "driver_id", nullable = false)
+  private DriverModel driver;
 
-  @Column(name = "school_id")
-  private Long schoolId;
-
-  @Column(name = "address_id")
-  private Long addressId;
-
-  @Column(nullable = false)
-  private String name;
-
-  @Column(name = "birth_date")
-  private LocalDate birthDate;
-
-  @Enumerated(EnumType.STRING)
-  @Column(length = 16)
-  private Gender gender;
-
-  @Column(length = 64)
-  private String document;
-
-  @Column(length = 32)
-  private String phone;
-
-  private String email;
-
-  @Column(name = "is_self", nullable = false)
-  private boolean self;
-
-  @Column(name = "is_default", nullable = false)
-  private boolean defaultDependent;
+  @Column(name = "service_date", nullable = false)
+  private LocalDate serviceDate;
 
   @Enumerated(EnumType.STRING)
   @Column(nullable = false, length = 16)
-  private Shift shift = Shift.MORNING;
+  private Shift shift;
+
+  @Enumerated(EnumType.STRING)
+  @Column(nullable = false, length = 16)
+  private TripStatus status = TripStatus.SCHEDULED;
+
+  @Column(name = "started_at")
+  private Instant startedAt;
+
+  @Column(name = "finished_at")
+  private Instant finishedAt;
 
   @CreationTimestamp
   @Column(name = "created_at", nullable = false, updatable = false)
