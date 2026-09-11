@@ -36,7 +36,8 @@ class LoginAttemptServiceTest {
 
   @Test
   void expiredWindowUnblocks() {
-    LoginAttemptService service = new LoginAttemptService(1, 0);
+    // A negative lock, not zero: see the same note in RateLimiterTest.expiredWindowResets.
+    LoginAttemptService service = new LoginAttemptService(1, -1);
     service.loginFailed("user@vanep.com");
     assertThat(service.isBlocked("user@vanep.com")).isFalse();
   }
