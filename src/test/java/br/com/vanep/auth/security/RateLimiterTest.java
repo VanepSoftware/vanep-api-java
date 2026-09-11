@@ -31,7 +31,10 @@ class RateLimiterTest {
 
   @Test
   void expiredWindowResets() {
-    RateLimiter limiter = new RateLimiter(true, 1, 0);
+    // A negative window, not zero: expiry is `now.isAfter(start.plus(window))`, so zero only
+    // expires once the clock ticks between the two calls. It does on Linux CI and does not on
+    // Windows, where consecutive Instant.now() reads are identical.
+    RateLimiter limiter = new RateLimiter(true, 1, -1);
     assertThat(limiter.tryAcquire("ip")).isTrue();
     assertThat(limiter.tryAcquire("ip")).isTrue();
   }

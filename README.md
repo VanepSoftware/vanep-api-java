@@ -327,11 +327,23 @@ Para criar as chaves do zero, veja [`docs/google-places-keys.md`](docs/google-pl
 
 Proxiar adicionaria uma ida ao servidor **a cada tecla**, sem ganho. O autocomplete roda no cliente (web/mobile) com a chave da plataforma; o backend só chama `Place Details`, e nunca confia em componentes enviados pelo cliente — recebe apenas o `placeId` e re-resolve.
 
-### O `sessionToken` atravessa a fronteira, e isso é dinheiro
+### O `sessionToken` atravessa a fronteira
 
-Uma sessão do Places só entra no SKU **gratuito** se o `Place Details` que a encerra carregar o **mesmo token** dos autocompletes. Como quem chama o `Place Details` é o backend, o cliente precisa enviar o `sessionToken` junto do `placeId`, e o backend precisa repassá-lo.
+Quem chama o `Place Details` é o backend, então o cliente envia o `sessionToken` junto do `placeId` e o backend repassa. Sem o mesmo token, os autocompletes e o `Place Details` não são reconhecidos como uma sessão.
 
-Sem isso, cada tecla digitada vira um `Autocomplete Request` cobrado à parte — custo maior desde o primeiro usuário, não só em escala.
+**O que isso economiza, na prática: quase nada — e é de propósito.** A regra do Google depende de em qual SKU a sessão *encerra*:
+
+| A sessão encerra em | Autocompletes | `Place Details` |
+|---|---|---|
+| **Essentials** ← o nosso caso | os **12 primeiros** são cobrados; do 13º em diante, grátis | Essentials |
+| Pro / Enterprise | todos grátis | cobrado na faixa **Enterprise + Atmosphere** |
+| Essentials **IDs Only** | todos cobrados, como se não houvesse sessão | grátis |
+
+Com o debounce de 350ms do cliente, praticamente nenhuma sessão passa de 12 requests — ou seja, encerrando em Essentials o token não muda a fatura. Quem segura o custo é o **debounce** e o **field mask**, não ele.
+
+Encerrar em Pro para zerar os autocompletes é armadilha, não otimização: troca um punhado de eventos a US$ 2,83/1.000 pelo `Place Details` na faixa mais cara da plataforma.
+
+Então por que manter o token? Porque ele é a única defesa contra o cenário do 13º request em diante (busca longa, digitação sem pausa, debounce afrouxado no futuro), custa uma string no payload, e é o que a documentação do Google pede. É seguro barato — só não é o que paga a conta.
 
 Por isso o cache de `Place Details` é **ciente da sessão**:
 
@@ -341,22 +353,26 @@ requisição COM sessionToken  →  SEMPRE chama o Google (encerra a sessão)
 requisição SEM sessionToken  →  serve do cache; só chama em miss
 ```
 
-Servir do cache quando há token economizaria uma chamada e faria o cliente pagar cada tecla — sairia **mais caro** que não cachear.
+Servir do cache quando há token deixaria a sessão aberta, sem o `Place Details` que a encerra — e o Google passaria a cobrar os autocompletes como se não houvesse sessão nenhuma.
 
 ### Custo
 
 Desde 1º de março de 2025 não há mais crédito mensal fixo: a cota gratuita é **por SKU**, reseta dia 1º e não acumula.
 
-| SKU | Grátis/mês | Depois |
-|---|---|---|
-| Place Details Essentials | 10.000 | US$ 5,00 / 1.000 |
-| Place Details Essentials **IDs Only** | ilimitado | — |
-| Autocomplete Requests | 10.000 | US$ 2,83 / 1.000 |
-| Autocomplete **Session Usage** | ilimitado | US$ 0 |
+| SKU | Quem chama | Grátis/mês | Depois | ≈ BRL / 1.000 |
+|---|---|---|---|---|
+| Place Details Essentials | backend | 10.000 | US$ 5,00 / 1.000 | R$ 29,35 |
+| Place Details Essentials **IDs Only** | — | ilimitado | — | R$ 0 |
+| Autocomplete Requests | web/mobile | 10.000 | US$ 2,83 / 1.000 | R$ 16,61 |
+| Autocomplete **Session Usage** | — | ilimitado | US$ 0 | R$ 0 |
 
 O *field mask* decide o SKU. O mask padrão (`id,formattedAddress,addressComponents`) cai inteiro em *Place Details Essentials* — uma cobrança só. **Não acrescente campo sem conferir em qual SKU ele cai**: `displayName`, por exemplo, é Pro e é cobrado por cima.
 
-Na prática: 1 busca = 2 eventos, 1 endereço salvo = 1, 1 escola resolvida = 1 (+ o SKU Pro do nome). Uma quota diária no console é o freio contra fatura surpresa — e ela é **por projeto**, não por chave: dev e produção dividem o mesmo teto enquanto estiverem no mesmo projeto Cloud.
+Na prática: 1 busca = 1 `Place Details` + os autocompletes que a digitação gerou (4 a 6 com o debounce atual); 1 endereço salvo = 1; 1 escola resolvida = 1. Isso põe o gratuito em torno de **2.000 buscas/mês**, e depois dele a ordem de grandeza é **R$ 110–130 por 1.000 buscas**.
+
+Uma quota diária no console é o freio contra fatura surpresa — e ela é **por projeto**, não por chave: dev e produção dividem o mesmo teto enquanto estiverem no mesmo projeto Cloud.
+
+> **Não confunda com a tabela da Places API legada**, que é o que o console mostra primeiro e chega a US$ 17,00 / 1.000 (≈ R$ 99,80) no `Places Details`. `Find Place`, `Query Autocomplete`, `Nearby Search` e `Places Photo` são SKUs legadas e **nenhuma delas existe neste código**. Os valores em BRL acima usam o câmbio de R$ 5,87/US$ que o console aplicava em 06/09/2026 — confira o seu antes de orçar.
 
 ### Erros: de quem é a culpa
 
