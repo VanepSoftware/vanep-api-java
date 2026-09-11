@@ -345,7 +345,9 @@ class DataSeederTest {
             PermissionEnum.CREATE_DRIVER_CNH.value(),
             PermissionEnum.LIST_DRIVER_CNHS.value(),
             PermissionEnum.CREATE_DRIVER_DOCUMENT.value(),
-            PermissionEnum.LIST_DRIVER_DOCUMENTS.value());
+            PermissionEnum.LIST_DRIVER_DOCUMENTS.value(),
+            PermissionEnum.START_TRIP.value(),
+            PermissionEnum.FINISH_TRIP.value());
     assertThat(driverRole.getRolePermission()).isEqualTo(captor.getValue());
   }
 }
