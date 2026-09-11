@@ -18,6 +18,7 @@ import br.com.vanep.role.repository.RoleRepository;
 import br.com.vanep.rolepermission.model.RolePermissionModel;
 import br.com.vanep.rolepermission.repository.RolePermissionRepository;
 import br.com.vanep.state.seed.StateSeeder;
+import br.com.vanep.trip.seed.TripSeeder;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
@@ -52,6 +53,7 @@ public class DataSeeder implements ApplicationRunner {
   private final CountrySeeder countrySeeder;
   private final StateSeeder stateSeeder;
   private final DriverRatingSeeder driverRatingSeeder;
+  private final TripSeeder tripSeeder;
   private final PasswordEncoder passwordEncoder;
 
   @Value("${vanep.seed.enabled:false}")
@@ -81,6 +83,7 @@ public class DataSeeder implements ApplicationRunner {
       CountrySeeder countrySeeder,
       StateSeeder stateSeeder,
       DriverRatingSeeder driverRatingSeeder,
+      TripSeeder tripSeeder,
       PasswordEncoder passwordEncoder) {
     this.users = users;
     this.clients = clients;
@@ -93,6 +96,7 @@ public class DataSeeder implements ApplicationRunner {
     this.countrySeeder = countrySeeder;
     this.stateSeeder = stateSeeder;
     this.driverRatingSeeder = driverRatingSeeder;
+    this.tripSeeder = tripSeeder;
     this.passwordEncoder = passwordEncoder;
   }
 
@@ -116,6 +120,7 @@ public class DataSeeder implements ApplicationRunner {
 
     stateSeeder.seed();
     driverRatingSeeder.seed();
+    tripSeeder.seed();
     if (seedOnly) {
       log.info("Seed-only: data seeded; the application will shut down.");
     }

@@ -58,6 +58,7 @@ class TripServiceTest {
             users,
             new TripMapper(),
             new TripTransitionPolicy(),
+            new TripCoherencePolicy(),
             new WorkWindowPolicy(),
             messages);
 

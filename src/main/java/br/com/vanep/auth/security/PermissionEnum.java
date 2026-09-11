@@ -81,7 +81,13 @@ public enum PermissionEnum {
   DELETE_DRIVER_DOCUMENT("delete_driver_document"),
   RESTORE_DRIVER_DOCUMENT("restore_driver_document"),
   START_TRIP("start_trip"),
-  FINISH_TRIP("finish_trip");
+  FINISH_TRIP("finish_trip"),
+  LIST_TRIPS("list_trips"),
+  SHOW_TRIP("show_trip"),
+  CREATE_TRIP("create_trip"),
+  UPDATE_TRIP("update_trip"),
+  DELETE_TRIP("delete_trip"),
+  RESTORE_TRIP("restore_trip");
 
   private final String value;
 

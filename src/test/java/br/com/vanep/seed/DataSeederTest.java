@@ -26,6 +26,7 @@ import br.com.vanep.role.repository.RoleRepository;
 import br.com.vanep.rolepermission.model.RolePermissionModel;
 import br.com.vanep.rolepermission.repository.RolePermissionRepository;
 import br.com.vanep.state.seed.StateSeeder;
+import br.com.vanep.trip.seed.TripSeeder;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
@@ -55,6 +56,7 @@ class DataSeederTest {
   @Mock private CountrySeeder countrySeeder;
   @Mock private StateSeeder stateSeeder;
   @Mock private DriverRatingSeeder driverRatingSeeder;
+  @Mock private TripSeeder tripSeeder;
   @Mock private PasswordEncoder passwordEncoder;
 
   private DataSeeder seeder;
@@ -74,6 +76,7 @@ class DataSeederTest {
             countrySeeder,
             stateSeeder,
             driverRatingSeeder,
+            tripSeeder,
             passwordEncoder);
 
     seeder.adminEmail = "admin@vanep.com.br";
