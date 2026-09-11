@@ -1,4 +1,4 @@
-package br.com.vanep.dependent.enums;
+package br.com.vanep.shared.enums;
 
 public enum Shift {
   MORNING,
