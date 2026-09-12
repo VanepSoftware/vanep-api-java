@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
@@ -19,16 +19,20 @@ import br.com.vanep.client.model.ClientModel;
 import br.com.vanep.client.repository.ClientRepository;
 import br.com.vanep.dependent.dto.DependentCreateDTO;
 import br.com.vanep.dependent.dto.DependentResponseDTO;
+import br.com.vanep.dependent.dto.DependentSchoolDTO;
 import br.com.vanep.dependent.dto.DependentUpdateDTO;
 import br.com.vanep.dependent.mapper.DependentMapper;
 import br.com.vanep.dependent.model.DependentModel;
 import br.com.vanep.dependent.repository.DependentRepository;
+import br.com.vanep.school.model.SchoolModel;
+import br.com.vanep.school.repository.SchoolRepository;
 import br.com.vanep.shared.enums.Shift;
 import br.com.vanep.user.enums.Gender;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -47,10 +51,14 @@ class DependentServiceTest {
   private static final String CLIENT_EMAIL = "ana.souza@vanep.com";
   private static final Long CLIENT_ID = 100L;
   private static final Long DEPENDENT_ID = 55L;
+  private static final Long SCHOOL_ID = 7L;
   private static final String TOKEN = "tok";
+  private static final String SCHOOL_TOKEN = "school-tok";
+  private static final String SCHOOL_NAME = "Escola Teste";
 
   @Mock private DependentRepository dependents;
   @Mock private ClientRepository clients;
+  @Mock private SchoolRepository schools;
   @Mock private UserRepository users;
   @Mock private DependentMapper mapper;
   @Mock private AddressService addressService;
@@ -60,7 +68,8 @@ class DependentServiceTest {
 
   @BeforeEach
   void setUp() {
-    service = new DependentService(dependents, clients, users, mapper, addressService, messages);
+    service =
+        new DependentService(dependents, clients, schools, users, mapper, addressService, messages);
     lenient().when(messages.getMessage(any(), any(), any())).thenAnswer(inv -> inv.getArgument(0));
   }
 
@@ -87,8 +96,40 @@ class DependentServiceTest {
     client.setToken("ctok");
     lenient().when(clients.findById(CLIENT_ID)).thenReturn(Optional.of(client));
     lenient()
-        .when(mapper.toResponse(any(DependentModel.class), eq("ctok"), isNull(), any()))
+        .when(
+            mapper.toResponse(
+                any(DependentModel.class),
+                eq("ctok"),
+                nullable(DependentSchoolDTO.class),
+                nullable(AddressResponseDTO.class)))
         .thenReturn(response(null));
+  }
+
+  private SchoolModel school() {
+    return school(SCHOOL_ID, SCHOOL_TOKEN, SCHOOL_NAME);
+  }
+
+  private SchoolModel school(Long id, String token, String name) {
+    SchoolModel model = new SchoolModel();
+    model.setId(id);
+    model.setToken(token);
+    model.setName(name);
+    return model;
+  }
+
+  private DependentUpdateDTO schoolOnly(JsonNullable<String> schoolToken) {
+    return patch(
+        JsonNullable.undefined(),
+        JsonNullable.undefined(),
+        JsonNullable.undefined(),
+        JsonNullable.undefined(),
+        JsonNullable.undefined(),
+        JsonNullable.undefined(),
+        JsonNullable.undefined(),
+        JsonNullable.undefined(),
+        JsonNullable.undefined(),
+        JsonNullable.undefined(),
+        schoolToken);
   }
 
   private DependentResponseDTO response(AddressResponseDTO address) {
@@ -266,17 +307,61 @@ class DependentServiceTest {
   }
 
   @Test
-  void createWithSchoolTokenThrows400() {
+  void createWithSchoolTokenSetsSchoolId() {
     DependentCreateDTO dto = new DependentCreateDTO();
     dto.setName("Kid");
-    dto.setSchoolToken("school-tok");
+    dto.setSchoolToken(SCHOOL_TOKEN);
+    DependentModel model = dependent(false);
+    SchoolModel linked = school();
 
     stubOwnershipResolution();
+    stubResponseMapping();
+    when(mapper.toModel(dto, CLIENT_ID)).thenReturn(model);
+    when(dependents.countByClientId(CLIENT_ID)).thenReturn(0L);
+    when(schools.findByToken(SCHOOL_TOKEN)).thenReturn(Optional.of(linked));
+    when(schools.findById(SCHOOL_ID)).thenReturn(Optional.of(linked));
+    when(dependents.save(model)).thenReturn(model);
+
+    service.create(clientJwt(), dto);
+
+    assertThat(model.getSchoolId()).isEqualTo(SCHOOL_ID);
+    verify(mapper)
+        .toResponse(model, "ctok", new DependentSchoolDTO(SCHOOL_TOKEN, SCHOOL_NAME), null);
+  }
+
+  @Test
+  void createWithUnknownSchoolTokenThrows404() {
+    DependentCreateDTO dto = new DependentCreateDTO();
+    dto.setName("Kid");
+    dto.setSchoolToken("missing-tok");
+    DependentModel model = dependent(false);
+
+    stubOwnershipResolution();
+    when(mapper.toModel(dto, CLIENT_ID)).thenReturn(model);
+    when(schools.findByToken("missing-tok")).thenReturn(Optional.empty());
+
+    assertThatThrownBy(() -> service.create(clientJwt(), dto))
+        .isInstanceOf(ResponseStatusException.class)
+        .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+        .isEqualTo(HttpStatus.NOT_FOUND);
+    verify(dependents, never()).save(any());
+  }
+
+  @Test
+  void createWithBlankSchoolTokenThrows400() {
+    DependentCreateDTO dto = new DependentCreateDTO();
+    dto.setName("Kid");
+    dto.setSchoolToken("  ");
+    DependentModel model = dependent(false);
+
+    stubOwnershipResolution();
+    when(mapper.toModel(dto, CLIENT_ID)).thenReturn(model);
 
     assertThatThrownBy(() -> service.create(clientJwt(), dto))
         .isInstanceOf(ResponseStatusException.class)
         .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
         .isEqualTo(HttpStatus.BAD_REQUEST);
+    verify(schools, never()).findByToken(any());
     verify(dependents, never()).save(any());
   }
 
@@ -452,62 +537,118 @@ class DependentServiceTest {
   }
 
   @Test
-  void updatePresentSchoolTokenThrows400() {
+  void updatePresentSchoolTokenSetsSchoolId() {
+    DependentModel model = dependent(true);
+    SchoolModel linked = school();
+
+    stubOwnershipResolution();
+    stubResponseMapping();
+    when(dependents.findByToken(TOKEN)).thenReturn(Optional.of(model));
+    when(schools.findByToken(SCHOOL_TOKEN)).thenReturn(Optional.of(linked));
+    when(schools.findById(SCHOOL_ID)).thenReturn(Optional.of(linked));
+    when(dependents.save(model)).thenReturn(model);
+
+    service.update(clientJwt(), TOKEN, schoolOnly(JsonNullable.of(SCHOOL_TOKEN)));
+
+    assertThat(model.getSchoolId()).isEqualTo(SCHOOL_ID);
+  }
+
+  @Test
+  void updatePresentNullSchoolTokenClearsSchoolId() {
+    DependentModel model = dependent(true);
+    model.setSchoolId(SCHOOL_ID);
+
+    stubOwnershipResolution();
+    stubResponseMapping();
+    when(dependents.findByToken(TOKEN)).thenReturn(Optional.of(model));
+    when(dependents.save(model)).thenReturn(model);
+
+    service.update(clientJwt(), TOKEN, schoolOnly(JsonNullable.of(null)));
+
+    assertThat(model.getSchoolId()).isNull();
+    verify(schools, never()).findByToken(any());
+  }
+
+  @Test
+  void updateOmitSchoolTokenLeavesSchoolId() {
+    DependentModel model = dependent(true);
+    model.setSchoolId(SCHOOL_ID);
+    SchoolModel linked = school();
+
+    stubOwnershipResolution();
+    stubResponseMapping();
+    when(dependents.findByToken(TOKEN)).thenReturn(Optional.of(model));
+    when(schools.findById(SCHOOL_ID)).thenReturn(Optional.of(linked));
+    when(dependents.save(model)).thenReturn(model);
+
+    service.update(clientJwt(), TOKEN, nameOnly("Novo"));
+
+    assertThat(model.getSchoolId()).isEqualTo(SCHOOL_ID);
+    verify(schools, never()).findByToken(any());
+  }
+
+  @Test
+  void updateUnknownSchoolTokenThrows404() {
     DependentModel model = dependent(true);
 
     stubOwnershipResolution();
     when(dependents.findByToken(TOKEN)).thenReturn(Optional.of(model));
+    when(schools.findByToken("missing-tok")).thenReturn(Optional.empty());
 
     assertThatThrownBy(
-            () ->
-                service.update(
-                    clientJwt(),
-                    TOKEN,
-                    patch(
-                        JsonNullable.undefined(),
-                        JsonNullable.undefined(),
-                        JsonNullable.undefined(),
-                        JsonNullable.undefined(),
-                        JsonNullable.undefined(),
-                        JsonNullable.undefined(),
-                        JsonNullable.undefined(),
-                        JsonNullable.undefined(),
-                        JsonNullable.undefined(),
-                        JsonNullable.undefined(),
-                        JsonNullable.of("school-tok"))))
+            () -> service.update(clientJwt(), TOKEN, schoolOnly(JsonNullable.of("missing-tok"))))
         .isInstanceOf(ResponseStatusException.class)
         .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
-        .isEqualTo(HttpStatus.BAD_REQUEST);
+        .isEqualTo(HttpStatus.NOT_FOUND);
     verify(dependents, never()).save(any());
   }
 
   @Test
-  void updatePresentNullSchoolTokenThrows400() {
+  void updateBlankSchoolTokenThrows400() {
     DependentModel model = dependent(true);
+    model.setSchoolId(SCHOOL_ID);
 
     stubOwnershipResolution();
     when(dependents.findByToken(TOKEN)).thenReturn(Optional.of(model));
 
-    assertThatThrownBy(
-            () ->
-                service.update(
-                    clientJwt(),
-                    TOKEN,
-                    patch(
-                        JsonNullable.undefined(),
-                        JsonNullable.undefined(),
-                        JsonNullable.undefined(),
-                        JsonNullable.undefined(),
-                        JsonNullable.undefined(),
-                        JsonNullable.undefined(),
-                        JsonNullable.undefined(),
-                        JsonNullable.undefined(),
-                        JsonNullable.undefined(),
-                        JsonNullable.undefined(),
-                        JsonNullable.of(null))))
+    assertThatThrownBy(() -> service.update(clientJwt(), TOKEN, schoolOnly(JsonNullable.of(""))))
         .isInstanceOf(ResponseStatusException.class)
         .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
         .isEqualTo(HttpStatus.BAD_REQUEST);
+    assertThat(model.getSchoolId()).isEqualTo(SCHOOL_ID);
+    verify(dependents, never()).save(any());
+  }
+
+  @Test
+  void listBatchesSchoolLookup() {
+    DependentModel first = dependent(true);
+    first.setSchoolId(SCHOOL_ID);
+    DependentModel second = dependent(false);
+    second.setId(56L);
+    second.setToken("other");
+    second.setSchoolId(8L);
+    SchoolModel firstSchool = school();
+    SchoolModel secondSchool = school(8L, "school-b", "Escola B");
+    ClientModel client = new ClientModel();
+    client.setId(CLIENT_ID);
+    client.setToken("ctok");
+
+    stubOwnershipResolution();
+    when(dependents.findByClientId(CLIENT_ID)).thenReturn(List.of(first, second));
+    when(clients.findAllById(List.of(CLIENT_ID))).thenReturn(List.of(client));
+    when(schools.findAllById(List.of(SCHOOL_ID, 8L)))
+        .thenReturn(List.of(firstSchool, secondSchool));
+    when(addressService.toResponsesByIds(List.of())).thenReturn(Map.of());
+    when(mapper.toResponse(any(), eq("ctok"), any(), nullable(AddressResponseDTO.class)))
+        .thenReturn(response(null));
+
+    service.list(clientJwt());
+
+    verify(schools).findAllById(List.of(SCHOOL_ID, 8L));
+    verify(schools, never()).findById(any());
+    verify(mapper)
+        .toResponse(first, "ctok", new DependentSchoolDTO(SCHOOL_TOKEN, SCHOOL_NAME), null);
+    verify(mapper).toResponse(second, "ctok", new DependentSchoolDTO("school-b", "Escola B"), null);
   }
 
   @Test
