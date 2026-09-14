@@ -37,7 +37,8 @@ Follow this sequence exactly, in order, without skipping steps:
 
 7. **Open the PR** with `gh pr create`:
    - Title: same as the commit message (`tipo(N-<numero>): mensagem`).
-   - Body in pt-BR, linking the issue (`Closes #<numero>`), summarizing what changed and why, and stating that lint/test/build passed locally.
+   - Body in pt-BR, summarizing what changed and why, stating that lint/test/build passed locally, and ending with the literal line `This PR closes #<numero>` — GitHub's auto-close keywords (`closes`/`fixes`/`resolves`) only work in English, so that line stays in English even though the rest of the body is pt-BR.
+   - After creating the PR, verify the link actually took: `gh pr view <pr-number> --json closingIssuesReferences` should list issue `<numero>`.
 
 ## Rules
 
