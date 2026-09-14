@@ -12,6 +12,7 @@ import static org.mockito.Mockito.when;
 import br.com.vanep.auth.security.PermissionEnum;
 import br.com.vanep.auth.security.PermissionRegistry;
 import br.com.vanep.client.repository.ClientRepository;
+import br.com.vanep.clientrating.seed.ClientRatingSeeder;
 import br.com.vanep.country.seed.CountrySeeder;
 import br.com.vanep.dependent.seed.DependentSeeder;
 import br.com.vanep.driver.DriverApprovalStatus;
@@ -56,6 +57,7 @@ class DataSeederTest {
   @Mock private CountrySeeder countrySeeder;
   @Mock private StateSeeder stateSeeder;
   @Mock private DriverRatingSeeder driverRatingSeeder;
+  @Mock private ClientRatingSeeder clientRatingSeeder;
   @Mock private TripSeeder tripSeeder;
   @Mock private PasswordEncoder passwordEncoder;
 
@@ -76,6 +78,7 @@ class DataSeederTest {
             countrySeeder,
             stateSeeder,
             driverRatingSeeder,
+            clientRatingSeeder,
             tripSeeder,
             passwordEncoder);
 
@@ -350,7 +353,10 @@ class DataSeederTest {
             PermissionEnum.CREATE_DRIVER_DOCUMENT.value(),
             PermissionEnum.LIST_DRIVER_DOCUMENTS.value(),
             PermissionEnum.START_TRIP.value(),
-            PermissionEnum.FINISH_TRIP.value());
+            PermissionEnum.FINISH_TRIP.value(),
+            PermissionEnum.CREATE_CLIENT_RATING.value(),
+            PermissionEnum.LIST_CLIENT_RATINGS.value(),
+            PermissionEnum.SHOW_CLIENT_RATING.value());
     assertThat(driverRole.getRolePermission()).isEqualTo(captor.getValue());
   }
 }

@@ -4,6 +4,7 @@ import br.com.vanep.auth.security.PermissionEnum;
 import br.com.vanep.auth.security.PermissionRegistry;
 import br.com.vanep.client.model.ClientModel;
 import br.com.vanep.client.repository.ClientRepository;
+import br.com.vanep.clientrating.seed.ClientRatingSeeder;
 import br.com.vanep.country.seed.CountrySeeder;
 import br.com.vanep.dependent.seed.DependentSeeder;
 import br.com.vanep.driver.DriverApprovalStatus;
@@ -53,6 +54,7 @@ public class DataSeeder implements ApplicationRunner {
   private final CountrySeeder countrySeeder;
   private final StateSeeder stateSeeder;
   private final DriverRatingSeeder driverRatingSeeder;
+  private final ClientRatingSeeder clientRatingSeeder;
   private final TripSeeder tripSeeder;
   private final PasswordEncoder passwordEncoder;
 
@@ -83,6 +85,7 @@ public class DataSeeder implements ApplicationRunner {
       CountrySeeder countrySeeder,
       StateSeeder stateSeeder,
       DriverRatingSeeder driverRatingSeeder,
+      ClientRatingSeeder clientRatingSeeder,
       TripSeeder tripSeeder,
       PasswordEncoder passwordEncoder) {
     this.users = users;
@@ -96,6 +99,7 @@ public class DataSeeder implements ApplicationRunner {
     this.countrySeeder = countrySeeder;
     this.stateSeeder = stateSeeder;
     this.driverRatingSeeder = driverRatingSeeder;
+    this.clientRatingSeeder = clientRatingSeeder;
     this.tripSeeder = tripSeeder;
     this.passwordEncoder = passwordEncoder;
   }
@@ -120,6 +124,7 @@ public class DataSeeder implements ApplicationRunner {
 
     stateSeeder.seed();
     driverRatingSeeder.seed();
+    clientRatingSeeder.seed();
     tripSeeder.seed();
     if (seedOnly) {
       log.info("Seed-only: data seeded; the application will shut down.");
@@ -233,7 +238,10 @@ public class DataSeeder implements ApplicationRunner {
               PermissionEnum.CREATE_DRIVER_DOCUMENT.value(),
               PermissionEnum.LIST_DRIVER_DOCUMENTS.value(),
               PermissionEnum.START_TRIP.value(),
-              PermissionEnum.FINISH_TRIP.value()));
+              PermissionEnum.FINISH_TRIP.value(),
+              PermissionEnum.CREATE_CLIENT_RATING.value(),
+              PermissionEnum.LIST_CLIENT_RATINGS.value(),
+              PermissionEnum.SHOW_CLIENT_RATING.value()));
       bundle = rolePermissions.save(bundle);
       driverRole.setRolePermission(bundle);
       roles.save(driverRole);

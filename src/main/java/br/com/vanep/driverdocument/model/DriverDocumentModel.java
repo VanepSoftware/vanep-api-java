@@ -69,7 +69,7 @@ public class DriverDocumentModel {
   @Column(name = "rejection_reason", length = 255)
   private String rejectionReason;
 
-  @ManyToOne(fetch = FetchType.LAZY)
+  @ManyToOne(fetch = FetchType.EAGER)
   @JoinColumn(name = "reviewed_by")
   private UserModel reviewedBy;
 

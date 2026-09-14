@@ -1,6 +1,7 @@
 package br.com.vanep.auth.security;
 
 import br.com.vanep.client.repository.ClientRepository;
+import br.com.vanep.clientrating.repository.ClientRatingRepository;
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.drivercnh.repository.DriverCnhRepository;
 import br.com.vanep.driverdocument.repository.DriverDocumentRepository;
@@ -18,6 +19,7 @@ public class SecurityEvaluator {
   private final VehicleRepository vehicleRepository;
   private final DriverCnhRepository cnhRepository;
   private final DriverRatingRepository driverRatingRepository;
+  private final ClientRatingRepository clientRatingRepository;
   private final DriverDocumentRepository driverDocumentRepository;
   private final TripRepository tripRepository;
 
@@ -27,6 +29,7 @@ public class SecurityEvaluator {
       VehicleRepository vehicleRepository,
       DriverCnhRepository cnhRepository,
       DriverRatingRepository driverRatingRepository,
+      ClientRatingRepository clientRatingRepository,
       DriverDocumentRepository driverDocumentRepository,
       TripRepository tripRepository) {
     this.driverRepository = driverRepository;
@@ -34,6 +37,7 @@ public class SecurityEvaluator {
     this.vehicleRepository = vehicleRepository;
     this.cnhRepository = cnhRepository;
     this.driverRatingRepository = driverRatingRepository;
+    this.clientRatingRepository = clientRatingRepository;
     this.driverDocumentRepository = driverDocumentRepository;
     this.tripRepository = tripRepository;
   }
@@ -85,6 +89,16 @@ public class SecurityEvaluator {
                 driverRatingRepository
                     .findClientUserTokenByRatingToken(token)
                     .map(clientUserToken -> clientUserToken.equals(uid)))
+        .orElse(false);
+  }
+
+  public boolean isClientRatingOwner(String token, Authentication authentication) {
+    return SecurityHelper.getCallerUid(authentication)
+        .flatMap(
+            uid ->
+                clientRatingRepository
+                    .findDriverUserTokenByRatingToken(token)
+                    .map(driverUserToken -> driverUserToken.equals(uid)))
         .orElse(false);
   }
 
