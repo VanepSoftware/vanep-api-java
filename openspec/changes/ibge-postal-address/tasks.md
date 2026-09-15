@@ -55,7 +55,7 @@
 - [ ] 5.5 Implementar client (`RestClient`), service, `CepLookupController`, bean de rate limiter, chaves MessageSource
 - [ ] 5.6 `make lint` + testes desta fase; abrir PR
 
-## 6. Fase 6 — Endereço pessoal postal (PR 6)
+## 6. Fase 6 — Endereço pessoal (PR 6)
 
 > Objetivo: **BREAKING** `PUT /api/user/me/address` = `cityToken` + `street` + `zipCode` (8 dígitos) + campos postais opcionais. Sem Places neste caminho.
 > Depende de: 1 | Paralelo com: 5

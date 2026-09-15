@@ -9,7 +9,7 @@ O `PUT /api/user/me/address` hoje aceita só `placeId` (+ `sessionToken`, `numbe
 **Objetivos:**
 
 - Uma tabela `city` = municípios IBGE; o Google nunca insere `city`.
-- Escrita do endereço pessoal postal com `cityToken` do catálogo.
+- Escrita do endereço pessoal com `cityToken` do catálogo.
 - ViaCEP só como prefill opcional num GET, nunca no PUT.
 - Falha visível quando o texto de cidade do Google não casa com o IBGE (escrita e busca).
 - Dropar `google_place_id` não usado em `city` e `state` (nunca foi gravado; não é o gancho de um Geocoding futuro).
