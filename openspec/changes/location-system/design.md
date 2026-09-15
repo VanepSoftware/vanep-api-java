@@ -207,6 +207,7 @@ Alternativas rejeitadas:
 |--------|------|--------|
 | `PUT` | `/api/user/me/address` | Cria/atualiza endereço residencial a partir de `placeId` + `sessionToken?` + `number?` + `complement?` |
 | `GET` | `/api/user/me/address` | Lê o endereço residencial do chamador |
+| `DELETE` | `/api/user/me/address` | Soft-delete da linha + `users.address_id = null`; 204 idempotente se já não houver endereço |
 | `GET` | `/api/drivers/me/service-areas` | Lista as regiões do motorista autenticado |
 | `PUT` | `/api/drivers/me/service-areas` | Substitui o conjunto de regiões (lista de `placeId` + `sessionToken?` por item) |
 | `GET` | `/api/drivers/search` | `originPlaceId` + `destinationPlaceId` (+ `originSessionToken?` / `destinationSessionToken?`) → motoristas que cobrem ambos |

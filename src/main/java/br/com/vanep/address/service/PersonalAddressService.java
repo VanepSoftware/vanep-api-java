@@ -79,6 +79,18 @@ public class PersonalAddressService {
     return toResponse(saved);
   }
 
+  @Transactional
+  public void clearMyAddress(String callerUid) {
+    UserModel caller = requireCaller(callerUid);
+    Long addressId = caller.getAddressId();
+    if (addressId == null) {
+      return;
+    }
+    addresses.findById(addressId).ifPresent(addresses::delete);
+    caller.setAddressId(null);
+    users.save(caller);
+  }
+
   @Transactional(readOnly = true)
   public PersonalAddressResponseDTO findMyAddress(String callerUid) {
     UserModel caller = requireCaller(callerUid);

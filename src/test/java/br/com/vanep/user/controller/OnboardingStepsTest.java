@@ -2,6 +2,7 @@ package br.com.vanep.user.controller;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -179,5 +180,19 @@ class OnboardingStepsTest {
         .perform(get("/api/user/me").with(as(uid)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.onboarding.pendingSteps.length()").value(0));
+  }
+
+  @Test
+  void clientPendingPersonalAddressReturnsAfterDelete() throws Exception {
+    String uid = saveUser(UserType.CLIENT, "cliente3@vanep.com", "66666666666").getToken();
+    setAddress(uid);
+
+    mockMvc.perform(delete("/api/user/me/address").with(as(uid))).andExpect(status().isNoContent());
+
+    mockMvc
+        .perform(get("/api/user/me").with(as(uid)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.onboarding.pendingSteps.length()").value(1))
+        .andExpect(jsonPath("$.onboarding.pendingSteps[0]").value("PERSONAL_ADDRESS"));
   }
 }

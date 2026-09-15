@@ -131,7 +131,6 @@ public class UserProfileService {
       return false;
     }
     Gender gender = genderField.get();
-    rejectIfNull(gender, "gender");
     if (Objects.equals(gender, user.getGender())) {
       return false;
     }

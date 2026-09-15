@@ -15,11 +15,18 @@ The system SHALL expose `PATCH /api/user/me` for the authenticated caller identi
 - **WHEN** an authenticated user sends `PATCH /api/user/me` omitting `phone`
 - **THEN** the system leaves the stored phone unchanged
 
-#### Scenario: Explicit null rejected
+#### Scenario: Explicit null name or phone rejected
 
-- **WHEN** an authenticated user sends `PATCH /api/user/me` with `"name": null` or `"phone": null` or `"gender": null`
+- **WHEN** an authenticated user sends `PATCH /api/user/me` with `"name": null` or `"phone": null`
 - **THEN** the system returns `400 Bad Request`
 - **AND** does not change the account
+
+#### Scenario: Explicit null gender clears the column
+
+- **WHEN** an authenticated user sends `PATCH /api/user/me` with `"gender": null`
+- **THEN** the system returns `200 OK`
+- **AND** persists `users.gender` as null
+- **AND** leaves `name`, `phone`, `document`, and `birthDate` unchanged
 
 #### Scenario: Blank phone rejected
 
@@ -81,7 +88,7 @@ Allowed `code` values:
 |------|--------|---------|--------------|
 | 409 | `cooldown` | `name` \| `phone` \| `email` | required |
 | 409 | `email_duplicate` | `email` | omitted/null |
-| 400 | `field_null` | name/phone/gender (as applicable) | omitted/null |
+| 400 | `field_null` | name/phone (as applicable) | omitted/null |
 | 400 | `phone_blank` | `phone` | omitted/null |
 | 400 | `email_same` | `email` | omitted/null |
 | 400 | `email_invalid` | `email` | omitted/null |

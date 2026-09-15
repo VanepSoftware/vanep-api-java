@@ -47,7 +47,8 @@ Request DTO (`UserProfileUpdateRequestDTO`) usa `JsonNullable<String>` / `JsonNu
 | Estado JSON | Semântica |
 |-------------|-----------|
 | campo ausente | no-op |
-| `"field": null` | **400** (não limpamos name/phone/gender) |
+| `"name": null` / `"phone": null` | **400** (não limpamos name/phone; name é NOT NULL) |
+| `"gender": null` | **clear** (`users.gender` é nullable; “prefiro não informar”) |
 | `"phone": ""` | **400** (`user.profile.phone.blank`) |
 | valor igual ao atual | no-op (não bumpa cooldown) |
 | valor novo válido | aplica + seta `last_*_change_at` |
@@ -154,7 +155,7 @@ DTO: `ProfileErrorResponseDTO`:
 |------|--------|--------|---------|--------------|
 | 409 | `cooldown` | mudança bloqueada pelo cooldown | `name` \| `phone` \| `email` | ISO-8601 obrigatório |
 | 409 | `email_duplicate` | e-mail já é `users.email` de outra conta | `email` | omitido ou `null` |
-| 400 | `field_null` | null explícito no PATCH | name/phone/gender | omitido |
+| 400 | `field_null` | null explícito no PATCH | name/phone | omitido |
 | 400 | `phone_blank` | phone `""` | `phone` | omitido |
 | 400 | `email_same` | novo e-mail == atual | `email` | omitido |
 | 400 | `email_invalid` | formato inválido | `email` | omitido |

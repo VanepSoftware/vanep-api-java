@@ -135,23 +135,44 @@ class UserProfileServiceTest {
   }
 
   @Test
-  void explicitNullGenderReturns400() {
+  void explicitNullGenderClearsAndLeavesNamePhoneUnchanged() {
     UserModel user = sampleUser();
+    Instant previousNameChange = Instant.parse("2026-01-01T00:00:00Z");
+    Instant previousPhoneChange = Instant.parse("2026-02-01T00:00:00Z");
+    user.setLastNameChangeAt(previousNameChange);
+    user.setLastPhoneChangeAt(previousPhoneChange);
     when(userService.requireByToken("uid-1")).thenReturn(user);
 
     UserProfileUpdateRequestDTO request =
         new UserProfileUpdateRequestDTO(
             JsonNullable.undefined(), JsonNullable.undefined(), JsonNullable.of(null));
 
-    assertThatThrownBy(() -> service.patchMe("uid-1", request))
-        .isInstanceOf(ProfileBadRequestException.class)
-        .satisfies(
-            ex -> {
-              ProfileBadRequestException error = (ProfileBadRequestException) ex;
-              assertThat(error.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
-              assertThat(error.getCode()).isEqualTo(ProfileErrorCode.FIELD_NULL);
-              assertThat(error.getField()).isEqualTo("gender");
-            });
+    UserMeResponseDTO result = service.patchMe("uid-1", request);
+
+    assertThat(result.gender()).isNull();
+    assertThat(result.name()).isEqualTo("Test User");
+    assertThat(result.phone()).isEqualTo("11999999999");
+    assertThat(user.getLastNameChangeAt()).isEqualTo(previousNameChange);
+    assertThat(user.getLastPhoneChangeAt()).isEqualTo(previousPhoneChange);
+    ArgumentCaptor<UserModel> captor = ArgumentCaptor.forClass(UserModel.class);
+    verify(users).save(captor.capture());
+    assertThat(captor.getValue().getGender()).isNull();
+  }
+
+  @Test
+  void explicitNullGenderWhenAlreadyNullIsNoOp() {
+    UserModel user = sampleUser();
+    user.setGender(null);
+    when(userService.requireByToken("uid-1")).thenReturn(user);
+
+    UserProfileUpdateRequestDTO request =
+        new UserProfileUpdateRequestDTO(
+            JsonNullable.undefined(), JsonNullable.undefined(), JsonNullable.of(null));
+
+    UserMeResponseDTO result = service.patchMe("uid-1", request);
+
+    assertThat(result.gender()).isNull();
+    verify(users, never()).save(any());
   }
 
   @Test
