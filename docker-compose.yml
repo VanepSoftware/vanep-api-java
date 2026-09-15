@@ -26,7 +26,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: vanep-api:local
+    # Dev builda localmente (vanep-api:local). Produção usa a imagem que o CD publica
+    # no GHCR: VANEP_IMAGE no .env do servidor + `docker compose up --no-build`.
+    image: ${VANEP_IMAGE:-vanep-api:local}
     env_file: .env
     ports:
       - "${APP_PORT}:8080"
