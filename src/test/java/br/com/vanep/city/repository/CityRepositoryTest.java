@@ -9,7 +9,6 @@ import br.com.vanep.country.repository.CountryRepository;
 import br.com.vanep.state.model.StateModel;
 import br.com.vanep.state.repository.StateRepository;
 import jakarta.persistence.EntityManager;
-import java.lang.reflect.Method;
 import java.util.Arrays;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -82,7 +81,10 @@ class CityRepositoryTest {
 
   @Test
   void doesNotLookupCityByGooglePlaceId() {
-    assertThat(Arrays.stream(CityRepository.class.getDeclaredMethods()).map(Method::getName))
-        .doesNotContain("findByGooglePlaceId");
+    boolean looksUpByGooglePlaceId =
+        Arrays.stream(CityRepository.class.getDeclaredMethods())
+            .anyMatch(method -> method.getName().equals("findByGooglePlaceId"));
+
+    assertThat(looksUpByGooglePlaceId).isFalse();
   }
 }
