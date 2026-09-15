@@ -19,7 +19,15 @@ env:
 
 jobs:
   build:
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    # Repo público: o filtro `branches` do workflow_run compara só o NOME da branch, então um PR
+    # vindo da `main` de um fork dispararia o CD com os secrets deste repo. Só deploya push
+    # direto na main deste repositório (ou disparo manual a partir da main).
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_branch == 'main' &&
+       github.event.workflow_run.head_repository.full_name == github.repository)
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -82,7 +90,9 @@ jobs:
             cd /home/vanep/vanep-projects/vanep-api-java
 
             # Só para atualizar o docker-compose.yml ao commit deployado (o .env é ignorado pelo git).
+            # Defesa extra: recusa qualquer commit que não esteja na main do GitHub.
             git fetch origin main
+            git merge-base --is-ancestor "$DEPLOY_SHA" origin/main || { echo "Commit $DEPLOY_SHA não está na main — deploy abortado"; exit 1; }
             git reset --hard "$DEPLOY_SHA"
 
             # A imagem vem pronta do GHCR; o token do job expira ao fim do workflow.
