@@ -40,7 +40,7 @@ Cada fase: branch própria a partir de `main`, uma PR (pt-BR, `Refs #177`; a úl
 - [ ] 0.1 Revisar `proposal.md`, `design.md` e os três specs com o time
 - [ ] 0.2 Confirmar o próximo número livre de migration Flyway no momento de cada fase (hoje `V33` é o último; 1a usa o próximo, 3a o seguinte)
 - [x] 0.3 Levantar a topologia de produção: Cloudflare Tunnel (`cloudflared` no host) → API na 8080; sem outro proxy; 8080 hoje exposta no IP público (design D9)
-- [ ] 0.4 Google Cloud: criar o OAuth client Android (package + SHA-1 de debug/release/Play) no mesmo projeto do client Web e publicar a tela de consentimento. `VANEP_GOOGLE_ID_TOKEN_AUDIENCES` não precisa ser definida até o iOS (default = `GOOGLE_CLIENT_ID`)
+- [ ] 0.4 Google Cloud: criar o OAuth client Android (package + SHA-1 de debug/release/Play) no mesmo projeto do client Web e publicar a tela de consentimento. `VANEP_GOOGLE_ID_TOKEN_AUDIENCES` não precisa ser definida até o iOS (default = `GOOGLE_CLIENT_ID`). Contrato com o `vanep-mobile` (M6): `serverClientId` = o mesmo `GOOGLE_CLIENT_ID` do `.env` do backend, e login Google testado em dispositivo real
 - [x] 0.5 Conferir (com root) o ingress de `/etc/cloudflared/config.yml`: `api.vanep.com.br` → `http://localhost:8080` (não é o IP público; o bind em loopback da 0b é compatível)
 - [ ] 0.6 No deploy da 0b, trocar o ingress para `http://127.0.0.1:8080` e reiniciar o `cloudflared`: o Docker publica só em IPv4, e `localhost` pode resolver primeiro para `::1`
 
@@ -92,9 +92,9 @@ Cada fase: branch própria a partir de `main`, uma PR (pt-BR, `Refs #177`; a úl
 > Depende de: — | Paralela com: 0a, 0b, 1a, 3a
 > Ordem: test → security (converter/provider) → config (token generator)
 
-- [ ] 4.1 Testes de slice falhando: `authorization_code` + PKCE do `vanep-mobile` passa a devolver `refresh_token`; refresh só com `client_id=vanep-mobile` devolve novos tokens; reuso do refresh antigo → `invalid_grant`; revoke seguido de refresh → `invalid_grant`; `vanep-frontend` continua sem refresh; `client_id` desconhecido → `401 invalid_client`
+- [ ] 4.1 Testes de slice falhando: `authorization_code` + PKCE do `vanep-mobile` passa a devolver `refresh_token`; refresh só com `client_id=vanep-mobile` devolve novos tokens; reuso do refresh antigo → `invalid_grant`; `POST /oauth2/revoke` só com `client_id=vanep-mobile` + `token` → `200`, e o refresh seguinte → `invalid_grant` (não `invalid_client`); revoke com `client_id` desconhecido → `401 invalid_client`; `vanep-frontend` continua sem refresh; `client_id` desconhecido → `401 invalid_client`
 - [ ] 4.2 Teste de claims: token emitido após o bean explícito de `OAuth2TokenGenerator` contém `uid`, `user_type`, `roles`, `permissions` (e `driver_status` para motorista)
-- [ ] 4.3 Criar `MobileClientAuthenticationConverter` e `MobileClientAuthenticationProvider` (regras do design D2)
+- [ ] 4.3 Criar `MobileClientAuthenticationConverter` e `MobileClientAuthenticationProvider` (regras do design D2, cobrindo `/oauth2/token` e `/oauth2/revoke`)
 - [ ] 4.4 Criar `MobileRefreshTokenGenerator` e o bean `OAuth2TokenGenerator` delegante (`JwtGenerator` + `JwtTokenCustomizer`, access token, refresh mobile)
 - [ ] 4.5 Registrar a autenticação de cliente em `SecurityConfig.authorizationServerSecurityFilterChain` antes dos conversores padrão
 - [ ] 4.6 `make lint` + `./mvnw verify`; abrir PR 2a
@@ -105,12 +105,12 @@ Cada fase: branch própria a partir de `main`, uma PR (pt-BR, `Refs #177`; a úl
 > Depende de: — | Paralela com: 0a, 0b, 1a, 2a
 > Ordem: test → migration → model → repository → service/validator
 
-- [ ] 5.1 Testes unitários falhando de `GoogleIdTokenValidator` com chave RSA local e tokens assinados no teste: válido; assinatura errada; `iss` inválido; `aud` fora da lista; lista vazia; expirado; `email_verified=false`
+- [ ] 5.1 Testes unitários falhando de `GoogleIdTokenValidator` com chave RSA local e tokens assinados no teste: válido; assinatura errada; `iss` inválido; `aud` fora da lista; `aud` = client Web com `azp` = client Android → válido; `aud` = client Android com lista só com o Web → `invalid_grant`; lista vazia; expirado; `email_verified=false`
 - [ ] 5.2 Testes unitários falhando de `SignupTicketService`: emite ticket (hash armazenado, TTL), consome uma vez, rejeita expirado/consumido/desconhecido
 - [ ] 5.3 Migration da tabela `signup_ticket` (colunas do design D5, `ticket_hash` unique)
 - [ ] 5.4 `SignupTicketModel` + `SignupTicketRepository` (busca por hash com `PESSIMISTIC_WRITE`)
 - [ ] 5.5 `SignupTicketService` (`SecureTokens`, `vanep.auth.signup-ticket.ttl-minutes` default 15)
-- [ ] 5.6 `GoogleIdTokenValidator` com `JwtDecoder` dedicado injetável; propriedades `vanep.google.id-token.jwks-uri` (default JWKS do Google) e `vanep.google.id-token.audiences=${VANEP_GOOGLE_ID_TOKEN_AUDIENCES:${GOOGLE_CLIENT_ID:}}`; teste do fallback (sem a variável própria, aceita `aud` igual ao `GOOGLE_CLIENT_ID`); `.env.example` documentado (comentada, usar só quando houver mais de um client ID)
+- [ ] 5.6 `GoogleIdTokenValidator` com `JwtDecoder` privado (nunca um segundo bean do tipo `JwtDecoder`; construtor de pacote para testes); teste de contexto confirmando que um JWT da Vanep continua aceito em `/api/**`; propriedades `vanep.google.id-token.jwks-uri` (default JWKS do Google) e `vanep.google.id-token.audiences=${VANEP_GOOGLE_ID_TOKEN_AUDIENCES:${GOOGLE_CLIENT_ID:}}`; teste do fallback (sem a variável própria, aceita `aud` igual ao `GOOGLE_CLIENT_ID`); `.env.example` documentado (comentada, usar só quando houver mais de um client ID)
 - [ ] 5.7 `application-test.properties`: JWKS URI `http://localhost:1` e audiences de teste falsas (regra 50)
 - [ ] 5.8 `make lint` + `./mvnw verify`; abrir PR 3a
 
@@ -192,7 +192,7 @@ Cada fase: branch própria a partir de `main`, uma PR (pt-BR, `Refs #177`; a úl
 
 - [ ] 11.1 Testes de slice falhando: `POST /api/auth/email/verify` `204` com código certo e `400 invalid_code` para e-mail inexistente, código errado/expirado/substituído/esgotado, conta verificada e conta com `pending_email`
 - [ ] 11.2 Testes de slice falhando: `resend` e `forgot` sempre `202` (conta elegível, inexistente, cooldown, limite diário), verificando envio ou não via mock do `MailService`
-- [ ] 11.3 Testes de slice falhando: `POST /api/auth/password/reset` `204` (senha nova aceita no grant, antiga rejeitada), `400 validation_error` para senha curta sem consumir o código, `400 invalid_code` nos demais casos
+- [ ] 11.3 Testes de slice falhando: `POST /api/auth/password/reset` `204` (senha nova aceita no grant, antiga rejeitada), `400 validation_error` para `newPassword` com 7 caracteres sem consumir o código, `204` com 8 caracteres (mesmo mínimo do reset web), `400 invalid_code` nos demais casos
 - [ ] 11.4 Request DTOs `EmailVerifyRequestDTO`, `EmailRequestDTO`, `PasswordResetRequestDTO`
 - [ ] 11.5 `EmailCodeApiController` com os quatro endpoints delegando aos services da 1b
 - [ ] 11.6 `make lint` + `./mvnw verify`; abrir PR 4b

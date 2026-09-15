@@ -203,7 +203,7 @@ The system SHALL expose `POST /api/auth/password/forgot` with `email`. It MUST a
 
 ### Requirement: Reset password by code
 
-The system SHALL expose `POST /api/auth/password/reset` with `email`, `code` and `newPassword`. `newPassword` MUST follow the sign-up password rule. With the active reset code, the system MUST store the new password, consume the code and its link, and return `204`. In every other case the system MUST return the same `400` with `code=invalid_code`. This includes an unknown e-mail, a wrong, expired, replaced or exhausted code, and an account without a local password.
+The system SHALL expose `POST /api/auth/password/reset` with `email`, `code` and `newPassword`. `newPassword` MUST have at least 8 characters, the same minimum the web reset form enforces today. Sign-up keeps its 6-character minimum; unifying the two is out of scope. With the active reset code, the system MUST store the new password, consume the code and its link, and return `204`. In every other case the system MUST return the same `400` with `code=invalid_code`. This includes an unknown e-mail, a wrong, expired, replaced or exhausted code, and an account without a local password.
 
 #### Scenario: Successful reset
 
@@ -213,9 +213,14 @@ The system SHALL expose `POST /api/auth/password/reset` with `email`, `code` and
 
 #### Scenario: Weak new password
 
-- **WHEN** a reset is posted with a 3-character `newPassword`
+- **WHEN** a reset is posted with a 7-character `newPassword`
 - **THEN** the system returns `400` with `code=validation_error`
 - **AND** the code is not consumed
+
+#### Scenario: Minimum length accepted
+
+- **WHEN** a reset is posted with the active code and an 8-character `newPassword`
+- **THEN** the system returns `204`
 
 ---
 

@@ -6,12 +6,22 @@ Issue access and refresh tokens to the first-party native mobile app through the
 
 ### Requirement: Public mobile client authenticates with client_id only
 
-The token endpoint SHALL authenticate the configured mobile client (`vanep-mobile` by default) by `client_id` alone, without a client secret, for the grant types `urn:vanep:params:oauth:grant-type:password`, `urn:vanep:params:oauth:grant-type:google` and `refresh_token`. Any other client that sends one of these grants without valid client authentication MUST be rejected. The configured web client (`vanep-frontend`) MUST keep its current authentication behavior.
+The authorization server SHALL authenticate the configured mobile client (`vanep-mobile` by default) by `client_id` alone, without a client secret, in these cases:
+- on `/oauth2/token`, for the grant types `urn:vanep:params:oauth:grant-type:password`, `urn:vanep:params:oauth:grant-type:google` and `refresh_token`;
+- on `/oauth2/revoke`, when the request carries `token`.
+
+Any other client that sends one of these requests without valid client authentication MUST be rejected. The `authorization_code` grant MUST keep requiring PKCE. The configured web client (`vanep-frontend`) MUST keep its current authentication behavior.
 
 #### Scenario: Refresh with only client_id
 
 - **WHEN** the mobile app posts `grant_type=refresh_token`, a valid `refresh_token` and `client_id=vanep-mobile` to `/oauth2/token`
 - **THEN** the system returns `200` with a new `access_token` and a new `refresh_token`
+
+#### Scenario: Revoke with only client_id
+
+- **WHEN** the mobile app posts a valid refresh token as `token` and `client_id=vanep-mobile`, without a secret, to `/oauth2/revoke`
+- **THEN** the system returns `200`
+- **AND** a later `refresh_token` grant with that token returns `400` with `error=invalid_grant`, not `invalid_client`
 
 #### Scenario: Unknown client id
 
@@ -34,7 +44,7 @@ The password and Google grants SHALL be enabled only on the mobile client regist
 
 ### Requirement: Mobile client receives rotating refresh tokens
 
-Every successful token response to the mobile client SHALL include a `refresh_token`. This covers the password grant, the Google grant, `refresh_token`, and the legacy `authorization_code` grant while that grant stays enabled. Refresh tokens MUST NOT be reusable: a successful refresh MUST invalidate the refresh token that was presented. Refresh-token TTL and revocation through `/oauth2/revoke` MUST keep working as they do today.
+Every successful token response to the mobile client SHALL include a `refresh_token`. This covers the password grant, the Google grant, `refresh_token`, and the legacy `authorization_code` grant while that grant stays enabled. Refresh tokens MUST NOT be reusable: a successful refresh MUST invalidate the refresh token that was presented. The refresh-token TTL MUST stay as configured today. Revocation through `/oauth2/revoke` MUST work for the mobile client with `client_id` alone, which it does not today.
 
 #### Scenario: Password grant returns refresh token
 
@@ -49,7 +59,7 @@ Every successful token response to the mobile client SHALL include a `refresh_to
 
 #### Scenario: Revoked refresh token
 
-- **WHEN** the mobile app revokes its refresh token through `/oauth2/revoke`
+- **WHEN** the mobile app revokes its refresh token through `/oauth2/revoke`, sending only `client_id` as client authentication
 - **AND** later tries to refresh with it
 - **THEN** the system returns `400` with `error=invalid_grant`
 
@@ -137,14 +147,24 @@ After the configured number of failed attempts (default 5) for a submitted e-mai
 
 ### Requirement: Google grant validates the ID token
 
-The Google grant SHALL accept an `id_token` issued by Google to the native app. The system MUST reject the grant with `400` and `error=invalid_grant` when any of these holds:
+The Google grant SHALL accept an `id_token` that the native app requests with the Google **Web** client ID as its audience: `serverClientId` on Android, and the equivalent setting on iOS once iOS is supported. Unless configured otherwise, the allowed-audience list contains exactly that Web client ID, the same one used by web Google login. The system MUST reject the grant with `400` and `error=invalid_grant` when any of these holds:
 - the signature does not verify against Google's published keys;
 - `iss` is neither `accounts.google.com` nor `https://accounts.google.com`;
 - `aud` is not in the configured list of allowed client IDs;
 - the token is expired;
 - `email_verified` is not `true`.
 
-When the allowed-audience list is empty, the system MUST reject every Google grant request with `invalid_grant`.
+The system MUST NOT require the `azp` claim to be in the allowed list, because on Android it holds the native Android client ID. When the allowed-audience list is empty, the system MUST reject every Google grant request with `invalid_grant`.
+
+#### Scenario: Android token requested for the Web client
+
+- **WHEN** the app posts an otherwise valid ID token whose `aud` is the Web client ID and whose `azp` is the Android client ID
+- **THEN** the token is accepted
+
+#### Scenario: Token requested without serverClientId
+
+- **WHEN** the app posts an otherwise valid ID token whose `aud` is the Android client ID, and the allowed list holds only the Web client ID
+- **THEN** the system returns `400` with `error=invalid_grant`
 
 #### Scenario: Audience not allowed
 

@@ -62,12 +62,15 @@ Refresh, revoke e introspecção continuam nativos. Pacote: `br.com.vanep.auth.o
 ### D2: Autenticação de cliente público só para o `vanep-mobile`
 
 `MobileClientAuthenticationConverter` é registrado em `clientAuthentication(...)` antes dos conversores padrão. Ele só reconhece a requisição quando todas estas condições valem:
-- `POST /oauth2/token`;
-- `grant_type` ∈ {password URN, google URN, `refresh_token`};
+- a requisição é um destes dois casos:
+  - `POST /oauth2/token` com `grant_type` ∈ {password URN, google URN, `refresh_token`};
+  - `POST /oauth2/revoke` com `token` (logout do app);
 - exatamente um `client_id`, sem `client_secret` e sem header `Authorization`;
 - `client_id` igual a `vanep.oauth.mobile-client.id`.
 
-Nesse caso produz `OAuth2ClientAuthenticationToken(clientId, NONE)`. `MobileClientAuthenticationProvider` carrega o `RegisteredClient`, exige `NONE` entre os métodos e autentica. Qualquer outra requisição segue o fluxo padrão, e o `vanep-frontend` não é afetado. O `OAuth2RefreshTokenAuthenticationProvider` do 7.0.5 aceita cliente `NONE` e só verifica DPoP quando há prova (bytecode, linhas 293–338). Um teste de slice na Fase 2a trava esse comportamento.
+Nesse caso produz `OAuth2ClientAuthenticationToken(clientId, NONE)`. O `authorization_code` + PKCE continua no conversor padrão, e a introspecção fica de fora até existir uso.
+
+**Por que o revoke entra:** sem ele, o logout do app recebe `401 invalid_client` antes de o token ser invalidado, e o refresh continua válido pelo TTL de 90 dias. Isso já acontece hoje: o app chama `/oauth2/revoke` só com `client_id` e ignora a falha. `MobileClientAuthenticationProvider` carrega o `RegisteredClient`, exige `NONE` entre os métodos e autentica. Qualquer outra requisição segue o fluxo padrão, e o `vanep-frontend` não é afetado. O `OAuth2RefreshTokenAuthenticationProvider` do 7.0.5 aceita cliente `NONE` e só verifica DPoP quando há prova (bytecode, linhas 293–338). Um teste de slice na Fase 2a trava esse comportamento.
 
 **Isso não é barreira de segurança.** O `client_id` de app público é extraível, e restringir grants ao `vanep-mobile` só evita configuração acidental. A defesa real do grant de senha são o lockout uniforme (D4) e o rate limit (D9).
 
@@ -103,11 +106,18 @@ O registro de sucesso (`loginSucceeded` + `last_login_at`) é extraído do `Auth
 
 ### D5: Grant Google e `signup_ticket`
 
-`GoogleIdTokenValidator` (em `auth/oauth`) recebe um `JwtDecoder` dedicado com estas partes:
+`GoogleIdTokenValidator` (em `auth/oauth`) é o único bean desta peça e guarda um `JwtDecoder` **privado**:
 - `NimbusJwtDecoder.withJwkSetUri(vanep.google.id-token.jwks-uri)`, com default `https://www.googleapis.com/oauth2/v3/certs` e cache de chaves do Nimbus;
-- validadores `JwtTimestampValidator`, emissor ∈ {`accounts.google.com`, `https://accounts.google.com`}, `aud` ∩ `vanep.google.id-token.audiences` ≠ ∅ (lista por vírgula, `${VANEP_GOOGLE_ID_TOKEN_AUDIENCES:${GOOGLE_CLIENT_ID:}}`). Sem a variável própria, o default é o client ID Web, que já é o `aud` do Android. A variável própria existe porque o login web do Spring aceita um único ID, e o iOS vai precisar de mais de um na lista e `email_verified == true`.
+- validadores: `JwtTimestampValidator`; emissor ∈ {`accounts.google.com`, `https://accounts.google.com`}; `aud` ∩ `vanep.google.id-token.audiences` ≠ ∅; `email_verified == true`.
+- O `azp` **não** é conferido contra a lista: no Android ele é o client Android, e isso é esperado.
 
-Com a lista vazia, todo pedido do grant Google recebe `invalid_grant`. Como o decoder é injetado como bean, os testes montam um decoder com chave RSA local e `id_token` assinado no próprio teste. `application-test.properties` fixa a JWKS URI em `http://localhost:1` (regra 50).
+**O decoder do Google não pode ser um bean do tipo `JwtDecoder`.** No 7.0.5, o `JwtConfigurer` do resource server resolve o decoder da Vanep com `getBean(JwtDecoder.class)`, ou seja, por tipo. Um segundo bean desse tipo quebra a subida da aplicação, mesmo com nome ou `@Qualifier`. Por isso o validator monta o decoder a partir das propriedades. Um construtor de pacote recebe um `JwtDecoder` pronto para os testes, que usam chave RSA local e `id_token` assinado no próprio teste. `application-test.properties` fixa a JWKS URI em `http://localhost:1` (regra 50).
+
+**Contrato do `aud` com o app:**
+- A lista vem de `${VANEP_GOOGLE_ID_TOKEN_AUDIENCES:${GOOGLE_CLIENT_ID:}}`, separada por vírgula. Sem a variável própria, vale o client ID Web.
+- Isso só funciona se o app pedir o `id_token` para o client Web. No Android, significa configurar `serverClientId` com o mesmo `GOOGLE_CLIENT_ID` do `.env` do backend. Sem `serverClientId`, o `aud` vem com o client Android e todo grant Google vira `invalid_grant`.
+- A variável própria existe porque o login web do Spring aceita um único ID, e o iOS pode precisar de mais de um na lista.
+- Com a lista vazia, todo pedido do grant Google recebe `invalid_grant`.
 
 O provider chama `OAuthAccountService.resolve(GOOGLE, sub, email, true, name)`:
 - **registrado:** emite tokens como no D1;
@@ -227,6 +237,8 @@ Duplicidade revelando e-mail/CPF é **aceita conscientemente**: é o padrão de 
 - **`client_id` público permite chamar o grant de senha de fora do app** → lockout uniforme por e-mail + rate limit por IP; DPoP como follow-up.
 - **Lockout por e-mail permite a terceiros bloquear uma conta por 15 min (DoS direcionado)** → comportamento que já existe no web; janela curta e configurável.
 - **Esquecer de ligar o `JwtTokenCustomizer` no `OAuth2TokenGenerator` explícito** → teste de claims na Fase 2a, cobrindo `authorization_code` e o grant de senha.
+- **App sem `serverClientId`**: todo grant Google em produção vira `invalid_grant`, com os testes verdes porque usam decoder local → contrato no spec e na tarefa 0.4, teste em que `aud` igual ao client Android é rejeitado, e login Google em dispositivo real como critério de aceite da M6.
+- **Segundo bean `JwtDecoder` entrando por engano** → o decoder do Google fica privado dentro do validator, e um teste de contexto confere que um JWT da Vanep continua sendo aceito em `/api/**`.
 - **CGNAT de operadoras (muitos usuários num IP) com 30 req/min por IP e rota, e o refresh dividindo o bucket do `/oauth2/token`** → capacidade por env; acompanhar `429` após o lançamento; se necessário, bucket separado para `refresh_token`.
 - **Ingress do `cloudflared` apontando para o IP público em vez da porta local** → com o bind em loopback, a API sai do ar. Conferir `/etc/cloudflared/config.yml` antes do deploy da 0b (tarefa 0.5).
 - **`CF-Connecting-IP` não chegar ao container, ou o valve não aceitar o gateway como proxy** → todos os clientes cairiam no bucket do gateway e tomariam `429` juntos. O teste pós-deploy do Migration Plan confere antes de liberar o app.
