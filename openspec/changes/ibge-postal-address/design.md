@@ -35,7 +35,7 @@ O `LocationResolverService` mantém `findOrCreateDistrict`. Lookup de cidade vir
 
 ### D2 — Dump no repo, seeder no boot, não 5570 inserts na Flyway
 
-Capturar IBGE `localidades/municipios` **uma vez** em `src/main/resources/seed/ibge-municipios.json`. `CitySeeder` (depois do `StateSeeder`) faz upsert por `ibge_code`. Testes nunca baixam IBGE: unitários usam fixture de duas cidades; slice insere as cidades que precisa.
+Capturar IBGE `localidades/municipios` **uma vez** em `src/main/resources/seed/ibge-municipalities.json`. `CitySeeder` (depois do `StateSeeder`) faz upsert por `ibge_code`. Testes nunca baixam IBGE: unitários usam fixture de duas cidades; slice insere as cidades que precisa.
 
 Cada item do JSON é **um** município. `microrregiao` e `regiao-imediata` são recortes estatísticos do mesmo município, não duas cidades. O seeder lê só:
 
@@ -44,8 +44,9 @@ Cada item do JSON é **um** município. `microrregiao` e `regiao-imediata` são 
 | `id` | `ibge_code` (varchar 7, ex. Cristalina `5206206`) |
 | `nome` | `name` (`normalized_name` no `@PrePersist`) |
 | `microrregiao.mesorregiao.UF.sigla` | FK para `state` já curado (`GO`) |
+| `regiao-imediata.regiao-intermediaria.UF.sigla` | fallback da UF se `microrregiao` for `null` (ex. Boa Esperança do Norte / MT) |
 
-O resto do objeto (meso, micro, região, imediata, `UF.id`/`nome`) é descartado. ViaCEP `ibge` casa com esse `id`.
+Se `id`, `nome` ou UF ainda faltarem depois do fallback, o seeder pula o município e loga; não aborta o seed. O resto do objeto (meso, micro, região, imediata como cidade, `UF.id`/`nome`) é descartado. ViaCEP `ibge` casa com esse `id`.
 
 **Alternativas:** CSV Flyway de 5570 (checksum doloroso, migration enorme); HTTP IBGE em runtime (viola regra 50 se o teste bater; mais um modo de queda).
 

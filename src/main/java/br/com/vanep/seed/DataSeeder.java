@@ -2,6 +2,7 @@ package br.com.vanep.seed;
 
 import br.com.vanep.auth.security.PermissionEnum;
 import br.com.vanep.auth.security.PermissionRegistry;
+import br.com.vanep.city.seed.CitySeeder;
 import br.com.vanep.client.model.ClientModel;
 import br.com.vanep.client.repository.ClientRepository;
 import br.com.vanep.clientrating.seed.ClientRatingSeeder;
@@ -53,6 +54,7 @@ public class DataSeeder implements ApplicationRunner {
   private final DriverDocumentSeeder driverDocumentSeeder;
   private final CountrySeeder countrySeeder;
   private final StateSeeder stateSeeder;
+  private final CitySeeder citySeeder;
   private final DriverRatingSeeder driverRatingSeeder;
   private final ClientRatingSeeder clientRatingSeeder;
   private final TripSeeder tripSeeder;
@@ -84,6 +86,7 @@ public class DataSeeder implements ApplicationRunner {
       DriverDocumentSeeder driverDocumentSeeder,
       CountrySeeder countrySeeder,
       StateSeeder stateSeeder,
+      CitySeeder citySeeder,
       DriverRatingSeeder driverRatingSeeder,
       ClientRatingSeeder clientRatingSeeder,
       TripSeeder tripSeeder,
@@ -98,6 +101,7 @@ public class DataSeeder implements ApplicationRunner {
     this.driverDocumentSeeder = driverDocumentSeeder;
     this.countrySeeder = countrySeeder;
     this.stateSeeder = stateSeeder;
+    this.citySeeder = citySeeder;
     this.driverRatingSeeder = driverRatingSeeder;
     this.clientRatingSeeder = clientRatingSeeder;
     this.tripSeeder = tripSeeder;
@@ -123,6 +127,7 @@ public class DataSeeder implements ApplicationRunner {
     countrySeeder.seed();
 
     stateSeeder.seed();
+    citySeeder.seed();
     driverRatingSeeder.seed();
     clientRatingSeeder.seed();
     tripSeeder.seed();
