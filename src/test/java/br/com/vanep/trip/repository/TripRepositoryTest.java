@@ -46,7 +46,7 @@ class TripRepositoryTest {
 
     assertThat(repository.findByDriverAndServiceDateAndShift(driver.getId(), TODAY, Shift.MORNING))
         .get()
-        .extracting(TripModel::getId)
+        .extracting(trip -> trip.getId())
         .isEqualTo(saved.getId());
   }
 
@@ -58,7 +58,7 @@ class TripRepositoryTest {
     assertThat(saved.getToken()).doesNotContain("-");
     assertThat(repository.findById(saved.getId()))
         .get()
-        .extracting(TripModel::getToken)
+        .extracting(trip -> trip.getToken())
         .isEqualTo(saved.getToken());
   }
 
@@ -98,7 +98,7 @@ class TripRepositoryTest {
 
     assertThat(today).hasSize(2);
     assertThat(today)
-        .extracting(TripModel::getShift)
+        .extracting(trip -> trip.getShift())
         .containsExactlyInAnyOrder(Shift.MORNING, Shift.AFTERNOON);
   }
 
@@ -123,7 +123,7 @@ class TripRepositoryTest {
     assertThat(recreated.getId()).isNotEqualTo(removed.getId());
     assertThat(repository.findByDriverAndServiceDateAndShift(driver.getId(), TODAY, Shift.MORNING))
         .get()
-        .extracting(TripModel::getId)
+        .extracting(trip -> trip.getId())
         .isEqualTo(recreated.getId());
   }
 

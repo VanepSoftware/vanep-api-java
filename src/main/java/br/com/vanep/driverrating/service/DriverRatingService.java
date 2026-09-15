@@ -52,6 +52,8 @@ public class DriverRatingService {
     return messages.getMessage(key, null, LocaleContextHolder.getLocale());
   }
 
+  // TODO: exigir que o cliente já tenha tido algum vínculo (viagem concluída) com o motorista
+  // antes de permitir a avaliação, uma vez que exista o relacionamento client_driver.
   @Transactional
   public DriverRatingResponseDTO create(DriverRatingCreateRequestDTO request, String callerEmail) {
     UserModel caller =

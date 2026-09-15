@@ -12,6 +12,7 @@ import static org.mockito.Mockito.when;
 import br.com.vanep.auth.security.PermissionEnum;
 import br.com.vanep.auth.security.PermissionRegistry;
 import br.com.vanep.client.repository.ClientRepository;
+import br.com.vanep.clientrating.seed.ClientRatingSeeder;
 import br.com.vanep.country.seed.CountrySeeder;
 import br.com.vanep.dependent.seed.DependentSeeder;
 import br.com.vanep.driver.DriverApprovalStatus;
@@ -26,6 +27,7 @@ import br.com.vanep.role.repository.RoleRepository;
 import br.com.vanep.rolepermission.model.RolePermissionModel;
 import br.com.vanep.rolepermission.repository.RolePermissionRepository;
 import br.com.vanep.state.seed.StateSeeder;
+import br.com.vanep.trip.seed.TripSeeder;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
@@ -55,6 +57,8 @@ class DataSeederTest {
   @Mock private CountrySeeder countrySeeder;
   @Mock private StateSeeder stateSeeder;
   @Mock private DriverRatingSeeder driverRatingSeeder;
+  @Mock private ClientRatingSeeder clientRatingSeeder;
+  @Mock private TripSeeder tripSeeder;
   @Mock private PasswordEncoder passwordEncoder;
 
   private DataSeeder seeder;
@@ -74,6 +78,8 @@ class DataSeederTest {
             countrySeeder,
             stateSeeder,
             driverRatingSeeder,
+            clientRatingSeeder,
+            tripSeeder,
             passwordEncoder);
 
     seeder.adminEmail = "admin@vanep.com.br";
@@ -345,7 +351,12 @@ class DataSeederTest {
             PermissionEnum.CREATE_DRIVER_CNH.value(),
             PermissionEnum.LIST_DRIVER_CNHS.value(),
             PermissionEnum.CREATE_DRIVER_DOCUMENT.value(),
-            PermissionEnum.LIST_DRIVER_DOCUMENTS.value());
+            PermissionEnum.LIST_DRIVER_DOCUMENTS.value(),
+            PermissionEnum.START_TRIP.value(),
+            PermissionEnum.FINISH_TRIP.value(),
+            PermissionEnum.CREATE_CLIENT_RATING.value(),
+            PermissionEnum.LIST_CLIENT_RATINGS.value(),
+            PermissionEnum.SHOW_CLIENT_RATING.value());
     assertThat(driverRole.getRolePermission()).isEqualTo(captor.getValue());
   }
 }

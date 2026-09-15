@@ -21,6 +21,8 @@ import br.com.vanep.country.model.CountryModel;
 import br.com.vanep.country.repository.CountryRepository;
 import br.com.vanep.dependent.model.DependentModel;
 import br.com.vanep.dependent.repository.DependentRepository;
+import br.com.vanep.school.model.SchoolModel;
+import br.com.vanep.school.repository.SchoolRepository;
 import br.com.vanep.shared.enums.Shift;
 import br.com.vanep.state.model.StateModel;
 import br.com.vanep.state.repository.StateRepository;
@@ -56,6 +58,7 @@ class DependentControllerTest {
   @Autowired private UserRepository users;
   @Autowired private ClientRepository clients;
   @Autowired private DependentRepository dependents;
+  @Autowired private SchoolRepository schools;
   @Autowired private AddressRepository addresses;
   @Autowired private CityRepository cities;
   @Autowired private StateRepository states;
@@ -149,6 +152,12 @@ class DependentControllerTest {
     return address;
   }
 
+  private SchoolModel persistSchool(String name) {
+    SchoolModel school = new SchoolModel();
+    school.setName(name);
+    return schools.save(school);
+  }
+
   private String addressJson(String street, String number) {
     return "{\"cityToken\":\""
         + cityToken
@@ -195,6 +204,7 @@ class DependentControllerTest {
         .andExpect(jsonPath("$.name").value("Lucas Souza"))
         .andExpect(jsonPath("$.token").isNotEmpty())
         .andExpect(jsonPath("$.client.token").value(ownerClientToken))
+        .andExpect(jsonPath("$.school").value(nullValue()))
         .andExpect(jsonPath("$.address").value(nullValue()))
         .andExpect(jsonPath("$.addressToken").doesNotExist());
   }
@@ -289,13 +299,43 @@ class DependentControllerTest {
   }
 
   @Test
-  void createWithSchoolTokenReturns400() throws Exception {
+  void createWithSchoolTokenLinksSchoolAndReturnsNested() throws Exception {
+    SchoolModel school = persistSchool("Escola Teste");
+
     mockMvc
         .perform(
             post("/api/dependent")
                 .with(ownerJwt())
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"name\":\"Lucas Souza\",\"schoolToken\":\"school-tok\"}"))
+                .content(
+                    "{\"name\":\"Lucas Souza\",\"schoolToken\":\"" + school.getToken() + "\"}"))
+        .andExpect(status().isCreated())
+        .andExpect(jsonPath("$.school.token").value(school.getToken()))
+        .andExpect(jsonPath("$.school.name").value("Escola Teste"));
+
+    DependentModel saved = dependents.findByClientId(ownerClientId).getFirst();
+    assertThat(saved.getSchoolId()).isEqualTo(school.getId());
+  }
+
+  @Test
+  void createWithUnknownSchoolTokenReturns404() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/dependent")
+                .with(ownerJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"Lucas Souza\",\"schoolToken\":\"missing-school\"}"))
+        .andExpect(status().isNotFound());
+  }
+
+  @Test
+  void createWithBlankSchoolTokenReturns400() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/dependent")
+                .with(ownerJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"Lucas Souza\",\"schoolToken\":\"\"}"))
         .andExpect(status().isBadRequest());
   }
 
@@ -468,21 +508,30 @@ class DependentControllerTest {
   }
 
   @Test
-  void patchSchoolTokenValueReturns400() throws Exception {
+  void patchSchoolTokenLinksSchool() throws Exception {
     DependentModel own = createDependent(ownerClientId, "Own Kid", true);
+    SchoolModel school = persistSchool("Escola Teste");
 
     mockMvc
         .perform(
             patch("/api/dependent/" + own.getToken())
                 .with(ownerJwt())
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"schoolToken\":\"school-tok\"}"))
-        .andExpect(status().isBadRequest());
+                .content("{\"schoolToken\":\"" + school.getToken() + "\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.school.token").value(school.getToken()))
+        .andExpect(jsonPath("$.school.name").value("Escola Teste"));
+
+    assertThat(dependents.findByToken(own.getToken()).orElseThrow().getSchoolId())
+        .isEqualTo(school.getId());
   }
 
   @Test
-  void patchSchoolTokenNullReturns400() throws Exception {
+  void patchSchoolTokenNullClearsSchool() throws Exception {
     DependentModel own = createDependent(ownerClientId, "Own Kid", true);
+    SchoolModel school = persistSchool("Escola Teste");
+    own.setSchoolId(school.getId());
+    dependents.save(own);
 
     mockMvc
         .perform(
@@ -490,7 +539,72 @@ class DependentControllerTest {
                 .with(ownerJwt())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"schoolToken\":null}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.school").value(nullValue()));
+
+    assertThat(dependents.findByToken(own.getToken()).orElseThrow().getSchoolId()).isNull();
+  }
+
+  @Test
+  void patchOmitSchoolTokenLeavesSchoolUnchanged() throws Exception {
+    DependentModel own = createDependent(ownerClientId, "Own Kid", true);
+    SchoolModel school = persistSchool("Escola Teste");
+    own.setSchoolId(school.getId());
+    dependents.save(own);
+
+    mockMvc
+        .perform(
+            patch("/api/dependent/" + own.getToken())
+                .with(ownerJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"Renamed\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.name").value("Renamed"))
+        .andExpect(jsonPath("$.school.token").value(school.getToken()))
+        .andExpect(jsonPath("$.school.name").value("Escola Teste"));
+
+    assertThat(dependents.findByToken(own.getToken()).orElseThrow().getSchoolId())
+        .isEqualTo(school.getId());
+  }
+
+  @Test
+  void patchUnknownSchoolTokenReturns404() throws Exception {
+    DependentModel own = createDependent(ownerClientId, "Own Kid", true);
+
+    mockMvc
+        .perform(
+            patch("/api/dependent/" + own.getToken())
+                .with(ownerJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"schoolToken\":\"missing-school\"}"))
+        .andExpect(status().isNotFound());
+  }
+
+  @Test
+  void patchBlankSchoolTokenReturns400() throws Exception {
+    DependentModel own = createDependent(ownerClientId, "Own Kid", true);
+
+    mockMvc
+        .perform(
+            patch("/api/dependent/" + own.getToken())
+                .with(ownerJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"schoolToken\":\"\"}"))
         .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void listReturnsNestedSchoolForLinkedDependent() throws Exception {
+    DependentModel own = createDependent(ownerClientId, "Own Kid", true);
+    SchoolModel school = persistSchool("Escola Teste");
+    own.setSchoolId(school.getId());
+    dependents.save(own);
+
+    mockMvc
+        .perform(get("/api/dependent").with(ownerJwt()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[0].school.token").value(school.getToken()))
+        .andExpect(jsonPath("$[0].school.name").value("Escola Teste"));
   }
 
   @Test

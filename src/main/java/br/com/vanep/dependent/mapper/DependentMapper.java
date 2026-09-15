@@ -27,7 +27,10 @@ public class DependentMapper {
   }
 
   public DependentResponseDTO toResponse(
-      DependentModel model, String clientToken, String schoolToken, AddressResponseDTO address) {
+      DependentModel model,
+      String clientToken,
+      DependentSchoolDTO school,
+      AddressResponseDTO address) {
     return new DependentResponseDTO(
         model.getToken(),
         new DependentClientDTO(clientToken),
@@ -40,7 +43,7 @@ public class DependentMapper {
         model.isSelf(),
         model.isDefaultDependent(),
         model.getShift(),
-        schoolToken != null ? new DependentSchoolDTO(schoolToken) : null,
+        school,
         address,
         model.getCreatedAt(),
         model.getUpdatedAt());
