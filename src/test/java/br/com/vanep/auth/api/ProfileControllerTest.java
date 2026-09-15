@@ -121,6 +121,31 @@ class ProfileControllerTest {
   }
 
   @Test
+  void patchMeExplicitNullGenderClearsAndLeavesOtherFields() throws Exception {
+    mockMvc
+        .perform(
+            patch("/api/user/me")
+                .with(jwt().jwt(token -> token.claim("uid", uid).subject(EMAIL)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"gender\":null}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.gender").doesNotExist())
+        .andExpect(jsonPath("$.name").value("Tester"))
+        .andExpect(jsonPath("$.phone").value("11999999999"))
+        .andExpect(jsonPath("$.document").value(DOCUMENT))
+        .andExpect(jsonPath("$.birthDate").value("1990-05-15"));
+
+    UserModel reloaded = users.findByToken(uid).orElseThrow();
+    assertThat(reloaded.getGender()).isNull();
+    assertThat(reloaded.getName()).isEqualTo("Tester");
+    assertThat(reloaded.getPhone()).isEqualTo("11999999999");
+    assertThat(reloaded.getDocument()).isEqualTo(DOCUMENT);
+    assertThat(reloaded.getBirthDate()).isEqualTo(BIRTH_DATE);
+    assertThat(reloaded.getLastNameChangeAt()).isNull();
+    assertThat(reloaded.getLastPhoneChangeAt()).isNull();
+  }
+
+  @Test
   void patchMeBlankPhoneReturns400() throws Exception {
     mockMvc
         .perform(

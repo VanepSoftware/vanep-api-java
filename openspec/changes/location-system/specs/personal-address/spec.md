@@ -34,6 +34,40 @@ Controllers MUST stay thin; resolution and persistence MUST live in a `@Service`
 - **WHEN** a request without a valid Bearer token calls `PUT /api/user/me/address` or `GET /api/user/me/address`
 - **THEN** the system returns `401 Unauthorized`
 
+### Requirement: Owner can clear personal address
+
+The system SHALL expose `DELETE /api/user/me/address` for the authenticated caller identified by JWT `uid`. On success the system MUST soft-delete the caller's `address` row, set `users.address_id` to null, and return HTTP 204. When the caller has no address, the system MUST return HTTP 204 (idempotent) so the app can always DELETE. Controllers MUST stay thin; this logic MUST live in `PersonalAddressService`. Clearing MUST NOT change a dependent's pickup address.
+
+#### Scenario: Delete existing address
+
+- **WHEN** an authenticated user who has a personal address calls `DELETE /api/user/me/address`
+- **THEN** the system returns HTTP 204
+- **AND** `users.address_id` is null
+- **AND** a subsequent `GET /api/user/me/address` returns HTTP 404
+
+#### Scenario: Delete when none
+
+- **WHEN** an authenticated user with null `users.address_id` calls `DELETE /api/user/me/address`
+- **THEN** the system returns HTTP 204
+
+#### Scenario: Put after clear creates a new row
+
+- **WHEN** an authenticated user DELETEs their personal address
+- **AND** then PUTs a valid `placeId`
+- **THEN** the system returns HTTP 200
+- **AND** persists a new `address` row linked to `users.address_id`
+
+#### Scenario: Unauthenticated delete
+
+- **WHEN** `DELETE /api/user/me/address` is called without a valid Bearer token
+- **THEN** the system returns HTTP 401
+
+#### Scenario: Onboarding step returns after clear
+
+- **WHEN** an authenticated client who had completed `PERSONAL_ADDRESS` deletes their address
+- **AND** calls `GET /api/user/me`
+- **THEN** `onboarding.pendingSteps` contains `PERSONAL_ADDRESS`
+
 ### Requirement: Personal address available to every role
 
 The system SHALL allow a personal address for client, driver, assistant, and dependent. The missing foreign keys on `school.address_id` and `dependent.address_id` MUST be created, and `assistant` MUST gain an `address_id` column.

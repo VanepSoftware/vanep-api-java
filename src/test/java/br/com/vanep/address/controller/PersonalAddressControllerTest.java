@@ -3,6 +3,7 @@ package br.com.vanep.address.controller;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -324,5 +325,71 @@ class PersonalAddressControllerTest {
   @Test
   void returnsNotFoundWhenTheCallerHasNoAddressYet() throws Exception {
     mockMvc.perform(get("/api/user/me/address").with(caller())).andExpect(status().isNotFound());
+  }
+
+  @Test
+  void rejectsUnauthenticatedDelete() throws Exception {
+    mockMvc.perform(delete("/api/user/me/address")).andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  void deleteClearsAddressAndSubsequentGetIsNotFound() throws Exception {
+    BDDMockito.given(places.findPlaceDetails("place-taguatinga", null))
+        .willReturn(fixture("df-taguatinga-qnl5"));
+
+    mockMvc
+        .perform(
+            put("/api/user/me/address")
+                .with(caller())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"placeId\":\"place-taguatinga\"}"))
+        .andExpect(status().isOk());
+
+    mockMvc
+        .perform(delete("/api/user/me/address").with(caller()))
+        .andExpect(status().isNoContent());
+
+    assertThat(users.findByToken(callerUid).orElseThrow().getAddressId()).isNull();
+    assertThat(addresses.count()).isZero();
+    mockMvc.perform(get("/api/user/me/address").with(caller())).andExpect(status().isNotFound());
+  }
+
+  @Test
+  void deleteWhenNoneIsIdempotentNoContent() throws Exception {
+    mockMvc
+        .perform(delete("/api/user/me/address").with(caller()))
+        .andExpect(status().isNoContent());
+
+    assertThat(users.findByToken(callerUid).orElseThrow().getAddressId()).isNull();
+  }
+
+  @Test
+  void putAfterDeleteCreatesANewAddress() throws Exception {
+    BDDMockito.given(places.findPlaceDetails("place-taguatinga", null))
+        .willReturn(fixture("df-taguatinga-qnl5"));
+
+    mockMvc
+        .perform(
+            put("/api/user/me/address")
+                .with(caller())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"placeId\":\"place-taguatinga\"}"))
+        .andExpect(status().isOk());
+
+    mockMvc
+        .perform(delete("/api/user/me/address").with(caller()))
+        .andExpect(status().isNoContent());
+
+    mockMvc
+        .perform(
+            put("/api/user/me/address")
+                .with(caller())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"placeId\":\"place-taguatinga\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.cityName").value("Brasília"));
+
+    assertThat(users.findByToken(callerUid).orElseThrow().getAddressId()).isNotNull();
+    assertThat(addresses.count()).isEqualTo(1);
   }
 }

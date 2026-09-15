@@ -193,6 +193,17 @@
 - [x] 9.10 Atualizar a spec main `openspec/specs/country-crud/spec.md` para refletir que `country` é o único nível curado
 - [x] 9.11 `make lint` + `./mvnw verify`; abrir PR fase 9
 
+## 11. Phase 11 — DELETE /api/user/me/address
+
+> Goal: o dono pode limpar o endereço residencial (204 idempotente). Sem migration.
+> Depends on: Phase 5 | Parallel with: —
+> Order: test → service → controller
+
+- [x] 11.1 Failing slice tests: DELETE unauthenticated 401; DELETE with address 204 + GET 404 + `addressId` null; DELETE when none 204; PUT after clear 200; client onboarding returns `PERSONAL_ADDRESS` after DELETE
+- [x] 11.2 `PersonalAddressService.clearMyAddress`: soft-delete the row, null `users.address_id`, no-op when already null; do not use `AddressService`
+- [x] 11.3 `DELETE /api/user/me/address` on `PersonalAddressController` (`isAuthenticated()`, 204)
+- [x] 11.4 `make lint` + tests of `PersonalAddressControllerTest` and `OnboardingStepsTest`
+
 ## 10. Encerramento
 
 - [x] 10.1 Confirmar que os 6 specs da change foram cobertos pelas fases entregues
