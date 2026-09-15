@@ -10,13 +10,13 @@
 
 ## 2. Phase 2 — place-backed owned address (branch name: feat/25-owned-address-by-place)
 
-- [ ] 2.1 Update `AddressServiceTest` for the new request shape: a create resolves the place; an amend with only `number` keeps street, city, district and `google_place_id` and does not call `Place Details`; a `placeId` on an existing address replaces it in the same row; an `address` with no `placeId` on an owner with none returns 400 with `address.place_required`
-- [ ] 2.2 Update `DependentServiceTest` and `DependentControllerTest` for the new shape, including the named PATCH test that a single-field body leaves every other stored field unchanged (rule 16)
-- [ ] 2.3 Update `SchoolServiceTest` and `SchoolControllerTest` for the new shape
-- [ ] 2.4 Change `AddressRequestDTO` to `(placeId, sessionToken, number, complement)` with `@Size` only, dropping `cityToken`, `zipCode` and `street`
-- [ ] 2.5 Add the `address.place_required` key to `messages.properties` and `messages_pt_BR.properties`
-- [ ] 2.6 Rewrite `AddressService.applyRequest` to branch on `placeId`: resolve and overwrite, or amend `number` and `complement` only; reject a blank `placeId` on an owner with no address
-- [ ] 2.7 Delete `AddressService.requireCityByToken` and its now-unused `CityRepository` dependency if nothing else uses them
-- [ ] 2.8 Confirm `DependentService` and `SchoolService` need no change, since they pass the DTO through
-- [ ] 2.9 Run `make lint` and `make test-coverage`
-- [ ] 2.10 Open PR
+- [x] 2.1 Update `AddressServiceTest` for the new request shape: a create resolves the place; an amend with only `number` keeps street, city, district and `google_place_id` and does not call `Place Details`; a `placeId` on an existing address replaces it in the same row; an `address` with no `placeId` on an owner with none returns 400 with `address.place_required`
+- [x] 2.2 Update `DependentServiceTest` and `DependentControllerTest` for the new shape, including the named PATCH test that a single-field body leaves every other stored field unchanged (rule 16)
+- [x] 2.3 Update `SchoolServiceTest` and `SchoolControllerTest` for the new shape
+- [x] 2.4 Change `AddressRequestDTO` to `(placeId, sessionToken, number, complement)` with `@Size` only, dropping `cityToken`, `zipCode` and `street`
+- [x] 2.5 Add the `address.place_required` key to `messages.properties` and `messages_pt_BR.properties`
+- [x] 2.6 Rewrite `AddressService.applyRequest` to branch on `placeId`: resolve and overwrite, or amend `number` and `complement` only; reject a blank `placeId` on an owner with no address
+- [x] 2.7 Delete `AddressService.requireCityByToken` and its now-unused `CityRepository` dependency if nothing else uses them
+- [x] 2.8 Confirm `DependentService` and `SchoolService` need no change, since they pass the DTO through
+- [x] 2.9 Run `make lint` and `make test-coverage`
+- [ ] 2.10 Open PR — adiado a pedido do desenvolvedor; branch commitada e enviada
