@@ -101,7 +101,7 @@ Use o formato **`CHAVE=valor`** sem espaços à volta do **`=`** (evita surpresa
 
 ### 3. Porta **5432** no host (conflito com PostgreSQL do sistema)
 
-O Compose mapeia **`${POSTGRES_PORT}:5432`** (porta do **host** → porta **interna** do container). Se algo já estiver a ouvir em **`0.0.0.0:5432`** ou **`127.0.0.1:5432`**, o `docker compose up` falha com **address already in use**.
+O Compose mapeia **`127.0.0.1:${POSTGRES_PORT}:5432`** (porta do **host**, só no loopback → porta **interna** do container). Se algo já estiver a ouvir em **`0.0.0.0:5432`** ou **`127.0.0.1:5432`**, o `docker compose up` falha com **address already in use**.
 
 Em Debian/Ubuntu costuma existir um serviço **`postgresql@…-main`** (ex.: `postgresql@18-main`). Para listar e parar **só esse cluster** (liberta a 5432 no host):
 
@@ -401,6 +401,8 @@ A API envia e-mails transacionais em dois fluxos: **verificação de e-mail** (n
 
 O **[Mailpit](https://mailpit.axllent.org/)** já está configurado no `docker-compose.yml`. Ele captura todos os e-mails enviados pela aplicação sem precisar de conta, API key ou domínio verificado.
 
+O serviço fica no profile **`mailpit`** do Compose. Os alvos do `make` já ativam o profile; para `docker compose` direto, o `.env.example` traz **`COMPOSE_PROFILES=mailpit`**. Se o seu `.env` é anterior a isso, adicione essa linha. Em produção o profile fica desligado e o e-mail sai pelo SMTP real.
+
 ```bash
 make mail-up       # sobe só o Mailpit
 make dev           # sobe Postgres + Mailpit + API (tudo de uma vez)
@@ -548,7 +550,13 @@ Outros comandos úteis:
 
 A imagem usa **multi-stage Dockerfile** (JDK 25 build, JRE 25 runtime). O **`Dockerfile`** define **`SPRING_PROFILES_ACTIVE=docker`** por padrão; o Compose pode reforçar o mesmo valor.
 
-O **`docker-compose.yml`** define **postgres**, **mailpit** e **vanep**, com **`env_file: .env`** para credenciais e portas no host. O serviço **vanep** usa **`POSTGRES_HOST=postgres`** e **`MAIL_HOST=mailpit`** na rede interna.
+O **`docker-compose.yml`** define **postgres**, **mailpit** e **vanep**, com **`env_file: .env`** para credenciais e portas no host. O serviço **vanep** usa **`POSTGRES_HOST=postgres`** e, sem `MAIL_HOST` no `.env`, **`mailpit`** como SMTP na rede interna.
+
+Pensando no servidor de produção:
+
+- **postgres** e **vanep** têm `restart: unless-stopped`, então voltam sozinhos após reboot.
+- As portas do Postgres e do Mailpit são publicadas só em **`127.0.0.1`**. O Docker ignora o UFW, então publicar em `0.0.0.0` exporia o banco no IP público. Para acessar o banco de fora, use túnel SSH (`ssh -L 5432:127.0.0.1:5432 usuario@servidor`).
+- O **mailpit** só sobe com o profile `mailpit` (ver [Desenvolvimento local (Mailpit)](#desenvolvimento-local-mailpit)).
 
 ```bash
 cp .env.example .env   # preencher

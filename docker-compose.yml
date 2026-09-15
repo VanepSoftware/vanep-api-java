@@ -1,9 +1,12 @@
 services:
   postgres:
     image: postgres:17-alpine
+    restart: unless-stopped
     env_file: .env
     ports:
-      - "${POSTGRES_PORT}:5432"
+      # Só no loopback: o Docker ignora o UFW, e 0.0.0.0 deixaria o banco aberto no IP público
+      # da VPS. O profile local conecta em 127.0.0.1; de fora, use túnel SSH.
+      - "127.0.0.1:${POSTGRES_PORT}:5432"
     volumes:
       - vanep-postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -16,11 +19,14 @@ services:
       timeout: 5s
       retries: 5
 
+  # Só dev: sobe com o profile "mailpit" (COMPOSE_PROFILES no .env ou via Makefile).
+  # Produção não ativa o profile e usa SMTP real (MAIL_* no .env).
   mailpit:
     image: axllent/mailpit:latest
+    profiles: ["mailpit"]
     ports:
-      - "${MAILPIT_SMTP_PORT:-1025}:1025"
-      - "${MAILPIT_UI_PORT:-8025}:8025"
+      - "127.0.0.1:${MAILPIT_SMTP_PORT:-1025}:1025"
+      - "127.0.0.1:${MAILPIT_UI_PORT:-8025}:8025"
 
   vanep:
     build:
@@ -29,6 +35,7 @@ services:
     # Dev builda localmente (vanep-api:local). Produção usa a imagem que o CD publica
     # no GHCR: VANEP_IMAGE no .env do servidor + `docker compose up --no-build`.
     image: ${VANEP_IMAGE:-vanep-api:local}
+    restart: unless-stopped
     env_file: .env
     ports:
       - "${APP_PORT}:8080"
