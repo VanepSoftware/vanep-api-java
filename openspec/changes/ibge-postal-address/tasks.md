@@ -4,9 +4,9 @@
 > Branch: `feat/ibge-postal-address-schema` a partir de `main`
 > Depende de: — | Paralelo com: —
 
-- [ ] 1.1 Testes de repositório falhando: `ibge_code` único entre cidades ativas; `neighborhood` persiste em `address`; persistir/carregar `city` e `state` sem mapeamento de `googlePlaceId`
-- [ ] 1.2 Migration `V34` (não editar arquivos já aplicados): `city.ibge_code varchar(7)` + índice unique parcial `WHERE deleted_at IS NULL`; `address.neighborhood varchar(128)` nullable; `DROP INDEX` `city_google_place_id_active_key` e `state_google_place_id_active_key`; `DROP COLUMN` `city.google_place_id` e `state.google_place_id`. Deixar `district.google_place_id`, `address.google_place_id` e `school.google_place_id`
-- [ ] 1.3 Atualizar `CityModel` e `StateModel` (remover `googlePlaceId`); dropar `CityRepository.findByGooglePlaceId`; adicionar `ibgeCode` em `CityModel` e `neighborhood` em `AddressModel`; aplicar `V34` no Postgres local
+- [x] 1.1 Testes de repositório falhando: `ibge_code` único entre cidades ativas; `neighborhood` persiste em `address`; persistir/carregar `city` e `state` sem mapeamento de `googlePlaceId`
+- [x] 1.2 Migration `V34` (não editar arquivos já aplicados): `city.ibge_code varchar(7)` + índice unique parcial `WHERE deleted_at IS NULL`; `address.neighborhood varchar(128)` nullable; `DROP INDEX` `city_google_place_id_active_key` e `state_google_place_id_active_key`; `DROP COLUMN` `city.google_place_id` e `state.google_place_id`. Deixar `district.google_place_id`, `address.google_place_id` e `school.google_place_id`
+- [x] 1.3 Atualizar `CityModel` e `StateModel` (remover `googlePlaceId`); dropar `CityRepository.findByGooglePlaceId`; adicionar `ibgeCode` em `CityModel` e `neighborhood` em `AddressModel`; aplicar `V34` no Postgres local
 - [ ] 1.4 `make lint` + testes desta fase; abrir PR
 
 ## 2. Fase 2 — Seeder do catálogo IBGE (PR 2)
