@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import br.com.vanep.auth.security.LoginAttemptService;
 import br.com.vanep.user.enums.Gender;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
@@ -37,6 +38,7 @@ class AuthEndpointsTest {
   @Autowired private WebApplicationContext context;
   @Autowired private UserRepository users;
   @Autowired private PasswordEncoder passwordEncoder;
+  @Autowired private LoginAttemptService loginAttempts;
 
   private MockMvc mockMvc;
 
@@ -48,6 +50,8 @@ class AuthEndpointsTest {
                 org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers
                     .springSecurity())
             .build();
+    loginAttempts.loginSucceeded(EMAIL);
+    loginAttempts.loginSucceeded("nobody@vanep.com");
 
     UserModel user = new UserModel();
     user.setType(UserType.CLIENT);
@@ -124,6 +128,25 @@ class AuthEndpointsTest {
         .perform(formLogin("/login").user("email", EMAIL).password(PASSWORD))
         .andExpect(status().is3xxRedirection())
         .andExpect(authenticated().withUsername(EMAIL));
+  }
+
+  @Test
+  void blockedEmailFailsTheSameWayWhetherOrNotTheAccountExists() throws Exception {
+    for (int attempt = 0; attempt < 5; attempt++) {
+      mockMvc.perform(formLogin("/login").user("email", EMAIL).password("wrong"));
+      mockMvc.perform(formLogin("/login").user("email", "nobody@vanep.com").password("wrong"));
+    }
+
+    mockMvc
+        .perform(formLogin("/login").user("email", EMAIL).password(PASSWORD))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrl("/login?error"))
+        .andExpect(unauthenticated());
+    mockMvc
+        .perform(formLogin("/login").user("email", "nobody@vanep.com").password(PASSWORD))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrl("/login?error"))
+        .andExpect(unauthenticated());
   }
 
   @Test

@@ -1,5 +1,8 @@
 package br.com.vanep.auth.config;
 
+import br.com.vanep.auth.oauth.JwtTokenCustomizer;
+import br.com.vanep.auth.oauth.grant.MobileAuthorizationGrantTypes;
+import br.com.vanep.auth.oauth.grant.MobileRefreshTokenGenerator;
 import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jose.jwk.source.ImmutableJWKSet;
@@ -23,6 +26,8 @@ import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
+import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
+import org.springframework.security.oauth2.server.authorization.InMemoryOAuth2AuthorizationService;
 import org.springframework.security.oauth2.server.authorization.JdbcOAuth2AuthorizationService;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService;
 import org.springframework.security.oauth2.server.authorization.client.InMemoryRegisteredClientRepository;
@@ -31,6 +36,10 @@ import org.springframework.security.oauth2.server.authorization.client.Registere
 import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
 import org.springframework.security.oauth2.server.authorization.settings.ClientSettings;
 import org.springframework.security.oauth2.server.authorization.settings.TokenSettings;
+import org.springframework.security.oauth2.server.authorization.token.DelegatingOAuth2TokenGenerator;
+import org.springframework.security.oauth2.server.authorization.token.JwtGenerator;
+import org.springframework.security.oauth2.server.authorization.token.OAuth2AccessTokenGenerator;
+import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenGenerator;
 
 @Configuration
 public class AuthorizationServerConfig {
@@ -68,6 +77,10 @@ public class AuthorizationServerConfig {
     RegisteredClient.Builder mobileBuilder =
         buildPublicClient(mobileClientId, publicClientSettings, tokenSettings);
     applyRedirectUris(mobileBuilder, mobileRedirectUris);
+    // Only the native app gets the extension grants. This is configuration hygiene, not a
+    // security barrier: the defence is the uniform lockout plus the rate limit.
+    mobileBuilder.authorizationGrantType(MobileAuthorizationGrantTypes.PASSWORD);
+    mobileBuilder.authorizationGrantType(MobileAuthorizationGrantTypes.GOOGLE);
     RegisteredClient mobileClient = mobileBuilder.build();
 
     return new InMemoryRegisteredClientRepository(webClient, mobileClient);
@@ -109,6 +122,16 @@ public class AuthorizationServerConfig {
     return new JdbcOAuth2AuthorizationService(jdbcTemplate, registeredClientRepository);
   }
 
+  /**
+   * Declared as a bean so the mobile grants and the server's own endpoints share one store; without
+   * it each side would build its own in-memory instance and refresh would not find the token.
+   */
+  @Bean
+  @Profile("!docker & !prod & !local")
+  public OAuth2AuthorizationService inMemoryAuthorizationService() {
+    return new InMemoryOAuth2AuthorizationService();
+  }
+
   @Bean
   public JWKSource<SecurityContext> jwkSource(
       @Value("${vanep.oauth.jwk.private-key:}") String privateKeyPem,
@@ -142,6 +165,24 @@ public class AuthorizationServerConfig {
       decoder.setJwtValidator(JwtValidators.createDefaultWithIssuer(issuer));
     }
     return decoder;
+  }
+
+  /**
+   * Declaring this bean takes over from the server's default generator, so the {@link
+   * JwtTokenCustomizer} has to be wired by hand here — without it every access token would ship
+   * without {@code uid}, {@code roles} and {@code permissions}.
+   */
+  @Bean
+  public OAuth2TokenGenerator<?> tokenGenerator(
+      JWKSource<SecurityContext> jwkSource,
+      JwtTokenCustomizer jwtTokenCustomizer,
+      @Value("${vanep.oauth.mobile-client.id:vanep-mobile}") String mobileClientId) {
+    JwtGenerator jwtGenerator = new JwtGenerator(new NimbusJwtEncoder(jwkSource));
+    jwtGenerator.setJwtCustomizer(jwtTokenCustomizer);
+    return new DelegatingOAuth2TokenGenerator(
+        jwtGenerator,
+        new OAuth2AccessTokenGenerator(),
+        new MobileRefreshTokenGenerator(mobileClientId));
   }
 
   @Bean

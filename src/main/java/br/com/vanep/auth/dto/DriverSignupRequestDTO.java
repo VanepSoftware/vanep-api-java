@@ -8,7 +8,7 @@ import lombok.Setter;
 
 @Getter
 @Setter
-public class DriverSignupRequestDTO extends AccountSignupRequestDTO {
+public class DriverSignupRequestDTO extends AccountSignupRequestDTO implements DriverSignupFields {
   private String cnpj;
 
   private Integer experienceYears;

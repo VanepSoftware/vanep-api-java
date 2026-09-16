@@ -92,11 +92,11 @@ Cada fase: branch própria a partir de `main`, uma PR (pt-BR, `Refs #177`; a úl
 > Depende de: — | Paralela com: 0a, 0b, 1a, 3a
 > Ordem: test → security (converter/provider) → config (token generator)
 
-- [ ] 4.1 Testes de slice falhando: `authorization_code` + PKCE do `vanep-mobile` passa a devolver `refresh_token`; refresh só com `client_id=vanep-mobile` devolve novos tokens; reuso do refresh antigo → `invalid_grant`; `POST /oauth2/revoke` só com `client_id=vanep-mobile` + `token` → `200`, e o refresh seguinte → `invalid_grant` (não `invalid_client`); revoke com `client_id` desconhecido → `401 invalid_client`; `vanep-frontend` continua sem refresh; `client_id` desconhecido → `401 invalid_client`
-- [ ] 4.2 Teste de claims: token emitido após o bean explícito de `OAuth2TokenGenerator` contém `uid`, `user_type`, `roles`, `permissions` (e `driver_status` para motorista)
-- [ ] 4.3 Criar `MobileClientAuthenticationConverter` e `MobileClientAuthenticationProvider` (regras do design D2, cobrindo `/oauth2/token` e `/oauth2/revoke`)
-- [ ] 4.4 Criar `MobileRefreshTokenGenerator` e o bean `OAuth2TokenGenerator` delegante (`JwtGenerator` + `JwtTokenCustomizer`, access token, refresh mobile)
-- [ ] 4.5 Registrar a autenticação de cliente em `SecurityConfig.authorizationServerSecurityFilterChain` antes dos conversores padrão
+- [x] 4.1 Testes de slice falhando: `authorization_code` + PKCE do `vanep-mobile` passa a devolver `refresh_token`; refresh só com `client_id=vanep-mobile` devolve novos tokens; reuso do refresh antigo → `invalid_grant`; `POST /oauth2/revoke` só com `client_id=vanep-mobile` + `token` → `200`, e o refresh seguinte → `invalid_grant` (não `invalid_client`); revoke com `client_id` desconhecido → `401 invalid_client`; `vanep-frontend` continua sem refresh; `client_id` desconhecido → `401 invalid_client`
+- [x] 4.2 Teste de claims: token emitido após o bean explícito de `OAuth2TokenGenerator` contém `uid`, `user_type`, `roles`, `permissions` (e `driver_status` para motorista)
+- [x] 4.3 Criar `MobileClientAuthenticationConverter` e `MobileClientAuthenticationProvider` (regras do design D2, cobrindo `/oauth2/token` e `/oauth2/revoke`)
+- [x] 4.4 Criar `MobileRefreshTokenGenerator` e o bean `OAuth2TokenGenerator` delegante (`JwtGenerator` + `JwtTokenCustomizer`, access token, refresh mobile)
+- [x] 4.5 Registrar a autenticação de cliente em `SecurityConfig.authorizationServerSecurityFilterChain` antes dos conversores padrão
 - [ ] 4.6 `make lint` + `./mvnw verify`; abrir PR 2a
 
 ## 5. Fase 3a — Validação do `id_token` Google + `signup_ticket` (PR 3a)
@@ -105,13 +105,13 @@ Cada fase: branch própria a partir de `main`, uma PR (pt-BR, `Refs #177`; a úl
 > Depende de: — | Paralela com: 0a, 0b, 1a, 2a
 > Ordem: test → migration → model → repository → service/validator
 
-- [ ] 5.1 Testes unitários falhando de `GoogleIdTokenValidator` com chave RSA local e tokens assinados no teste: válido; assinatura errada; `iss` inválido; `aud` fora da lista; `aud` = client Web com `azp` = client Android → válido; `aud` = client Android com lista só com o Web → `invalid_grant`; lista vazia; expirado; `email_verified=false`
-- [ ] 5.2 Testes unitários falhando de `SignupTicketService`: emite ticket (hash armazenado, TTL), consome uma vez, rejeita expirado/consumido/desconhecido
-- [ ] 5.3 Migration da tabela `signup_ticket` (colunas do design D5, `ticket_hash` unique)
-- [ ] 5.4 `SignupTicketModel` + `SignupTicketRepository` (busca por hash com `PESSIMISTIC_WRITE`)
-- [ ] 5.5 `SignupTicketService` (`SecureTokens`, `vanep.auth.signup-ticket.ttl-minutes` default 15)
-- [ ] 5.6 `GoogleIdTokenValidator` com `JwtDecoder` privado (nunca um segundo bean do tipo `JwtDecoder`; construtor de pacote para testes); teste de contexto confirmando que um JWT da Vanep continua aceito em `/api/**`; propriedades `vanep.google.id-token.jwks-uri` (default JWKS do Google) e `vanep.google.id-token.audiences=${VANEP_GOOGLE_ID_TOKEN_AUDIENCES:${GOOGLE_CLIENT_ID:}}`; teste do fallback (sem a variável própria, aceita `aud` igual ao `GOOGLE_CLIENT_ID`); `.env.example` documentado (comentada, usar só quando houver mais de um client ID)
-- [ ] 5.7 `application-test.properties`: JWKS URI `http://localhost:1` e audiences de teste falsas (regra 50)
+- [x] 5.1 Testes unitários falhando de `GoogleIdTokenValidator` com chave RSA local e tokens assinados no teste: válido; assinatura errada; `iss` inválido; `aud` fora da lista; `aud` = client Web com `azp` = client Android → válido; `aud` = client Android com lista só com o Web → `invalid_grant`; lista vazia; expirado; `email_verified=false`
+- [x] 5.2 Testes unitários falhando de `SignupTicketService`: emite ticket (hash armazenado, TTL), consome uma vez, rejeita expirado/consumido/desconhecido
+- [x] 5.3 Migration da tabela `signup_ticket` (colunas do design D5, `ticket_hash` unique)
+- [x] 5.4 `SignupTicketModel` + `SignupTicketRepository` (busca por hash com `PESSIMISTIC_WRITE`)
+- [x] 5.5 `SignupTicketService` (`SecureTokens`, `vanep.auth.signup-ticket.ttl-minutes` default 15)
+- [x] 5.6 `GoogleIdTokenValidator` com `JwtDecoder` privado (nunca um segundo bean do tipo `JwtDecoder`; construtor de pacote para testes); teste de contexto confirmando que um JWT da Vanep continua aceito em `/api/**`; propriedades `vanep.google.id-token.jwks-uri` (default JWKS do Google) e `vanep.google.id-token.audiences=${VANEP_GOOGLE_ID_TOKEN_AUDIENCES:${GOOGLE_CLIENT_ID:}}`; teste do fallback (sem a variável própria, aceita `aud` igual ao `GOOGLE_CLIENT_ID`); `.env.example` documentado (comentada, usar só quando houver mais de um client ID)
+- [x] 5.7 `application-test.properties`: JWKS URI `http://localhost:1` e audiences de teste falsas (regra 50)
 - [ ] 5.8 `make lint` + `./mvnw verify`; abrir PR 3a
 
 ## 6. Fase 0c — Conclusão Google cria registro de papel (PR 0c)
@@ -120,10 +120,10 @@ Cada fase: branch própria a partir de `main`, uma PR (pt-BR, `Refs #177`; a úl
 > Depende de: 0a | Paralela com: 1b, 2b, 4a
 > Ordem: test → service → controller web
 
-- [ ] 6.1 Testes unitários falhando (`OAuthAccountServiceTest`): conclusão como CLIENT cria `ClientModel`; como DRIVER com `basePrice` cria `DriverModel` `PENDING`; como ASSISTANT continua criando `AssistantModel`
-- [ ] 6.2 Extrair em `RegistrationService` o método público de criação do registro de papel e reusar em `registerClient/Driver/Assistant`
-- [ ] 6.3 `OAuthAccountService.completeRegistration` passa a delegar a criação do papel; DRIVER exige os campos de motorista (validação condicional no DTO de conclusão)
-- [ ] 6.4 `SignupController` (web): DRIVER sem campos de motorista mostra erro de validação e não cria conta; teste de slice cobrindo cliente e motorista
+- [x] 6.1 Testes unitários falhando (`OAuthAccountServiceTest`): conclusão como CLIENT cria `ClientModel`; como DRIVER com `basePrice` cria `DriverModel` `PENDING`; como ASSISTANT continua criando `AssistantModel`
+- [x] 6.2 Extrair em `RegistrationService` o método público de criação do registro de papel e reusar em `registerClient/Driver/Assistant`
+- [x] 6.3 `OAuthAccountService.completeRegistration` passa a delegar a criação do papel; DRIVER exige os campos de motorista (validação condicional no DTO de conclusão)
+- [x] 6.4 `SignupController` (web): DRIVER sem campos de motorista mostra erro de validação e não cria conta; teste de slice cobrindo cliente e motorista
 - [ ] 6.5 `make lint` + `./mvnw verify`; abrir PR 0c (mencionar follow-up da tela `signup-complete` para motorista)
 
 ## 7. Fase 1b — Códigos nos fluxos de verificação e reset (PR 1b)
@@ -147,14 +147,14 @@ Cada fase: branch própria a partir de `main`, uma PR (pt-BR, `Refs #177`; a úl
 > Depende de: 2a | Paralela com: 0c, 1b, 4a
 > Ordem: test → security (user details, provider) → service (registro de login) → config
 
-- [ ] 8.1 Testes unitários falhando em `VanepUserDetailsServiceTest`: e-mail bloqueado lança `LockedException` antes de buscar usuário (existente, inexistente e sem senha local)
-- [ ] 8.2 Testes de slice falhando do grant: sucesso (tokens + `last_login_at` + contador zerado); e-mail inexistente, senha errada e conta só Google com resposta idêntica `invalid_grant`; não verificado com senha certa → `email_not_verified`; com senha errada → `invalid_grant`; 5 falhas → `account_locked` mesmo com senha certa e para e-mail inexistente; lock expira; `vanep-frontend` → `unauthorized_client`
-- [ ] 8.3 Teste de form login web: e-mail bloqueado inexistente e existente têm o mesmo resultado
-- [ ] 8.4 `VanepUserDetailsService`: checar `LoginAttemptService.isBlocked` antes da busca e lançar `LockedException`
-- [ ] 8.5 Extrair o registro de login bem-sucedido (`loginSucceeded` + `last_login_at`) do `AuthenticationEventsListener` para método de service reutilizável; listener passa a delegar
-- [ ] 8.6 Criar `MobilePasswordGrantAuthenticationConverter`, `Token` e `Provider` (Dao dedicado com pre/post checks do design D4; mapeamento de erros com descrições via `MessageSource`)
-- [ ] 8.7 Registrar o grant no token endpoint e habilitar o `AuthorizationGrantType` só no `RegisteredClient` mobile
-- [ ] 8.8 Chaves de mensagem das descrições de erro (EN + pt-BR)
+- [x] 8.1 Testes unitários falhando em `VanepUserDetailsServiceTest`: e-mail bloqueado lança `LockedException` antes de buscar usuário (existente, inexistente e sem senha local)
+- [x] 8.2 Testes de slice falhando do grant: sucesso (tokens + `last_login_at` + contador zerado); e-mail inexistente, senha errada e conta só Google com resposta idêntica `invalid_grant`; não verificado com senha certa → `email_not_verified`; com senha errada → `invalid_grant`; 5 falhas → `account_locked` mesmo com senha certa e para e-mail inexistente; lock expira; `vanep-frontend` → `unauthorized_client`
+- [x] 8.3 Teste de form login web: e-mail bloqueado inexistente e existente têm o mesmo resultado
+- [x] 8.4 `VanepUserDetailsService`: checar `LoginAttemptService.isBlocked` antes da busca e lançar `LockedException`
+- [x] 8.5 Extrair o registro de login bem-sucedido (`loginSucceeded` + `last_login_at`) do `AuthenticationEventsListener` para método de service reutilizável; listener passa a delegar
+- [x] 8.6 Criar `MobilePasswordGrantAuthenticationConverter`, `Token` e `Provider` (Dao dedicado com pre/post checks do design D4; mapeamento de erros com descrições via `MessageSource`)
+- [x] 8.7 Registrar o grant no token endpoint e habilitar o `AuthorizationGrantType` só no `RegisteredClient` mobile
+- [x] 8.8 Chaves de mensagem das descrições de erro (EN + pt-BR)
 - [ ] 8.9 `make lint` + `./mvnw verify`; abrir PR 2b
 
 ## 9. Fase 4a — Base da API pública + cadastro (PR 4a)
@@ -178,10 +178,10 @@ Cada fase: branch própria a partir de `main`, uma PR (pt-BR, `Refs #177`; a úl
 > Depende de: 2a, 3a (sequencial após 2b por tocar a mesma configuração) | Paralela com: 4b, 4c
 > Ordem: test → security (converter/provider) → config (error handler)
 
-- [ ] 10.1 Testes de slice falhando (decoder local, sem rede): conta vinculada → tokens; e-mail existente → vincula e emite tokens; conta desativada → `account_disabled`; usuário novo → `400 registration_required` com `signup_ticket`, `email` e `name`; `id_token` inválido → `invalid_grant`; `vanep-frontend` → `unauthorized_client`
-- [ ] 10.2 Criar `RegistrationRequiredException` e o `errorResponseHandler` do token endpoint que inclui `signup_ticket`, `email` e `name` só para ela
-- [ ] 10.3 Criar `MobileGoogleGrantAuthenticationConverter`, `Token` e `Provider` (validator → `OAuthAccountService.resolve` → tokens ou ticket)
-- [ ] 10.4 Registrar o grant no token endpoint e habilitar o `AuthorizationGrantType` só no `RegisteredClient` mobile
+- [x] 10.1 Testes de slice falhando (decoder local, sem rede): conta vinculada → tokens; e-mail existente → vincula e emite tokens; conta desativada → `account_disabled`; usuário novo → `400 registration_required` com `signup_ticket`, `email` e `name`; `id_token` inválido → `invalid_grant`; `vanep-frontend` → `unauthorized_client`
+- [x] 10.2 Criar `RegistrationRequiredException` e o `errorResponseHandler` do token endpoint que inclui `signup_ticket`, `email` e `name` só para ela
+- [x] 10.3 Criar `MobileGoogleGrantAuthenticationConverter`, `Token` e `Provider` (validator → `OAuthAccountService.resolve` → tokens ou ticket)
+- [x] 10.4 Registrar o grant no token endpoint e habilitar o `AuthorizationGrantType` só no `RegisteredClient` mobile
 - [ ] 10.5 `make lint` + `./mvnw verify`; abrir PR 3b
 
 ## 11. Fase 4b — Endpoints de código (PR 4b)
