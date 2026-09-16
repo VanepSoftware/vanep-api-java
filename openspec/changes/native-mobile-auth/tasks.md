@@ -50,13 +50,13 @@ Cada fase: branch própria a partir de `main`, uma PR (pt-BR, `Refs #177`; a úl
 > Depende de: — | Paralela com: 0b, 1a, 2a, 3a
 > Ordem: test → request DTO → service → controller web
 
-- [ ] 1.1 Testes unitários (`RegistrationServiceTest`) falhando: duplicidade de e-mail e de CPF normalizado lança `SignupDuplicateException` com campo e chave; cadastro válido de cliente/motorista/assistente continua criando conta não verificada + registro de papel + e-mail
-- [ ] 1.2 Criar `AccountSignupRequestDTO` (base) e `ClientSignupRequestDTO`, `DriverSignupRequestDTO`, `AssistantSignupRequestDTO` em `br.com.vanep.auth.dto` com Bean Validation usando chaves `{auth.signup.*}`
-- [ ] 1.3 Adicionar as chaves de validação em `messages.properties` e `messages_pt_BR.properties` (mesmos textos pt-BR atuais) e trocar as strings fixas dos `*SignupForm`/`SignupForm` pelas chaves
-- [ ] 1.4 Criar `SignupDuplicateException` (campo + chave de mensagem)
-- [ ] 1.5 Alterar `RegistrationService` para receber os request DTOs, normalizar CPF e checar duplicidade antes de salvar
-- [ ] 1.6 Alterar `RegistrationController` para mapear `*SignupForm` → DTO, remover `rejectDuplicates` e converter `SignupDuplicateException` em `rejectValue`
-- [ ] 1.7 Rodar `RegistrationControllerTest` sem alteração de asserções de mensagem (garantia de não regressão web)
+- [x] 1.1 Testes unitários (`RegistrationServiceTest`) falhando: duplicidade de e-mail e de CPF normalizado lança `SignupDuplicateException` com campo e chave; cadastro válido de cliente/motorista/assistente continua criando conta não verificada + registro de papel + e-mail
+- [x] 1.2 Criar `AccountSignupRequestDTO` (base) e `ClientSignupRequestDTO`, `DriverSignupRequestDTO`, `AssistantSignupRequestDTO` em `br.com.vanep.auth.dto` com Bean Validation usando chaves `{auth.signup.*}`
+- [x] 1.3 Adicionar as chaves de validação em `messages.properties` e `messages_pt_BR.properties` (mesmos textos pt-BR atuais) e trocar as strings fixas dos `*SignupForm`/`SignupForm` pelas chaves
+- [x] 1.4 Criar `SignupDuplicateException` (campo + chave de mensagem)
+- [x] 1.5 Alterar `RegistrationService` para receber os request DTOs, normalizar CPF e checar duplicidade antes de salvar
+- [x] 1.6 Alterar `RegistrationController` para mapear `*SignupForm` → DTO, remover `rejectDuplicates` e converter `SignupDuplicateException` em `rejectValue`
+- [x] 1.7 Rodar `RegistrationControllerTest` sem alteração de asserções de mensagem (garantia de não regressão web)
 - [ ] 1.8 `make lint` + `./mvnw verify`; abrir PR 0a
 
 ## 2. Fase 0b — Rate limit por endereço confiável (PR 0b)
