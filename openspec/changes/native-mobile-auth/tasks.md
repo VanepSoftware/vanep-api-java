@@ -77,13 +77,13 @@ Cada fase: branch própria a partir de `main`, uma PR (pt-BR, `Refs #177`; a úl
 > Depende de: — | Paralela com: 0a, 0b, 2a, 3a
 > Ordem: test → migration → model → repository → policy/utilitário
 
-- [ ] 3.1 Testes unitários falhando: `SecureCodes.generate()` sempre 6 dígitos com zeros à esquerda; `SecureCodes.hmac` determinístico por (purpose, userId, code) e diferente entre usuários; `AuthCodeIssuePolicy` (sem código anterior → emite; dentro do cooldown → pula; ≥ máximo em 24 h → pula)
-- [ ] 3.2 Migration: `code_hash varchar(64) null` (sem unique), `failed_attempts integer not null default 0` e índice `(user_id, created_at)` em `email_verification_token` e `password_reset_token`
-- [ ] 3.3 Criar `@MappedSuperclass OneTimeTokenModel` com as colunas comuns e fazer `EmailVerificationTokenModel` e `PasswordResetTokenModel` estenderem
-- [ ] 3.4 Repositórios: contagem por `user_id` e `created_at > :since`; última linha criada; linha ativa mais recente com `@Lock(PESSIMISTIC_WRITE)`; consumo de ativas já existente
-- [ ] 3.5 Teste de repositório (H2) das novas consultas
-- [ ] 3.6 Implementar `SecureCodes` (em `auth/token`, HMAC-SHA256 com `vanep.password.pepper`, comparação em tempo constante) e `AuthCodeIssuePolicy` (classe pura)
-- [ ] 3.7 Propriedades `vanep.auth.code.max-attempts`, `vanep.auth.code.resend-cooldown-seconds`, `vanep.auth.code.max-per-day` com defaults 5/60/10 em `application.properties` e `.env.example`
+- [x] 3.1 Testes unitários falhando: `SecureCodes.generate()` sempre 6 dígitos com zeros à esquerda; `SecureCodes.hmac` determinístico por (purpose, userId, code) e diferente entre usuários; `AuthCodeIssuePolicy` (sem código anterior → emite; dentro do cooldown → pula; ≥ máximo em 24 h → pula)
+- [x] 3.2 Migration: `code_hash varchar(64) null` (sem unique), `failed_attempts integer not null default 0` e índice `(user_id, created_at)` em `email_verification_token` e `password_reset_token`
+- [x] 3.3 Criar `@MappedSuperclass OneTimeTokenModel` com as colunas comuns e fazer `EmailVerificationTokenModel` e `PasswordResetTokenModel` estenderem
+- [x] 3.4 Repositórios: contagem por `user_id` e `created_at > :since`; última linha criada; linha ativa mais recente com `@Lock(PESSIMISTIC_WRITE)`; consumo de ativas já existente
+- [x] 3.5 Teste de repositório (H2) das novas consultas
+- [x] 3.6 Implementar `SecureCodes` (em `auth/token`, HMAC-SHA256 com `vanep.password.pepper`, comparação em tempo constante) e `AuthCodeIssuePolicy` (classe pura)
+- [x] 3.7 Propriedades `vanep.auth.code.max-attempts`, `vanep.auth.code.resend-cooldown-seconds`, `vanep.auth.code.max-per-day` com defaults 5/60/10 em `application.properties` e `.env.example`
 - [ ] 3.8 `make lint` + `./mvnw verify`; abrir PR 1a
 
 ## 4. Fase 2a — Cliente público mobile + refresh (PR 2a)
