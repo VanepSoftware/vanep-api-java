@@ -50,13 +50,13 @@ Cada fase: branch própria a partir de `main`, uma PR (pt-BR, `Refs #177`; a úl
 > Depende de: — | Paralela com: 0b, 1a, 2a, 3a
 > Ordem: test → request DTO → service → controller web
 
-- [ ] 1.1 Testes unitários (`RegistrationServiceTest`) falhando: duplicidade de e-mail e de CPF normalizado lança `SignupDuplicateException` com campo e chave; cadastro válido de cliente/motorista/assistente continua criando conta não verificada + registro de papel + e-mail
-- [ ] 1.2 Criar `AccountSignupRequestDTO` (base) e `ClientSignupRequestDTO`, `DriverSignupRequestDTO`, `AssistantSignupRequestDTO` em `br.com.vanep.auth.dto` com Bean Validation usando chaves `{auth.signup.*}`
-- [ ] 1.3 Adicionar as chaves de validação em `messages.properties` e `messages_pt_BR.properties` (mesmos textos pt-BR atuais) e trocar as strings fixas dos `*SignupForm`/`SignupForm` pelas chaves
-- [ ] 1.4 Criar `SignupDuplicateException` (campo + chave de mensagem)
-- [ ] 1.5 Alterar `RegistrationService` para receber os request DTOs, normalizar CPF e checar duplicidade antes de salvar
-- [ ] 1.6 Alterar `RegistrationController` para mapear `*SignupForm` → DTO, remover `rejectDuplicates` e converter `SignupDuplicateException` em `rejectValue`
-- [ ] 1.7 Rodar `RegistrationControllerTest` sem alteração de asserções de mensagem (garantia de não regressão web)
+- [x] 1.1 Testes unitários (`RegistrationServiceTest`) falhando: duplicidade de e-mail e de CPF normalizado lança `SignupDuplicateException` com campo e chave; cadastro válido de cliente/motorista/assistente continua criando conta não verificada + registro de papel + e-mail
+- [x] 1.2 Criar `AccountSignupRequestDTO` (base) e `ClientSignupRequestDTO`, `DriverSignupRequestDTO`, `AssistantSignupRequestDTO` em `br.com.vanep.auth.dto` com Bean Validation usando chaves `{auth.signup.*}`
+- [x] 1.3 Adicionar as chaves de validação em `messages.properties` e `messages_pt_BR.properties` (mesmos textos pt-BR atuais) e trocar as strings fixas dos `*SignupForm`/`SignupForm` pelas chaves
+- [x] 1.4 Criar `SignupDuplicateException` (campo + chave de mensagem)
+- [x] 1.5 Alterar `RegistrationService` para receber os request DTOs, normalizar CPF e checar duplicidade antes de salvar
+- [x] 1.6 Alterar `RegistrationController` para mapear `*SignupForm` → DTO, remover `rejectDuplicates` e converter `SignupDuplicateException` em `rejectValue`
+- [x] 1.7 Rodar `RegistrationControllerTest` sem alteração de asserções de mensagem (garantia de não regressão web)
 - [ ] 1.8 `make lint` + `./mvnw verify`; abrir PR 0a
 
 ## 2. Fase 0b — Rate limit por endereço confiável (PR 0b)
@@ -65,10 +65,10 @@ Cada fase: branch própria a partir de `main`, uma PR (pt-BR, `Refs #177`; a úl
 > Depende de: — | Paralela com: 0a, 1a, 2a, 3a
 > Ordem: test → security/config
 
-- [ ] 2.1 Teste em `RateLimitingFilterTest`: requisições do mesmo `remoteAddr` com `X-Forwarded-For` e `CF-Connecting-IP` diferentes compartilham o bucket e recebem `429` ao exceder
-- [ ] 2.2 `RateLimitingFilter` passa a usar só `request.getRemoteAddr()` (remover leitura manual do header)
-- [ ] 2.3 `application-prod.properties`: `server.forward-headers-strategy=native` e `server.tomcat.remoteip.remote-ip-header=${VANEP_REMOTE_IP_HEADER:CF-Connecting-IP}` (`internal-proxies` no default do Tomcat); documentar `VANEP_REMOTE_IP_HEADER` em `.env.example`
-- [ ] 2.4 `docker-compose.yml`: publicar a API em `"${APP_BIND_ADDRESS:-127.0.0.1}:${APP_PORT}:8080"` com comentário do motivo (Tunnel; porta pública contorna a Cloudflare); documentar `APP_BIND_ADDRESS` em `.env.example` (dev com celular físico usa `0.0.0.0`)
+- [x] 2.1 Teste em `RateLimitingFilterTest`: requisições do mesmo `remoteAddr` com `X-Forwarded-For` e `CF-Connecting-IP` diferentes compartilham o bucket e recebem `429` ao exceder
+- [x] 2.2 `RateLimitingFilter` passa a usar só `request.getRemoteAddr()` (remover leitura manual do header)
+- [x] 2.3 `application-prod.properties`: `server.forward-headers-strategy=native` e `server.tomcat.remoteip.remote-ip-header=${VANEP_REMOTE_IP_HEADER:CF-Connecting-IP}` (`internal-proxies` no default do Tomcat); documentar `VANEP_REMOTE_IP_HEADER` em `.env.example`
+- [x] 2.4 `docker-compose.yml`: publicar a API em `"${APP_BIND_ADDRESS:-127.0.0.1}:${APP_PORT}:8080"` com comentário do motivo (Tunnel; porta pública contorna a Cloudflare); documentar `APP_BIND_ADDRESS` em `.env.example` (dev com celular físico usa `0.0.0.0`)
 - [ ] 2.5 `make lint` + `./mvnw verify`; abrir PR 0b com o checklist de validação pós-deploy do design e a dependência da tarefa 0.5
 
 ## 3. Fase 1a — Base dos códigos (PR 1a)
@@ -77,13 +77,13 @@ Cada fase: branch própria a partir de `main`, uma PR (pt-BR, `Refs #177`; a úl
 > Depende de: — | Paralela com: 0a, 0b, 2a, 3a
 > Ordem: test → migration → model → repository → policy/utilitário
 
-- [ ] 3.1 Testes unitários falhando: `SecureCodes.generate()` sempre 6 dígitos com zeros à esquerda; `SecureCodes.hmac` determinístico por (purpose, userId, code) e diferente entre usuários; `AuthCodeIssuePolicy` (sem código anterior → emite; dentro do cooldown → pula; ≥ máximo em 24 h → pula)
-- [ ] 3.2 Migration: `code_hash varchar(64) null` (sem unique), `failed_attempts integer not null default 0` e índice `(user_id, created_at)` em `email_verification_token` e `password_reset_token`
-- [ ] 3.3 Criar `@MappedSuperclass OneTimeTokenModel` com as colunas comuns e fazer `EmailVerificationTokenModel` e `PasswordResetTokenModel` estenderem
-- [ ] 3.4 Repositórios: contagem por `user_id` e `created_at > :since`; última linha criada; linha ativa mais recente com `@Lock(PESSIMISTIC_WRITE)`; consumo de ativas já existente
-- [ ] 3.5 Teste de repositório (H2) das novas consultas
-- [ ] 3.6 Implementar `SecureCodes` (em `auth/token`, HMAC-SHA256 com `vanep.password.pepper`, comparação em tempo constante) e `AuthCodeIssuePolicy` (classe pura)
-- [ ] 3.7 Propriedades `vanep.auth.code.max-attempts`, `vanep.auth.code.resend-cooldown-seconds`, `vanep.auth.code.max-per-day` com defaults 5/60/10 em `application.properties` e `.env.example`
+- [x] 3.1 Testes unitários falhando: `SecureCodes.generate()` sempre 6 dígitos com zeros à esquerda; `SecureCodes.hmac` determinístico por (purpose, userId, code) e diferente entre usuários; `AuthCodeIssuePolicy` (sem código anterior → emite; dentro do cooldown → pula; ≥ máximo em 24 h → pula)
+- [x] 3.2 Migration: `code_hash varchar(64) null` (sem unique), `failed_attempts integer not null default 0` e índice `(user_id, created_at)` em `email_verification_token` e `password_reset_token`
+- [x] 3.3 Criar `@MappedSuperclass OneTimeTokenModel` com as colunas comuns e fazer `EmailVerificationTokenModel` e `PasswordResetTokenModel` estenderem
+- [x] 3.4 Repositórios: contagem por `user_id` e `created_at > :since`; última linha criada; linha ativa mais recente com `@Lock(PESSIMISTIC_WRITE)`; consumo de ativas já existente
+- [x] 3.5 Teste de repositório (H2) das novas consultas
+- [x] 3.6 Implementar `SecureCodes` (em `auth/token`, HMAC-SHA256 com `vanep.password.pepper`, comparação em tempo constante) e `AuthCodeIssuePolicy` (classe pura)
+- [x] 3.7 Propriedades `vanep.auth.code.max-attempts`, `vanep.auth.code.resend-cooldown-seconds`, `vanep.auth.code.max-per-day` com defaults 5/60/10 em `application.properties` e `.env.example`
 - [ ] 3.8 `make lint` + `./mvnw verify`; abrir PR 1a
 
 ## 4. Fase 2a — Cliente público mobile + refresh (PR 2a)
@@ -92,11 +92,11 @@ Cada fase: branch própria a partir de `main`, uma PR (pt-BR, `Refs #177`; a úl
 > Depende de: — | Paralela com: 0a, 0b, 1a, 3a
 > Ordem: test → security (converter/provider) → config (token generator)
 
-- [ ] 4.1 Testes de slice falhando: `authorization_code` + PKCE do `vanep-mobile` passa a devolver `refresh_token`; refresh só com `client_id=vanep-mobile` devolve novos tokens; reuso do refresh antigo → `invalid_grant`; `POST /oauth2/revoke` só com `client_id=vanep-mobile` + `token` → `200`, e o refresh seguinte → `invalid_grant` (não `invalid_client`); revoke com `client_id` desconhecido → `401 invalid_client`; `vanep-frontend` continua sem refresh; `client_id` desconhecido → `401 invalid_client`
-- [ ] 4.2 Teste de claims: token emitido após o bean explícito de `OAuth2TokenGenerator` contém `uid`, `user_type`, `roles`, `permissions` (e `driver_status` para motorista)
-- [ ] 4.3 Criar `MobileClientAuthenticationConverter` e `MobileClientAuthenticationProvider` (regras do design D2, cobrindo `/oauth2/token` e `/oauth2/revoke`)
-- [ ] 4.4 Criar `MobileRefreshTokenGenerator` e o bean `OAuth2TokenGenerator` delegante (`JwtGenerator` + `JwtTokenCustomizer`, access token, refresh mobile)
-- [ ] 4.5 Registrar a autenticação de cliente em `SecurityConfig.authorizationServerSecurityFilterChain` antes dos conversores padrão
+- [x] 4.1 Testes de slice falhando: `authorization_code` + PKCE do `vanep-mobile` passa a devolver `refresh_token`; refresh só com `client_id=vanep-mobile` devolve novos tokens; reuso do refresh antigo → `invalid_grant`; `POST /oauth2/revoke` só com `client_id=vanep-mobile` + `token` → `200`, e o refresh seguinte → `invalid_grant` (não `invalid_client`); revoke com `client_id` desconhecido → `401 invalid_client`; `vanep-frontend` continua sem refresh; `client_id` desconhecido → `401 invalid_client`
+- [x] 4.2 Teste de claims: token emitido após o bean explícito de `OAuth2TokenGenerator` contém `uid`, `user_type`, `roles`, `permissions` (e `driver_status` para motorista)
+- [x] 4.3 Criar `MobileClientAuthenticationConverter` e `MobileClientAuthenticationProvider` (regras do design D2, cobrindo `/oauth2/token` e `/oauth2/revoke`)
+- [x] 4.4 Criar `MobileRefreshTokenGenerator` e o bean `OAuth2TokenGenerator` delegante (`JwtGenerator` + `JwtTokenCustomizer`, access token, refresh mobile)
+- [x] 4.5 Registrar a autenticação de cliente em `SecurityConfig.authorizationServerSecurityFilterChain` antes dos conversores padrão
 - [ ] 4.6 `make lint` + `./mvnw verify`; abrir PR 2a
 
 ## 5. Fase 3a — Validação do `id_token` Google + `signup_ticket` (PR 3a)
