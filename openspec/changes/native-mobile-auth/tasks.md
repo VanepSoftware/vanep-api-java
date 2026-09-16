@@ -105,13 +105,13 @@ Cada fase: branch própria a partir de `main`, uma PR (pt-BR, `Refs #177`; a úl
 > Depende de: — | Paralela com: 0a, 0b, 1a, 2a
 > Ordem: test → migration → model → repository → service/validator
 
-- [ ] 5.1 Testes unitários falhando de `GoogleIdTokenValidator` com chave RSA local e tokens assinados no teste: válido; assinatura errada; `iss` inválido; `aud` fora da lista; `aud` = client Web com `azp` = client Android → válido; `aud` = client Android com lista só com o Web → `invalid_grant`; lista vazia; expirado; `email_verified=false`
-- [ ] 5.2 Testes unitários falhando de `SignupTicketService`: emite ticket (hash armazenado, TTL), consome uma vez, rejeita expirado/consumido/desconhecido
-- [ ] 5.3 Migration da tabela `signup_ticket` (colunas do design D5, `ticket_hash` unique)
-- [ ] 5.4 `SignupTicketModel` + `SignupTicketRepository` (busca por hash com `PESSIMISTIC_WRITE`)
-- [ ] 5.5 `SignupTicketService` (`SecureTokens`, `vanep.auth.signup-ticket.ttl-minutes` default 15)
-- [ ] 5.6 `GoogleIdTokenValidator` com `JwtDecoder` privado (nunca um segundo bean do tipo `JwtDecoder`; construtor de pacote para testes); teste de contexto confirmando que um JWT da Vanep continua aceito em `/api/**`; propriedades `vanep.google.id-token.jwks-uri` (default JWKS do Google) e `vanep.google.id-token.audiences=${VANEP_GOOGLE_ID_TOKEN_AUDIENCES:${GOOGLE_CLIENT_ID:}}`; teste do fallback (sem a variável própria, aceita `aud` igual ao `GOOGLE_CLIENT_ID`); `.env.example` documentado (comentada, usar só quando houver mais de um client ID)
-- [ ] 5.7 `application-test.properties`: JWKS URI `http://localhost:1` e audiences de teste falsas (regra 50)
+- [x] 5.1 Testes unitários falhando de `GoogleIdTokenValidator` com chave RSA local e tokens assinados no teste: válido; assinatura errada; `iss` inválido; `aud` fora da lista; `aud` = client Web com `azp` = client Android → válido; `aud` = client Android com lista só com o Web → `invalid_grant`; lista vazia; expirado; `email_verified=false`
+- [x] 5.2 Testes unitários falhando de `SignupTicketService`: emite ticket (hash armazenado, TTL), consome uma vez, rejeita expirado/consumido/desconhecido
+- [x] 5.3 Migration da tabela `signup_ticket` (colunas do design D5, `ticket_hash` unique)
+- [x] 5.4 `SignupTicketModel` + `SignupTicketRepository` (busca por hash com `PESSIMISTIC_WRITE`)
+- [x] 5.5 `SignupTicketService` (`SecureTokens`, `vanep.auth.signup-ticket.ttl-minutes` default 15)
+- [x] 5.6 `GoogleIdTokenValidator` com `JwtDecoder` privado (nunca um segundo bean do tipo `JwtDecoder`; construtor de pacote para testes); teste de contexto confirmando que um JWT da Vanep continua aceito em `/api/**`; propriedades `vanep.google.id-token.jwks-uri` (default JWKS do Google) e `vanep.google.id-token.audiences=${VANEP_GOOGLE_ID_TOKEN_AUDIENCES:${GOOGLE_CLIENT_ID:}}`; teste do fallback (sem a variável própria, aceita `aud` igual ao `GOOGLE_CLIENT_ID`); `.env.example` documentado (comentada, usar só quando houver mais de um client ID)
+- [x] 5.7 `application-test.properties`: JWKS URI `http://localhost:1` e audiences de teste falsas (regra 50)
 - [ ] 5.8 `make lint` + `./mvnw verify`; abrir PR 3a
 
 ## 6. Fase 0c — Conclusão Google cria registro de papel (PR 0c)
