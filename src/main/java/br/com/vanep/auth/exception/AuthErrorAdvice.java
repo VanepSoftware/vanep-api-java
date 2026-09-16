@@ -1,5 +1,6 @@
 package br.com.vanep.auth.exception;
 
+import br.com.vanep.auth.api.EmailCodeApiController;
 import br.com.vanep.auth.api.SignupApiController;
 import br.com.vanep.auth.dto.AuthErrorResponseDTO;
 import br.com.vanep.auth.enums.AuthErrorCode;
@@ -19,7 +20,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
  * Scoped to the auth API controllers and ordered ahead of the global profile advice, which also
  * handles {@code MethodArgumentNotValidException}.
  */
-@RestControllerAdvice(assignableTypes = {SignupApiController.class})
+@RestControllerAdvice(assignableTypes = {SignupApiController.class, EmailCodeApiController.class})
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class AuthErrorAdvice {
 
@@ -49,6 +50,15 @@ public class AuthErrorAdvice {
         .body(
             AuthErrorResponseDTO.of(
                 exception.getCode().value(), message(exception.getMessageKey())));
+  }
+
+  @ExceptionHandler(InvalidAuthCodeException.class)
+  public ResponseEntity<AuthErrorResponseDTO> handleInvalidCode(
+      InvalidAuthCodeException exception) {
+    return ResponseEntity.badRequest()
+        .body(
+            AuthErrorResponseDTO.of(
+                AuthErrorCode.INVALID_CODE.value(), message("auth.error.invalid_code")));
   }
 
   private String messageOf(FieldError error) {
