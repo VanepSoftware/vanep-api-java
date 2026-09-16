@@ -178,10 +178,10 @@ Cada fase: branch própria a partir de `main`, uma PR (pt-BR, `Refs #177`; a úl
 > Depende de: 2a, 3a (sequencial após 2b por tocar a mesma configuração) | Paralela com: 4b, 4c
 > Ordem: test → security (converter/provider) → config (error handler)
 
-- [ ] 10.1 Testes de slice falhando (decoder local, sem rede): conta vinculada → tokens; e-mail existente → vincula e emite tokens; conta desativada → `account_disabled`; usuário novo → `400 registration_required` com `signup_ticket`, `email` e `name`; `id_token` inválido → `invalid_grant`; `vanep-frontend` → `unauthorized_client`
-- [ ] 10.2 Criar `RegistrationRequiredException` e o `errorResponseHandler` do token endpoint que inclui `signup_ticket`, `email` e `name` só para ela
-- [ ] 10.3 Criar `MobileGoogleGrantAuthenticationConverter`, `Token` e `Provider` (validator → `OAuthAccountService.resolve` → tokens ou ticket)
-- [ ] 10.4 Registrar o grant no token endpoint e habilitar o `AuthorizationGrantType` só no `RegisteredClient` mobile
+- [x] 10.1 Testes de slice falhando (decoder local, sem rede): conta vinculada → tokens; e-mail existente → vincula e emite tokens; conta desativada → `account_disabled`; usuário novo → `400 registration_required` com `signup_ticket`, `email` e `name`; `id_token` inválido → `invalid_grant`; `vanep-frontend` → `unauthorized_client`
+- [x] 10.2 Criar `RegistrationRequiredException` e o `errorResponseHandler` do token endpoint que inclui `signup_ticket`, `email` e `name` só para ela
+- [x] 10.3 Criar `MobileGoogleGrantAuthenticationConverter`, `Token` e `Provider` (validator → `OAuthAccountService.resolve` → tokens ou ticket)
+- [x] 10.4 Registrar o grant no token endpoint e habilitar o `AuthorizationGrantType` só no `RegisteredClient` mobile
 - [ ] 10.5 `make lint` + `./mvnw verify`; abrir PR 3b
 
 ## 11. Fase 4b — Endpoints de código (PR 4b)
