@@ -12,6 +12,8 @@ import br.com.vanep.user.repository.OAuthAccountRepository;
 import br.com.vanep.user.repository.UserRepository;
 import java.time.Instant;
 import java.util.Optional;
+import org.springframework.context.MessageSource;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.stereotype.Service;
@@ -24,33 +26,40 @@ public class OAuthAccountService {
   private final OAuthAccountRepository oauthAccounts;
   private final RoleRepository roles;
   private final RegistrationService registrationService;
+  private final MessageSource messages;
 
   public OAuthAccountService(
       UserRepository users,
       OAuthAccountRepository oauthAccounts,
       RoleRepository roles,
-      RegistrationService registrationService) {
+      RegistrationService registrationService,
+      MessageSource messages) {
     this.users = users;
     this.oauthAccounts = oauthAccounts;
     this.roles = roles;
     this.registrationService = registrationService;
+    this.messages = messages;
   }
 
   @Transactional
   public OAuthResolution resolve(
       AuthProvider provider, String providerUid, String email, boolean emailVerified, String name) {
-    Optional<OAuthAccountModel> existing =
-        oauthAccounts.findByProviderAndProviderUid(provider, providerUid);
-    if (existing.isPresent()) {
-
+    Optional<Long> linkedUserId = oauthAccounts.findLinkedUserId(provider.name(), providerUid);
+    if (linkedUserId.isPresent()) {
       // @SoftDelete filtra contas removidas: findById não retorna usuário desativado.
       UserModel user =
           users
-              .findById(existing.get().getUser().getId())
+              .findById(linkedUserId.get())
               .orElseThrow(
                   () ->
                       new OAuth2AuthenticationException(
-                          new OAuth2Error("account_disabled", "Esta conta foi desativada.", null)));
+                          new OAuth2Error(
+                              "account_disabled",
+                              messages.getMessage(
+                                  "auth.grant.account_disabled",
+                                  null,
+                                  LocaleContextHolder.getLocale()),
+                              null)));
       return OAuthResolution.registered(user);
     }
 
