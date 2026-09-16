@@ -50,13 +50,13 @@ Cada fase: branch própria a partir de `main`, uma PR (pt-BR, `Refs #177`; a úl
 > Depende de: — | Paralela com: 0b, 1a, 2a, 3a
 > Ordem: test → request DTO → service → controller web
 
-- [ ] 1.1 Testes unitários (`RegistrationServiceTest`) falhando: duplicidade de e-mail e de CPF normalizado lança `SignupDuplicateException` com campo e chave; cadastro válido de cliente/motorista/assistente continua criando conta não verificada + registro de papel + e-mail
-- [ ] 1.2 Criar `AccountSignupRequestDTO` (base) e `ClientSignupRequestDTO`, `DriverSignupRequestDTO`, `AssistantSignupRequestDTO` em `br.com.vanep.auth.dto` com Bean Validation usando chaves `{auth.signup.*}`
-- [ ] 1.3 Adicionar as chaves de validação em `messages.properties` e `messages_pt_BR.properties` (mesmos textos pt-BR atuais) e trocar as strings fixas dos `*SignupForm`/`SignupForm` pelas chaves
-- [ ] 1.4 Criar `SignupDuplicateException` (campo + chave de mensagem)
-- [ ] 1.5 Alterar `RegistrationService` para receber os request DTOs, normalizar CPF e checar duplicidade antes de salvar
-- [ ] 1.6 Alterar `RegistrationController` para mapear `*SignupForm` → DTO, remover `rejectDuplicates` e converter `SignupDuplicateException` em `rejectValue`
-- [ ] 1.7 Rodar `RegistrationControllerTest` sem alteração de asserções de mensagem (garantia de não regressão web)
+- [x] 1.1 Testes unitários (`RegistrationServiceTest`) falhando: duplicidade de e-mail e de CPF normalizado lança `SignupDuplicateException` com campo e chave; cadastro válido de cliente/motorista/assistente continua criando conta não verificada + registro de papel + e-mail
+- [x] 1.2 Criar `AccountSignupRequestDTO` (base) e `ClientSignupRequestDTO`, `DriverSignupRequestDTO`, `AssistantSignupRequestDTO` em `br.com.vanep.auth.dto` com Bean Validation usando chaves `{auth.signup.*}`
+- [x] 1.3 Adicionar as chaves de validação em `messages.properties` e `messages_pt_BR.properties` (mesmos textos pt-BR atuais) e trocar as strings fixas dos `*SignupForm`/`SignupForm` pelas chaves
+- [x] 1.4 Criar `SignupDuplicateException` (campo + chave de mensagem)
+- [x] 1.5 Alterar `RegistrationService` para receber os request DTOs, normalizar CPF e checar duplicidade antes de salvar
+- [x] 1.6 Alterar `RegistrationController` para mapear `*SignupForm` → DTO, remover `rejectDuplicates` e converter `SignupDuplicateException` em `rejectValue`
+- [x] 1.7 Rodar `RegistrationControllerTest` sem alteração de asserções de mensagem (garantia de não regressão web)
 - [ ] 1.8 `make lint` + `./mvnw verify`; abrir PR 0a
 
 ## 2. Fase 0b — Rate limit por endereço confiável (PR 0b)
@@ -65,10 +65,10 @@ Cada fase: branch própria a partir de `main`, uma PR (pt-BR, `Refs #177`; a úl
 > Depende de: — | Paralela com: 0a, 1a, 2a, 3a
 > Ordem: test → security/config
 
-- [ ] 2.1 Teste em `RateLimitingFilterTest`: requisições do mesmo `remoteAddr` com `X-Forwarded-For` e `CF-Connecting-IP` diferentes compartilham o bucket e recebem `429` ao exceder
-- [ ] 2.2 `RateLimitingFilter` passa a usar só `request.getRemoteAddr()` (remover leitura manual do header)
-- [ ] 2.3 `application-prod.properties`: `server.forward-headers-strategy=native` e `server.tomcat.remoteip.remote-ip-header=${VANEP_REMOTE_IP_HEADER:CF-Connecting-IP}` (`internal-proxies` no default do Tomcat); documentar `VANEP_REMOTE_IP_HEADER` em `.env.example`
-- [ ] 2.4 `docker-compose.yml`: publicar a API em `"${APP_BIND_ADDRESS:-127.0.0.1}:${APP_PORT}:8080"` com comentário do motivo (Tunnel; porta pública contorna a Cloudflare); documentar `APP_BIND_ADDRESS` em `.env.example` (dev com celular físico usa `0.0.0.0`)
+- [x] 2.1 Teste em `RateLimitingFilterTest`: requisições do mesmo `remoteAddr` com `X-Forwarded-For` e `CF-Connecting-IP` diferentes compartilham o bucket e recebem `429` ao exceder
+- [x] 2.2 `RateLimitingFilter` passa a usar só `request.getRemoteAddr()` (remover leitura manual do header)
+- [x] 2.3 `application-prod.properties`: `server.forward-headers-strategy=native` e `server.tomcat.remoteip.remote-ip-header=${VANEP_REMOTE_IP_HEADER:CF-Connecting-IP}` (`internal-proxies` no default do Tomcat); documentar `VANEP_REMOTE_IP_HEADER` em `.env.example`
+- [x] 2.4 `docker-compose.yml`: publicar a API em `"${APP_BIND_ADDRESS:-127.0.0.1}:${APP_PORT}:8080"` com comentário do motivo (Tunnel; porta pública contorna a Cloudflare); documentar `APP_BIND_ADDRESS` em `.env.example` (dev com celular físico usa `0.0.0.0`)
 - [ ] 2.5 `make lint` + `./mvnw verify`; abrir PR 0b com o checklist de validação pós-deploy do design e a dependência da tarefa 0.5
 
 ## 3. Fase 1a — Base dos códigos (PR 1a)
@@ -77,13 +77,13 @@ Cada fase: branch própria a partir de `main`, uma PR (pt-BR, `Refs #177`; a úl
 > Depende de: — | Paralela com: 0a, 0b, 2a, 3a
 > Ordem: test → migration → model → repository → policy/utilitário
 
-- [ ] 3.1 Testes unitários falhando: `SecureCodes.generate()` sempre 6 dígitos com zeros à esquerda; `SecureCodes.hmac` determinístico por (purpose, userId, code) e diferente entre usuários; `AuthCodeIssuePolicy` (sem código anterior → emite; dentro do cooldown → pula; ≥ máximo em 24 h → pula)
-- [ ] 3.2 Migration: `code_hash varchar(64) null` (sem unique), `failed_attempts integer not null default 0` e índice `(user_id, created_at)` em `email_verification_token` e `password_reset_token`
-- [ ] 3.3 Criar `@MappedSuperclass OneTimeTokenModel` com as colunas comuns e fazer `EmailVerificationTokenModel` e `PasswordResetTokenModel` estenderem
-- [ ] 3.4 Repositórios: contagem por `user_id` e `created_at > :since`; última linha criada; linha ativa mais recente com `@Lock(PESSIMISTIC_WRITE)`; consumo de ativas já existente
-- [ ] 3.5 Teste de repositório (H2) das novas consultas
-- [ ] 3.6 Implementar `SecureCodes` (em `auth/token`, HMAC-SHA256 com `vanep.password.pepper`, comparação em tempo constante) e `AuthCodeIssuePolicy` (classe pura)
-- [ ] 3.7 Propriedades `vanep.auth.code.max-attempts`, `vanep.auth.code.resend-cooldown-seconds`, `vanep.auth.code.max-per-day` com defaults 5/60/10 em `application.properties` e `.env.example`
+- [x] 3.1 Testes unitários falhando: `SecureCodes.generate()` sempre 6 dígitos com zeros à esquerda; `SecureCodes.hmac` determinístico por (purpose, userId, code) e diferente entre usuários; `AuthCodeIssuePolicy` (sem código anterior → emite; dentro do cooldown → pula; ≥ máximo em 24 h → pula)
+- [x] 3.2 Migration: `code_hash varchar(64) null` (sem unique), `failed_attempts integer not null default 0` e índice `(user_id, created_at)` em `email_verification_token` e `password_reset_token`
+- [x] 3.3 Criar `@MappedSuperclass OneTimeTokenModel` com as colunas comuns e fazer `EmailVerificationTokenModel` e `PasswordResetTokenModel` estenderem
+- [x] 3.4 Repositórios: contagem por `user_id` e `created_at > :since`; última linha criada; linha ativa mais recente com `@Lock(PESSIMISTIC_WRITE)`; consumo de ativas já existente
+- [x] 3.5 Teste de repositório (H2) das novas consultas
+- [x] 3.6 Implementar `SecureCodes` (em `auth/token`, HMAC-SHA256 com `vanep.password.pepper`, comparação em tempo constante) e `AuthCodeIssuePolicy` (classe pura)
+- [x] 3.7 Propriedades `vanep.auth.code.max-attempts`, `vanep.auth.code.resend-cooldown-seconds`, `vanep.auth.code.max-per-day` com defaults 5/60/10 em `application.properties` e `.env.example`
 - [ ] 3.8 `make lint` + `./mvnw verify`; abrir PR 1a
 
 ## 4. Fase 2a — Cliente público mobile + refresh (PR 2a)
@@ -120,10 +120,10 @@ Cada fase: branch própria a partir de `main`, uma PR (pt-BR, `Refs #177`; a úl
 > Depende de: 0a | Paralela com: 1b, 2b, 4a
 > Ordem: test → service → controller web
 
-- [ ] 6.1 Testes unitários falhando (`OAuthAccountServiceTest`): conclusão como CLIENT cria `ClientModel`; como DRIVER com `basePrice` cria `DriverModel` `PENDING`; como ASSISTANT continua criando `AssistantModel`
-- [ ] 6.2 Extrair em `RegistrationService` o método público de criação do registro de papel e reusar em `registerClient/Driver/Assistant`
-- [ ] 6.3 `OAuthAccountService.completeRegistration` passa a delegar a criação do papel; DRIVER exige os campos de motorista (validação condicional no DTO de conclusão)
-- [ ] 6.4 `SignupController` (web): DRIVER sem campos de motorista mostra erro de validação e não cria conta; teste de slice cobrindo cliente e motorista
+- [x] 6.1 Testes unitários falhando (`OAuthAccountServiceTest`): conclusão como CLIENT cria `ClientModel`; como DRIVER com `basePrice` cria `DriverModel` `PENDING`; como ASSISTANT continua criando `AssistantModel`
+- [x] 6.2 Extrair em `RegistrationService` o método público de criação do registro de papel e reusar em `registerClient/Driver/Assistant`
+- [x] 6.3 `OAuthAccountService.completeRegistration` passa a delegar a criação do papel; DRIVER exige os campos de motorista (validação condicional no DTO de conclusão)
+- [x] 6.4 `SignupController` (web): DRIVER sem campos de motorista mostra erro de validação e não cria conta; teste de slice cobrindo cliente e motorista
 - [ ] 6.5 `make lint` + `./mvnw verify`; abrir PR 0c (mencionar follow-up da tela `signup-complete` para motorista)
 
 ## 7. Fase 1b — Códigos nos fluxos de verificação e reset (PR 1b)
@@ -132,13 +132,13 @@ Cada fase: branch própria a partir de `main`, uma PR (pt-BR, `Refs #177`; a úl
 > Depende de: 1a | Paralela com: 0c, 2b, 4a
 > Ordem: test → service → templates/config
 
-- [ ] 7.1 Testes unitários falhando em `EmailVerificationServiceTest`: emissão grava `code_hash` e envia `code` + `link` + TTL; troca de e-mail continua só com link; reenvio respeita cooldown e máximo diário (sem envio, sem erro); `verifyByCode` correto marca verificado e consome; errado incrementa tentativas; 5º erro consome a linha (link também); conta verificada ou com `pending_email` → falha; e-mail inexistente → falha
-- [ ] 7.2 Testes unitários falhando em `PasswordResetServiceTest`: mesmo conjunto para reset (conta sem senha local não recebe; `resetByCode` troca senha e consome código e link)
-- [ ] 7.3 Implementar emissão com código e política em `EmailVerificationService` (`startVerification`, `resend`) e `verifyByCode(email, code)`
-- [ ] 7.4 Implementar emissão com código e política em `PasswordResetService.requestReset` e `resetByCode(email, code, newPassword)`
-- [ ] 7.5 Templates `email/verification.html` e `email/password-reset.html` exibem `code` e a validade vinda de `ttl` (remover "1 hora" fixo)
-- [ ] 7.6 Default de `vanep.mail.reset-ttl-minutes` para 15 em `application.properties` e `VANEP_MAIL_RESET_TTL_MINUTES=15` em `.env.example`
-- [ ] 7.7 Rodar `PasswordRecoveryFlowTest` e testes web de verificação: link continua funcionando e respeita o novo TTL
+- [x] 7.1 Testes unitários falhando em `EmailVerificationServiceTest`: emissão grava `code_hash` e envia `code` + `link` + TTL; troca de e-mail continua só com link; reenvio respeita cooldown e máximo diário (sem envio, sem erro); `verifyByCode` correto marca verificado e consome; errado incrementa tentativas; 5º erro consome a linha (link também); conta verificada ou com `pending_email` → falha; e-mail inexistente → falha
+- [x] 7.2 Testes unitários falhando em `PasswordResetServiceTest`: mesmo conjunto para reset (conta sem senha local não recebe; `resetByCode` troca senha e consome código e link)
+- [x] 7.3 Implementar emissão com código e política em `EmailVerificationService` (`startVerification`, `resend`) e `verifyByCode(email, code)`
+- [x] 7.4 Implementar emissão com código e política em `PasswordResetService.requestReset` e `resetByCode(email, code, newPassword)`
+- [x] 7.5 Templates `email/verification.html` e `email/password-reset.html` exibem `code` e a validade vinda de `ttl` (remover "1 hora" fixo)
+- [x] 7.6 Default de `vanep.mail.reset-ttl-minutes` para 15 em `application.properties` e `VANEP_MAIL_RESET_TTL_MINUTES=15` em `.env.example`
+- [x] 7.7 Rodar `PasswordRecoveryFlowTest` e testes web de verificação: link continua funcionando e respeita o novo TTL
 - [ ] 7.8 `make lint` + `./mvnw verify`; abrir PR 1b
 
 ## 8. Fase 2b — Grant de senha (PR 2b)
@@ -163,13 +163,13 @@ Cada fase: branch própria a partir de `main`, uma PR (pt-BR, `Refs #177`; a úl
 > Depende de: 0a, 0b | Paralela com: 0c, 1b, 2b
 > Ordem: test → security → request DTO (já existe da 0a) → service (já existe) → controller → response DTO
 
-- [ ] 9.1 Testes de slice falhando: rota `/api/auth/**` sem token e com Bearer expirado não dá `401`; `GET /api/user/me` sem token continua `401`
-- [ ] 9.2 Testes de slice falhando de `SignupApiController`: `201` cliente/motorista/assistente com `email` e `emailVerified=false` e e-mail disparado; `400 validation_error` com `errors` por campo (nome em branco + CPF inválido, motorista sem `basePrice`, termos não aceitos); `409 email_duplicate` e `document_duplicate`
-- [ ] 9.3 Teste: erro de validação em `ProfileController` continua no envelope do perfil (sem interferência do novo advice)
-- [ ] 9.4 Nova `SecurityFilterChain` para `/api/auth/**` (permitAll, stateless, CSRF off, sem resource server) antes da chain `/api/**`
-- [ ] 9.5 Adicionar os `POST /api/auth/**` ao `RateLimitingFilter` e teste de `429`
-- [ ] 9.6 `AuthErrorResponseDTO(code, message, errors[])`, exceções tipadas e `AuthErrorAdvice` (`assignableTypes` + `@Order`)
-- [ ] 9.7 `SignupApiController` com `POST /api/auth/signup/{client|driver|assistant}` e `SignupResponseDTO`
+- [x] 9.1 Testes de slice falhando: rota `/api/auth/**` sem token e com Bearer expirado não dá `401`; `GET /api/user/me` sem token continua `401`
+- [x] 9.2 Testes de slice falhando de `SignupApiController`: `201` cliente/motorista/assistente com `email` e `emailVerified=false` e e-mail disparado; `400 validation_error` com `errors` por campo (nome em branco + CPF inválido, motorista sem `basePrice`, termos não aceitos); `409 email_duplicate` e `document_duplicate`
+- [x] 9.3 Teste: erro de validação em `ProfileController` continua no envelope do perfil (sem interferência do novo advice)
+- [x] 9.4 Nova `SecurityFilterChain` para `/api/auth/**` (permitAll, stateless, CSRF off, sem resource server) antes da chain `/api/**`
+- [x] 9.5 Adicionar os `POST /api/auth/**` ao `RateLimitingFilter` e teste de `429`
+- [x] 9.6 `AuthErrorResponseDTO(code, message, errors[])`, exceções tipadas e `AuthErrorAdvice` (`assignableTypes` + `@Order`)
+- [x] 9.7 `SignupApiController` com `POST /api/auth/signup/{client|driver|assistant}` e `SignupResponseDTO`
 - [ ] 9.8 `make lint` + `./mvnw verify`; abrir PR 4a
 
 ## 10. Fase 3b — Grant Google (PR 3b)

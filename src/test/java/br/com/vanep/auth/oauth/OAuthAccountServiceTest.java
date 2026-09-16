@@ -8,7 +8,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import br.com.vanep.assistant.repository.AssistantRepository;
+import br.com.vanep.auth.web.RegistrationService;
 import br.com.vanep.auth.web.SignupForm;
 import br.com.vanep.role.RoleName;
 import br.com.vanep.role.model.RoleModel;
@@ -33,7 +33,7 @@ class OAuthAccountServiceTest {
   @Mock private UserRepository users;
   @Mock private OAuthAccountRepository oauthAccounts;
   @Mock private RoleRepository roles;
-  @Mock private AssistantRepository assistants;
+  @Mock private RegistrationService registrationService;
   @Mock private org.springframework.context.MessageSource messages;
   @InjectMocks private OAuthAccountService service;
 
@@ -144,7 +144,7 @@ class OAuthAccountServiceTest {
     assertThat(created.getTermsAcceptedAt()).isNotNull();
     verify(users).save(any(UserModel.class));
     verify(oauthAccounts).save(any(OAuthAccountModel.class));
-    verify(assistants, never()).save(any());
+    verify(registrationService).createRoleRecord(created, UserType.DRIVER, form);
   }
 
   @Test
@@ -165,6 +165,51 @@ class OAuthAccountServiceTest {
 
     assertThat(created.getType()).isEqualTo(UserType.ASSISTANT);
     assertThat(created.getRoleId()).isEqualTo(4L);
-    verify(assistants).save(any());
+    verify(registrationService).createRoleRecord(created, UserType.ASSISTANT, form);
+  }
+
+  @Test
+  void completeRegistrationCreatesTheClientRoleRecord() {
+    when(users.save(any(UserModel.class))).thenAnswer(inv -> inv.getArgument(0));
+    when(oauthAccounts.save(any(OAuthAccountModel.class))).thenAnswer(inv -> inv.getArgument(0));
+    when(roles.findByRoleName(RoleName.CLIENT))
+        .thenReturn(Optional.of(roleTaggedAs(RoleName.CLIENT)));
+
+    SignupForm form = new SignupForm();
+    form.setType(UserType.CLIENT);
+    form.setDocument("39053344705");
+    form.setAcceptTerms(true);
+
+    UserModel created =
+        service.completeRegistration(AuthProvider.GOOGLE, "sub-6", "c@vanep.com", "Client C", form);
+
+    verify(registrationService).createRoleRecord(created, UserType.CLIENT, form);
+  }
+
+  @Test
+  void completeRegistrationPassesTheDriverFieldsThrough() {
+    when(users.save(any(UserModel.class))).thenAnswer(inv -> inv.getArgument(0));
+    when(oauthAccounts.save(any(OAuthAccountModel.class))).thenAnswer(inv -> inv.getArgument(0));
+    when(roles.findByRoleName(RoleName.DRIVER))
+        .thenReturn(Optional.of(roleTaggedAs(RoleName.DRIVER)));
+
+    SignupForm form = new SignupForm();
+    form.setType(UserType.DRIVER);
+    form.setDocument("52998224725");
+    form.setBasePrice(new java.math.BigDecimal("150.00"));
+    form.setAcceptTerms(true);
+
+    UserModel created =
+        service.completeRegistration(
+            AuthProvider.GOOGLE, "sub-7", "d2@vanep.com", "Driver D", form);
+
+    org.mockito.ArgumentCaptor<SignupForm> fields =
+        org.mockito.ArgumentCaptor.forClass(SignupForm.class);
+    verify(registrationService)
+        .createRoleRecord(
+            org.mockito.ArgumentMatchers.eq(created),
+            org.mockito.ArgumentMatchers.eq(UserType.DRIVER),
+            fields.capture());
+    assertThat(fields.getValue().getBasePrice()).isEqualByComparingTo("150.00");
   }
 }

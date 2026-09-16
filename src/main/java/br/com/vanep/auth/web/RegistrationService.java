@@ -2,6 +2,14 @@ package br.com.vanep.auth.web;
 
 import br.com.vanep.assistant.model.AssistantModel;
 import br.com.vanep.assistant.repository.AssistantRepository;
+import br.com.vanep.auth.dto.AccountSignupRequestDTO;
+import br.com.vanep.auth.dto.AssistantSignupRequestDTO;
+import br.com.vanep.auth.dto.ClientSignupRequestDTO;
+import br.com.vanep.auth.dto.DriverSignupFields;
+import br.com.vanep.auth.dto.DriverSignupRequestDTO;
+import br.com.vanep.auth.enums.AuthErrorCode;
+import br.com.vanep.auth.exception.SignupDuplicateException;
+import br.com.vanep.auth.validation.CpfValidator;
 import br.com.vanep.auth.verification.EmailVerificationService;
 import br.com.vanep.client.model.ClientModel;
 import br.com.vanep.client.repository.ClientRepository;
@@ -46,52 +54,82 @@ public class RegistrationService {
   }
 
   @Transactional
-  public UserModel registerClient(ClientSignupForm form) {
-    UserModel user = createUser(UserType.CLIENT, RoleName.CLIENT, form);
-    ClientModel client = new ClientModel();
-    client.setUser(user);
-    clients.save(client);
+  public UserModel registerClient(ClientSignupRequestDTO request) {
+    UserModel user = createUser(UserType.CLIENT, RoleName.CLIENT, request);
+    createRoleRecord(user, UserType.CLIENT, null);
     emailVerification.startVerification(user);
     return user;
   }
 
   @Transactional
-  public UserModel registerDriver(DriverSignupForm form) {
-    UserModel user = createUser(UserType.DRIVER, RoleName.DRIVER, form);
-    DriverModel driver = new DriverModel();
-    driver.setUser(user);
-    driver.setCnpj(form.getCnpj());
-    driver.setExperienceYears(form.getExperienceYears());
-    driver.setBasePrice(form.getBasePrice());
-    driver.setApprovalStatus(DriverApprovalStatus.PENDING);
-    drivers.save(driver);
+  public UserModel registerDriver(DriverSignupRequestDTO request) {
+    UserModel user = createUser(UserType.DRIVER, RoleName.DRIVER, request);
+    createRoleRecord(user, UserType.DRIVER, request);
     emailVerification.startVerification(user);
     return user;
   }
 
   @Transactional
-  public UserModel registerAssistant(AssistantSignupForm form) {
-    UserModel user = createUser(UserType.ASSISTANT, RoleName.ASSISTANT, form);
-    AssistantModel assistant = new AssistantModel();
-    assistant.setUser(user);
-    assistants.save(assistant);
+  public UserModel registerAssistant(AssistantSignupRequestDTO request) {
+    UserModel user = createUser(UserType.ASSISTANT, RoleName.ASSISTANT, request);
+    createRoleRecord(user, UserType.ASSISTANT, null);
     emailVerification.startVerification(user);
     return user;
   }
 
-  private UserModel createUser(UserType type, RoleName roleName, AccountSignupForm form) {
+  /** Shared with the Google sign-up completion, so every channel creates the same role record. */
+  public void createRoleRecord(UserModel user, UserType type, DriverSignupFields driverFields) {
+    switch (type) {
+      case CLIENT -> {
+        ClientModel client = new ClientModel();
+        client.setUser(user);
+        clients.save(client);
+      }
+      case DRIVER -> {
+        DriverModel driver = new DriverModel();
+        driver.setUser(user);
+        driver.setCnpj(driverFields.getCnpj());
+        driver.setExperienceYears(driverFields.getExperienceYears());
+        driver.setBasePrice(driverFields.getBasePrice());
+        driver.setApprovalStatus(DriverApprovalStatus.PENDING);
+        drivers.save(driver);
+      }
+      case ASSISTANT -> {
+        AssistantModel assistant = new AssistantModel();
+        assistant.setUser(user);
+        assistants.save(assistant);
+      }
+      case ADMIN ->
+          throw new IllegalArgumentException("Admin accounts are not created by sign-up.");
+    }
+  }
+
+  UserModel createUser(UserType type, RoleName roleName, AccountSignupRequestDTO request) {
+    String document = CpfValidator.normalize(request.getDocument());
+    rejectDuplicates(request.getEmail(), document);
     UserModel user = new UserModel();
     user.setType(type);
     roles.findByRoleName(roleName).ifPresent(role -> user.setRoleId(role.getId()));
-    user.setName(form.getName());
-    user.setEmail(form.getEmail());
-    user.setPassword(passwordEncoder.encode(form.getPassword()));
-    user.setDocument(form.getDocument());
-    user.setPhone(form.getPhone());
-    user.setBirthDate(form.getBirthDate());
-    user.setGender(form.getGender());
+    user.setName(request.getName());
+    user.setEmail(request.getEmail());
+    user.setPassword(passwordEncoder.encode(request.getPassword()));
+    user.setDocument(document);
+    user.setPhone(request.getPhone());
+    user.setBirthDate(request.getBirthDate());
+    user.setGender(request.getGender());
     user.setVerified(false);
     user.setTermsAcceptedAt(Instant.now());
     return users.save(user);
+  }
+
+  void rejectDuplicates(String email, String normalizedDocument) {
+    if (email != null && users.existsByEmail(email)) {
+      throw new SignupDuplicateException(
+          "email", "auth.signup.email.duplicate", AuthErrorCode.EMAIL_DUPLICATE);
+    }
+    if (!normalizedDocument.isEmpty() && users.existsByDocument(normalizedDocument)) {
+      throw new SignupDuplicateException(
+          "document", "auth.signup.document.duplicate", AuthErrorCode.DOCUMENT_DUPLICATE);
+    }
   }
 }

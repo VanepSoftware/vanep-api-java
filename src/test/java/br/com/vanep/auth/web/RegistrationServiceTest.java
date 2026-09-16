@@ -1,14 +1,20 @@
 package br.com.vanep.auth.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import br.com.vanep.assistant.enums.AssistantStatus;
 import br.com.vanep.assistant.model.AssistantModel;
 import br.com.vanep.assistant.repository.AssistantRepository;
+import br.com.vanep.auth.dto.AssistantSignupRequestDTO;
+import br.com.vanep.auth.dto.ClientSignupRequestDTO;
+import br.com.vanep.auth.dto.DriverSignupRequestDTO;
+import br.com.vanep.auth.exception.SignupDuplicateException;
 import br.com.vanep.auth.verification.EmailVerificationService;
 import br.com.vanep.client.model.ClientModel;
 import br.com.vanep.client.repository.ClientRepository;
@@ -49,25 +55,33 @@ class RegistrationServiceTest {
   }
 
   private RegistrationService service() {
-    when(users.save(any(UserModel.class))).thenAnswer(inv -> inv.getArgument(0));
-    when(passwordEncoder.encode(anyString())).thenReturn("hashed");
     return new RegistrationService(
         users, clients, drivers, assistants, roles, passwordEncoder, emailVerification);
   }
 
+  private RegistrationService serviceThatSaves() {
+    when(users.save(any(UserModel.class))).thenAnswer(inv -> inv.getArgument(0));
+    when(passwordEncoder.encode(anyString())).thenReturn("hashed");
+    return service();
+  }
+
+  private ClientSignupRequestDTO clientRequest() {
+    ClientSignupRequestDTO request = new ClientSignupRequestDTO();
+    request.setName("Ana");
+    request.setEmail("ana@vanep.com");
+    request.setPassword("secret1");
+    request.setDocument("39053344705");
+    request.setAcceptTerms(true);
+    return request;
+  }
+
   @Test
   void registerClientCreatesUserAndClientProfile() {
-    RegistrationService service = service();
+    RegistrationService service = serviceThatSaves();
     when(roles.findByRoleName(RoleName.CLIENT))
         .thenReturn(Optional.of(roleTaggedAs(RoleName.CLIENT, 2L)));
-    ClientSignupForm form = new ClientSignupForm();
-    form.setName("Ana");
-    form.setEmail("ana@vanep.com");
-    form.setPassword("secret1");
-    form.setDocument("39053344705");
-    form.setAcceptTerms(true);
 
-    UserModel user = service.registerClient(form);
+    UserModel user = service.registerClient(clientRequest());
 
     assertThat(user.getType()).isEqualTo(UserType.CLIENT);
     assertThat(user.getPassword()).isEqualTo("hashed");
@@ -77,23 +91,24 @@ class RegistrationServiceTest {
     ArgumentCaptor<ClientModel> client = ArgumentCaptor.forClass(ClientModel.class);
     verify(clients).save(client.capture());
     assertThat(client.getValue().getUser()).isSameAs(user);
+    verify(emailVerification).startVerification(user);
   }
 
   @Test
   void registerDriverCreatesUserAndPendingDriverProfile() {
-    RegistrationService service = service();
+    RegistrationService service = serviceThatSaves();
     when(roles.findByRoleName(RoleName.DRIVER))
         .thenReturn(Optional.of(roleTaggedAs(RoleName.DRIVER, 3L)));
-    DriverSignupForm form = new DriverSignupForm();
-    form.setName("Bruno");
-    form.setEmail("bruno@vanep.com");
-    form.setPassword("secret1");
-    form.setDocument("52998224725");
-    form.setBasePrice(new BigDecimal("120.00"));
-    form.setExperienceYears(5);
-    form.setAcceptTerms(true);
+    DriverSignupRequestDTO request = new DriverSignupRequestDTO();
+    request.setName("Bruno");
+    request.setEmail("bruno@vanep.com");
+    request.setPassword("secret1");
+    request.setDocument("52998224725");
+    request.setBasePrice(new BigDecimal("120.00"));
+    request.setExperienceYears(5);
+    request.setAcceptTerms(true);
 
-    UserModel user = service.registerDriver(form);
+    UserModel user = service.registerDriver(request);
 
     assertThat(user.getType()).isEqualTo(UserType.DRIVER);
     assertThat(user.getRoleId()).isEqualTo(3L);
@@ -102,21 +117,22 @@ class RegistrationServiceTest {
     verify(drivers).save(driver.capture());
     assertThat(driver.getValue().getApprovalStatus()).isEqualTo(DriverApprovalStatus.PENDING);
     assertThat(driver.getValue().getBasePrice()).isEqualByComparingTo("120.00");
+    verify(emailVerification).startVerification(user);
   }
 
   @Test
   void registerAssistantCreatesUserAndUnlinkedProfile() {
-    RegistrationService service = service();
+    RegistrationService service = serviceThatSaves();
     when(roles.findByRoleName(RoleName.ASSISTANT))
         .thenReturn(Optional.of(roleTaggedAs(RoleName.ASSISTANT, 4L)));
-    AssistantSignupForm form = new AssistantSignupForm();
-    form.setName("Carla");
-    form.setEmail("carla@vanep.com");
-    form.setPassword("secret1");
-    form.setDocument("11144477735");
-    form.setAcceptTerms(true);
+    AssistantSignupRequestDTO request = new AssistantSignupRequestDTO();
+    request.setName("Carla");
+    request.setEmail("carla@vanep.com");
+    request.setPassword("secret1");
+    request.setDocument("11144477735");
+    request.setAcceptTerms(true);
 
-    UserModel user = service.registerAssistant(form);
+    UserModel user = service.registerAssistant(request);
 
     assertThat(user.getType()).isEqualTo(UserType.ASSISTANT);
     assertThat(user.getRoleId()).isEqualTo(4L);
@@ -126,5 +142,48 @@ class RegistrationServiceTest {
     assertThat(assistant.getValue().getUser()).isSameAs(user);
     assertThat(assistant.getValue().getStatus()).isEqualTo(AssistantStatus.UNLINKED);
     assertThat(assistant.getValue().getDriver()).isNull();
+    verify(emailVerification).startVerification(user);
+  }
+
+  @Test
+  void registerStoresNormalizedDocument() {
+    RegistrationService service = serviceThatSaves();
+    when(roles.findByRoleName(RoleName.CLIENT))
+        .thenReturn(Optional.of(roleTaggedAs(RoleName.CLIENT, 2L)));
+    ClientSignupRequestDTO request = clientRequest();
+    request.setDocument("390.533.447-05");
+
+    UserModel user = service.registerClient(request);
+
+    assertThat(user.getDocument()).isEqualTo("39053344705");
+  }
+
+  @Test
+  void registerRejectsDuplicateEmail() {
+    RegistrationService service = service();
+    when(users.existsByEmail("ana@vanep.com")).thenReturn(true);
+
+    assertThatThrownBy(() -> service.registerClient(clientRequest()))
+        .isInstanceOf(SignupDuplicateException.class)
+        .extracting("field", "messageKey")
+        .containsExactly("email", "auth.signup.email.duplicate");
+
+    verify(users, never()).save(any(UserModel.class));
+    verify(clients, never()).save(any(ClientModel.class));
+  }
+
+  @Test
+  void registerRejectsDuplicateNormalizedDocument() {
+    RegistrationService service = service();
+    ClientSignupRequestDTO request = clientRequest();
+    request.setDocument("390.533.447-05");
+    when(users.existsByDocument("39053344705")).thenReturn(true);
+
+    assertThatThrownBy(() -> service.registerClient(request))
+        .isInstanceOf(SignupDuplicateException.class)
+        .extracting("field", "messageKey")
+        .containsExactly("document", "auth.signup.document.duplicate");
+
+    verify(users, never()).save(any(UserModel.class));
   }
 }
