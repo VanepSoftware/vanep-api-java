@@ -147,14 +147,14 @@ Cada fase: branch própria a partir de `main`, uma PR (pt-BR, `Refs #177`; a úl
 > Depende de: 2a | Paralela com: 0c, 1b, 4a
 > Ordem: test → security (user details, provider) → service (registro de login) → config
 
-- [ ] 8.1 Testes unitários falhando em `VanepUserDetailsServiceTest`: e-mail bloqueado lança `LockedException` antes de buscar usuário (existente, inexistente e sem senha local)
-- [ ] 8.2 Testes de slice falhando do grant: sucesso (tokens + `last_login_at` + contador zerado); e-mail inexistente, senha errada e conta só Google com resposta idêntica `invalid_grant`; não verificado com senha certa → `email_not_verified`; com senha errada → `invalid_grant`; 5 falhas → `account_locked` mesmo com senha certa e para e-mail inexistente; lock expira; `vanep-frontend` → `unauthorized_client`
-- [ ] 8.3 Teste de form login web: e-mail bloqueado inexistente e existente têm o mesmo resultado
-- [ ] 8.4 `VanepUserDetailsService`: checar `LoginAttemptService.isBlocked` antes da busca e lançar `LockedException`
-- [ ] 8.5 Extrair o registro de login bem-sucedido (`loginSucceeded` + `last_login_at`) do `AuthenticationEventsListener` para método de service reutilizável; listener passa a delegar
-- [ ] 8.6 Criar `MobilePasswordGrantAuthenticationConverter`, `Token` e `Provider` (Dao dedicado com pre/post checks do design D4; mapeamento de erros com descrições via `MessageSource`)
-- [ ] 8.7 Registrar o grant no token endpoint e habilitar o `AuthorizationGrantType` só no `RegisteredClient` mobile
-- [ ] 8.8 Chaves de mensagem das descrições de erro (EN + pt-BR)
+- [x] 8.1 Testes unitários falhando em `VanepUserDetailsServiceTest`: e-mail bloqueado lança `LockedException` antes de buscar usuário (existente, inexistente e sem senha local)
+- [x] 8.2 Testes de slice falhando do grant: sucesso (tokens + `last_login_at` + contador zerado); e-mail inexistente, senha errada e conta só Google com resposta idêntica `invalid_grant`; não verificado com senha certa → `email_not_verified`; com senha errada → `invalid_grant`; 5 falhas → `account_locked` mesmo com senha certa e para e-mail inexistente; lock expira; `vanep-frontend` → `unauthorized_client`
+- [x] 8.3 Teste de form login web: e-mail bloqueado inexistente e existente têm o mesmo resultado
+- [x] 8.4 `VanepUserDetailsService`: checar `LoginAttemptService.isBlocked` antes da busca e lançar `LockedException`
+- [x] 8.5 Extrair o registro de login bem-sucedido (`loginSucceeded` + `last_login_at`) do `AuthenticationEventsListener` para método de service reutilizável; listener passa a delegar
+- [x] 8.6 Criar `MobilePasswordGrantAuthenticationConverter`, `Token` e `Provider` (Dao dedicado com pre/post checks do design D4; mapeamento de erros com descrições via `MessageSource`)
+- [x] 8.7 Registrar o grant no token endpoint e habilitar o `AuthorizationGrantType` só no `RegisteredClient` mobile
+- [x] 8.8 Chaves de mensagem das descrições de erro (EN + pt-BR)
 - [ ] 8.9 `make lint` + `./mvnw verify`; abrir PR 2b
 
 ## 9. Fase 4a — Base da API pública + cadastro (PR 4a)

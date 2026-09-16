@@ -4,10 +4,17 @@ import br.com.vanep.auth.oauth.OAuthLoginSuccessHandler;
 import br.com.vanep.auth.oauth.VanepOidcUserService;
 import br.com.vanep.auth.oauth.grant.MobileClientAuthenticationConverter;
 import br.com.vanep.auth.oauth.grant.MobileClientAuthenticationProvider;
+import br.com.vanep.auth.oauth.grant.MobileGrantTokenIssuer;
+import br.com.vanep.auth.oauth.grant.MobilePasswordGrantAuthenticationConverter;
+import br.com.vanep.auth.oauth.grant.MobilePasswordGrantAuthenticationProvider;
+import br.com.vanep.auth.security.LoginActivityService;
+import br.com.vanep.auth.security.LoginAttemptService;
+import br.com.vanep.auth.security.VanepUserDetailsService;
 import java.util.ArrayList;
 import java.util.Collection;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.MessageSource;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
@@ -19,9 +26,12 @@ import org.springframework.security.config.annotation.web.configurers.oauth2.ser
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
+import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
+import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenGenerator;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.SecurityFilterChain;
@@ -62,11 +72,19 @@ public class SecurityConfig {
       JwtAuthenticationConverter jwtAuthenticationConverter,
       RegisteredClientRepository registeredClients,
       AuthorizationServerSettings authorizationServerSettings,
+      OAuth2AuthorizationService authorizations,
+      OAuth2TokenGenerator<?> tokenGenerator,
+      VanepUserDetailsService userDetailsService,
+      PasswordEncoder passwordEncoder,
+      LoginAttemptService loginAttempts,
+      LoginActivityService loginActivity,
+      MessageSource messages,
       @Value("${vanep.oauth.mobile-client.id:vanep-mobile}") String mobileClientId)
       throws Exception {
     OAuth2AuthorizationServerConfigurer authorizationServer =
         new OAuth2AuthorizationServerConfigurer();
     RequestMatcher endpointsMatcher = authorizationServer.getEndpointsMatcher();
+    MobileGrantTokenIssuer tokenIssuer = new MobileGrantTokenIssuer(authorizations, tokenGenerator);
 
     http.securityMatcher(endpointsMatcher)
         .authorizeHttpRequests(authorize -> authorize.anyRequest().authenticated())
@@ -74,15 +92,29 @@ public class SecurityConfig {
         .with(
             authorizationServer,
             server ->
-                server.clientAuthentication(
-                    clientAuthentication ->
-                        clientAuthentication
-                            .authenticationConverter(
-                                new MobileClientAuthenticationConverter(
-                                    authorizationServerSettings))
-                            .authenticationProvider(
-                                new MobileClientAuthenticationProvider(
-                                    registeredClients, mobileClientId))))
+                server
+                    .clientAuthentication(
+                        clientAuthentication ->
+                            clientAuthentication
+                                .authenticationConverter(
+                                    new MobileClientAuthenticationConverter(
+                                        authorizationServerSettings))
+                                .authenticationProvider(
+                                    new MobileClientAuthenticationProvider(
+                                        registeredClients, mobileClientId)))
+                    .tokenEndpoint(
+                        tokenEndpoint ->
+                            tokenEndpoint
+                                .accessTokenRequestConverter(
+                                    new MobilePasswordGrantAuthenticationConverter())
+                                .authenticationProvider(
+                                    new MobilePasswordGrantAuthenticationProvider(
+                                        userDetailsService,
+                                        passwordEncoder,
+                                        tokenIssuer,
+                                        loginAttempts,
+                                        loginActivity,
+                                        messages))))
         .exceptionHandling(
             exceptions ->
                 exceptions.defaultAuthenticationEntryPointFor(
