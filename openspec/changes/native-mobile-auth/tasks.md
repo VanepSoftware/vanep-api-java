@@ -132,13 +132,13 @@ Cada fase: branch própria a partir de `main`, uma PR (pt-BR, `Refs #177`; a úl
 > Depende de: 1a | Paralela com: 0c, 2b, 4a
 > Ordem: test → service → templates/config
 
-- [ ] 7.1 Testes unitários falhando em `EmailVerificationServiceTest`: emissão grava `code_hash` e envia `code` + `link` + TTL; troca de e-mail continua só com link; reenvio respeita cooldown e máximo diário (sem envio, sem erro); `verifyByCode` correto marca verificado e consome; errado incrementa tentativas; 5º erro consome a linha (link também); conta verificada ou com `pending_email` → falha; e-mail inexistente → falha
-- [ ] 7.2 Testes unitários falhando em `PasswordResetServiceTest`: mesmo conjunto para reset (conta sem senha local não recebe; `resetByCode` troca senha e consome código e link)
-- [ ] 7.3 Implementar emissão com código e política em `EmailVerificationService` (`startVerification`, `resend`) e `verifyByCode(email, code)`
-- [ ] 7.4 Implementar emissão com código e política em `PasswordResetService.requestReset` e `resetByCode(email, code, newPassword)`
-- [ ] 7.5 Templates `email/verification.html` e `email/password-reset.html` exibem `code` e a validade vinda de `ttl` (remover "1 hora" fixo)
-- [ ] 7.6 Default de `vanep.mail.reset-ttl-minutes` para 15 em `application.properties` e `VANEP_MAIL_RESET_TTL_MINUTES=15` em `.env.example`
-- [ ] 7.7 Rodar `PasswordRecoveryFlowTest` e testes web de verificação: link continua funcionando e respeita o novo TTL
+- [x] 7.1 Testes unitários falhando em `EmailVerificationServiceTest`: emissão grava `code_hash` e envia `code` + `link` + TTL; troca de e-mail continua só com link; reenvio respeita cooldown e máximo diário (sem envio, sem erro); `verifyByCode` correto marca verificado e consome; errado incrementa tentativas; 5º erro consome a linha (link também); conta verificada ou com `pending_email` → falha; e-mail inexistente → falha
+- [x] 7.2 Testes unitários falhando em `PasswordResetServiceTest`: mesmo conjunto para reset (conta sem senha local não recebe; `resetByCode` troca senha e consome código e link)
+- [x] 7.3 Implementar emissão com código e política em `EmailVerificationService` (`startVerification`, `resend`) e `verifyByCode(email, code)`
+- [x] 7.4 Implementar emissão com código e política em `PasswordResetService.requestReset` e `resetByCode(email, code, newPassword)`
+- [x] 7.5 Templates `email/verification.html` e `email/password-reset.html` exibem `code` e a validade vinda de `ttl` (remover "1 hora" fixo)
+- [x] 7.6 Default de `vanep.mail.reset-ttl-minutes` para 15 em `application.properties` e `VANEP_MAIL_RESET_TTL_MINUTES=15` em `.env.example`
+- [x] 7.7 Rodar `PasswordRecoveryFlowTest` e testes web de verificação: link continua funcionando e respeita o novo TTL
 - [ ] 7.8 `make lint` + `./mvnw verify`; abrir PR 1b
 
 ## 8. Fase 2b — Grant de senha (PR 2b)
