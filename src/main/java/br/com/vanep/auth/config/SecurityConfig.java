@@ -2,6 +2,8 @@ package br.com.vanep.auth.config;
 
 import br.com.vanep.auth.oauth.OAuthLoginSuccessHandler;
 import br.com.vanep.auth.oauth.VanepOidcUserService;
+import br.com.vanep.auth.oauth.grant.MobileClientAuthenticationConverter;
+import br.com.vanep.auth.oauth.grant.MobileClientAuthenticationProvider;
 import java.util.ArrayList;
 import java.util.Collection;
 import org.springframework.beans.factory.ObjectProvider;
@@ -10,7 +12,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.MediaType;
-import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -19,6 +20,8 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
+import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
+import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.SecurityFilterChain;
@@ -55,7 +58,12 @@ public class SecurityConfig {
   @Bean
   @Order(1)
   public SecurityFilterChain authorizationServerSecurityFilterChain(
-      HttpSecurity http, JwtAuthenticationConverter jwtAuthenticationConverter) throws Exception {
+      HttpSecurity http,
+      JwtAuthenticationConverter jwtAuthenticationConverter,
+      RegisteredClientRepository registeredClients,
+      AuthorizationServerSettings authorizationServerSettings,
+      @Value("${vanep.oauth.mobile-client.id:vanep-mobile}") String mobileClientId)
+      throws Exception {
     OAuth2AuthorizationServerConfigurer authorizationServer =
         new OAuth2AuthorizationServerConfigurer();
     RequestMatcher endpointsMatcher = authorizationServer.getEndpointsMatcher();
@@ -63,7 +71,18 @@ public class SecurityConfig {
     http.securityMatcher(endpointsMatcher)
         .authorizeHttpRequests(authorize -> authorize.anyRequest().authenticated())
         .csrf(csrf -> csrf.ignoringRequestMatchers(endpointsMatcher))
-        .with(authorizationServer, Customizer.withDefaults())
+        .with(
+            authorizationServer,
+            server ->
+                server.clientAuthentication(
+                    clientAuthentication ->
+                        clientAuthentication
+                            .authenticationConverter(
+                                new MobileClientAuthenticationConverter(
+                                    authorizationServerSettings))
+                            .authenticationProvider(
+                                new MobileClientAuthenticationProvider(
+                                    registeredClients, mobileClientId))))
         .exceptionHandling(
             exceptions ->
                 exceptions.defaultAuthenticationEntryPointFor(
