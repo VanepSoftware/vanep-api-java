@@ -120,10 +120,10 @@ Cada fase: branch própria a partir de `main`, uma PR (pt-BR, `Refs #177`; a úl
 > Depende de: 0a | Paralela com: 1b, 2b, 4a
 > Ordem: test → service → controller web
 
-- [ ] 6.1 Testes unitários falhando (`OAuthAccountServiceTest`): conclusão como CLIENT cria `ClientModel`; como DRIVER com `basePrice` cria `DriverModel` `PENDING`; como ASSISTANT continua criando `AssistantModel`
-- [ ] 6.2 Extrair em `RegistrationService` o método público de criação do registro de papel e reusar em `registerClient/Driver/Assistant`
-- [ ] 6.3 `OAuthAccountService.completeRegistration` passa a delegar a criação do papel; DRIVER exige os campos de motorista (validação condicional no DTO de conclusão)
-- [ ] 6.4 `SignupController` (web): DRIVER sem campos de motorista mostra erro de validação e não cria conta; teste de slice cobrindo cliente e motorista
+- [x] 6.1 Testes unitários falhando (`OAuthAccountServiceTest`): conclusão como CLIENT cria `ClientModel`; como DRIVER com `basePrice` cria `DriverModel` `PENDING`; como ASSISTANT continua criando `AssistantModel`
+- [x] 6.2 Extrair em `RegistrationService` o método público de criação do registro de papel e reusar em `registerClient/Driver/Assistant`
+- [x] 6.3 `OAuthAccountService.completeRegistration` passa a delegar a criação do papel; DRIVER exige os campos de motorista (validação condicional no DTO de conclusão)
+- [x] 6.4 `SignupController` (web): DRIVER sem campos de motorista mostra erro de validação e não cria conta; teste de slice cobrindo cliente e motorista
 - [ ] 6.5 `make lint` + `./mvnw verify`; abrir PR 0c (mencionar follow-up da tela `signup-complete` para motorista)
 
 ## 7. Fase 1b — Códigos nos fluxos de verificação e reset (PR 1b)

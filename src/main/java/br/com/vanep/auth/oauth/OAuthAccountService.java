@@ -1,7 +1,6 @@
 package br.com.vanep.auth.oauth;
 
-import br.com.vanep.assistant.model.AssistantModel;
-import br.com.vanep.assistant.repository.AssistantRepository;
+import br.com.vanep.auth.web.RegistrationService;
 import br.com.vanep.auth.web.SignupForm;
 import br.com.vanep.role.RoleName;
 import br.com.vanep.role.repository.RoleRepository;
@@ -24,17 +23,17 @@ public class OAuthAccountService {
   private final UserRepository users;
   private final OAuthAccountRepository oauthAccounts;
   private final RoleRepository roles;
-  private final AssistantRepository assistants;
+  private final RegistrationService registrationService;
 
   public OAuthAccountService(
       UserRepository users,
       OAuthAccountRepository oauthAccounts,
       RoleRepository roles,
-      AssistantRepository assistants) {
+      RegistrationService registrationService) {
     this.users = users;
     this.oauthAccounts = oauthAccounts;
     this.roles = roles;
-    this.assistants = assistants;
+    this.registrationService = registrationService;
   }
 
   @Transactional
@@ -84,11 +83,7 @@ public class OAuthAccountService {
     user.setTermsAcceptedAt(Instant.now());
     users.save(user);
 
-    if (form.getType() == UserType.ASSISTANT) {
-      AssistantModel assistant = new AssistantModel();
-      assistant.setUser(user);
-      assistants.save(assistant);
-    }
+    registrationService.createRoleRecord(user, form.getType(), form);
 
     link(user, provider, providerUid, email);
     return user;
