@@ -1,7 +1,7 @@
 package br.com.vanep.auth.web;
 
-import br.com.vanep.auth.validation.CpfValidator;
-import br.com.vanep.user.repository.UserRepository;
+import br.com.vanep.auth.exception.SignupDuplicateException;
+import br.com.vanep.auth.mapper.SignupFormMapper;
 import jakarta.validation.Valid;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
@@ -16,13 +16,15 @@ import org.springframework.web.bind.annotation.PostMapping;
 public class RegistrationController {
 
   private final RegistrationService registrationService;
-  private final UserRepository users;
+  private final SignupFormMapper signupFormMapper;
   private final MessageSource messages;
 
   public RegistrationController(
-      RegistrationService registrationService, UserRepository users, MessageSource messages) {
+      RegistrationService registrationService,
+      SignupFormMapper signupFormMapper,
+      MessageSource messages) {
     this.registrationService = registrationService;
-    this.users = users;
+    this.signupFormMapper = signupFormMapper;
     this.messages = messages;
   }
 
@@ -43,13 +45,13 @@ public class RegistrationController {
   public String registerClient(
       @Valid @ModelAttribute("clientSignupForm") ClientSignupForm form,
       BindingResult bindingResult) {
-    rejectDuplicates(form, bindingResult);
     if (bindingResult.hasErrors()) {
       return "signup-client";
     }
-    normalizeDocument(form);
-    registrationService.registerClient(form);
-    return "redirect:/login?registered";
+    return saveRegistration(
+        () -> registrationService.registerClient(signupFormMapper.toRequest(form)),
+        bindingResult,
+        "signup-client");
   }
 
   @GetMapping("/signup/driver")
@@ -64,13 +66,13 @@ public class RegistrationController {
   public String registerDriver(
       @Valid @ModelAttribute("driverSignupForm") DriverSignupForm form,
       BindingResult bindingResult) {
-    rejectDuplicates(form, bindingResult);
     if (bindingResult.hasErrors()) {
       return "signup-driver";
     }
-    normalizeDocument(form);
-    registrationService.registerDriver(form);
-    return "redirect:/login?registered";
+    return saveRegistration(
+        () -> registrationService.registerDriver(signupFormMapper.toRequest(form)),
+        bindingResult,
+        "signup-driver");
   }
 
   @GetMapping("/signup/assistant")
@@ -85,37 +87,25 @@ public class RegistrationController {
   public String registerAssistant(
       @Valid @ModelAttribute("assistantSignupForm") AssistantSignupForm form,
       BindingResult bindingResult) {
-    rejectDuplicates(form, bindingResult);
     if (bindingResult.hasErrors()) {
       return "signup-assistant";
     }
-    normalizeDocument(form);
-    registrationService.registerAssistant(form);
+    return saveRegistration(
+        () -> registrationService.registerAssistant(signupFormMapper.toRequest(form)),
+        bindingResult,
+        "signup-assistant");
+  }
+
+  String saveRegistration(Runnable registration, BindingResult bindingResult, String formView) {
+    try {
+      registration.run();
+    } catch (SignupDuplicateException duplicate) {
+      bindingResult.rejectValue(
+          duplicate.getField(),
+          "duplicate",
+          messages.getMessage(duplicate.getMessageKey(), null, LocaleContextHolder.getLocale()));
+      return formView;
+    }
     return "redirect:/login?registered";
-  }
-
-  private void rejectDuplicates(AccountSignupForm form, BindingResult bindingResult) {
-    if (form.getEmail() != null && users.existsByEmail(form.getEmail())) {
-      bindingResult.rejectValue(
-          "email",
-          "duplicate",
-          messages.getMessage(
-              "auth.signup.email.duplicate", null, LocaleContextHolder.getLocale()));
-    }
-    if (bindingResult.hasFieldErrors("document")) {
-      return;
-    }
-    String document = CpfValidator.normalize(form.getDocument());
-    if (!document.isEmpty() && users.existsByDocument(document)) {
-      bindingResult.rejectValue(
-          "document",
-          "duplicate",
-          messages.getMessage(
-              "auth.signup.document.duplicate", null, LocaleContextHolder.getLocale()));
-    }
-  }
-
-  private void normalizeDocument(AccountSignupForm form) {
-    form.setDocument(CpfValidator.normalize(form.getDocument()));
   }
 }

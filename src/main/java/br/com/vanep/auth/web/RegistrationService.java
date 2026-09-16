@@ -2,6 +2,12 @@ package br.com.vanep.auth.web;
 
 import br.com.vanep.assistant.model.AssistantModel;
 import br.com.vanep.assistant.repository.AssistantRepository;
+import br.com.vanep.auth.dto.AccountSignupRequestDTO;
+import br.com.vanep.auth.dto.AssistantSignupRequestDTO;
+import br.com.vanep.auth.dto.ClientSignupRequestDTO;
+import br.com.vanep.auth.dto.DriverSignupRequestDTO;
+import br.com.vanep.auth.exception.SignupDuplicateException;
+import br.com.vanep.auth.validation.CpfValidator;
 import br.com.vanep.auth.verification.EmailVerificationService;
 import br.com.vanep.client.model.ClientModel;
 import br.com.vanep.client.repository.ClientRepository;
@@ -46,8 +52,8 @@ public class RegistrationService {
   }
 
   @Transactional
-  public UserModel registerClient(ClientSignupForm form) {
-    UserModel user = createUser(UserType.CLIENT, RoleName.CLIENT, form);
+  public UserModel registerClient(ClientSignupRequestDTO request) {
+    UserModel user = createUser(UserType.CLIENT, RoleName.CLIENT, request);
     ClientModel client = new ClientModel();
     client.setUser(user);
     clients.save(client);
@@ -56,13 +62,13 @@ public class RegistrationService {
   }
 
   @Transactional
-  public UserModel registerDriver(DriverSignupForm form) {
-    UserModel user = createUser(UserType.DRIVER, RoleName.DRIVER, form);
+  public UserModel registerDriver(DriverSignupRequestDTO request) {
+    UserModel user = createUser(UserType.DRIVER, RoleName.DRIVER, request);
     DriverModel driver = new DriverModel();
     driver.setUser(user);
-    driver.setCnpj(form.getCnpj());
-    driver.setExperienceYears(form.getExperienceYears());
-    driver.setBasePrice(form.getBasePrice());
+    driver.setCnpj(request.getCnpj());
+    driver.setExperienceYears(request.getExperienceYears());
+    driver.setBasePrice(request.getBasePrice());
     driver.setApprovalStatus(DriverApprovalStatus.PENDING);
     drivers.save(driver);
     emailVerification.startVerification(user);
@@ -70,8 +76,8 @@ public class RegistrationService {
   }
 
   @Transactional
-  public UserModel registerAssistant(AssistantSignupForm form) {
-    UserModel user = createUser(UserType.ASSISTANT, RoleName.ASSISTANT, form);
+  public UserModel registerAssistant(AssistantSignupRequestDTO request) {
+    UserModel user = createUser(UserType.ASSISTANT, RoleName.ASSISTANT, request);
     AssistantModel assistant = new AssistantModel();
     assistant.setUser(user);
     assistants.save(assistant);
@@ -79,19 +85,30 @@ public class RegistrationService {
     return user;
   }
 
-  private UserModel createUser(UserType type, RoleName roleName, AccountSignupForm form) {
+  UserModel createUser(UserType type, RoleName roleName, AccountSignupRequestDTO request) {
+    String document = CpfValidator.normalize(request.getDocument());
+    rejectDuplicates(request.getEmail(), document);
     UserModel user = new UserModel();
     user.setType(type);
     roles.findByRoleName(roleName).ifPresent(role -> user.setRoleId(role.getId()));
-    user.setName(form.getName());
-    user.setEmail(form.getEmail());
-    user.setPassword(passwordEncoder.encode(form.getPassword()));
-    user.setDocument(form.getDocument());
-    user.setPhone(form.getPhone());
-    user.setBirthDate(form.getBirthDate());
-    user.setGender(form.getGender());
+    user.setName(request.getName());
+    user.setEmail(request.getEmail());
+    user.setPassword(passwordEncoder.encode(request.getPassword()));
+    user.setDocument(document);
+    user.setPhone(request.getPhone());
+    user.setBirthDate(request.getBirthDate());
+    user.setGender(request.getGender());
     user.setVerified(false);
     user.setTermsAcceptedAt(Instant.now());
     return users.save(user);
+  }
+
+  void rejectDuplicates(String email, String normalizedDocument) {
+    if (email != null && users.existsByEmail(email)) {
+      throw new SignupDuplicateException("email", "auth.signup.email.duplicate");
+    }
+    if (!normalizedDocument.isEmpty() && users.existsByDocument(normalizedDocument)) {
+      throw new SignupDuplicateException("document", "auth.signup.document.duplicate");
+    }
   }
 }
