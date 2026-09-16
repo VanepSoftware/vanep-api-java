@@ -77,13 +77,13 @@ Cada fase: branch própria a partir de `main`, uma PR (pt-BR, `Refs #177`; a úl
 > Depende de: — | Paralela com: 0a, 0b, 2a, 3a
 > Ordem: test → migration → model → repository → policy/utilitário
 
-- [ ] 3.1 Testes unitários falhando: `SecureCodes.generate()` sempre 6 dígitos com zeros à esquerda; `SecureCodes.hmac` determinístico por (purpose, userId, code) e diferente entre usuários; `AuthCodeIssuePolicy` (sem código anterior → emite; dentro do cooldown → pula; ≥ máximo em 24 h → pula)
-- [ ] 3.2 Migration: `code_hash varchar(64) null` (sem unique), `failed_attempts integer not null default 0` e índice `(user_id, created_at)` em `email_verification_token` e `password_reset_token`
-- [ ] 3.3 Criar `@MappedSuperclass OneTimeTokenModel` com as colunas comuns e fazer `EmailVerificationTokenModel` e `PasswordResetTokenModel` estenderem
-- [ ] 3.4 Repositórios: contagem por `user_id` e `created_at > :since`; última linha criada; linha ativa mais recente com `@Lock(PESSIMISTIC_WRITE)`; consumo de ativas já existente
-- [ ] 3.5 Teste de repositório (H2) das novas consultas
-- [ ] 3.6 Implementar `SecureCodes` (em `auth/token`, HMAC-SHA256 com `vanep.password.pepper`, comparação em tempo constante) e `AuthCodeIssuePolicy` (classe pura)
-- [ ] 3.7 Propriedades `vanep.auth.code.max-attempts`, `vanep.auth.code.resend-cooldown-seconds`, `vanep.auth.code.max-per-day` com defaults 5/60/10 em `application.properties` e `.env.example`
+- [x] 3.1 Testes unitários falhando: `SecureCodes.generate()` sempre 6 dígitos com zeros à esquerda; `SecureCodes.hmac` determinístico por (purpose, userId, code) e diferente entre usuários; `AuthCodeIssuePolicy` (sem código anterior → emite; dentro do cooldown → pula; ≥ máximo em 24 h → pula)
+- [x] 3.2 Migration: `code_hash varchar(64) null` (sem unique), `failed_attempts integer not null default 0` e índice `(user_id, created_at)` em `email_verification_token` e `password_reset_token`
+- [x] 3.3 Criar `@MappedSuperclass OneTimeTokenModel` com as colunas comuns e fazer `EmailVerificationTokenModel` e `PasswordResetTokenModel` estenderem
+- [x] 3.4 Repositórios: contagem por `user_id` e `created_at > :since`; última linha criada; linha ativa mais recente com `@Lock(PESSIMISTIC_WRITE)`; consumo de ativas já existente
+- [x] 3.5 Teste de repositório (H2) das novas consultas
+- [x] 3.6 Implementar `SecureCodes` (em `auth/token`, HMAC-SHA256 com `vanep.password.pepper`, comparação em tempo constante) e `AuthCodeIssuePolicy` (classe pura)
+- [x] 3.7 Propriedades `vanep.auth.code.max-attempts`, `vanep.auth.code.resend-cooldown-seconds`, `vanep.auth.code.max-per-day` com defaults 5/60/10 em `application.properties` e `.env.example`
 - [ ] 3.8 `make lint` + `./mvnw verify`; abrir PR 1a
 
 ## 4. Fase 2a — Cliente público mobile + refresh (PR 2a)
@@ -132,13 +132,13 @@ Cada fase: branch própria a partir de `main`, uma PR (pt-BR, `Refs #177`; a úl
 > Depende de: 1a | Paralela com: 0c, 2b, 4a
 > Ordem: test → service → templates/config
 
-- [ ] 7.1 Testes unitários falhando em `EmailVerificationServiceTest`: emissão grava `code_hash` e envia `code` + `link` + TTL; troca de e-mail continua só com link; reenvio respeita cooldown e máximo diário (sem envio, sem erro); `verifyByCode` correto marca verificado e consome; errado incrementa tentativas; 5º erro consome a linha (link também); conta verificada ou com `pending_email` → falha; e-mail inexistente → falha
-- [ ] 7.2 Testes unitários falhando em `PasswordResetServiceTest`: mesmo conjunto para reset (conta sem senha local não recebe; `resetByCode` troca senha e consome código e link)
-- [ ] 7.3 Implementar emissão com código e política em `EmailVerificationService` (`startVerification`, `resend`) e `verifyByCode(email, code)`
-- [ ] 7.4 Implementar emissão com código e política em `PasswordResetService.requestReset` e `resetByCode(email, code, newPassword)`
-- [ ] 7.5 Templates `email/verification.html` e `email/password-reset.html` exibem `code` e a validade vinda de `ttl` (remover "1 hora" fixo)
-- [ ] 7.6 Default de `vanep.mail.reset-ttl-minutes` para 15 em `application.properties` e `VANEP_MAIL_RESET_TTL_MINUTES=15` em `.env.example`
-- [ ] 7.7 Rodar `PasswordRecoveryFlowTest` e testes web de verificação: link continua funcionando e respeita o novo TTL
+- [x] 7.1 Testes unitários falhando em `EmailVerificationServiceTest`: emissão grava `code_hash` e envia `code` + `link` + TTL; troca de e-mail continua só com link; reenvio respeita cooldown e máximo diário (sem envio, sem erro); `verifyByCode` correto marca verificado e consome; errado incrementa tentativas; 5º erro consome a linha (link também); conta verificada ou com `pending_email` → falha; e-mail inexistente → falha
+- [x] 7.2 Testes unitários falhando em `PasswordResetServiceTest`: mesmo conjunto para reset (conta sem senha local não recebe; `resetByCode` troca senha e consome código e link)
+- [x] 7.3 Implementar emissão com código e política em `EmailVerificationService` (`startVerification`, `resend`) e `verifyByCode(email, code)`
+- [x] 7.4 Implementar emissão com código e política em `PasswordResetService.requestReset` e `resetByCode(email, code, newPassword)`
+- [x] 7.5 Templates `email/verification.html` e `email/password-reset.html` exibem `code` e a validade vinda de `ttl` (remover "1 hora" fixo)
+- [x] 7.6 Default de `vanep.mail.reset-ttl-minutes` para 15 em `application.properties` e `VANEP_MAIL_RESET_TTL_MINUTES=15` em `.env.example`
+- [x] 7.7 Rodar `PasswordRecoveryFlowTest` e testes web de verificação: link continua funcionando e respeita o novo TTL
 - [ ] 7.8 `make lint` + `./mvnw verify`; abrir PR 1b
 
 ## 8. Fase 2b — Grant de senha (PR 2b)
