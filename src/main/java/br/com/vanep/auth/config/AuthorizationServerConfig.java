@@ -1,5 +1,7 @@
 package br.com.vanep.auth.config;
 
+import br.com.vanep.auth.oauth.JwtTokenCustomizer;
+import br.com.vanep.auth.oauth.grant.MobileRefreshTokenGenerator;
 import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jose.jwk.source.ImmutableJWKSet;
@@ -23,6 +25,7 @@ import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
+import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.oauth2.server.authorization.JdbcOAuth2AuthorizationService;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService;
 import org.springframework.security.oauth2.server.authorization.client.InMemoryRegisteredClientRepository;
@@ -31,6 +34,10 @@ import org.springframework.security.oauth2.server.authorization.client.Registere
 import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
 import org.springframework.security.oauth2.server.authorization.settings.ClientSettings;
 import org.springframework.security.oauth2.server.authorization.settings.TokenSettings;
+import org.springframework.security.oauth2.server.authorization.token.DelegatingOAuth2TokenGenerator;
+import org.springframework.security.oauth2.server.authorization.token.JwtGenerator;
+import org.springframework.security.oauth2.server.authorization.token.OAuth2AccessTokenGenerator;
+import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenGenerator;
 
 @Configuration
 public class AuthorizationServerConfig {
@@ -142,6 +149,24 @@ public class AuthorizationServerConfig {
       decoder.setJwtValidator(JwtValidators.createDefaultWithIssuer(issuer));
     }
     return decoder;
+  }
+
+  /**
+   * Declaring this bean takes over from the server's default generator, so the {@link
+   * JwtTokenCustomizer} has to be wired by hand here — without it every access token would ship
+   * without {@code uid}, {@code roles} and {@code permissions}.
+   */
+  @Bean
+  public OAuth2TokenGenerator<?> tokenGenerator(
+      JWKSource<SecurityContext> jwkSource,
+      JwtTokenCustomizer jwtTokenCustomizer,
+      @Value("${vanep.oauth.mobile-client.id:vanep-mobile}") String mobileClientId) {
+    JwtGenerator jwtGenerator = new JwtGenerator(new NimbusJwtEncoder(jwkSource));
+    jwtGenerator.setJwtCustomizer(jwtTokenCustomizer);
+    return new DelegatingOAuth2TokenGenerator(
+        jwtGenerator,
+        new OAuth2AccessTokenGenerator(),
+        new MobileRefreshTokenGenerator(mobileClientId));
   }
 
   @Bean
