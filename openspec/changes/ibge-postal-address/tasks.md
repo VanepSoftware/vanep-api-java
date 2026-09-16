@@ -66,8 +66,8 @@
 > Branch: `feat/ibge-postal-address-personal-address` a partir de `feat/ibge-postal-address-schema`
 > Depende de: 1 | Paralelo com: 5
 
-- [ ] 6.1 Slice falhando: `200` com `cityToken` + street + CEP de 8 dígitos; CEP omitido `400`; CEP inválido `400`; street em branco `400`; token desconhecido `404` `city.not_found`; `cityName` extra ignorado; `placeId` não é aceito como contrato; `neighborhood` persiste e volta; `district_id` e `google_place_id` null; `401`; DELETE + PUT ainda cria linha nova; resposta da busca continua sem neighborhood/street de motoristas
-- [ ] 6.2 Trocar `PersonalAddressRequestDTO`; parar de chamar `PlacesClient` / `LocationResolverService` no `PersonalAddressService`
-- [ ] 6.3 DTO de resposta: `neighborhood`; não exigir `googlePlaceId`
-- [ ] 6.4 MessageSource conforme precisar; manter onboarding `PERSONAL_ADDRESS` atrelado a `users.address_id`
-- [ ] 6.5 `make lint` + `./mvnw verify`; abrir PR
+- [x] 6.1 Slice falhando: `200` com `cityToken` + street + CEP de 8 dígitos; CEP omitido `400`; CEP inválido `400`; street em branco `400`; token desconhecido `404` `city.not_found`; `cityName` extra ignorado; `placeId` não é aceito como contrato; `neighborhood` persiste e volta; `district_id` e `google_place_id` null; `401`; DELETE + PUT ainda cria linha nova; resposta da busca continua sem neighborhood/street de motoristas
+- [x] 6.2 Trocar `PersonalAddressRequestDTO`; parar de chamar `PlacesClient` / `LocationResolverService` no `PersonalAddressService`
+- [x] 6.3 DTO de resposta: `neighborhood`; não exigir `googlePlaceId`
+- [x] 6.4 MessageSource conforme precisar; manter onboarding `PERSONAL_ADDRESS` atrelado a `users.address_id`
+- [x] 6.5 `make lint` + `./mvnw verify`; abrir PR

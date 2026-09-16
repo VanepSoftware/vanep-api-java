@@ -1,6 +1,8 @@
 package br.com.vanep.address.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -9,6 +11,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import br.com.vanep.address.model.AddressModel;
 import br.com.vanep.address.repository.AddressRepository;
 import br.com.vanep.city.model.CityModel;
 import br.com.vanep.city.repository.CityRepository;
@@ -16,25 +19,22 @@ import br.com.vanep.country.model.CountryModel;
 import br.com.vanep.country.repository.CountryRepository;
 import br.com.vanep.district.repository.DistrictRepository;
 import br.com.vanep.places.client.PlacesClient;
-import br.com.vanep.places.dto.AddressComponentDTO;
-import br.com.vanep.places.dto.PlaceDetailsResponseDTO;
-import br.com.vanep.places.exception.PlaceNotFoundException;
 import br.com.vanep.state.repository.StateRepository;
 import br.com.vanep.state.seed.StateSeeder;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.time.Instant;
-import java.util.List;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.BDDMockito;
+import org.mockito.ArgumentMatchers;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.core.io.ClassPathResource;
+import org.springframework.context.MessageSource;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor;
 import org.springframework.test.context.ActiveProfiles;
@@ -49,6 +49,8 @@ import org.springframework.web.context.WebApplicationContext;
 @Sql(scripts = "/db/clean.sql", executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
 class PersonalAddressControllerTest {
   private static final ObjectMapper MAPPER = new ObjectMapper();
+  private static final String STREET = "QNL 5 Conjunto I";
+  private static final String ZIP = "72115105";
 
   @Autowired private WebApplicationContext context;
   @Autowired private UserRepository users;
@@ -58,11 +60,13 @@ class PersonalAddressControllerTest {
   @Autowired private CityRepository cities;
   @Autowired private StateSeeder stateSeeder;
   @Autowired private DistrictRepository districts;
+  @Autowired private MessageSource messages;
 
   @MockitoBean private PlacesClient places;
 
   private MockMvc mockMvc;
   private String callerUid;
+  private String brasiliaToken;
 
   @BeforeEach
   void setUp() {
@@ -76,7 +80,7 @@ class PersonalAddressControllerTest {
     countries.save(brasil);
 
     stateSeeder.seed();
-    seedIbgeCity("DF", "Brasília", "5300108");
+    brasiliaToken = seedIbgeCity("DF", "Brasília", "5300108").getToken();
 
     UserModel user = new UserModel();
     user.setType(UserType.DRIVER);
@@ -86,28 +90,6 @@ class PersonalAddressControllerTest {
     user.setVerified(true);
     user.setTermsAcceptedAt(Instant.now());
     callerUid = users.save(user).getToken();
-  }
-
-  private PlaceDetailsResponseDTO fixture(String name) throws IOException {
-    String json =
-        new ClassPathResource("fixtures/places/" + name + ".json")
-            .getContentAsString(StandardCharsets.UTF_8);
-    return MAPPER.readValue(json, PlaceDetailsResponseDTO.class);
-  }
-
-  private AddressComponentDTO component(String longText, String shortText, String... types) {
-    return new AddressComponentDTO(longText, shortText, List.of(types));
-  }
-
-  private PlaceDetailsResponseDTO administrativeRegionOnly() {
-    return new PlaceDetailsResponseDTO(
-        "ra-inteira",
-        "Águas Claras, Brasília - DF",
-        List.of(
-            component("Brazil", "BR", "country", "political"),
-            component("Distrito Federal", "DF", "administrative_area_level_1", "political"),
-            component("Brasília", "Brasília", "administrative_area_level_2", "political"),
-            component("Águas Claras", "Águas Claras", "administrative_area_level_4", "political")));
   }
 
   private JwtRequestPostProcessor caller() {
@@ -122,13 +104,29 @@ class PersonalAddressControllerTest {
     return cities.save(city);
   }
 
+  private Map<String, Object> validPostal() {
+    Map<String, Object> body = new LinkedHashMap<>();
+    body.put("cityToken", brasiliaToken);
+    body.put("street", STREET);
+    body.put("zipCode", ZIP);
+    return body;
+  }
+
+  private String json(Map<String, Object> body) throws Exception {
+    return MAPPER.writeValueAsString(body);
+  }
+
+  private String message(String key) {
+    return messages.getMessage(key, null, LocaleContextHolder.getLocale());
+  }
+
   @Test
   void rejectsUnauthenticatedWrite() throws Exception {
     mockMvc
         .perform(
             put("/api/user/me/address")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"placeId\":\"any\"}"))
+                .content(json(validPostal())))
         .andExpect(status().isUnauthorized());
   }
 
@@ -138,202 +136,226 @@ class PersonalAddressControllerTest {
   }
 
   @Test
-  void createsAddressFromPlaceIdAndLinksItToTheTree() throws Exception {
-    BDDMockito.given(places.findPlaceDetails("place-taguatinga", null))
-        .willReturn(fixture("df-taguatinga-qnl5"));
-
+  void createsAddressFromCatalogCityStreetAndZip() throws Exception {
     mockMvc
         .perform(
             put("/api/user/me/address")
                 .with(caller())
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"placeId\":\"place-taguatinga\"}"))
+                .content(json(validPostal())))
         .andExpect(status().isOk())
+        .andExpect(jsonPath("$.cityToken").value(brasiliaToken))
         .andExpect(jsonPath("$.cityName").value("Brasília"))
-        .andExpect(jsonPath("$.districtName").value("QNL 5"))
         .andExpect(jsonPath("$.stateUf").value("DF"))
         .andExpect(jsonPath("$.countryIsoCode").value("BR"))
-        .andExpect(jsonPath("$.token").isNotEmpty());
-
-    assertThat(districts.count()).isEqualTo(3);
-    assertThat(users.findByToken(callerUid).orElseThrow().getAddressId()).isNotNull();
-  }
-
-  @Test
-  void exposesOpaqueTokensAndNeverInternalIds() throws Exception {
-    BDDMockito.given(places.findPlaceDetails("place-taguatinga", null))
-        .willReturn(fixture("df-taguatinga-qnl5"));
-
-    mockMvc
-        .perform(
-            put("/api/user/me/address")
-                .with(caller())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"placeId\":\"place-taguatinga\"}"))
-        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.street").value(STREET))
+        .andExpect(jsonPath("$.zipCode").value(ZIP))
+        .andExpect(jsonPath("$.token").isNotEmpty())
         .andExpect(jsonPath("$.id").doesNotExist())
         .andExpect(jsonPath("$.cityId").doesNotExist())
-        .andExpect(jsonPath("$.districtId").doesNotExist())
-        .andExpect(jsonPath("$.cityToken").isNotEmpty())
-        .andExpect(jsonPath("$.districtToken").isNotEmpty());
+        .andExpect(jsonPath("$.googlePlaceId").doesNotExist());
+
+    AddressModel saved = addresses.findAll().getFirst();
+    assertThat(saved.getDistrict()).isNull();
+    assertThat(saved.getGooglePlaceId()).isNull();
+    assertThat(districts.count()).isZero();
+    assertThat(users.findByToken(callerUid).orElseThrow().getAddressId()).isEqualTo(saved.getId());
+    verify(places, never()).findPlaceDetails(ArgumentMatchers.any(), ArgumentMatchers.any());
   }
 
   @Test
-  void preservesTheUserSuppliedComplementAndNumber() throws Exception {
-    BDDMockito.given(places.findPlaceDetails("place-taguatinga", null))
-        .willReturn(fixture("df-taguatinga-qnl5"));
+  void rejectsOmittedZipCode() throws Exception {
+    Map<String, Object> body = validPostal();
+    body.remove("zipCode");
 
     mockMvc
         .perform(
             put("/api/user/me/address")
                 .with(caller())
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    "{\"placeId\":\"place-taguatinga\",\"number\":\"42\",\"complement\":\"Bloco B"
-                        + " apto 101\"}"))
+                .content(json(body)))
+        .andExpect(status().isBadRequest());
+
+    assertThat(addresses.count()).isZero();
+  }
+
+  @Test
+  void rejectsInvalidZipCode() throws Exception {
+    Map<String, Object> body = validPostal();
+    body.put("zipCode", "70040-010");
+
+    mockMvc
+        .perform(
+            put("/api/user/me/address")
+                .with(caller())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json(body)))
+        .andExpect(status().isBadRequest());
+
+    assertThat(addresses.count()).isZero();
+  }
+
+  @Test
+  void rejectsBlankStreet() throws Exception {
+    Map<String, Object> body = validPostal();
+    body.put("street", "  ");
+
+    mockMvc
+        .perform(
+            put("/api/user/me/address")
+                .with(caller())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json(body)))
+        .andExpect(status().isBadRequest());
+
+    assertThat(addresses.count()).isZero();
+  }
+
+  @Test
+  void rejectsUnknownCityToken() throws Exception {
+    Map<String, Object> body = validPostal();
+    body.put("cityToken", "does-not-exist");
+
+    mockMvc
+        .perform(
+            put("/api/user/me/address")
+                .with(caller())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json(body)))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.detail").value(message("city.not_found")));
+
+    assertThat(addresses.count()).isZero();
+  }
+
+  @Test
+  void ignoresClientSuppliedCityNameAndUf() throws Exception {
+    String campinasToken = seedIbgeCity("SP", "Campinas", "3509502").getToken();
+    long cityCount = cities.count();
+
+    Map<String, Object> body = validPostal();
+    body.put("cityToken", campinasToken);
+    body.put("cityName", "Cidade Falsa");
+    body.put("uf", "DF");
+
+    mockMvc
+        .perform(
+            put("/api/user/me/address")
+                .with(caller())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json(body)))
         .andExpect(status().isOk())
+        .andExpect(jsonPath("$.cityToken").value(campinasToken))
+        .andExpect(jsonPath("$.cityName").value("Campinas"))
+        .andExpect(jsonPath("$.stateUf").value("SP"));
+
+    assertThat(cities.count()).isEqualTo(cityCount);
+  }
+
+  @Test
+  void acceptsBodyWithoutPlaceId() throws Exception {
+    mockMvc
+        .perform(
+            put("/api/user/me/address")
+                .with(caller())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json(validPostal())))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.street").value(STREET));
+
+    verify(places, never()).findPlaceDetails(ArgumentMatchers.any(), ArgumentMatchers.any());
+  }
+
+  @Test
+  void ignoresPlaceIdWhenPostalFieldsArePresent() throws Exception {
+    Map<String, Object> body = validPostal();
+    body.put("placeId", "place-taguatinga");
+
+    mockMvc
+        .perform(
+            put("/api/user/me/address")
+                .with(caller())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json(body)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.street").value(STREET))
+        .andExpect(jsonPath("$.cityToken").value(brasiliaToken));
+
+    verify(places, never()).findPlaceDetails(ArgumentMatchers.any(), ArgumentMatchers.any());
+    assertThat(addresses.findAll().getFirst().getGooglePlaceId()).isNull();
+  }
+
+  @Test
+  void persistsNeighborhoodWithoutCreatingADistrict() throws Exception {
+    Map<String, Object> body = validPostal();
+    body.put("neighborhood", "Taguatinga Norte");
+    body.put("number", "42");
+    body.put("complement", "Bloco B apto 101");
+
+    mockMvc
+        .perform(
+            put("/api/user/me/address")
+                .with(caller())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json(body)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.neighborhood").value("Taguatinga Norte"))
         .andExpect(jsonPath("$.number").value("42"))
         .andExpect(jsonPath("$.complement").value("Bloco B apto 101"));
-  }
 
-  @Test
-  void ignoresAddressComponentsSuppliedByTheClient() throws Exception {
-    BDDMockito.given(places.findPlaceDetails("place-taguatinga", null))
-        .willReturn(fixture("df-taguatinga-qnl5"));
-
-    mockMvc
-        .perform(
-            put("/api/user/me/address")
-                .with(caller())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    "{\"placeId\":\"place-taguatinga\",\"cityName\":\"Cidade Falsa\",\"street\":\"Rua"
-                        + " Inventada\",\"districtName\":\"Bairro Plantado\"}"))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.cityName").value("Brasília"))
-        .andExpect(jsonPath("$.street").value("Setor L Norte Qnl 5 Conjunto I J"));
-
-    assertThat(districts.findAll())
-        .extracting(district -> district.getName())
-        .doesNotContain("Bairro Plantado");
-  }
-
-  @Test
-  void rejectsAPlaceIdGoogleCannotResolve() throws Exception {
-    BDDMockito.given(places.findPlaceDetails("inexistente", null))
-        .willThrow(new PlaceNotFoundException("inexistente"));
-
-    mockMvc
-        .perform(
-            put("/api/user/me/address")
-                .with(caller())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"placeId\":\"inexistente\"}"))
-        .andExpect(status().isBadRequest());
-
-    assertThat(addresses.count()).isZero();
-  }
-
-  @Test
-  void rejectsABlankPlaceId() throws Exception {
-    mockMvc
-        .perform(
-            put("/api/user/me/address")
-                .with(caller())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"placeId\":\"  \"}"))
-        .andExpect(status().isBadRequest());
-  }
-
-  @Test
-  void rejectsAPlaceThatStopsAtTheAdministrativeRegion() throws Exception {
-    BDDMockito.given(places.findPlaceDetails("ra-inteira", null))
-        .willReturn(administrativeRegionOnly());
-
-    mockMvc
-        .perform(
-            put("/api/user/me/address")
-                .with(caller())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"placeId\":\"ra-inteira\"}"))
-        .andExpect(status().isBadRequest());
-
-    assertThat(addresses.count()).isZero();
-  }
-
-  @Test
-  void acceptsABlockAddressThatTheGoogleDidNotLabelAsRoute() throws Exception {
-    BDDMockito.given(places.findPlaceDetails("qnm-17", null)).willReturn(fixture("df-ceilandia"));
-
-    mockMvc
-        .perform(
-            put("/api/user/me/address")
-                .with(caller())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"placeId\":\"qnm-17\"}"))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.street").value("QNM 17"));
-  }
-
-  @Test
-  void forwardsTheSessionTokenToThePlacesClient() throws Exception {
-    BDDMockito.given(places.findPlaceDetails("place-taguatinga", "sessao-1"))
-        .willReturn(fixture("df-taguatinga-qnl5"));
-
-    mockMvc
-        .perform(
-            put("/api/user/me/address")
-                .with(caller())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"placeId\":\"place-taguatinga\",\"sessionToken\":\"sessao-1\"}"))
-        .andExpect(status().isOk());
-
-    BDDMockito.then(places).should().findPlaceDetails("place-taguatinga", "sessao-1");
+    AddressModel saved = addresses.findAll().getFirst();
+    assertThat(saved.getNeighborhood()).isEqualTo("Taguatinga Norte");
+    assertThat(saved.getDistrict()).isNull();
+    assertThat(districts.count()).isZero();
   }
 
   @Test
   void replacesTheExistingAddressInsteadOfCreatingASecondOne() throws Exception {
-    BDDMockito.given(places.findPlaceDetails("place-taguatinga", null))
-        .willReturn(fixture("df-taguatinga-qnl5"));
-    BDDMockito.given(places.findPlaceDetails("place-aguas-claras", null))
-        .willReturn(fixture("df-aguas-claras"));
+    mockMvc
+        .perform(
+            put("/api/user/me/address")
+                .with(caller())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json(validPostal())))
+        .andExpect(status().isOk());
+
+    Map<String, Object> replacement = validPostal();
+    replacement.put("street", "SQN 202 Bloco A");
+    replacement.put("zipCode", "70832010");
 
     mockMvc
         .perform(
             put("/api/user/me/address")
                 .with(caller())
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"placeId\":\"place-taguatinga\"}"))
-        .andExpect(status().isOk());
-    mockMvc
-        .perform(
-            put("/api/user/me/address")
-                .with(caller())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"placeId\":\"place-aguas-claras\"}"))
+                .content(json(replacement)))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.districtName").value("Águas Claras"));
+        .andExpect(jsonPath("$.street").value("SQN 202 Bloco A"))
+        .andExpect(jsonPath("$.zipCode").value("70832010"));
 
     assertThat(addresses.count()).isEqualTo(1);
   }
 
   @Test
   void readsBackTheOwnAddress() throws Exception {
-    BDDMockito.given(places.findPlaceDetails("place-taguatinga", null))
-        .willReturn(fixture("df-taguatinga-qnl5"));
+    Map<String, Object> body = validPostal();
+    body.put("neighborhood", "Asa Norte");
 
     mockMvc
         .perform(
             put("/api/user/me/address")
                 .with(caller())
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"placeId\":\"place-taguatinga\"}"))
+                .content(json(body)))
         .andExpect(status().isOk());
 
     mockMvc
         .perform(get("/api/user/me/address").with(caller()))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.cityName").value("Brasília"));
+        .andExpect(jsonPath("$.cityName").value("Brasília"))
+        .andExpect(jsonPath("$.street").value(STREET))
+        .andExpect(jsonPath("$.neighborhood").value("Asa Norte"))
+        .andExpect(jsonPath("$.googlePlaceId").doesNotExist());
   }
 
   @Test
@@ -348,15 +370,12 @@ class PersonalAddressControllerTest {
 
   @Test
   void deleteClearsAddressAndSubsequentGetIsNotFound() throws Exception {
-    BDDMockito.given(places.findPlaceDetails("place-taguatinga", null))
-        .willReturn(fixture("df-taguatinga-qnl5"));
-
     mockMvc
         .perform(
             put("/api/user/me/address")
                 .with(caller())
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"placeId\":\"place-taguatinga\"}"))
+                .content(json(validPostal())))
         .andExpect(status().isOk());
 
     mockMvc
@@ -379,16 +398,20 @@ class PersonalAddressControllerTest {
 
   @Test
   void putAfterDeleteCreatesANewAddress() throws Exception {
-    BDDMockito.given(places.findPlaceDetails("place-taguatinga", null))
-        .willReturn(fixture("df-taguatinga-qnl5"));
-
     mockMvc
         .perform(
             put("/api/user/me/address")
                 .with(caller())
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"placeId\":\"place-taguatinga\"}"))
+                .content(json(validPostal())))
         .andExpect(status().isOk());
+
+    String firstToken =
+        mockMvc
+            .perform(get("/api/user/me/address").with(caller()))
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
 
     mockMvc
         .perform(delete("/api/user/me/address").with(caller()))
@@ -399,11 +422,19 @@ class PersonalAddressControllerTest {
             put("/api/user/me/address")
                 .with(caller())
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"placeId\":\"place-taguatinga\"}"))
+                .content(json(validPostal())))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.cityName").value("Brasília"));
+        .andExpect(jsonPath("$.cityName").value("Brasília"))
+        .andExpect(jsonPath("$.street").value(STREET));
 
     assertThat(users.findByToken(callerUid).orElseThrow().getAddressId()).isNotNull();
     assertThat(addresses.count()).isEqualTo(1);
+    String secondToken =
+        mockMvc
+            .perform(get("/api/user/me/address").with(caller()))
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    assertThat(secondToken).isNotEqualTo(firstToken);
   }
 }
