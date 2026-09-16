@@ -38,7 +38,10 @@ services:
     restart: unless-stopped
     env_file: .env
     ports:
-      - "${APP_PORT}:8080"
+      # Em produção a API só é alcançada pelo cloudflared, que roda no host. Publicar
+      # em 0.0.0.0 deixaria a porta aberta no IP público, contornando a Cloudflare e
+      # entregando o header de IP real a qualquer cliente direto.
+      - "${APP_BIND_ADDRESS:-127.0.0.1}:${APP_PORT}:8080"
     environment:
       # Dev usa o profile "docker". Produção define SPRING_PROFILES_ACTIVE=docker,prod
       # no .env do servidor (ativa application-prod: cookie secure, swagger off, etc.).
