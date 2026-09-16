@@ -1,24 +1,33 @@
 package br.com.vanep.auth.oauth.grant;
 
 import java.io.Serial;
-import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
-import org.springframework.security.oauth2.server.authorization.authentication.OAuth2ClientAuthenticationToken;
-import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
+import java.util.List;
+import org.springframework.security.authentication.AbstractAuthenticationToken;
 
 /**
- * Marks a client authentication request that {@link MobileClientAuthenticationConverter} accepted,
- * so {@link MobileClientAuthenticationProvider} never sees a PKCE request and cannot authenticate
- * an authorization code without its {@code code_verifier}.
+ * Deliberately not an {@code OAuth2ClientAuthenticationToken}: the server's own client-auth
+ * providers accept that type, and a {@code ProviderManager} keeps trying providers after a failure
+ * and reports the last error. Our own type keeps this request ours alone, so rejecting it answers
+ * {@code invalid_client} instead of whatever the PKCE provider would have said.
  */
-public class MobileClientAuthenticationToken extends OAuth2ClientAuthenticationToken {
+public class MobileClientAuthenticationToken extends AbstractAuthenticationToken {
 
   @Serial private static final long serialVersionUID = 1L;
 
+  private final String clientId;
+
   public MobileClientAuthenticationToken(String clientId) {
-    super(clientId, ClientAuthenticationMethod.NONE, null, null);
+    super(List.of());
+    this.clientId = clientId;
   }
 
-  public MobileClientAuthenticationToken(RegisteredClient registeredClient) {
-    super(registeredClient, ClientAuthenticationMethod.NONE, null);
+  @Override
+  public Object getPrincipal() {
+    return clientId;
+  }
+
+  @Override
+  public Object getCredentials() {
+    return null;
   }
 }
