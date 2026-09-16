@@ -40,11 +40,11 @@
 > Branch: `feat/ibge-postal-address-resolver` a partir de `feat/ibge-postal-address-seeder`
 > Depende de: 2 | Paralelo com: 3
 
-- [ ] 4.1 Testes unitários falhando: persistir sob Brasília existente cria só Taguatinga; persistir com nome de cidade `Embu` sob SP (sem esse `normalized_name`) lança e não insere nada; `resolveAnchor` lança em cidade sem match em vez de optional vazio
-- [ ] 4.2 Slice falhando: `PUT` área de atuação / `POST` school resolve / `GET` busca de motorista com componente de cidade sem match → `400` MessageSource; busca com cidade casada e sem motoristas continua `200` página vazia
-- [ ] 4.3 Chave MessageSource para cidade Google sem correspondência no IBGE (EN + pt-BR); logar UF, nome Google da cidade, place id
-- [ ] 4.4 Mudar o caminho de cidade do `LocationResolverService` para só find; manter `findOrCreateDistrict`; mapear a exceção nos services de busca/escola/área de atuação
-- [ ] 4.5 Atualizar testes existentes de resolver/busca/escola/área de atuação que assumiam que o Google criava `city` — MUST inserir a cidade IBGE antes (Brasília / São Paulo)
+- [x] 4.1 Testes unitários falhando: persistir sob Brasília existente cria só Taguatinga; persistir com nome de cidade `Embu` sob SP (sem esse `normalized_name`) lança e não insere nada; `resolveAnchor` lança em cidade sem match em vez de optional vazio
+- [x] 4.2 Slice falhando: `PUT` área de atuação / `POST` school resolve / `GET` busca de motorista com componente de cidade sem match → `400` MessageSource; busca com cidade casada e sem motoristas continua `200` página vazia
+- [x] 4.3 Chave MessageSource para cidade Google sem correspondência no IBGE (EN + pt-BR); logar UF, nome Google da cidade, place id
+- [x] 4.4 Mudar o caminho de cidade do `LocationResolverService` para só find; manter `findOrCreateDistrict`; mapear a exceção nos services de busca/escola/área de atuação
+- [x] 4.5 Atualizar testes existentes de resolver/busca/escola/área de atuação que assumiam que o Google criava `city` — MUST inserir a cidade IBGE antes (Brasília / São Paulo)
 - [ ] 4.6 `make lint` + `./mvnw verify`; abrir PR
 
 ## 5. Fase 5 — Lookup ViaCEP (PR 5)

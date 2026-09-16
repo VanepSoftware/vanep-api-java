@@ -7,11 +7,15 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import br.com.vanep.city.model.CityModel;
+import br.com.vanep.city.repository.CityRepository;
 import br.com.vanep.country.model.CountryModel;
 import br.com.vanep.country.repository.CountryRepository;
 import br.com.vanep.places.client.PlacesClient;
+import br.com.vanep.places.dto.AddressComponentDTO;
 import br.com.vanep.places.dto.PlaceDetailsResponseDTO;
 import br.com.vanep.school.repository.SchoolRepository;
+import br.com.vanep.state.repository.StateRepository;
 import br.com.vanep.state.seed.StateSeeder;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
@@ -20,11 +24,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.BDDMockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.MessageSource;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor;
@@ -44,8 +51,11 @@ class SchoolResolveControllerTest {
   @Autowired private WebApplicationContext context;
   @Autowired private UserRepository users;
   @Autowired private CountryRepository countries;
+  @Autowired private StateRepository states;
+  @Autowired private CityRepository cities;
   @Autowired private StateSeeder stateSeeder;
   @Autowired private SchoolRepository schools;
+  @Autowired private MessageSource messages;
 
   @MockitoBean private PlacesClient places;
 
@@ -64,6 +74,7 @@ class SchoolResolveControllerTest {
     countries.save(brasil);
 
     stateSeeder.seed();
+    seedIbgeCity("DF", "Brasília", "5300108");
 
     UserModel user = new UserModel();
     user.setType(UserType.CLIENT);
@@ -91,6 +102,32 @@ class SchoolResolveControllerTest {
 
   private JwtRequestPostProcessor caller() {
     return jwt().jwt(builder -> builder.claim("uid", callerUid).subject(callerUid));
+  }
+
+  private CityModel seedIbgeCity(String uf, String name, String ibgeCode) {
+    CityModel city = new CityModel();
+    city.setState(states.findByUf(uf).orElseThrow());
+    city.setName(name);
+    city.setIbgeCode(ibgeCode);
+    return cities.save(city);
+  }
+
+  private PlaceDetailsResponseDTO unmatchedEmbuSchool() {
+    return new PlaceDetailsResponseDTO(
+        "place-embu-school",
+        "Embu, SP",
+        List.of(
+            new AddressComponentDTO("Brazil", "BR", List.of("country", "political")),
+            new AddressComponentDTO(
+                "São Paulo", "SP", List.of("administrative_area_level_1", "political")),
+            new AddressComponentDTO(
+                "Embu", "Embu", List.of("administrative_area_level_2", "political"))),
+        List.of("school", "educational_institution"),
+        new PlaceDetailsResponseDTO.DisplayName("Escola Embu", "pt-BR"));
+  }
+
+  private String message(String key) {
+    return messages.getMessage(key, null, LocaleContextHolder.getLocale());
   }
 
   @Test
@@ -161,6 +198,23 @@ class SchoolResolveControllerTest {
         .andExpect(jsonPath("$.phone").doesNotExist())
         .andExpect(jsonPath("$.email").doesNotExist())
         .andExpect(jsonPath("$.googlePlaceId").isNotEmpty());
+  }
+
+  @Test
+  void rejectsAnUnmatchedGoogleCityWithCatalogMessage() throws Exception {
+    BDDMockito.given(places.findPlaceDetailsWithName("embu-escola", null))
+        .willReturn(unmatchedEmbuSchool());
+
+    mockMvc
+        .perform(
+            post("/api/schools/resolve")
+                .with(caller())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"placeId\":\"embu-escola\"}"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.detail").value(message("location.city.unmatched")));
+
+    assertThat(schools.count()).isZero();
   }
 
   @Test

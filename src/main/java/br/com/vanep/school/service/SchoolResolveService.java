@@ -2,6 +2,7 @@ package br.com.vanep.school.service;
 
 import br.com.vanep.auth.security.RateLimiter;
 import br.com.vanep.location.dto.ResolvedLocationChainDTO;
+import br.com.vanep.location.exception.UnmatchedCityException;
 import br.com.vanep.location.service.LocationResolverService;
 import br.com.vanep.places.client.PlacesClient;
 import br.com.vanep.places.dto.PlaceDetailsResponseDTO;
@@ -74,7 +75,13 @@ public class SchoolResolveService {
   }
 
   private SchoolModel create(PlaceDetailsResponseDTO details) {
-    ResolvedLocationChainDTO chain = resolver.resolveAndPersist(details);
+    ResolvedLocationChainDTO chain;
+    try {
+      chain = resolver.resolveAndPersist(details);
+    } catch (UnmatchedCityException ex) {
+      throw new ResponseStatusException(
+          HttpStatus.BAD_REQUEST, message("location.city.unmatched"), ex);
+    }
 
     SchoolModel school = new SchoolModel();
     school.setGooglePlaceId(details.id());

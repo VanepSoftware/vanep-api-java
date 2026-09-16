@@ -9,6 +9,7 @@ import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.driverservicearea.model.DriverServiceAreaModel;
 import br.com.vanep.driverservicearea.repository.DriverServiceAreaRepository;
 import br.com.vanep.location.dto.ResolvedLocationChainDTO;
+import br.com.vanep.location.exception.UnmatchedCityException;
 import br.com.vanep.location.service.LocationResolverService;
 import br.com.vanep.places.client.PlacesClient;
 import java.util.ArrayList;
@@ -63,8 +64,13 @@ public class DriverSearchService {
           HttpStatus.TOO_MANY_REQUESTS, message("location.place.rate_limited"));
     }
 
-    Optional<ResolvedLocationChainDTO> anchor =
-        resolver.resolveAnchor(places.findPlaceDetails(placeId, sessionToken));
+    Optional<ResolvedLocationChainDTO> anchor;
+    try {
+      anchor = resolver.resolveAnchor(places.findPlaceDetails(placeId, sessionToken));
+    } catch (UnmatchedCityException ex) {
+      throw new ResponseStatusException(
+          HttpStatus.BAD_REQUEST, message("location.city.unmatched"), ex);
+    }
 
     if (anchor.isEmpty()) {
       return Page.empty(pageable);

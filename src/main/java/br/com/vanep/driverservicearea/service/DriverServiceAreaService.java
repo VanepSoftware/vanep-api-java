@@ -8,6 +8,7 @@ import br.com.vanep.driverservicearea.dto.DriverServiceAreaResponseDTO;
 import br.com.vanep.driverservicearea.model.DriverServiceAreaModel;
 import br.com.vanep.driverservicearea.repository.DriverServiceAreaRepository;
 import br.com.vanep.location.dto.ResolvedLocationChainDTO;
+import br.com.vanep.location.exception.UnmatchedCityException;
 import br.com.vanep.location.service.LocationResolverService;
 import br.com.vanep.places.client.PlacesClient;
 import br.com.vanep.user.enums.UserType;
@@ -82,8 +83,15 @@ public class DriverServiceAreaService {
         continue;
       }
 
-      ResolvedLocationChainDTO chain =
-          resolver.resolveAndPersist(places.findPlaceDetails(item.placeId(), item.sessionToken()));
+      ResolvedLocationChainDTO chain;
+      try {
+        chain =
+            resolver.resolveAndPersist(
+                places.findPlaceDetails(item.placeId(), item.sessionToken()));
+      } catch (UnmatchedCityException ex) {
+        throw new ResponseStatusException(
+            HttpStatus.BAD_REQUEST, message("location.city.unmatched"), ex);
+      }
 
       if (!ServiceAreaGranularityPolicy.isAcceptable(chain)) {
         throw new ResponseStatusException(
