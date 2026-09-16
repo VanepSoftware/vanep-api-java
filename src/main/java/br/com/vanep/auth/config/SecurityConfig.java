@@ -77,8 +77,24 @@ public class SecurityConfig {
     return http.build();
   }
 
+  /**
+   * Ahead of the {@code /api/**} chain and without a resource server, so a stale Bearer token from
+   * the app does not turn a public account call into a {@code 401}.
+   */
   @Bean
   @Order(2)
+  public SecurityFilterChain authApiSecurityFilterChain(HttpSecurity http) throws Exception {
+    http.securityMatcher("/api/auth/**")
+        .authorizeHttpRequests(authorize -> authorize.anyRequest().permitAll())
+        .csrf(csrf -> csrf.disable())
+        .sessionManagement(
+            session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
+
+    return http.build();
+  }
+
+  @Bean
+  @Order(3)
   public SecurityFilterChain apiSecurityFilterChain(
       HttpSecurity http, JwtAuthenticationConverter jwtAuthenticationConverter) throws Exception {
     http.securityMatcher("/api/**")
@@ -95,7 +111,7 @@ public class SecurityConfig {
   }
 
   @Bean
-  @Order(3)
+  @Order(4)
   public SecurityFilterChain defaultSecurityFilterChain(
       HttpSecurity http,
       @Value("${vanep.remember-me.key}") String rememberMeKey,

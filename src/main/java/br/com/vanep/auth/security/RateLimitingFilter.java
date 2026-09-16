@@ -31,10 +31,15 @@ public class RateLimitingFilter extends OncePerRequestFilter {
     this.rateLimiter = rateLimiter;
   }
 
+  private static final String LIMITED_PATH_PREFIX = "/api/auth/";
+
   @Override
   protected boolean shouldNotFilter(HttpServletRequest request) {
-    return !HttpMethod.POST.matches(request.getMethod())
-        || !LIMITED_PATHS.contains(request.getRequestURI());
+    return !HttpMethod.POST.matches(request.getMethod()) || !isLimited(request.getRequestURI());
+  }
+
+  private static boolean isLimited(String path) {
+    return LIMITED_PATHS.contains(path) || path.startsWith(LIMITED_PATH_PREFIX);
   }
 
   @Override

@@ -163,13 +163,13 @@ Cada fase: branch própria a partir de `main`, uma PR (pt-BR, `Refs #177`; a úl
 > Depende de: 0a, 0b | Paralela com: 0c, 1b, 2b
 > Ordem: test → security → request DTO (já existe da 0a) → service (já existe) → controller → response DTO
 
-- [ ] 9.1 Testes de slice falhando: rota `/api/auth/**` sem token e com Bearer expirado não dá `401`; `GET /api/user/me` sem token continua `401`
-- [ ] 9.2 Testes de slice falhando de `SignupApiController`: `201` cliente/motorista/assistente com `email` e `emailVerified=false` e e-mail disparado; `400 validation_error` com `errors` por campo (nome em branco + CPF inválido, motorista sem `basePrice`, termos não aceitos); `409 email_duplicate` e `document_duplicate`
-- [ ] 9.3 Teste: erro de validação em `ProfileController` continua no envelope do perfil (sem interferência do novo advice)
-- [ ] 9.4 Nova `SecurityFilterChain` para `/api/auth/**` (permitAll, stateless, CSRF off, sem resource server) antes da chain `/api/**`
-- [ ] 9.5 Adicionar os `POST /api/auth/**` ao `RateLimitingFilter` e teste de `429`
-- [ ] 9.6 `AuthErrorResponseDTO(code, message, errors[])`, exceções tipadas e `AuthErrorAdvice` (`assignableTypes` + `@Order`)
-- [ ] 9.7 `SignupApiController` com `POST /api/auth/signup/{client|driver|assistant}` e `SignupResponseDTO`
+- [x] 9.1 Testes de slice falhando: rota `/api/auth/**` sem token e com Bearer expirado não dá `401`; `GET /api/user/me` sem token continua `401`
+- [x] 9.2 Testes de slice falhando de `SignupApiController`: `201` cliente/motorista/assistente com `email` e `emailVerified=false` e e-mail disparado; `400 validation_error` com `errors` por campo (nome em branco + CPF inválido, motorista sem `basePrice`, termos não aceitos); `409 email_duplicate` e `document_duplicate`
+- [x] 9.3 Teste: erro de validação em `ProfileController` continua no envelope do perfil (sem interferência do novo advice)
+- [x] 9.4 Nova `SecurityFilterChain` para `/api/auth/**` (permitAll, stateless, CSRF off, sem resource server) antes da chain `/api/**`
+- [x] 9.5 Adicionar os `POST /api/auth/**` ao `RateLimitingFilter` e teste de `429`
+- [x] 9.6 `AuthErrorResponseDTO(code, message, errors[])`, exceções tipadas e `AuthErrorAdvice` (`assignableTypes` + `@Order`)
+- [x] 9.7 `SignupApiController` com `POST /api/auth/signup/{client|driver|assistant}` e `SignupResponseDTO`
 - [ ] 9.8 `make lint` + `./mvnw verify`; abrir PR 4a
 
 ## 10. Fase 3b — Grant Google (PR 3b)

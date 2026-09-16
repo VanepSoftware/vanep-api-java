@@ -52,6 +52,22 @@ class RateLimitingFilterTest {
   }
 
   @Test
+  void limitsThePublicAuthApiPosts() throws Exception {
+    RateLimiter limiter = new RateLimiter(true, 1, 60);
+    RateLimitingFilter filter = new RateLimitingFilter(limiter);
+    FilterChain chain = mock(FilterChain.class);
+    assertThat(filter.shouldNotFilter(request("POST", "/api/auth/password/forgot"))).isFalse();
+    assertThat(filter.shouldNotFilter(request("GET", "/api/auth/password/forgot"))).isTrue();
+
+    filter.doFilter(
+        request("POST", "/api/auth/password/forgot"), new MockHttpServletResponse(), chain);
+    MockHttpServletResponse blocked = new MockHttpServletResponse();
+    filter.doFilter(request("POST", "/api/auth/password/forgot"), blocked, chain);
+
+    assertThat(blocked.getStatus()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS.value());
+  }
+
+  @Test
   void keysByRemoteAddressIgnoringForwardingHeaders() throws Exception {
     RateLimiter limiter = new RateLimiter(true, 2, 60);
     RateLimitingFilter filter = new RateLimitingFilter(limiter);
