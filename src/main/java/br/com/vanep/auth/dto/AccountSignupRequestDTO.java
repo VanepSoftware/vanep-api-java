@@ -1,4 +1,4 @@
-package br.com.vanep.auth.web;
+package br.com.vanep.auth.dto;
 
 import br.com.vanep.auth.validation.Cpf;
 import br.com.vanep.user.enums.Gender;
@@ -13,7 +13,7 @@ import org.springframework.format.annotation.DateTimeFormat;
 
 @Getter
 @Setter
-public class AccountSignupForm {
+public class AccountSignupRequestDTO {
 
   @NotBlank(message = "{auth.signup.name.required}")
   private String name;
