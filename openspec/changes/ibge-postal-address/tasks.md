@@ -27,11 +27,11 @@
 > Branch: `feat/ibge-postal-address-picker` a partir de `feat/ibge-postal-address-seeder`
 > Depende de: 2 | Paralelo com: 4
 
-- [ ] 3.1 Testes slice falhando: `401` sem token; `GET /api/states` devolve UFs para cliente autenticado (sem `list_states`); `GET /api/cities?uf=DF&search=brasilia` devolve token de Brasília; sem `uf` → `400`; UF desconhecida `404`; `search` omitido lista a UF paginada
-- [ ] 3.2 Chaves MessageSource EN + `messages_pt_BR.properties` para UF desconhecida e `uf` ausente
-- [ ] 3.3 `CityController` / `StateController`: `@PreAuthorize("isAuthenticated()")`; `GET /api/cities` exige `uf`; `search` opcional em `normalized_name`; DTOs com tokens opacos. Sem `CityCatalogController`
-- [ ] 3.4 Declarar autorização no `SecurityConfig` se preciso (regras 20–21). `list_cities` / `list_states` não são mais exigidas nesses GETs
-- [ ] 3.5 Atualizar testes admin existentes de city/state que esperavam `403` sem `list_cities` / `list_states`
+- [x] 3.1 Testes slice falhando: `401` sem token; `GET /api/states` devolve UFs para cliente autenticado (sem `list_states`); `GET /api/cities?uf=DF&search=brasilia` devolve token de Brasília; sem `uf` → `400`; UF desconhecida `404`; `search` omitido lista a UF paginada
+- [x] 3.2 Chaves MessageSource EN + `messages_pt_BR.properties` para UF desconhecida e `uf` ausente
+- [x] 3.3 `CityController` / `StateController`: `@PreAuthorize("isAuthenticated()")`; `GET /api/cities` exige `uf`; `search` opcional em `normalized_name`; DTOs com tokens opacos. Sem `CityCatalogController`
+- [x] 3.4 Declarar autorização no `SecurityConfig` se preciso (regras 20–21). `list_cities` / `list_states` não são mais exigidas nesses GETs
+- [x] 3.5 Atualizar testes admin existentes de city/state que esperavam `403` sem `list_cities` / `list_states`
 - [ ] 3.6 `make lint` + testes desta fase; abrir PR
 
 ## 4. Fase 4 — Google casa cidade IBGE, nunca cria cidade (PR 4)

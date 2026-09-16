@@ -15,6 +15,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.jdbc.Sql;
 
@@ -77,6 +79,19 @@ class CityRepositoryTest {
   void cityModelHasNoGooglePlaceIdMapping() {
     assertThatThrownBy(() -> CityModel.class.getDeclaredField("googlePlaceId"))
         .isInstanceOf(NoSuchFieldException.class);
+  }
+
+  @Test
+  void findsCitiesByStateAndNormalizedNameContaining() {
+    cities.saveAndFlush(newCity("Brasília", "5300108"));
+    cities.saveAndFlush(newCity("Gama", "5300109"));
+
+    Page<CityModel> page =
+        cities.findByStateIdAndNormalizedNameContaining(
+            distritoFederal.getId(), "brasil", Pageable.unpaged());
+
+    assertThat(page.getContent()).hasSize(1);
+    assertThat(page.getContent().getFirst().getName()).isEqualTo("Brasília");
   }
 
   @Test
