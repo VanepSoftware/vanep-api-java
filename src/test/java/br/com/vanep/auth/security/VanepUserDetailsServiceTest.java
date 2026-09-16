@@ -2,86 +2,93 @@ package br.com.vanep.auth.security;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
 import java.util.Optional;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.authentication.LockedException;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 
 @ExtendWith(MockitoExtension.class)
 class VanepUserDetailsServiceTest {
 
+  private static final String EMAIL = "person@vanep.com";
+
   @Mock private UserRepository users;
   @Mock private LoginAttemptService loginAttempts;
+  @InjectMocks private VanepUserDetailsService service;
 
-  private VanepUserDetailsService service;
-
-  @BeforeEach
-  void setUp() {
-    service = new VanepUserDetailsService(users, loginAttempts);
-  }
-
-  private UserModel verifiedUser() {
+  private UserModel account() {
     UserModel user = new UserModel();
-    user.setEmail("a@vanep.com");
-    user.setPassword("hashed");
     user.setType(UserType.CLIENT);
+    user.setEmail(EMAIL);
+    user.setPassword("stored-hash");
     user.setVerified(true);
     return user;
   }
 
   @Test
-  void loadsEnabledUnlockedUser() {
-    when(users.findByEmail("a@vanep.com")).thenReturn(Optional.of(verifiedUser()));
-    when(loginAttempts.isBlocked("a@vanep.com")).thenReturn(false);
+  void blockedEmailIsLockedBeforeTheAccountIsEvenLookedUp() {
+    when(loginAttempts.isBlocked(EMAIL)).thenReturn(true);
 
-    UserDetails details = service.loadUserByUsername("a@vanep.com");
+    assertThatThrownBy(() -> service.loadUserByUsername(EMAIL)).isInstanceOf(LockedException.class);
 
-    assertThat(details.isEnabled()).isTrue();
-    assertThat(details.isAccountNonLocked()).isTrue();
-    assertThat(details.getAuthorities())
-        .extracting(authority -> authority.toString())
-        .containsExactly("ROLE_CLIENT");
+    verify(users, never()).findByEmail(EMAIL);
   }
 
   @Test
-  void unverifiedUserIsDisabled() {
-    UserModel user = verifiedUser();
-    user.setVerified(false);
-    when(users.findByEmail("a@vanep.com")).thenReturn(Optional.of(user));
+  void blockedUnknownEmailIsLockedTheSameWay() {
+    when(loginAttempts.isBlocked("nobody@vanep.com")).thenReturn(true);
 
-    assertThat(service.loadUserByUsername("a@vanep.com").isEnabled()).isFalse();
+    assertThatThrownBy(() -> service.loadUserByUsername("nobody@vanep.com"))
+        .isInstanceOf(LockedException.class);
+
+    verify(users, never()).findByEmail("nobody@vanep.com");
   }
 
   @Test
-  void blockedUserIsLocked() {
-    when(users.findByEmail("a@vanep.com")).thenReturn(Optional.of(verifiedUser()));
-    when(loginAttempts.isBlocked("a@vanep.com")).thenReturn(true);
+  void blockedGoogleOnlyEmailIsLockedTheSameWay() {
+    when(loginAttempts.isBlocked(EMAIL)).thenReturn(true);
 
-    assertThat(service.loadUserByUsername("a@vanep.com").isAccountNonLocked()).isFalse();
+    assertThatThrownBy(() -> service.loadUserByUsername(EMAIL)).isInstanceOf(LockedException.class);
   }
 
   @Test
-  void unknownUserThrows() {
-    when(users.findByEmail("ghost@vanep.com")).thenReturn(Optional.empty());
-    assertThatThrownBy(() -> service.loadUserByUsername("ghost@vanep.com"))
+  void unknownEmailIsNotFoundWhenNotBlocked() {
+    when(loginAttempts.isBlocked("nobody@vanep.com")).thenReturn(false);
+    when(users.findByEmail("nobody@vanep.com")).thenReturn(Optional.empty());
+
+    assertThatThrownBy(() -> service.loadUserByUsername("nobody@vanep.com"))
         .isInstanceOf(UsernameNotFoundException.class);
   }
 
   @Test
-  void accountWithoutLocalPasswordThrows() {
-    UserModel user = verifiedUser();
-    user.setPassword(null);
-    when(users.findByEmail("a@vanep.com")).thenReturn(Optional.of(user));
-    assertThatThrownBy(() -> service.loadUserByUsername("a@vanep.com"))
+  void googleOnlyAccountIsNotFoundWhenNotBlocked() {
+    UserModel googleOnly = account();
+    googleOnly.setPassword(null);
+    when(loginAttempts.isBlocked(EMAIL)).thenReturn(false);
+    when(users.findByEmail(EMAIL)).thenReturn(Optional.of(googleOnly));
+
+    assertThatThrownBy(() -> service.loadUserByUsername(EMAIL))
         .isInstanceOf(UsernameNotFoundException.class);
+  }
+
+  @Test
+  void unverifiedAccountLoadsAsDisabled() {
+    UserModel unverified = account();
+    unverified.setVerified(false);
+    when(loginAttempts.isBlocked(EMAIL)).thenReturn(false);
+    when(users.findByEmail(EMAIL)).thenReturn(Optional.of(unverified));
+
+    assertThat(service.loadUserByUsername(EMAIL).isEnabled()).isFalse();
   }
 }
