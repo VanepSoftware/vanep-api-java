@@ -16,6 +16,7 @@ import br.com.vanep.user.enums.AuthProvider;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.repository.OAuthAccountRepository;
 import br.com.vanep.user.repository.UserRepository;
+import java.util.Locale;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -114,6 +115,7 @@ class GoogleLoginTest {
                                     .claim("email", "driver@gmail.com")
                                     .claim("name", "Driver")))
                 .with(csrf())
+                .locale(Locale.forLanguageTag("pt-BR"))
                 .param("type", "DRIVER")
                 .param("document", "52998224725")
                 .param("acceptTerms", "true"))
