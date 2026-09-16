@@ -5,6 +5,7 @@ import br.com.vanep.assistant.repository.AssistantRepository;
 import br.com.vanep.auth.dto.AccountSignupRequestDTO;
 import br.com.vanep.auth.dto.AssistantSignupRequestDTO;
 import br.com.vanep.auth.dto.ClientSignupRequestDTO;
+import br.com.vanep.auth.dto.DriverSignupFields;
 import br.com.vanep.auth.dto.DriverSignupRequestDTO;
 import br.com.vanep.auth.enums.AuthErrorCode;
 import br.com.vanep.auth.exception.SignupDuplicateException;
@@ -55,9 +56,7 @@ public class RegistrationService {
   @Transactional
   public UserModel registerClient(ClientSignupRequestDTO request) {
     UserModel user = createUser(UserType.CLIENT, RoleName.CLIENT, request);
-    ClientModel client = new ClientModel();
-    client.setUser(user);
-    clients.save(client);
+    createRoleRecord(user, UserType.CLIENT, null);
     emailVerification.startVerification(user);
     return user;
   }
@@ -65,13 +64,7 @@ public class RegistrationService {
   @Transactional
   public UserModel registerDriver(DriverSignupRequestDTO request) {
     UserModel user = createUser(UserType.DRIVER, RoleName.DRIVER, request);
-    DriverModel driver = new DriverModel();
-    driver.setUser(user);
-    driver.setCnpj(request.getCnpj());
-    driver.setExperienceYears(request.getExperienceYears());
-    driver.setBasePrice(request.getBasePrice());
-    driver.setApprovalStatus(DriverApprovalStatus.PENDING);
-    drivers.save(driver);
+    createRoleRecord(user, UserType.DRIVER, request);
     emailVerification.startVerification(user);
     return user;
   }
@@ -79,11 +72,36 @@ public class RegistrationService {
   @Transactional
   public UserModel registerAssistant(AssistantSignupRequestDTO request) {
     UserModel user = createUser(UserType.ASSISTANT, RoleName.ASSISTANT, request);
-    AssistantModel assistant = new AssistantModel();
-    assistant.setUser(user);
-    assistants.save(assistant);
+    createRoleRecord(user, UserType.ASSISTANT, null);
     emailVerification.startVerification(user);
     return user;
+  }
+
+  /** Shared with the Google sign-up completion, so every channel creates the same role record. */
+  public void createRoleRecord(UserModel user, UserType type, DriverSignupFields driverFields) {
+    switch (type) {
+      case CLIENT -> {
+        ClientModel client = new ClientModel();
+        client.setUser(user);
+        clients.save(client);
+      }
+      case DRIVER -> {
+        DriverModel driver = new DriverModel();
+        driver.setUser(user);
+        driver.setCnpj(driverFields.getCnpj());
+        driver.setExperienceYears(driverFields.getExperienceYears());
+        driver.setBasePrice(driverFields.getBasePrice());
+        driver.setApprovalStatus(DriverApprovalStatus.PENDING);
+        drivers.save(driver);
+      }
+      case ASSISTANT -> {
+        AssistantModel assistant = new AssistantModel();
+        assistant.setUser(user);
+        assistants.save(assistant);
+      }
+      case ADMIN ->
+          throw new IllegalArgumentException("Admin accounts are not created by sign-up.");
+    }
   }
 
   UserModel createUser(UserType type, RoleName roleName, AccountSignupRequestDTO request) {

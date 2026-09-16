@@ -36,6 +36,11 @@
               <span>Assistente</span>
             </label>
             <div class="form-error" th:if="${#fields.hasErrors('type')}" th:errors="*{type}"></div>
+            <div
+              class="form-error"
+              th:if="${#fields.hasErrors('driverFieldsComplete')}"
+              th:errors="*{driverFieldsComplete}"
+            ></div>
           </div>
 
           <div class="field">
