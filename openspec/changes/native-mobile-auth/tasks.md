@@ -203,10 +203,10 @@ Cada fase: branch própria a partir de `main`, uma PR (pt-BR, `Refs #177`; a úl
 > Depende de: 0c, 3a, 4a | Paralela com: 3b, 4b
 > Ordem: test → request DTO → service → controller
 
-- [ ] 12.1 Testes de slice falhando: `201` cliente (grant Google seguinte devolve `ROLE_CLIENT`) e motorista (`driver_status`); ticket desconhecido/expirado/usado → `400 invalid_signup_ticket` sem criar nada; e-mail registrado enquanto o ticket estava aberto → `409 email_duplicate`; CPF duplicado → `409 document_duplicate`; motorista sem `basePrice` → `400 validation_error`
-- [ ] 12.2 `GoogleSignupCompleteRequestDTO` (validação condicional de motorista reaproveitando as regras da 0c)
-- [ ] 12.3 Service de conclusão: consome ticket (`SignupTicketService`) e delega a `OAuthAccountService.completeRegistration` na mesma transação
-- [ ] 12.4 Endpoint `POST /api/auth/signup/complete` no `SignupApiController`
+- [x] 12.1 Testes de slice falhando: `201` cliente (grant Google seguinte devolve `ROLE_CLIENT`) e motorista (`driver_status`); ticket desconhecido/expirado/usado → `400 invalid_signup_ticket` sem criar nada; e-mail registrado enquanto o ticket estava aberto → `409 email_duplicate`; CPF duplicado → `409 document_duplicate`; motorista sem `basePrice` → `400 validation_error`
+- [x] 12.2 `GoogleSignupCompleteRequestDTO` (validação condicional de motorista reaproveitando as regras da 0c)
+- [x] 12.3 Service de conclusão: consome ticket (`SignupTicketService`) e delega a `OAuthAccountService.completeRegistration` na mesma transação
+- [x] 12.4 Endpoint `POST /api/auth/signup/complete` no `SignupApiController`
 - [ ] 12.5 `make lint` + `./mvnw verify`; abrir PR 4c
 
 ## 13. Fase 9 — Limpeza do fluxo legado (PR 9, após o mobile)

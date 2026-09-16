@@ -122,7 +122,7 @@ public class RegistrationService {
     return users.save(user);
   }
 
-  void rejectDuplicates(String email, String normalizedDocument) {
+  public void rejectDuplicates(String email, String normalizedDocument) {
     if (email != null && users.existsByEmail(email)) {
       throw new SignupDuplicateException(
           "email", "auth.signup.email.duplicate", AuthErrorCode.EMAIL_DUPLICATE);

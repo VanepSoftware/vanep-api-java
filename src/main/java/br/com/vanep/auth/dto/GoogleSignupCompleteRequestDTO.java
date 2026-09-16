@@ -1,6 +1,5 @@
-package br.com.vanep.auth.web;
+package br.com.vanep.auth.dto;
 
-import br.com.vanep.auth.dto.SignupCompletionFields;
 import br.com.vanep.auth.validation.Cpf;
 import br.com.vanep.user.enums.Gender;
 import br.com.vanep.user.enums.UserType;
@@ -11,16 +10,17 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import lombok.Getter;
 import lombok.Setter;
-import org.springframework.format.annotation.DateTimeFormat;
 
+/** Name and e-mail are not accepted here: both come from the ticket, which came from Google. */
 @Getter
 @Setter
-public class SignupForm implements SignupCompletionFields {
+public class GoogleSignupCompleteRequestDTO implements SignupCompletionFields {
+
+  @NotBlank(message = "{auth.signup.ticket.required}")
+  private String signupTicket;
 
   @NotNull(message = "{auth.signup.type.required}")
   private UserType type;
-
-  private String name;
 
   @NotBlank(message = "{auth.signup.document.required}")
   @Cpf
@@ -28,7 +28,6 @@ public class SignupForm implements SignupCompletionFields {
 
   private String phone;
 
-  @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
   private LocalDate birthDate;
 
   private Gender gender;
@@ -42,11 +41,7 @@ public class SignupForm implements SignupCompletionFields {
 
   private BigDecimal basePrice;
 
-  /**
-   * The Thymeleaf screen does not render the driver inputs yet, so choosing driver here fails
-   * validation instead of creating an account without a driver record.
-   */
-  @AssertTrue(message = "{auth.signup.driver.fields.required}")
+  @AssertTrue(message = "{auth.signup.basePrice.required}")
   public boolean isDriverFieldsComplete() {
     return type != UserType.DRIVER || (basePrice != null && basePrice.signum() > 0);
   }

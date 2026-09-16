@@ -3,7 +3,9 @@ package br.com.vanep.auth.api;
 import br.com.vanep.auth.dto.AssistantSignupRequestDTO;
 import br.com.vanep.auth.dto.ClientSignupRequestDTO;
 import br.com.vanep.auth.dto.DriverSignupRequestDTO;
+import br.com.vanep.auth.dto.GoogleSignupCompleteRequestDTO;
 import br.com.vanep.auth.dto.SignupResponseDTO;
+import br.com.vanep.auth.signup.GoogleSignupService;
 import br.com.vanep.auth.web.RegistrationService;
 import br.com.vanep.user.model.UserModel;
 import jakarta.validation.Valid;
@@ -19,9 +21,12 @@ import org.springframework.web.bind.annotation.RestController;
 public class SignupApiController {
 
   private final RegistrationService registrationService;
+  private final GoogleSignupService googleSignupService;
 
-  public SignupApiController(RegistrationService registrationService) {
+  public SignupApiController(
+      RegistrationService registrationService, GoogleSignupService googleSignupService) {
     this.registrationService = registrationService;
+    this.googleSignupService = googleSignupService;
   }
 
   @PostMapping("/client")
@@ -41,6 +46,13 @@ public class SignupApiController {
   public SignupResponseDTO registerAssistant(
       @Valid @RequestBody AssistantSignupRequestDTO request) {
     return toResponse(registrationService.registerAssistant(request));
+  }
+
+  @PostMapping("/complete")
+  @ResponseStatus(HttpStatus.CREATED)
+  public SignupResponseDTO completeGoogleSignup(
+      @Valid @RequestBody GoogleSignupCompleteRequestDTO request) {
+    return toResponse(googleSignupService.completeRegistration(request));
   }
 
   private static SignupResponseDTO toResponse(UserModel user) {
