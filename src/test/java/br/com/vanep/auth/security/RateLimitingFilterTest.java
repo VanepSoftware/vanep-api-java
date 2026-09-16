@@ -51,6 +51,33 @@ class RateLimitingFilterTest {
         .doFilter(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
   }
 
+  @Test
+  void keysByRemoteAddressIgnoringForwardingHeaders() throws Exception {
+    RateLimiter limiter = new RateLimiter(true, 2, 60);
+    RateLimitingFilter filter = new RateLimitingFilter(limiter);
+    FilterChain chain = mock(FilterChain.class);
+
+    filter.doFilter(spoofedRequest("203.0.113.1", null), new MockHttpServletResponse(), chain);
+    filter.doFilter(spoofedRequest("198.51.100.7", null), new MockHttpServletResponse(), chain);
+    MockHttpServletResponse blocked = new MockHttpServletResponse();
+    filter.doFilter(spoofedRequest(null, "192.0.2.9"), blocked, chain);
+
+    assertThat(blocked.getStatus()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS.value());
+    verify(chain, org.mockito.Mockito.times(2))
+        .doFilter(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+  }
+
+  private static MockHttpServletRequest spoofedRequest(String forwardedFor, String connectingIp) {
+    MockHttpServletRequest request = request("POST", "/oauth2/token");
+    if (forwardedFor != null) {
+      request.addHeader("X-Forwarded-For", forwardedFor);
+    }
+    if (connectingIp != null) {
+      request.addHeader("CF-Connecting-IP", connectingIp);
+    }
+    return request;
+  }
+
   private static MockHttpServletRequest request(String method, String uri) {
     MockHttpServletRequest request = new MockHttpServletRequest(method, uri);
     request.setRequestURI(uri);

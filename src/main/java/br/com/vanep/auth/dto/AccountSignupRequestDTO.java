@@ -1,11 +1,11 @@
-package br.com.vanep.auth.web;
+package br.com.vanep.auth.dto;
 
 import br.com.vanep.auth.validation.Cpf;
 import br.com.vanep.user.enums.Gender;
-import br.com.vanep.user.enums.UserType;
 import jakarta.validation.constraints.AssertTrue;
+import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import java.time.LocalDate;
 import lombok.Getter;
 import lombok.Setter;
@@ -13,12 +13,18 @@ import org.springframework.format.annotation.DateTimeFormat;
 
 @Getter
 @Setter
-public class SignupForm {
+public class AccountSignupRequestDTO {
 
-  @NotNull(message = "{auth.signup.type.required}")
-  private UserType type;
-
+  @NotBlank(message = "{auth.signup.name.required}")
   private String name;
+
+  @NotBlank(message = "{auth.signup.email.required}")
+  @Email(message = "{auth.signup.email.invalid}")
+  private String email;
+
+  @NotBlank(message = "{auth.signup.password.required}")
+  @Size(min = 6, message = "{auth.signup.password.min}")
+  private String password;
 
   @NotBlank(message = "{auth.signup.document.required}")
   @Cpf
