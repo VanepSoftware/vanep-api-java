@@ -123,6 +123,23 @@ public class ClientRatingService {
     recalculateClientAverage(client);
   }
 
+  @Transactional
+  public ClientRatingResponseDTO restore(String token) {
+    if (clientRatingRepository.existsDeletedByToken(token)) {
+      clientRatingRepository.restoreByToken(token);
+      ClientRatingModel restored = requireByToken(token);
+      recalculateClientAverage(restored.getClient());
+      return mapper.toResponse(restored);
+    }
+
+    if (clientRatingRepository.findByToken(token).isPresent()) {
+      throw new ResponseStatusException(
+          HttpStatus.CONFLICT, message("client_rating.already_active"));
+    }
+
+    throw new ResponseStatusException(HttpStatus.NOT_FOUND, message("client_rating.not_found"));
+  }
+
   private ClientRatingModel requireByToken(String token) {
     return clientRatingRepository
         .findByToken(token)
