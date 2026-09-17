@@ -225,4 +225,37 @@ class ClientRatingServiceTest {
     verify(clientRatingRepository).delete(ratingModel);
     verify(clientRepository).save(client);
   }
+
+  @Test
+  void restoreBringsBackARemovedRating() {
+    ClientModel client = mockClient(1L, 10L);
+    ClientRatingModel ratingModel = new ClientRatingModel();
+    ratingModel.setClient(client);
+    ClientRatingResponseDTO response =
+        new ClientRatingResponseDTO(
+            "tok", "dtok", "DName", "ctok", "CName", BigDecimal.valueOf(5.0), "Good", null, null);
+
+    when(clientRatingRepository.existsDeletedByToken("tok")).thenReturn(true);
+    when(clientRatingRepository.findByToken("tok")).thenReturn(Optional.of(ratingModel));
+    when(clientRatingRepository.calculateAverageRatingForClient(1L))
+        .thenReturn(Optional.of(BigDecimal.valueOf(5.00)));
+    when(mapper.toResponse(ratingModel)).thenReturn(response);
+
+    assertThat(service.restore("tok")).isEqualTo(response);
+    verify(clientRatingRepository).restoreByToken("tok");
+  }
+
+  @Test
+  void restoringAnActiveRatingIsRefused() {
+    ClientRatingModel ratingModel = new ClientRatingModel();
+
+    when(clientRatingRepository.existsDeletedByToken("tok")).thenReturn(false);
+    when(clientRatingRepository.findByToken("tok")).thenReturn(Optional.of(ratingModel));
+    when(messages.getMessage(anyString(), any(), any())).thenAnswer(c -> c.getArgument(0));
+
+    assertThatThrownBy(() -> service.restore("tok"))
+        .isInstanceOf(ResponseStatusException.class)
+        .hasMessageContaining("409")
+        .hasMessageContaining("client_rating.already_active");
+  }
 }

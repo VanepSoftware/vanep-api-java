@@ -1,5 +1,6 @@
 package br.com.vanep.clientrating.controller;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -108,7 +109,8 @@ class ClientRatingControllerTest {
             new SimpleGrantedAuthority("list_client_ratings"),
             new SimpleGrantedAuthority("show_client_rating"),
             new SimpleGrantedAuthority("create_client_rating"),
-            new SimpleGrantedAuthority("delete_client_rating"));
+            new SimpleGrantedAuthority("delete_client_rating"),
+            new SimpleGrantedAuthority("restore_client_rating"));
   }
 
   private JwtRequestPostProcessor driverJwt() {
@@ -211,5 +213,43 @@ class ClientRatingControllerTest {
     mockMvc
         .perform(delete("/api/client-ratings/" + ratingToken).with(adminJwt()))
         .andExpect(status().isNoContent());
+  }
+
+  @Test
+  void deletingKeepsTheRowWithDeletedAtSet() throws Exception {
+    mockMvc
+        .perform(delete("/api/client-ratings/" + ratingToken).with(driverJwt()))
+        .andExpect(status().isNoContent());
+
+    assertThat(clientRatings.findByToken(ratingToken)).isEmpty();
+    assertThat(clientRatings.existsDeletedByToken(ratingToken)).isTrue();
+  }
+
+  @Test
+  void aRemovedClientRatingCanBeRestored() throws Exception {
+    mockMvc
+        .perform(delete("/api/client-ratings/" + ratingToken).with(driverJwt()))
+        .andExpect(status().isNoContent());
+
+    mockMvc
+        .perform(post("/api/client-ratings/" + ratingToken + "/restore").with(adminJwt()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.token").value(ratingToken));
+
+    assertThat(clientRatings.findByToken(ratingToken)).isPresent();
+  }
+
+  @Test
+  void restoringAnActiveClientRatingIsRefused() throws Exception {
+    mockMvc
+        .perform(post("/api/client-ratings/" + ratingToken + "/restore").with(adminJwt()))
+        .andExpect(status().isConflict());
+  }
+
+  @Test
+  void restoreForbidsANonAdmin() throws Exception {
+    mockMvc
+        .perform(post("/api/client-ratings/" + ratingToken + "/restore").with(driverJwt()))
+        .andExpect(status().isForbidden());
   }
 }

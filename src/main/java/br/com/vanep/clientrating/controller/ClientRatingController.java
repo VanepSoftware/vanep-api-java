@@ -54,6 +54,12 @@ public class ClientRatingController {
     return service.findByToken(token);
   }
 
+  @PostMapping("/{token}/restore")
+  @PreAuthorize("hasAuthority('restore_client_rating')")
+  public ClientRatingResponseDTO restore(@PathVariable String token) {
+    return service.restore(token);
+  }
+
   @DeleteMapping("/{token}")
   @PreAuthorize(
       "hasAuthority('delete_client_rating') or @sec.isClientRatingOwner(#token, authentication)")

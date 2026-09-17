@@ -78,6 +78,7 @@ public enum PermissionEnum {
   SHOW_CLIENT_RATING("show_client_rating"),
   CREATE_CLIENT_RATING("create_client_rating"),
   DELETE_CLIENT_RATING("delete_client_rating"),
+  RESTORE_CLIENT_RATING("restore_client_rating"),
   LIST_DRIVER_DOCUMENTS("list_driver_documents"),
   SHOW_DRIVER_DOCUMENT("show_driver_document"),
   CREATE_DRIVER_DOCUMENT("create_driver_document"),
