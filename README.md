@@ -101,7 +101,7 @@ Use o formato **`CHAVE=valor`** sem espaços à volta do **`=`** (evita surpresa
 
 ### 3. Porta **5432** no host (conflito com PostgreSQL do sistema)
 
-O Compose mapeia **`${POSTGRES_PORT}:5432`** (porta do **host** → porta **interna** do container). Se algo já estiver a ouvir em **`0.0.0.0:5432`** ou **`127.0.0.1:5432`**, o `docker compose up` falha com **address already in use**.
+O Compose mapeia **`127.0.0.1:${POSTGRES_PORT}:5432`** (porta do **host**, só no loopback → porta **interna** do container). Se algo já estiver a ouvir em **`0.0.0.0:5432`** ou **`127.0.0.1:5432`**, o `docker compose up` falha com **address already in use**.
 
 Em Debian/Ubuntu costuma existir um serviço **`postgresql@…-main`** (ex.: `postgresql@18-main`). Para listar e parar **só esse cluster** (liberta a 5432 no host):
 
@@ -215,7 +215,7 @@ também o **Resource Server**.
 | **Authorization Server** | Endpoints OAuth2 padrão: `/oauth2/authorize`, `/oauth2/token`, `/oauth2/jwks`. Fluxo **authorization code + PKCE** (cliente público, sem secret — igual ao `token_endpoint_auth_method: none` do vanep-frontend). |
 | **Tela de login** | Servida pela própria API (Thymeleaf) em **`/login`** — fundo preto, marca Vanep, e-mail + senha. É a tela mostrada durante o fluxo de autorização. |
 | **Login social (Google)** | Botão **"Entrar com Google"** (OAuth2 Client / OIDC). Aparece só quando há `GOOGLE_CLIENT_ID` configurado. |
-| **Resource Server** | Rotas **`/api/**`** são protegidas por **JWT** (Bearer). Sem token → **401**. Ex.: `GET /api/user/profile` devolve o perfil da conta autenticada (consumido pelo front como "userinfo"). |
+| **Resource Server** | Rotas **`/api/**`** são protegidas por **JWT** (Bearer). Sem token → **401**. Ex.: `GET /api/user/me` devolve o perfil da conta autenticada (consumido pelo front como "userinfo"), incluindo `pendingEmail` (só se houver token de verificação aberto) e `nameChangeAvailableAt` / `phoneChangeAvailableAt` / `emailChangeAvailableAt` (instantes ISO quando o cooldown ainda bloqueia a próxima mudança; omitidos/`null` caso contrário). |
 | **Senhas** | **Argon2id + pepper** (HMAC-SHA256 com `VANEP_PASSWORD_PEPPER` antes do hash). |
 
 ### Login com Google (cadastro em 2 passos)
@@ -295,6 +295,104 @@ make db-seed   # cria admin@vanep.com.br / password
 
 ---
 
+## Geolocalização (Google Places)
+
+A geografia da Vanep é uma **árvore única e compartilhada** — `country → state → city → district ⟲` — construída sob demanda a partir do Google Places. Motorista e cliente atravessam a mesma normalização, então caem no mesmo nó por construção; sem isso o ponto de embarque do cliente nunca casaria com a área do motorista.
+
+### O que é curado e o que nasce sozinho
+
+| Nível | Origem |
+|---|---|
+| `country` | **curado.** País ausente é decisão de negócio ("não atendemos aqui"), não dado faltando — a API responde `400` |
+| `state`, `city`, `district` | criados sob demanda pelo resolver, a partir dos `addressComponents` do Places |
+
+Duas colunas curadas moram em `state`: `requires_district` (e o override opcional `city.requires_district`) respondem *"o motorista pode declarar esta cidade inteira como área de atuação?"*. No DF um único município cobre 5.800 km², então lá a resposta é não. O Google não tem como responder isso — é política de produto.
+
+### Três chaves, não uma
+
+A restrição de aplicação do Google é **exclusiva por tipo**: uma chave é restrita por IP **ou** por referrer **ou** por package+SHA-1 — nunca por dois. Daí precisarmos de uma por superfície:
+
+| Chave | Restrição | Onde vive | Chama |
+|---|---|---|---|
+| servidor | endereço IP | `.env` desta API | `Place Details` |
+| web | referrer HTTP | `vanep-frontend` | autocomplete |
+| Android | package + SHA-1 | `vanep-mobile` | autocomplete |
+| iOS | bundle id | `vanep-mobile` | autocomplete |
+
+Todas com `API restrictions → Restrict key → Places API (New)`. Atenção: é a **"(New)"** — a legada tem outro contrato de `addressComponents` e o código não serve para ela.
+
+Para criar as chaves do zero, veja [`docs/google-places-keys.md`](docs/google-places-keys.md).
+
+### O backend não faz proxy de autocomplete
+
+Proxiar adicionaria uma ida ao servidor **a cada tecla**, sem ganho. O autocomplete roda no cliente (web/mobile) com a chave da plataforma; o backend só chama `Place Details`, e nunca confia em componentes enviados pelo cliente — recebe apenas o `placeId` e re-resolve.
+
+### O `sessionToken` atravessa a fronteira
+
+Quem chama o `Place Details` é o backend, então o cliente envia o `sessionToken` junto do `placeId` e o backend repassa. Sem o mesmo token, os autocompletes e o `Place Details` não são reconhecidos como uma sessão.
+
+**O que isso economiza, na prática: quase nada — e é de propósito.** A regra do Google depende de em qual SKU a sessão *encerra*:
+
+| A sessão encerra em | Autocompletes | `Place Details` |
+|---|---|---|
+| **Essentials** ← o nosso caso | os **12 primeiros** são cobrados; do 13º em diante, grátis | Essentials |
+| Pro / Enterprise | todos grátis | cobrado na faixa **Enterprise + Atmosphere** |
+| Essentials **IDs Only** | todos cobrados, como se não houvesse sessão | grátis |
+
+Com o debounce de 350ms do cliente, praticamente nenhuma sessão passa de 12 requests — ou seja, encerrando em Essentials o token não muda a fatura. Quem segura o custo é o **debounce** e o **field mask**, não ele.
+
+Encerrar em Pro para zerar os autocompletes é armadilha, não otimização: troca um punhado de eventos a US$ 2,83/1.000 pelo `Place Details` na faixa mais cara da plataforma.
+
+Então por que manter o token? Porque ele é a única defesa contra o cenário do 13º request em diante (busca longa, digitação sem pausa, debounce afrouxado no futuro), custa uma string no payload, e é o que a documentação do Google pede. É seguro barato — só não é o que paga a conta.
+
+Por isso o cache de `Place Details` é **ciente da sessão**:
+
+```
+requisição COM sessionToken  →  SEMPRE chama o Google (encerra a sessão)
+                                e atualiza o cache
+requisição SEM sessionToken  →  serve do cache; só chama em miss
+```
+
+Servir do cache quando há token deixaria a sessão aberta, sem o `Place Details` que a encerra — e o Google passaria a cobrar os autocompletes como se não houvesse sessão nenhuma.
+
+### Custo
+
+Desde 1º de março de 2025 não há mais crédito mensal fixo: a cota gratuita é **por SKU**, reseta dia 1º e não acumula.
+
+| SKU | Quem chama | Grátis/mês | Depois | ≈ BRL / 1.000 |
+|---|---|---|---|---|
+| Place Details Essentials | backend | 10.000 | US$ 5,00 / 1.000 | R$ 29,35 |
+| Place Details Essentials **IDs Only** | — | ilimitado | — | R$ 0 |
+| Autocomplete Requests | web/mobile | 10.000 | US$ 2,83 / 1.000 | R$ 16,61 |
+| Autocomplete **Session Usage** | — | ilimitado | US$ 0 | R$ 0 |
+
+O *field mask* decide o SKU. O mask padrão (`id,formattedAddress,addressComponents`) cai inteiro em *Place Details Essentials* — uma cobrança só. **Não acrescente campo sem conferir em qual SKU ele cai**: `displayName`, por exemplo, é Pro e é cobrado por cima.
+
+Na prática: 1 busca = 1 `Place Details` + os autocompletes que a digitação gerou (4 a 6 com o debounce atual); 1 endereço salvo = 1; 1 escola resolvida = 1. Isso põe o gratuito em torno de **2.000 buscas/mês**, e depois dele a ordem de grandeza é **R$ 110–130 por 1.000 buscas**.
+
+Uma quota diária no console é o freio contra fatura surpresa — e ela é **por projeto**, não por chave: dev e produção dividem o mesmo teto enquanto estiverem no mesmo projeto Cloud.
+
+> **Não confunda com a tabela da Places API legada**, que é o que o console mostra primeiro e chega a US$ 17,00 / 1.000 (≈ R$ 99,80) no `Places Details`. `Find Place`, `Query Autocomplete`, `Nearby Search` e `Places Photo` são SKUs legadas e **nenhuma delas existe neste código**. Os valores em BRL acima usam o câmbio de R$ 5,87/US$ que o console aplicava em 06/09/2026 — confira o seu antes de orçar.
+
+### Erros: de quem é a culpa
+
+A distinção não é cosmética — define se o usuário deve agir ou esperar:
+
+| Origem | HTTP | Significa |
+|---|---|---|
+| `400`, `404` do Google | `400` | o `placeId` do cliente não presta |
+| `401`, `403`, `429`, `5xx` | `503` | credencial, quota ou fornecedor fora do ar — problema nosso |
+
+Um `403` costuma ser **a chave**, não o código. Confira `error.details[].reason` antes de qualquer outra hipótese — `API_KEY_IP_ADDRESS_BLOCKED`, `SERVICE_DISABLED` e estouro de quota são coisas diferentes.
+
+Foi restringir a chave de servidor por IP que motivou a chave de dev compartilhada de hoje: IP residencial é dinâmico, então a chave morria sozinha e o sintoma chegava como "algo deu errado". Os porquês e o rumo estão em [`docs/google-places-keys.md`](docs/google-places-keys.md) e no `.env.example`.
+
+### Nenhum teste chama a API real
+
+Constituição, regra 50. A suíte roda sem rede e sem credencial: tudo é mockado com as fixtures em `src/test/resources/fixtures/places/`, coletadas **uma vez** num spike manual.
+
+A regra é aplicada por configuração, não por disciplina — `application-test.properties` aponta `vanep.google.places.base-url` para `http://localhost:1`, então uma chamada não mockada morre em *connection refused* em vez de consumir quota paga. O `PlacesTestIsolationTest` falha se alguém apontar o profile de teste para um host real.
+
 ## E-mail (verificação de conta e reset de senha)
 
 A API envia e-mails transacionais em dois fluxos: **verificação de e-mail** (no cadastro por e-mail/senha) e **reset de senha** (esqueci minha senha). O login exige e-mail verificado — sem e-mail funcional, usuários cadastrados por e-mail/senha não conseguem logar.
@@ -302,6 +400,8 @@ A API envia e-mails transacionais em dois fluxos: **verificação de e-mail** (n
 ### Desenvolvimento local (Mailpit)
 
 O **[Mailpit](https://mailpit.axllent.org/)** já está configurado no `docker-compose.yml`. Ele captura todos os e-mails enviados pela aplicação sem precisar de conta, API key ou domínio verificado.
+
+O serviço fica no profile **`mailpit`** do Compose. Os alvos do `make` já ativam o profile; para `docker compose` direto, o `.env.example` traz **`COMPOSE_PROFILES=mailpit`**. Se o seu `.env` é anterior a isso, adicione essa linha. Em produção o profile fica desligado e o e-mail sai pelo SMTP real.
 
 ```bash
 make mail-up       # sobe só o Mailpit
@@ -450,7 +550,13 @@ Outros comandos úteis:
 
 A imagem usa **multi-stage Dockerfile** (JDK 25 build, JRE 25 runtime). O **`Dockerfile`** define **`SPRING_PROFILES_ACTIVE=docker`** por padrão; o Compose pode reforçar o mesmo valor.
 
-O **`docker-compose.yml`** define **postgres**, **mailpit** e **vanep**, com **`env_file: .env`** para credenciais e portas no host. O serviço **vanep** usa **`POSTGRES_HOST=postgres`** e **`MAIL_HOST=mailpit`** na rede interna.
+O **`docker-compose.yml`** define **postgres**, **mailpit** e **vanep**, com **`env_file: .env`** para credenciais e portas no host. O serviço **vanep** usa **`POSTGRES_HOST=postgres`** e, sem `MAIL_HOST` no `.env`, **`mailpit`** como SMTP na rede interna.
+
+Pensando no servidor de produção:
+
+- **postgres** e **vanep** têm `restart: unless-stopped`, então voltam sozinhos após reboot.
+- As portas do Postgres e do Mailpit são publicadas só em **`127.0.0.1`**. O Docker ignora o UFW, então publicar em `0.0.0.0` exporia o banco no IP público. Para acessar o banco de fora, use túnel SSH (`ssh -L 5432:127.0.0.1:5432 usuario@servidor`).
+- O **mailpit** só sobe com o profile `mailpit` (ver [Desenvolvimento local (Mailpit)](#desenvolvimento-local-mailpit)).
 
 ```bash
 cp .env.example .env   # preencher

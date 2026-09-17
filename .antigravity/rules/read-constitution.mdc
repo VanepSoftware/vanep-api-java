@@ -1,0 +1,14 @@
+---
+description: Read project constitution and check commit restrictions at the start of every session
+alwaysApply: true
+---
+
+# Read Constitution & Commit Constraints First
+
+At the start of every new session (first turn of a conversation), before planning, exploring, or editing:
+
+1. **Read Constitution:** Read the [constitution.md](file:///home/matheus/Documentos/Projetos/Vanep/vanep-api-java/constitution.md) at the repository root. Follow all guidelines (architecture, testing, PR workflow, naming, pt-BR messages/commits, English code).
+2. **Commit Restriction:** You are strictly **forbidden** from running `git commit`, `git push`, or any other version control write operations without explicit user confirmation.
+3. **Re-read:** Re-read these rules if a long session drifts from these conventions or the user asks about project standards.
+
+Do not skip this step even for small or seemingly unrelated requests.

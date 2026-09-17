@@ -5,33 +5,117 @@ on:
     workflows: ["CI"]
     types: [completed]
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  DEPLOY_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+
 jobs:
-  deploy:
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
-    runs-on: [self-hosted, vanep]
+  build:
+    # Repo público: o filtro `branches` do workflow_run compara só o NOME da branch, então um PR
+    # vindo da `main` de um fork dispararia o CD com os secrets deste repo. Só deploya push
+    # direto na main deste repositório (ou disparo manual a partir da main).
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_branch == 'main' &&
+       github.event.workflow_run.head_repository.full_name == github.repository)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.image.outputs.name }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ env.DEPLOY_SHA }}
 
-      - name: Deploy
-        working-directory: /home/vanep/vanep-projects/vanep-api-java
-        run: |
-          git pull origin main
-          docker compose build --no-cache
-          docker compose up -d
-          echo "Deploy concluído!"
+      - name: Nome da imagem (GHCR exige minúsculas)
+        id: image
+        run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
 
-      - name: Health check
-        run: |
-          sleep 10
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080)
-          if [ "$STATUS" -ge 200 ] && [ "$STATUS" -lt 400 ]; then
-            echo "API respondendo com status $STATUS"
-          else
-            echo "API retornou status $STATUS"
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login no GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build e push da imagem
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ steps.image.outputs.name }}:${{ env.DEPLOY_SHA }}
+            ${{ steps.image.outputs.name }}:latest
+          labels: org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      packages: read
+    steps:
+      - name: Deploy na VPS via SSH
+        uses: appleboy/ssh-action@v1
+        env:
+          IMAGE_NAME: ${{ needs.build.outputs.image }}
+          GHCR_USER: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          envs: DEPLOY_SHA,IMAGE_NAME,GHCR_USER,GHCR_TOKEN
+          command_timeout: 15m
+          script: |
+            set -e
+            cd /home/vanep/vanep-projects/vanep-api-java
+
+            # Só para atualizar o docker-compose.yml ao commit deployado (o .env é ignorado pelo git).
+            # Defesa extra: recusa qualquer commit que não esteja na main do GitHub.
+            git fetch origin main
+            git merge-base --is-ancestor "$DEPLOY_SHA" origin/main || { echo "Commit $DEPLOY_SHA não está na main — deploy abortado"; exit 1; }
+            git reset --hard "$DEPLOY_SHA"
+
+            # A imagem vem pronta do GHCR; o token do job expira ao fim do workflow.
+            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+            trap 'docker logout ghcr.io >/dev/null 2>&1 || true' EXIT
+
+            export VANEP_IMAGE="$IMAGE_NAME:$DEPLOY_SHA"
+            docker compose pull vanep
+            docker tag "$VANEP_IMAGE" "$IMAGE_NAME:latest"
+            docker compose up -d --no-build
+            docker image prune -af --filter "until=168h"
+
+            # Health check: /login é público; espera até ~2 min pela subida do Spring.
+            APP_PORT=$(grep -E '^APP_PORT=' .env | cut -d= -f2)
+            for i in $(seq 1 24); do
+              STATUS=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:${APP_PORT:-8080}/login" || true)
+              if [ "$STATUS" -ge 200 ] && [ "$STATUS" -lt 400 ]; then
+                echo "Deploy de $DEPLOY_SHA concluído — API respondendo com status $STATUS"
+                exit 0
+              fi
+              sleep 5
+            done
+
+            echo "API não respondeu após o deploy (último status: $STATUS)"
+            docker compose logs --tail=100 vanep
             exit 1
-          fi

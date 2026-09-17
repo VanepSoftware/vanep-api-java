@@ -1,5 +1,6 @@
 package br.com.vanep.auth.verification;
 
+import br.com.vanep.user.exception.ProfileEmailDuplicateException;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -17,11 +18,15 @@ public class EmailVerificationController {
 
   @GetMapping("/verify-email")
   public String verify(@RequestParam(required = false) String token, Model model) {
-    if (verification.verify(token)) {
-      return "redirect:/login?verified";
+    try {
+      if (verification.verify(token)) {
+        return "redirect:/login?verified";
+      }
+      model.addAttribute("invalid", true);
+      return "verify-email";
+    } catch (ProfileEmailDuplicateException ex) {
+      return "redirect:/login?email_taken";
     }
-    model.addAttribute("invalid", true);
-    return "verify-email";
   }
 
   @PostMapping("/verify-email/resend")

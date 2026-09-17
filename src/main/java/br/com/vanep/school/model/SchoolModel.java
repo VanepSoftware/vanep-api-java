@@ -1,10 +1,15 @@
 package br.com.vanep.school.model;
 
+import br.com.vanep.city.model.CityModel;
+import br.com.vanep.district.model.DistrictModel;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import java.time.Instant;
@@ -22,7 +27,6 @@ import org.hibernate.annotations.UpdateTimestamp;
 @Getter
 @Setter
 public class SchoolModel {
-
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;
@@ -33,14 +37,16 @@ public class SchoolModel {
   @Column(nullable = false, length = 255)
   private String name;
 
-  @Column(length = 32)
-  private String cnpj;
+  @Column(name = "google_place_id", length = 255)
+  private String googlePlaceId;
 
-  @Column(length = 32)
-  private String phone;
+  @ManyToOne(fetch = FetchType.EAGER)
+  @JoinColumn(name = "city_id")
+  private CityModel city;
 
-  @Column(length = 255)
-  private String email;
+  @ManyToOne(fetch = FetchType.EAGER)
+  @JoinColumn(name = "district_id")
+  private DistrictModel district;
 
   @Column(name = "address_id")
   private Long addressId;

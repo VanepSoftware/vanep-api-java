@@ -1,0 +1,62 @@
+{
+    "id": "EkBSLiBkb3MgUGluaGVpcm9zIC0gUGluaGVpcm9zLCBTw6NvIFBhdWxvIC0gU1AsIDA4MTQyLTY0MCwgQnJhemlsIi4qLAoUChIJE7IU-nVXzpQRK4tMXivpFHESFAoSCY8mFsuYV86UEQg3muOjFECp",
+    "types": [
+        "route"
+    ],
+    "formattedAddress": "R. dos Pinheiros - Pinheiros, S\u00e3o Paulo - SP, 08142-640, Brazil",
+    "addressComponents": [
+        {
+            "longText": "Rua dos Pinheiros",
+            "shortText": "R. dos Pinheiros",
+            "types": [
+                "route"
+            ],
+            "languageCode": "pt"
+        },
+        {
+            "longText": "Pinheiros",
+            "shortText": "Pinheiros",
+            "types": [
+                "sublocality_level_1",
+                "sublocality",
+                "political"
+            ],
+            "languageCode": "pt"
+        },
+        {
+            "longText": "S\u00e3o Paulo",
+            "shortText": "S\u00e3o Paulo",
+            "types": [
+                "administrative_area_level_2",
+                "political"
+            ],
+            "languageCode": "pt"
+        },
+        {
+            "longText": "S\u00e3o Paulo",
+            "shortText": "SP",
+            "types": [
+                "administrative_area_level_1",
+                "political"
+            ],
+            "languageCode": "pt"
+        },
+        {
+            "longText": "Brazil",
+            "shortText": "BR",
+            "types": [
+                "country",
+                "political"
+            ],
+            "languageCode": "en"
+        },
+        {
+            "longText": "08142-640",
+            "shortText": "08142-640",
+            "types": [
+                "postal_code"
+            ],
+            "languageCode": "en-US"
+        }
+    ]
+}

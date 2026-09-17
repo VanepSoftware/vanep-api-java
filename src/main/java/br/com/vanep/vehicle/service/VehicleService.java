@@ -2,9 +2,9 @@ package br.com.vanep.vehicle.service;
 
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
-import br.com.vanep.user.UserRepository;
-import br.com.vanep.user.UserType;
+import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
+import br.com.vanep.user.repository.UserRepository;
 import br.com.vanep.vehicle.dto.VehicleRequestDTO;
 import br.com.vanep.vehicle.dto.VehicleResponseDTO;
 import br.com.vanep.vehicle.mapper.VehicleMapper;

@@ -1,6 +1,6 @@
 package br.com.vanep.auth.oauth;
 
-import br.com.vanep.user.AuthProvider;
+import br.com.vanep.user.enums.AuthProvider;
 import br.com.vanep.user.model.UserModel;
 import java.util.HashMap;
 import java.util.List;

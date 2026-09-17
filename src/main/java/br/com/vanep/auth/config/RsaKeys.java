@@ -2,6 +2,8 @@ package br.com.vanep.auth.config;
 
 import com.nimbusds.jose.jwk.RSAKey;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.security.KeyFactory;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
@@ -10,10 +12,44 @@ import java.security.interfaces.RSAPublicKey;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Base64;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 final class RsaKeys {
 
+  private static final Logger log = LoggerFactory.getLogger(RsaKeys.class);
+
   private RsaKeys() {}
+
+  /**
+   * Loads a persisted RSA JWK (including its private key) from {@code path}, generating and saving
+   * a new one when the file is missing or unreadable. Used only in dev so that issued tokens keep
+   * validating across application restarts. Never use for production keys.
+   */
+  static RSAKey loadOrCreate(String keyId, Path path) {
+    try {
+      if (Files.isReadable(path)) {
+        return RSAKey.parse(Files.readString(path, StandardCharsets.UTF_8));
+      }
+    } catch (Exception ex) {
+      log.warn("Não foi possível ler a JWK de dev em {}; gerando uma nova.", path, ex);
+    }
+
+    RSAKey generated = generate(keyId);
+    try {
+      Path parent = path.getParent();
+      if (parent != null) {
+        Files.createDirectories(parent);
+      }
+      Files.writeString(path, generated.toJSONString(), StandardCharsets.UTF_8);
+    } catch (Exception ex) {
+      log.warn(
+          "Não foi possível persistir a JWK de dev em {}; tokens não sobreviverão a restart.",
+          path,
+          ex);
+    }
+    return generated;
+  }
 
   static RSAKey fromPem(String privateKeyPem, String publicKeyPem, String keyId) {
     try {

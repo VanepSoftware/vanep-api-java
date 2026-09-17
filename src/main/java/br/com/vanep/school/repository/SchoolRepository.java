@@ -8,12 +8,15 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface SchoolRepository extends JpaRepository<SchoolModel, Long> {
-
   Optional<SchoolModel> findByToken(String token);
 
-  boolean existsByCnpj(String cnpj);
+  Optional<SchoolModel> findByGooglePlaceId(String googlePlaceId);
 
   boolean existsByName(String name);
+
+  long countByAddressId(Long addressId);
+
+  long countByAddressIdAndIdNot(Long addressId, Long id);
 
   @Modifying
   @Query(value = "UPDATE school SET deleted_at = NULL WHERE token = :token", nativeQuery = true)

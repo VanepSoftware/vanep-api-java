@@ -1,0 +1,55 @@
+{
+    "id": "ChIJ1fpnIJGiUJMRi1PfLkuZNWo",
+    "types": [
+        "locality",
+        "political"
+    ],
+    "formattedAddress": "Formosa, State of Goi\u00e1s, Brazil",
+    "addressComponents": [
+        {
+            "longText": "Formosa",
+            "shortText": "Formosa",
+            "types": [
+                "locality",
+                "political"
+            ],
+            "languageCode": "en"
+        },
+        {
+            "longText": "Formosa",
+            "shortText": "Formosa",
+            "types": [
+                "administrative_area_level_4",
+                "political"
+            ],
+            "languageCode": "pt"
+        },
+        {
+            "longText": "Formosa",
+            "shortText": "Formosa",
+            "types": [
+                "administrative_area_level_2",
+                "political"
+            ],
+            "languageCode": "en"
+        },
+        {
+            "longText": "State of Goi\u00e1s",
+            "shortText": "GO",
+            "types": [
+                "administrative_area_level_1",
+                "political"
+            ],
+            "languageCode": "en"
+        },
+        {
+            "longText": "Brazil",
+            "shortText": "BR",
+            "types": [
+                "country",
+                "political"
+            ],
+            "languageCode": "en"
+        }
+    ]
+}

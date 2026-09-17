@@ -1,7 +1,8 @@
 package br.com.vanep.auth.web;
 
-import br.com.vanep.user.Gender;
-import br.com.vanep.user.UserType;
+import br.com.vanep.auth.validation.Cpf;
+import br.com.vanep.user.enums.Gender;
+import br.com.vanep.user.enums.UserType;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -14,12 +15,13 @@ import org.springframework.format.annotation.DateTimeFormat;
 @Setter
 public class SignupForm {
 
-  @NotNull(message = "Escolha cliente ou motorista.")
+  @NotNull(message = "{auth.signup.type.required}")
   private UserType type;
 
   private String name;
 
   @NotBlank(message = "Informe seu documento (CPF).")
+  @Cpf
   private String document;
 
   private String phone;

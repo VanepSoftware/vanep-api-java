@@ -6,6 +6,9 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import br.com.vanep.assistant.enums.AssistantStatus;
+import br.com.vanep.assistant.model.AssistantModel;
+import br.com.vanep.assistant.repository.AssistantRepository;
 import br.com.vanep.auth.verification.EmailVerificationService;
 import br.com.vanep.client.model.ClientModel;
 import br.com.vanep.client.repository.ClientRepository;
@@ -15,9 +18,9 @@ import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.role.RoleName;
 import br.com.vanep.role.model.RoleModel;
 import br.com.vanep.role.repository.RoleRepository;
-import br.com.vanep.user.UserRepository;
-import br.com.vanep.user.UserType;
+import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
+import br.com.vanep.user.repository.UserRepository;
 import java.math.BigDecimal;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
@@ -29,10 +32,10 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 
 @ExtendWith(MockitoExtension.class)
 class RegistrationServiceTest {
-
   @Mock private UserRepository users;
   @Mock private ClientRepository clients;
   @Mock private DriverRepository drivers;
+  @Mock private AssistantRepository assistants;
   @Mock private RoleRepository roles;
   @Mock private PasswordEncoder passwordEncoder;
   @Mock private EmailVerificationService emailVerification;
@@ -49,7 +52,7 @@ class RegistrationServiceTest {
     when(users.save(any(UserModel.class))).thenAnswer(inv -> inv.getArgument(0));
     when(passwordEncoder.encode(anyString())).thenReturn("hashed");
     return new RegistrationService(
-        users, clients, drivers, roles, passwordEncoder, emailVerification);
+        users, clients, drivers, assistants, roles, passwordEncoder, emailVerification);
   }
 
   @Test
@@ -61,7 +64,7 @@ class RegistrationServiceTest {
     form.setName("Ana");
     form.setEmail("ana@vanep.com");
     form.setPassword("secret1");
-    form.setDocument("11111111111");
+    form.setDocument("39053344705");
     form.setAcceptTerms(true);
 
     UserModel user = service.registerClient(form);
@@ -85,8 +88,7 @@ class RegistrationServiceTest {
     form.setName("Bruno");
     form.setEmail("bruno@vanep.com");
     form.setPassword("secret1");
-    form.setDocument("22222222222");
-    form.setCity("Taguatinga");
+    form.setDocument("52998224725");
     form.setBasePrice(new BigDecimal("120.00"));
     form.setExperienceYears(5);
     form.setAcceptTerms(true);
@@ -100,6 +102,29 @@ class RegistrationServiceTest {
     verify(drivers).save(driver.capture());
     assertThat(driver.getValue().getApprovalStatus()).isEqualTo(DriverApprovalStatus.PENDING);
     assertThat(driver.getValue().getBasePrice()).isEqualByComparingTo("120.00");
-    assertThat(driver.getValue().getCity()).isEqualTo("Taguatinga");
+  }
+
+  @Test
+  void registerAssistantCreatesUserAndUnlinkedProfile() {
+    RegistrationService service = service();
+    when(roles.findByRoleName(RoleName.ASSISTANT))
+        .thenReturn(Optional.of(roleTaggedAs(RoleName.ASSISTANT, 4L)));
+    AssistantSignupForm form = new AssistantSignupForm();
+    form.setName("Carla");
+    form.setEmail("carla@vanep.com");
+    form.setPassword("secret1");
+    form.setDocument("11144477735");
+    form.setAcceptTerms(true);
+
+    UserModel user = service.registerAssistant(form);
+
+    assertThat(user.getType()).isEqualTo(UserType.ASSISTANT);
+    assertThat(user.getRoleId()).isEqualTo(4L);
+
+    ArgumentCaptor<AssistantModel> assistant = ArgumentCaptor.forClass(AssistantModel.class);
+    verify(assistants).save(assistant.capture());
+    assertThat(assistant.getValue().getUser()).isSameAs(user);
+    assertThat(assistant.getValue().getStatus()).isEqualTo(AssistantStatus.UNLINKED);
+    assertThat(assistant.getValue().getDriver()).isNull();
   }
 }

@@ -12,8 +12,8 @@ import br.com.vanep.client.model.ClientModel;
 import br.com.vanep.client.repository.ClientRepository;
 import br.com.vanep.dependent.model.DependentModel;
 import br.com.vanep.dependent.repository.DependentRepository;
-import br.com.vanep.user.UserRepository;
 import br.com.vanep.user.model.UserModel;
+import br.com.vanep.user.repository.UserRepository;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -62,7 +62,10 @@ class DependentSeederTest {
     ArgumentCaptor<DependentModel> captor = ArgumentCaptor.forClass(DependentModel.class);
     verify(dependents, times(2)).save(captor.capture());
     assertThat(captor.getAllValues()).allMatch(dependent -> dependent.getClientId().equals(100L));
-    assertThat(captor.getAllValues().stream().filter(DependentModel::isDefaultDependent).count())
+    assertThat(
+            captor.getAllValues().stream()
+                .filter(dependent -> dependent.isDefaultDependent())
+                .count())
         .isEqualTo(1);
   }
 

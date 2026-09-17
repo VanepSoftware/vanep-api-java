@@ -1,0 +1,61 @@
+{
+    "id": "EkZSLiBkYXMgUGl0YW5ndWVpcmFzIC0gw4FndWFzIENsYXJhcywgQnJhc8OtbGlhIC0gREYsIDcxOTM4LTU0MCwgQnJhemlsIi4qLAoUChIJbdXY6xMyWpMRUtgFr-l9NswSFAoSCc0-IwdrMlqTEQ6fG43ykvZ3",
+    "types": [
+        "route"
+    ],
+    "formattedAddress": "R. das Pitangueiras - \u00c1guas Claras, Bras\u00edlia - DF, 71938-540, Brazil",
+    "addressComponents": [
+        {
+            "longText": "Rua das Pitangueiras",
+            "shortText": "R. das Pitangueiras",
+            "types": [
+                "route"
+            ],
+            "languageCode": "pt"
+        },
+        {
+            "longText": "\u00c1guas Claras",
+            "shortText": "\u00c1guas Claras",
+            "types": [
+                "administrative_area_level_4",
+                "political"
+            ],
+            "languageCode": "pt"
+        },
+        {
+            "longText": "Bras\u00edlia",
+            "shortText": "Bras\u00edlia",
+            "types": [
+                "administrative_area_level_2",
+                "political"
+            ],
+            "languageCode": "pt"
+        },
+        {
+            "longText": "Distrito Federal",
+            "shortText": "DF",
+            "types": [
+                "administrative_area_level_1",
+                "political"
+            ],
+            "languageCode": "pt"
+        },
+        {
+            "longText": "Brazil",
+            "shortText": "BR",
+            "types": [
+                "country",
+                "political"
+            ],
+            "languageCode": "en"
+        },
+        {
+            "longText": "71938-540",
+            "shortText": "71938-540",
+            "types": [
+                "postal_code"
+            ],
+            "languageCode": "en-US"
+        }
+    ]
+}

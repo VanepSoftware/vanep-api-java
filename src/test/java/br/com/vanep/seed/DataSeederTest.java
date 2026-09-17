@@ -11,22 +11,27 @@ import static org.mockito.Mockito.when;
 
 import br.com.vanep.auth.security.PermissionEnum;
 import br.com.vanep.auth.security.PermissionRegistry;
-import br.com.vanep.city.seed.CitySeeder;
 import br.com.vanep.client.repository.ClientRepository;
+import br.com.vanep.clientrating.seed.ClientRatingSeeder;
+import br.com.vanep.country.seed.CountrySeeder;
 import br.com.vanep.dependent.seed.DependentSeeder;
 import br.com.vanep.driver.DriverApprovalStatus;
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
+import br.com.vanep.drivercnh.seed.DriverCnhSeeder;
+import br.com.vanep.driverdocument.seed.DriverDocumentSeeder;
+import br.com.vanep.driverrating.seed.DriverRatingSeeder;
 import br.com.vanep.role.RoleName;
 import br.com.vanep.role.model.RoleModel;
 import br.com.vanep.role.repository.RoleRepository;
 import br.com.vanep.rolepermission.model.RolePermissionModel;
 import br.com.vanep.rolepermission.repository.RolePermissionRepository;
-import br.com.vanep.school.seed.SchoolSeeder;
 import br.com.vanep.state.seed.StateSeeder;
-import br.com.vanep.user.UserRepository;
-import br.com.vanep.user.UserType;
+import br.com.vanep.trip.seed.TripSeeder;
+import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
+import br.com.vanep.user.repository.UserRepository;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -40,16 +45,20 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 
 @ExtendWith(MockitoExtension.class)
 class DataSeederTest {
-
   @Mock private UserRepository users;
   @Mock private ClientRepository clients;
   @Mock private DriverRepository drivers;
   @Mock private RoleRepository roles;
   @Mock private RolePermissionRepository rolePermissions;
+
   @Mock private DependentSeeder dependentSeeder;
-  @Mock private SchoolSeeder schoolSeeder;
+  @Mock private DriverCnhSeeder driverCnhSeeder;
+  @Mock private DriverDocumentSeeder driverDocumentSeeder;
+  @Mock private CountrySeeder countrySeeder;
   @Mock private StateSeeder stateSeeder;
-  @Mock private CitySeeder citySeeder;
+  @Mock private DriverRatingSeeder driverRatingSeeder;
+  @Mock private ClientRatingSeeder clientRatingSeeder;
+  @Mock private TripSeeder tripSeeder;
   @Mock private PasswordEncoder passwordEncoder;
 
   private DataSeeder seeder;
@@ -64,13 +73,18 @@ class DataSeederTest {
             roles,
             rolePermissions,
             dependentSeeder,
-            schoolSeeder,
+            driverCnhSeeder,
+            driverDocumentSeeder,
+            countrySeeder,
             stateSeeder,
-            citySeeder,
+            driverRatingSeeder,
+            clientRatingSeeder,
+            tripSeeder,
             passwordEncoder);
+
     seeder.adminEmail = "admin@vanep.com.br";
     seeder.adminPassword = "password";
-    seeder.adminDocument = "00000000000";
+    seeder.adminDocument = "56789012303";
   }
 
   private RoleModel roleTaggedAs(RoleName roleName) {
@@ -79,6 +93,13 @@ class DataSeederTest {
     role.setName(roleName.name().toLowerCase());
     role.setRoleName(roleName);
     return role;
+  }
+
+  private RolePermissionModel completeAdminBundle() {
+    RolePermissionModel bundle = new RolePermissionModel();
+    bundle.setName("ADMIN");
+    bundle.setPermissions(List.copyOf(PermissionRegistry.all()));
+    return bundle;
   }
 
   @Test
@@ -102,6 +123,8 @@ class DataSeederTest {
         .thenReturn(Optional.of(roleTaggedAs(RoleName.CLIENT)));
     when(roles.findByRoleName(RoleName.DRIVER))
         .thenReturn(Optional.of(roleTaggedAs(RoleName.DRIVER)));
+    when(roles.findByRoleName(RoleName.ASSISTANT))
+        .thenReturn(Optional.of(roleTaggedAs(RoleName.ASSISTANT)));
 
     RoleModel adminRole = roleTaggedAs(RoleName.ADMIN);
     when(roles.findByRoleName(RoleName.ADMIN))
@@ -113,7 +136,7 @@ class DataSeederTest {
     seeder.run(new DefaultApplicationArguments());
 
     ArgumentCaptor<RolePermissionModel> captor = ArgumentCaptor.forClass(RolePermissionModel.class);
-    verify(rolePermissions, times(2)).save(captor.capture());
+    verify(rolePermissions, times(4)).save(captor.capture());
     RolePermissionModel adminBundle =
         captor.getAllValues().stream()
             .filter(bundle -> "ADMIN".equals(bundle.getName()))
@@ -128,12 +151,53 @@ class DataSeederTest {
   void createsClientBundleWithDependentPermissionsWhenMissing() {
     seeder.enabled = true;
     RoleModel adminRole = roleTaggedAs(RoleName.ADMIN);
-    adminRole.setRolePermission(new RolePermissionModel());
+    adminRole.setRolePermission(completeAdminBundle());
     RoleModel clientRole = roleTaggedAs(RoleName.CLIENT);
+    RoleModel driverRole = roleTaggedAs(RoleName.DRIVER);
+    RoleModel assistantRole = roleTaggedAs(RoleName.ASSISTANT);
     when(roles.findByRoleName(RoleName.ADMIN)).thenReturn(Optional.of(adminRole));
     when(roles.findByRoleName(RoleName.CLIENT)).thenReturn(Optional.of(clientRole));
-    when(roles.findByRoleName(RoleName.DRIVER))
-        .thenReturn(Optional.of(roleTaggedAs(RoleName.DRIVER)));
+    when(roles.findByRoleName(RoleName.DRIVER)).thenReturn(Optional.of(driverRole));
+    when(roles.findByRoleName(RoleName.ASSISTANT)).thenReturn(Optional.of(assistantRole));
+    when(users.existsByEmail(anyString())).thenReturn(true);
+    when(users.findByTypeAndRoleIdIsNull(UserType.ADMIN)).thenReturn(List.of());
+    when(rolePermissions.save(any(RolePermissionModel.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+
+    seeder.run(new DefaultApplicationArguments());
+
+    ArgumentCaptor<RolePermissionModel> captor = ArgumentCaptor.forClass(RolePermissionModel.class);
+    verify(rolePermissions, times(3)).save(captor.capture());
+    assertThat(captor.getAllValues())
+        .extracting(bundle -> bundle.getName())
+        .containsExactlyInAnyOrder("CLIENT", "ASSISTANT", "DRIVER");
+  }
+
+  @Test
+  void resyncsAdminBundleDroppingRemovedAddressPermissions() {
+    seeder.enabled = true;
+    RolePermissionModel stale = new RolePermissionModel();
+    stale.setName("ADMIN");
+    List<String> stalePermissions = new ArrayList<>(PermissionRegistry.all());
+    stalePermissions.add("list_addresses");
+    stalePermissions.add("show_address");
+    stalePermissions.add("create_address");
+    stalePermissions.add("update_address");
+    stalePermissions.add("delete_address");
+    stale.setPermissions(stalePermissions);
+
+    RoleModel adminRole = roleTaggedAs(RoleName.ADMIN);
+    adminRole.setRolePermission(stale);
+    RoleModel clientRole = roleTaggedAs(RoleName.CLIENT);
+    clientRole.setRolePermission(new RolePermissionModel());
+    RoleModel driverRole = roleTaggedAs(RoleName.DRIVER);
+    driverRole.setRolePermission(new RolePermissionModel());
+    RoleModel assistantRole = roleTaggedAs(RoleName.ASSISTANT);
+    assistantRole.setRolePermission(new RolePermissionModel());
+    when(roles.findByRoleName(RoleName.ADMIN)).thenReturn(Optional.of(adminRole));
+    when(roles.findByRoleName(RoleName.CLIENT)).thenReturn(Optional.of(clientRole));
+    when(roles.findByRoleName(RoleName.DRIVER)).thenReturn(Optional.of(driverRole));
+    when(roles.findByRoleName(RoleName.ASSISTANT)).thenReturn(Optional.of(assistantRole));
     when(users.existsByEmail(anyString())).thenReturn(true);
     when(users.findByTypeAndRoleIdIsNull(UserType.ADMIN)).thenReturn(List.of());
     when(rolePermissions.save(any(RolePermissionModel.class)))
@@ -143,23 +207,27 @@ class DataSeederTest {
 
     ArgumentCaptor<RolePermissionModel> captor = ArgumentCaptor.forClass(RolePermissionModel.class);
     verify(rolePermissions).save(captor.capture());
-    assertThat(captor.getValue().getName()).isEqualTo("CLIENT");
     assertThat(captor.getValue().getPermissions())
-        .containsExactlyInAnyOrderElementsOf(PermissionEnum.crudFor("dependents"));
-    assertThat(clientRole.getRolePermission()).isEqualTo(captor.getValue());
+        .containsExactlyInAnyOrderElementsOf(PermissionRegistry.all())
+        .doesNotContain(
+            "list_addresses", "show_address", "create_address", "update_address", "delete_address");
   }
 
   @Test
   void seedingIsIdempotentWhenAdminBundleAndRolesAlreadyExist() {
     seeder.enabled = true;
     RoleModel adminRole = roleTaggedAs(RoleName.ADMIN);
-    adminRole.setRolePermission(new RolePermissionModel());
+    adminRole.setRolePermission(completeAdminBundle());
     RoleModel clientRole = roleTaggedAs(RoleName.CLIENT);
     clientRole.setRolePermission(new RolePermissionModel());
+    RoleModel driverRole = roleTaggedAs(RoleName.DRIVER);
+    driverRole.setRolePermission(new RolePermissionModel());
+    RoleModel assistantRole = roleTaggedAs(RoleName.ASSISTANT);
+    assistantRole.setRolePermission(new RolePermissionModel());
     when(roles.findByRoleName(RoleName.ADMIN)).thenReturn(Optional.of(adminRole));
     when(roles.findByRoleName(RoleName.CLIENT)).thenReturn(Optional.of(clientRole));
-    when(roles.findByRoleName(RoleName.DRIVER))
-        .thenReturn(Optional.of(roleTaggedAs(RoleName.DRIVER)));
+    when(roles.findByRoleName(RoleName.DRIVER)).thenReturn(Optional.of(driverRole));
+    when(roles.findByRoleName(RoleName.ASSISTANT)).thenReturn(Optional.of(assistantRole));
     when(users.existsByEmail(anyString())).thenReturn(true);
     when(users.findByTypeAndRoleIdIsNull(UserType.ADMIN)).thenReturn(List.of());
 
@@ -180,6 +248,8 @@ class DataSeederTest {
         .thenReturn(Optional.of(roleTaggedAs(RoleName.CLIENT)));
     when(roles.findByRoleName(RoleName.DRIVER))
         .thenReturn(Optional.of(roleTaggedAs(RoleName.DRIVER)));
+    when(roles.findByRoleName(RoleName.ASSISTANT))
+        .thenReturn(Optional.of(roleTaggedAs(RoleName.ASSISTANT)));
     when(users.existsByEmail(anyString())).thenReturn(false);
     when(users.findByTypeAndRoleIdIsNull(UserType.ADMIN)).thenReturn(List.of());
     when(passwordEncoder.encode(anyString())).thenReturn("hashed");
@@ -199,6 +269,8 @@ class DataSeederTest {
     when(roles.findByRoleName(RoleName.CLIENT))
         .thenReturn(Optional.of(roleTaggedAs(RoleName.CLIENT)));
     when(roles.findByRoleName(RoleName.DRIVER)).thenReturn(Optional.of(driverRole));
+    when(roles.findByRoleName(RoleName.ASSISTANT))
+        .thenReturn(Optional.of(roleTaggedAs(RoleName.ASSISTANT)));
     when(users.existsByEmail(anyString())).thenReturn(false);
     when(users.findByTypeAndRoleIdIsNull(UserType.ADMIN)).thenReturn(List.of());
     when(passwordEncoder.encode(anyString())).thenReturn("hashed");
@@ -206,8 +278,85 @@ class DataSeederTest {
     seeder.run(new DefaultApplicationArguments());
 
     ArgumentCaptor<DriverModel> captor = ArgumentCaptor.forClass(DriverModel.class);
-    verify(drivers, times(1)).save(captor.capture());
-    assertThat(captor.getValue().getApprovalStatus()).isEqualTo(DriverApprovalStatus.APPROVED);
-    assertThat(captor.getValue().getUser().getRoleId()).isEqualTo(driverRole.getId());
+    verify(drivers, times(3)).save(captor.capture());
+    assertThat(captor.getAllValues().get(0).getApprovalStatus())
+        .isEqualTo(DriverApprovalStatus.APPROVED);
+    assertThat(captor.getAllValues().get(0).getUser().getRoleId()).isEqualTo(driverRole.getId());
+  }
+
+  @Test
+  void createsAssistantBundleWithProfilePermissionsWhenMissing() {
+    seeder.enabled = true;
+    RoleModel adminRole = roleTaggedAs(RoleName.ADMIN);
+    adminRole.setRolePermission(completeAdminBundle());
+    RoleModel clientRole = roleTaggedAs(RoleName.CLIENT);
+    clientRole.setRolePermission(new RolePermissionModel());
+    RoleModel driverRole = roleTaggedAs(RoleName.DRIVER);
+    driverRole.setRolePermission(new RolePermissionModel());
+    RoleModel assistantRole = roleTaggedAs(RoleName.ASSISTANT);
+    when(roles.findByRoleName(RoleName.ADMIN)).thenReturn(Optional.of(adminRole));
+    when(roles.findByRoleName(RoleName.CLIENT)).thenReturn(Optional.of(clientRole));
+    when(roles.findByRoleName(RoleName.DRIVER)).thenReturn(Optional.of(driverRole));
+    when(roles.findByRoleName(RoleName.ASSISTANT)).thenReturn(Optional.of(assistantRole));
+    when(users.existsByEmail(anyString())).thenReturn(true);
+    when(users.findByTypeAndRoleIdIsNull(UserType.ADMIN)).thenReturn(List.of());
+    when(rolePermissions.save(any(RolePermissionModel.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+
+    seeder.run(new DefaultApplicationArguments());
+
+    ArgumentCaptor<RolePermissionModel> captor = ArgumentCaptor.forClass(RolePermissionModel.class);
+    verify(rolePermissions).save(captor.capture());
+    assertThat(captor.getValue().getName()).isEqualTo("ASSISTANT");
+    assertThat(captor.getValue().getPermissions())
+        .containsExactlyInAnyOrder(
+            PermissionEnum.SHOW_ASSISTANT.value(),
+            PermissionEnum.UPDATE_ASSISTANT.value(),
+            PermissionEnum.REVOKE_ASSISTANT.value());
+    assertThat(assistantRole.getRolePermission()).isEqualTo(captor.getValue());
+  }
+
+  @Test
+  void createsDriverBundleWithAssistantManagementPermissionsWhenMissing() {
+    seeder.enabled = true;
+    RoleModel adminRole = roleTaggedAs(RoleName.ADMIN);
+    adminRole.setRolePermission(completeAdminBundle());
+    RoleModel clientRole = roleTaggedAs(RoleName.CLIENT);
+    clientRole.setRolePermission(new RolePermissionModel());
+    RoleModel assistantRole = roleTaggedAs(RoleName.ASSISTANT);
+    assistantRole.setRolePermission(new RolePermissionModel());
+    RoleModel driverRole = roleTaggedAs(RoleName.DRIVER);
+    when(roles.findByRoleName(RoleName.ADMIN)).thenReturn(Optional.of(adminRole));
+    when(roles.findByRoleName(RoleName.CLIENT)).thenReturn(Optional.of(clientRole));
+    when(roles.findByRoleName(RoleName.ASSISTANT)).thenReturn(Optional.of(assistantRole));
+    when(roles.findByRoleName(RoleName.DRIVER)).thenReturn(Optional.of(driverRole));
+    when(users.existsByEmail(anyString())).thenReturn(true);
+    when(users.findByTypeAndRoleIdIsNull(UserType.ADMIN)).thenReturn(List.of());
+    when(rolePermissions.save(any(RolePermissionModel.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+
+    seeder.run(new DefaultApplicationArguments());
+
+    ArgumentCaptor<RolePermissionModel> captor = ArgumentCaptor.forClass(RolePermissionModel.class);
+    verify(rolePermissions).save(captor.capture());
+    assertThat(captor.getValue().getName()).isEqualTo("DRIVER");
+    assertThat(captor.getValue().getPermissions())
+        .containsExactlyInAnyOrder(
+            PermissionEnum.LIST_ASSISTANTS.value(),
+            PermissionEnum.PAUSE_ASSISTANT.value(),
+            PermissionEnum.RESUME_ASSISTANT.value(),
+            PermissionEnum.REVOKE_ASSISTANT.value(),
+            PermissionEnum.CREATE_ASSISTANT_INVITE.value(),
+            PermissionEnum.CANCEL_ASSISTANT_INVITE.value(),
+            PermissionEnum.CREATE_DRIVER_CNH.value(),
+            PermissionEnum.LIST_DRIVER_CNHS.value(),
+            PermissionEnum.CREATE_DRIVER_DOCUMENT.value(),
+            PermissionEnum.LIST_DRIVER_DOCUMENTS.value(),
+            PermissionEnum.START_TRIP.value(),
+            PermissionEnum.FINISH_TRIP.value(),
+            PermissionEnum.CREATE_CLIENT_RATING.value(),
+            PermissionEnum.LIST_CLIENT_RATINGS.value(),
+            PermissionEnum.SHOW_CLIENT_RATING.value());
+    assertThat(driverRole.getRolePermission()).isEqualTo(captor.getValue());
   }
 }

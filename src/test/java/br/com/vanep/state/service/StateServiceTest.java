@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
+import br.com.vanep.country.model.CountryModel;
 import br.com.vanep.state.dto.StateResponseDTO;
 import br.com.vanep.state.mapper.StateMapper;
 import br.com.vanep.state.model.StateModel;
@@ -36,10 +37,15 @@ class StateServiceTest {
   }
 
   private StateModel stateWithToken(String token) {
+    CountryModel country = new CountryModel();
+    country.setId(100L);
+    country.setName("Brasil");
+
     StateModel state = new StateModel();
     state.setToken(token);
     state.setName("São Paulo");
     state.setUf("SP");
+    state.setCountry(country);
     return state;
   }
 

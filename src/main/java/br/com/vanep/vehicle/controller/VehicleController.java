@@ -44,30 +44,27 @@ public class VehicleController {
   }
 
   @GetMapping("/{token}")
-  @PreAuthorize("hasAuthority('show_vehicle') or @vehicleSecurity.isOwner(#token, authentication)")
+  @PreAuthorize("hasAuthority('show_vehicle') or @sec.isVehicleOwner(#token, authentication)")
   public VehicleResponseDTO get(@PathVariable String token) {
     return service.findByToken(token);
   }
 
   @PutMapping("/{token}")
-  @PreAuthorize(
-      "hasAuthority('update_vehicle') or @vehicleSecurity.isOwner(#token, authentication)")
+  @PreAuthorize("hasAuthority('update_vehicle') or @sec.isVehicleOwner(#token, authentication)")
   public VehicleResponseDTO update(
       @PathVariable String token, @Valid @RequestBody VehicleRequestDTO request) {
     return service.update(token, request);
   }
 
   @DeleteMapping("/{token}")
-  @PreAuthorize(
-      "hasAuthority('delete_vehicle') or @vehicleSecurity.isOwner(#token, authentication)")
+  @PreAuthorize("hasAuthority('delete_vehicle') or @sec.isVehicleOwner(#token, authentication)")
   @ResponseStatus(HttpStatus.NO_CONTENT)
   public void delete(@PathVariable String token) {
     service.delete(token);
   }
 
   @PostMapping("/{token}/restore")
-  @PreAuthorize(
-      "hasAuthority('restore_vehicle') or @vehicleSecurity.isOwner(#token, authentication)")
+  @PreAuthorize("hasAuthority('restore_vehicle') or @sec.isVehicleOwner(#token, authentication)")
   public VehicleResponseDTO restore(@PathVariable String token) {
     return service.restore(token);
   }

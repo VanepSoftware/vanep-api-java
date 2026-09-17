@@ -8,9 +8,12 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import br.com.vanep.user.AuthProvider;
-import br.com.vanep.user.OAuthAccountRepository;
-import br.com.vanep.user.UserRepository;
+import br.com.vanep.assistant.enums.AssistantStatus;
+import br.com.vanep.assistant.repository.AssistantRepository;
+import br.com.vanep.user.enums.AuthProvider;
+import br.com.vanep.user.enums.UserType;
+import br.com.vanep.user.repository.OAuthAccountRepository;
+import br.com.vanep.user.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,6 +33,7 @@ class GoogleLoginTest {
   @Autowired private WebApplicationContext context;
   @Autowired private UserRepository users;
   @Autowired private OAuthAccountRepository oauthAccounts;
+  @Autowired private AssistantRepository assistants;
 
   private MockMvc mockMvc;
 
@@ -81,14 +85,14 @@ class GoogleLoginTest {
                                     .claim("name", "Buyer")))
                 .with(csrf())
                 .param("type", "CLIENT")
-                .param("document", "12345678901")
+                .param("document", "39053344705")
                 .param("phone", "11999990000")
                 .param("acceptTerms", "true"))
         .andExpect(status().is3xxRedirection());
 
     var created = users.findByEmail("buyer@gmail.com");
     assertThat(created).isPresent();
-    assertThat(created.get().getDocument()).isEqualTo("12345678901");
+    assertThat(created.get().getDocument()).isEqualTo("39053344705");
     assertThat(oauthAccounts.findByProviderAndProviderUid(AuthProvider.GOOGLE, "g-2")).isPresent();
   }
 
@@ -105,5 +109,33 @@ class GoogleLoginTest {
         .andExpect(content().string(org.hamcrest.Matchers.containsString("Complete seu cadastro")));
 
     assertThat(users.findByEmail("x@gmail.com")).isEmpty();
+  }
+
+  @Test
+  void signupCompleteCreatesUnlinkedAssistant() throws Exception {
+    mockMvc
+        .perform(
+            post("/signup/complete")
+                .with(
+                    oidcLogin()
+                        .idToken(
+                            t ->
+                                t.subject("g-4")
+                                    .claim("email", "assistant@gmail.com")
+                                    .claim("name", "Assistant")))
+                .with(csrf())
+                .param("type", "ASSISTANT")
+                .param("document", "52998224725")
+                .param("acceptTerms", "true"))
+        .andExpect(status().is3xxRedirection());
+
+    var created = users.findByEmail("assistant@gmail.com");
+    assertThat(created).isPresent();
+    assertThat(created.get().getType()).isEqualTo(UserType.ASSISTANT);
+    assertThat(assistants.findByUserId(created.get().getId())).isPresent();
+    assertThat(assistants.findByUserId(created.get().getId()).orElseThrow().getStatus())
+        .isEqualTo(AssistantStatus.UNLINKED);
+    assertThat(assistants.findByUserId(created.get().getId()).orElseThrow().getDriver()).isNull();
+    assertThat(oauthAccounts.findByProviderAndProviderUid(AuthProvider.GOOGLE, "g-4")).isPresent();
   }
 }

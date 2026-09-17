@@ -1,7 +1,7 @@
 package br.com.vanep.user.model;
 
-import br.com.vanep.user.Gender;
-import br.com.vanep.user.UserType;
+import br.com.vanep.user.enums.Gender;
+import br.com.vanep.user.enums.UserType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -27,7 +27,6 @@ import org.hibernate.annotations.UpdateTimestamp;
 @Getter
 @Setter
 public class UserModel {
-
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;
@@ -45,11 +44,17 @@ public class UserModel {
   @Column(name = "country_id")
   private Long countryId;
 
+  @Column(name = "address_id")
+  private Long addressId;
+
   @Column(nullable = false)
   private String name;
 
   @Column(nullable = false, unique = true)
   private String email;
+
+  @Column(name = "pending_email")
+  private String pendingEmail;
 
   @Column(unique = true)
   private String username;
@@ -76,6 +81,12 @@ public class UserModel {
 
   @Column(name = "last_name_change_at")
   private Instant lastNameChangeAt;
+
+  @Column(name = "last_phone_change_at")
+  private Instant lastPhoneChangeAt;
+
+  @Column(name = "last_email_change_at")
+  private Instant lastEmailChangeAt;
 
   @Column(name = "last_login_at")
   private Instant lastLoginAt;

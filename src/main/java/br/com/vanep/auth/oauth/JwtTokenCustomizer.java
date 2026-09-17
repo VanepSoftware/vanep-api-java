@@ -1,10 +1,11 @@
 package br.com.vanep.auth.oauth;
 
+import br.com.vanep.assistant.repository.AssistantRepository;
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.role.repository.RoleRepository;
-import br.com.vanep.user.UserRepository;
-import br.com.vanep.user.UserType;
+import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
+import br.com.vanep.user.repository.UserRepository;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.security.oauth2.server.authorization.OAuth2TokenType;
@@ -17,11 +18,17 @@ public class JwtTokenCustomizer implements OAuth2TokenCustomizer<JwtEncodingCont
 
   private final UserRepository users;
   private final DriverRepository drivers;
+  private final AssistantRepository assistants;
   private final RoleRepository roles;
 
-  public JwtTokenCustomizer(UserRepository users, DriverRepository drivers, RoleRepository roles) {
+  public JwtTokenCustomizer(
+      UserRepository users,
+      DriverRepository drivers,
+      AssistantRepository assistants,
+      RoleRepository roles) {
     this.users = users;
     this.drivers = drivers;
+    this.assistants = assistants;
     this.roles = roles;
   }
 
@@ -46,6 +53,13 @@ public class JwtTokenCustomizer implements OAuth2TokenCustomizer<JwtEncodingCont
           .ifPresent(
               driver ->
                   context.getClaims().claim("driver_status", driver.getApprovalStatus().name()));
+    }
+    if (user.getType() == UserType.ASSISTANT) {
+      assistants
+          .findByUserId(user.getId())
+          .ifPresent(
+              assistant ->
+                  context.getClaims().claim("assistant_status", assistant.getStatus().name()));
     }
   }
 

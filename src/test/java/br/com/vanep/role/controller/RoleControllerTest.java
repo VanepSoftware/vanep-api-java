@@ -11,6 +11,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import br.com.vanep.role.model.RoleModel;
 import br.com.vanep.role.repository.RoleRepository;
+import br.com.vanep.rolepermission.model.RolePermissionModel;
+import br.com.vanep.rolepermission.repository.RolePermissionRepository;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,6 +34,7 @@ class RoleControllerTest {
 
   @Autowired private WebApplicationContext context;
   @Autowired private RoleRepository roles;
+  @Autowired private RolePermissionRepository rolePermissions;
 
   private MockMvc mockMvc;
   private String roleToken;
@@ -139,6 +143,38 @@ class RoleControllerTest {
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.name").value("New Role"))
         .andExpect(jsonPath("$.token").isNotEmpty());
+  }
+
+  @Test
+  void createLinksRolePermissionBundle() throws Exception {
+    RolePermissionModel bundle = new RolePermissionModel();
+    bundle.setName("Bundle A");
+    bundle.setPermissions(List.of("list_drivers", "show_driver"));
+    bundle = rolePermissions.save(bundle);
+
+    mockMvc
+        .perform(
+            post("/api/roles")
+                .with(adminJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"name\":\"Ops\",\"description\":\"d\",\"rolePermissionToken\":\""
+                        + bundle.getToken()
+                        + "\"}"))
+        .andExpect(status().isCreated())
+        .andExpect(jsonPath("$.rolePermission.token").value(bundle.getToken()))
+        .andExpect(jsonPath("$.rolePermission.name").value("Bundle A"));
+  }
+
+  @Test
+  void createReturns404WhenBundleMissing() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/roles")
+                .with(adminJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"Ops\",\"rolePermissionToken\":\"doesnotexist\"}"))
+        .andExpect(status().isNotFound());
   }
 
   @Test

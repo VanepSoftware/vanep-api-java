@@ -1,11 +1,10 @@
 package br.com.vanep.dependent.seed;
 
-import br.com.vanep.client.model.ClientModel;
 import br.com.vanep.client.repository.ClientRepository;
-import br.com.vanep.dependent.enums.Shift;
 import br.com.vanep.dependent.model.DependentModel;
 import br.com.vanep.dependent.repository.DependentRepository;
-import br.com.vanep.user.UserRepository;
+import br.com.vanep.shared.enums.Shift;
+import br.com.vanep.user.repository.UserRepository;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,7 +41,7 @@ public class DependentSeeder {
     return users
         .findByEmail(SEED_CLIENT_EMAIL)
         .flatMap(user -> clients.findByUserId(user.getId()))
-        .map(ClientModel::getId);
+        .map(client -> client.getId());
   }
 
   private void createIfMissing(Long clientId, String name, String document, boolean isDefault) {

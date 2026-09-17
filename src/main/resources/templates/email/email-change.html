@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+  <head>
+    <meta charset="utf-8" />
+  </head>
+  <body style="font-family: Arial, Helvetica, sans-serif; color: #111">
+    <h2>Confirme seu novo e-mail</h2>
+    <p th:text="'Olá, ' + ${name} + '!'">Olá!</p>
+    <p>
+      Recebemos uma solicitação para alterar o endereço de e-mail da sua conta Vanep.
+    </p>
+    <p>
+      Para concluir essa alteração, confirme seu novo endereço de e-mail clicando no botão
+      abaixo.
+    </p>
+    <p>
+      <a
+        th:href="${link}"
+        style="
+          display: inline-block;
+          padding: 12px 20px;
+          background: #111;
+          color: #fff;
+          border-radius: 8px;
+          text-decoration: none;
+        "
+        >Confirmar novo e-mail</a
+      >
+    </p>
+    <p>Se o botão não funcionar, copie e cole este endereço no navegador:</p>
+    <p><a th:href="${link}" th:text="${link}">link</a></p>
+    <p style="color: #666; font-size: 12px">
+      Se você não solicitou essa alteração, ignore este e-mail — o endereço atual da sua conta
+      continua o mesmo.
+    </p>
+  </body>
+</html>

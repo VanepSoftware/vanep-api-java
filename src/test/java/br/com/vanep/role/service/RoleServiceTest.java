@@ -12,11 +12,14 @@ import br.com.vanep.role.dto.RoleUpdateRequestDTO;
 import br.com.vanep.role.mapper.RoleMapper;
 import br.com.vanep.role.model.RoleModel;
 import br.com.vanep.role.repository.RoleRepository;
+import br.com.vanep.rolepermission.model.RolePermissionModel;
+import br.com.vanep.rolepermission.repository.RolePermissionRepository;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
@@ -27,13 +30,14 @@ import org.springframework.web.server.ResponseStatusException;
 class RoleServiceTest {
 
   @Mock private RoleRepository repository;
+  @Mock private RolePermissionRepository rolePermissions;
   @Mock private RoleMapper mapper;
 
   private RoleService service;
 
   @BeforeEach
   void setUp() {
-    service = new RoleService(repository, mapper);
+    service = new RoleService(repository, rolePermissions, mapper);
   }
 
   private RoleModel roleWithToken(String token) {
@@ -78,7 +82,7 @@ class RoleServiceTest {
 
   @Test
   void createPersistsRole() {
-    RoleCreateRequestDTO req = new RoleCreateRequestDTO("Admin", "Administrator role");
+    RoleCreateRequestDTO req = new RoleCreateRequestDTO("Admin", "Administrator role", null);
     RoleModel saved = roleWithToken("tok");
     RoleResponseDTO response =
         new RoleResponseDTO("tok", "Admin", "Administrator role", null, null);
@@ -92,6 +96,33 @@ class RoleServiceTest {
   }
 
   @Test
+  void createLinksRolePermissionWhenTokenProvided() {
+    RolePermissionModel bundle = new RolePermissionModel();
+    bundle.setToken("bundle-tok");
+    RoleCreateRequestDTO req = new RoleCreateRequestDTO("Admin", "desc", "bundle-tok");
+    when(rolePermissions.findByToken("bundle-tok")).thenReturn(Optional.of(bundle));
+    when(repository.save(any(RoleModel.class))).thenAnswer(call -> call.getArgument(0));
+    when(mapper.toResponse(any(RoleModel.class)))
+        .thenReturn(new RoleResponseDTO("tok", "Admin", "desc", null, null));
+
+    service.create(req);
+
+    ArgumentCaptor<RoleModel> captor = ArgumentCaptor.forClass(RoleModel.class);
+    verify(repository).save(captor.capture());
+    assertThat(captor.getValue().getRolePermission()).isSameAs(bundle);
+  }
+
+  @Test
+  void createThrows404WhenBundleMissing() {
+    RoleCreateRequestDTO req = new RoleCreateRequestDTO("Admin", "desc", "missing-bundle");
+    when(rolePermissions.findByToken("missing-bundle")).thenReturn(Optional.empty());
+
+    assertThatThrownBy(() -> service.create(req))
+        .isInstanceOf(ResponseStatusException.class)
+        .hasMessageContaining("404");
+  }
+
+  @Test
   void updatePersistsFields() {
     RoleModel role = roleWithToken("tok");
     RoleResponseDTO response = new RoleResponseDTO("tok", "Updated", "new desc", null, null);
@@ -99,7 +130,8 @@ class RoleServiceTest {
     when(repository.save(role)).thenReturn(role);
     when(mapper.toResponse(role)).thenReturn(response);
 
-    RoleResponseDTO result = service.update("tok", new RoleUpdateRequestDTO("Updated", "new desc"));
+    RoleResponseDTO result =
+        service.update("tok", new RoleUpdateRequestDTO("Updated", "new desc", null));
 
     assertThat(result).isEqualTo(response);
     assertThat(role.getName()).isEqualTo("Updated");
@@ -110,7 +142,7 @@ class RoleServiceTest {
   void updateThrows404WhenNotFound() {
     when(repository.findByToken("missing")).thenReturn(Optional.empty());
 
-    assertThatThrownBy(() -> service.update("missing", new RoleUpdateRequestDTO("x", "y")))
+    assertThatThrownBy(() -> service.update("missing", new RoleUpdateRequestDTO("x", "y", null)))
         .isInstanceOf(ResponseStatusException.class)
         .hasMessageContaining("404");
   }

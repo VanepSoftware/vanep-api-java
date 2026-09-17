@@ -21,6 +21,9 @@
         <div class="alert alert-error" th:if="${param.error}">
           E-mail ou senha inválidos.
         </div>
+        <div class="alert alert-error" th:if="${param.email_taken}">
+          Já existe uma conta com este e-mail.
+        </div>
         <div class="alert alert-success" th:if="${param.logout}">
           Sessão encerrada com sucesso.
         </div>

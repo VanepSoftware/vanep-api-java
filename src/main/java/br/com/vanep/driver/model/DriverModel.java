@@ -16,13 +16,17 @@ import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalTime;
+import java.util.List;
 import java.util.UUID;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.SoftDelete;
 import org.hibernate.annotations.SoftDeleteType;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "driver")
@@ -30,7 +34,6 @@ import org.hibernate.annotations.UpdateTimestamp;
 @Getter
 @Setter
 public class DriverModel {
-
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;
@@ -47,15 +50,28 @@ public class DriverModel {
   @Column(precision = 3, scale = 2)
   private BigDecimal rating;
 
+  @Column private String bio;
+
   @Column private String cnpj;
 
   @Column(name = "experience_years")
   private Integer experienceYears;
 
-  @Column private String city;
-
   @Column(name = "base_price", nullable = false, precision = 12, scale = 2)
   private BigDecimal basePrice;
+
+  @Column(name = "work_start_time")
+  private LocalTime workStartTime;
+
+  @Column(name = "work_end_time")
+  private LocalTime workEndTime;
+
+  @JdbcTypeCode(SqlTypes.JSON)
+  @Column(name = "work_days", columnDefinition = "jsonb")
+  private List<String> workDays;
+
+  @Column(name = "wait_tolerance_minutes")
+  private Integer waitToleranceMinutes;
 
   @Enumerated(EnumType.STRING)
   @Column(name = "approval_status", nullable = false, length = 16)

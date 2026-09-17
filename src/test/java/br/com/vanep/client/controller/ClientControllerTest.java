@@ -1,18 +1,30 @@
 package br.com.vanep.client.controller;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import br.com.vanep.address.model.AddressModel;
+import br.com.vanep.address.repository.AddressRepository;
+import br.com.vanep.city.model.CityModel;
+import br.com.vanep.city.repository.CityRepository;
 import br.com.vanep.client.model.ClientModel;
 import br.com.vanep.client.repository.ClientRepository;
-import br.com.vanep.user.UserRepository;
-import br.com.vanep.user.UserType;
+import br.com.vanep.country.model.CountryModel;
+import br.com.vanep.country.repository.CountryRepository;
+import br.com.vanep.district.model.DistrictModel;
+import br.com.vanep.district.repository.DistrictRepository;
+import br.com.vanep.state.model.StateModel;
+import br.com.vanep.state.repository.StateRepository;
+import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
+import br.com.vanep.user.repository.UserRepository;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -32,19 +44,44 @@ import org.springframework.web.context.WebApplicationContext;
 @ActiveProfiles("test")
 @Sql(scripts = "/db/clean.sql", executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
 class ClientControllerTest {
-
   @Autowired private WebApplicationContext context;
   @Autowired private UserRepository users;
   @Autowired private ClientRepository clients;
+  @Autowired private AddressRepository addresses;
+  @Autowired private CityRepository cities;
+  @Autowired private DistrictRepository districts;
+  @Autowired private StateRepository states;
+  @Autowired private CountryRepository countries;
 
   private MockMvc mockMvc;
 
   private String clientToken;
   private String ownerUid;
+  private String cityToken;
 
   @BeforeEach
   void setUp() {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
+
+    CountryModel country = new CountryModel();
+    country.setName("Brasil");
+    country.setIsoCode("BR");
+    country.setPhoneCode("+55");
+    country.setCurrency("BRL");
+    country.setLocale("pt-BR");
+    country = countries.save(country);
+
+    StateModel state = new StateModel();
+    state.setName("São Paulo");
+    state.setUf("SP");
+    state.setCountry(country);
+    state = states.save(state);
+
+    CityModel city = new CityModel();
+    city.setState(state);
+    city.setName("Campinas");
+    city = cities.save(city);
+    cityToken = city.getToken();
 
     UserModel user = new UserModel();
     user.setType(UserType.CLIENT);
@@ -93,6 +130,35 @@ class ClientControllerTest {
         .authorities(new SimpleGrantedAuthority("ROLE_CLIENT"));
   }
 
+  private JwtRequestPostProcessor driverJwt(String driverUid) {
+    return jwt()
+        .jwt(t -> t.claim("uid", driverUid).claim("roles", List.of("ROLE_DRIVER")))
+        .authorities(new SimpleGrantedAuthority("ROLE_DRIVER"));
+  }
+
+  private AddressModel persistLinkedHomeAddress() {
+    CityModel city = cities.findByToken(cityToken).orElseThrow();
+
+    DistrictModel centro = new DistrictModel();
+    centro.setCity(city);
+    centro.setName("Centro");
+    centro = districts.save(centro);
+
+    AddressModel address = new AddressModel();
+    address.setCity(city);
+    address.setDistrict(centro);
+    address.setZipCode("13015904");
+    address.setStreet("Rua Barão de Jaguara");
+    address.setNumber("1481");
+    address.setComplement("Apto 12");
+    address = addresses.save(address);
+
+    UserModel owner = users.findByToken(ownerUid).orElseThrow();
+    owner.setAddressId(address.getId());
+    users.save(owner);
+    return address;
+  }
+
   @Test
   void listRequiresAuthentication() throws Exception {
     mockMvc.perform(get("/api/clients")).andExpect(status().isUnauthorized());
@@ -109,7 +175,21 @@ class ClientControllerTest {
         .perform(get("/api/clients").with(adminJwt()))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.content").isArray())
-        .andExpect(jsonPath("$.content[0].token").value(clientToken));
+        .andExpect(jsonPath("$.content[0].token").value(clientToken))
+        .andExpect(jsonPath("$.content[0].address").value(nullValue()))
+        .andExpect(jsonPath("$.content[0].addressToken").doesNotExist());
+  }
+
+  @Test
+  void listReturnsNestedAddressNotAddressToken() throws Exception {
+    AddressModel address = persistLinkedHomeAddress();
+
+    mockMvc
+        .perform(get("/api/clients").with(adminJwt()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content[0].address.token").value(address.getToken()))
+        .andExpect(jsonPath("$.content[0].address.street").value("Rua Barão de Jaguara"))
+        .andExpect(jsonPath("$.content[0].addressToken").doesNotExist());
   }
 
   @Test
@@ -127,11 +207,32 @@ class ClientControllerTest {
   }
 
   @Test
+  void getByTokenReturnsNestedAddressNotAddressToken() throws Exception {
+    AddressModel address = persistLinkedHomeAddress();
+
+    mockMvc
+        .perform(get("/api/clients/" + clientToken).with(ownerJwt()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.address.token").value(address.getToken()))
+        .andExpect(jsonPath("$.address.zipCode").value("13015904"))
+        .andExpect(jsonPath("$.address.street").value("Rua Barão de Jaguara"))
+        .andExpect(jsonPath("$.address.number").value("1481"))
+        .andExpect(jsonPath("$.address.complement").value("Apto 12"))
+        .andExpect(jsonPath("$.address.district").value("Centro"))
+        .andExpect(jsonPath("$.address.cityToken").value(cityToken))
+        .andExpect(jsonPath("$.address.cityName").value("Campinas"))
+        .andExpect(jsonPath("$.address.stateUf").value("SP"))
+        .andExpect(jsonPath("$.addressToken").doesNotExist());
+  }
+
+  @Test
   void getByTokenReturns200ForOwner() throws Exception {
     mockMvc
         .perform(get("/api/clients/" + clientToken).with(ownerJwt()))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.token").value(clientToken));
+        .andExpect(jsonPath("$.token").value(clientToken))
+        .andExpect(jsonPath("$.address").value(nullValue()))
+        .andExpect(jsonPath("$.addressToken").doesNotExist());
   }
 
   @Test
@@ -165,29 +266,62 @@ class ClientControllerTest {
   void updateRequiresAuthentication() throws Exception {
     mockMvc
         .perform(
-            put("/api/clients/" + clientToken)
+            patch("/api/clients/" + clientToken)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{}"))
         .andExpect(status().isUnauthorized());
   }
 
   @Test
-  void updateReturns200ForOwner() throws Exception {
+  void updateReturns200ForOwnerWithoutAddressToken() throws Exception {
     mockMvc
         .perform(
-            put("/api/clients/" + clientToken)
+            patch("/api/clients/" + clientToken)
                 .with(ownerJwt())
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"photo\":\"https://example.com/photo.jpg\",\"addressToken\":null}"))
+                .content("{\"photo\":\"https://example.com/photo.jpg\"}"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.token").value(clientToken));
+        .andExpect(jsonPath("$.token").value(clientToken))
+        .andExpect(jsonPath("$.photo").value("https://example.com/photo.jpg"))
+        .andExpect(jsonPath("$.address").value(nullValue()))
+        .andExpect(jsonPath("$.addressToken").doesNotExist());
+  }
+
+  @Test
+  void updateIgnoresAddressTokenAndDoesNotLinkCatalog() throws Exception {
+    CityModel city = cities.findByToken(cityToken).orElseThrow();
+    AddressModel catalog = new AddressModel();
+    catalog.setCity(city);
+    catalog.setZipCode("01310100");
+    catalog.setStreet("Avenida Paulista");
+    catalog.setNumber("1000");
+    catalog = addresses.save(catalog);
+
+    mockMvc
+        .perform(
+            patch("/api/clients/" + clientToken)
+                .with(ownerJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"photo\":\"https://example.com/photo.jpg\",\"addressToken\":\""
+                        + catalog.getToken()
+                        + "\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.photo").value("https://example.com/photo.jpg"))
+        .andExpect(jsonPath("$.address").value(nullValue()))
+        .andExpect(jsonPath("$.addressToken").doesNotExist());
+
+    mockMvc
+        .perform(get("/api/clients/me").with(ownerJwt()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.address").value(nullValue()));
   }
 
   @Test
   void updateReturns403ForOtherClient() throws Exception {
     mockMvc
         .perform(
-            put("/api/clients/" + clientToken)
+            patch("/api/clients/" + clientToken)
                 .with(otherClientJwt())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{}"))
@@ -198,7 +332,7 @@ class ClientControllerTest {
   void updateReturns403ForAdminWithoutUpdatePermission() throws Exception {
     mockMvc
         .perform(
-            put("/api/clients/" + clientToken)
+            patch("/api/clients/" + clientToken)
                 .with(adminJwt())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{}"))
@@ -209,7 +343,7 @@ class ClientControllerTest {
   void updateReturns200ForAdminWithUpdatePermission() throws Exception {
     mockMvc
         .perform(
-            put("/api/clients/" + clientToken)
+            patch("/api/clients/" + clientToken)
                 .with(adminWithUpdateJwt())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"name\":\"Nome Editado\",\"photo\":\"https://example.com/p.jpg\"}"))
@@ -222,7 +356,7 @@ class ClientControllerTest {
   void updateReturns403ForNonExistentToken() throws Exception {
     mockMvc
         .perform(
-            put("/api/clients/doesnotexist")
+            patch("/api/clients/doesnotexist")
                 .with(ownerJwt())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{}"))
@@ -249,9 +383,73 @@ class ClientControllerTest {
   }
 
   @Test
+  void deleteKeepsTheUserHomeAddress() throws Exception {
+    AddressModel address = persistLinkedHomeAddress();
+    String addressToken = address.getToken();
+
+    mockMvc
+        .perform(delete("/api/clients/" + clientToken).with(adminJwt()))
+        .andExpect(status().isNoContent());
+
+    assertThat(addresses.findByToken(addressToken)).isPresent();
+  }
+
+  @Test
   void deleteReturns404WhenMissing() throws Exception {
     mockMvc
         .perform(delete("/api/clients/doesnotexist").with(adminJwt()))
         .andExpect(status().isNotFound());
+  }
+
+  @Test
+  void meRequiresAuthentication() throws Exception {
+    mockMvc.perform(get("/api/clients/me")).andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  void meReturnsNullAddressWhenClientHasNone() throws Exception {
+    mockMvc
+        .perform(get("/api/clients/me").with(ownerJwt()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.token").value(clientToken))
+        .andExpect(jsonPath("$.user.email").value("client@vanep.com"))
+        .andExpect(jsonPath("$.user.document").value("12345678901"))
+        .andExpect(jsonPath("$.user.type").value("CLIENT"))
+        .andExpect(jsonPath("$.address").value(nullValue()))
+        .andExpect(jsonPath("$.addressToken").doesNotExist());
+  }
+
+  @Test
+  void meReturnsNestedAddressWhenLinked() throws Exception {
+    AddressModel address = persistLinkedHomeAddress();
+
+    mockMvc
+        .perform(get("/api/clients/me").with(ownerJwt()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.address.token").value(address.getToken()))
+        .andExpect(jsonPath("$.address.zipCode").value("13015904"))
+        .andExpect(jsonPath("$.address.street").value("Rua Barão de Jaguara"))
+        .andExpect(jsonPath("$.address.number").value("1481"))
+        .andExpect(jsonPath("$.address.complement").value("Apto 12"))
+        .andExpect(jsonPath("$.address.district").value("Centro"))
+        .andExpect(jsonPath("$.address.cityToken").value(cityToken))
+        .andExpect(jsonPath("$.address.cityName").value("Campinas"))
+        .andExpect(jsonPath("$.address.stateUf").value("SP"))
+        .andExpect(jsonPath("$.addressToken").doesNotExist());
+  }
+
+  @Test
+  void meReturns403ForDriverUid() throws Exception {
+    UserModel driverUser = new UserModel();
+    driverUser.setType(UserType.DRIVER);
+    driverUser.setName("Driver");
+    driverUser.setEmail("driver@vanep.com");
+    driverUser.setDocument("98765432100");
+    driverUser.setVerified(true);
+    final String driverUid = users.save(driverUser).getToken();
+
+    mockMvc
+        .perform(get("/api/clients/me").with(driverJwt(driverUid)))
+        .andExpect(status().isForbidden());
   }
 }

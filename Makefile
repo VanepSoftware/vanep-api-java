@@ -1,5 +1,8 @@
 MVNW = ./mvnw
 COMPOSE = docker compose
+# Mailpit fica no profile "mailpit" do compose (fora de produção). Os alvos do Make são de dev,
+# então ativam o profile mesmo para quem tem um `.env` antigo sem COMPOSE_PROFILES.
+export COMPOSE_PROFILES ?= mailpit
 SERVICE = vanep
 POSTGRES_SERVICE = postgres
 MAILPIT_SERVICE = mailpit

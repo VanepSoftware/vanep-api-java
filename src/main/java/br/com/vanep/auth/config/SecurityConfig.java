@@ -108,7 +108,8 @@ public class SecurityConfig {
                 authorize
                     .requestMatchers("/login", "/error", "/css/**", "/images/**", "/webjars/**")
                     .permitAll()
-                    .requestMatchers("/signup", "/signup/client", "/signup/driver")
+                    .requestMatchers(
+                        "/signup", "/signup/client", "/signup/driver", "/signup/assistant")
                     .permitAll()
                     .requestMatchers(
                         "/verify-email",

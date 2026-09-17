@@ -20,6 +20,10 @@ public interface DependentRepository extends JpaRepository<DependentModel, Long>
 
   boolean existsByDocumentAndTokenNot(String document, String token);
 
+  long countByAddressId(Long addressId);
+
+  long countByAddressIdAndIdNot(Long addressId, Long id);
+
   @Query(
       value = "SELECT client_id FROM dependent WHERE token = :token AND deleted_at IS NOT NULL",
       nativeQuery = true)

@@ -6,6 +6,8 @@ import br.com.vanep.role.dto.RoleUpdateRequestDTO;
 import br.com.vanep.role.mapper.RoleMapper;
 import br.com.vanep.role.model.RoleModel;
 import br.com.vanep.role.repository.RoleRepository;
+import br.com.vanep.rolepermission.model.RolePermissionModel;
+import br.com.vanep.rolepermission.repository.RolePermissionRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -17,10 +19,13 @@ import org.springframework.web.server.ResponseStatusException;
 public class RoleService {
 
   private final RoleRepository roles;
+  private final RolePermissionRepository rolePermissions;
   private final RoleMapper mapper;
 
-  public RoleService(RoleRepository roles, RoleMapper mapper) {
+  public RoleService(
+      RoleRepository roles, RolePermissionRepository rolePermissions, RoleMapper mapper) {
     this.roles = roles;
+    this.rolePermissions = rolePermissions;
     this.mapper = mapper;
   }
 
@@ -39,6 +44,7 @@ public class RoleService {
     RoleModel role = new RoleModel();
     role.setName(request.name());
     role.setDescription(request.description());
+    role.setRolePermission(resolveRolePermission(request.rolePermissionToken()));
     return mapper.toResponse(roles.save(role));
   }
 
@@ -47,6 +53,7 @@ public class RoleService {
     RoleModel role = requireByToken(token);
     role.setName(request.name());
     role.setDescription(request.description());
+    role.setRolePermission(resolveRolePermission(request.rolePermissionToken()));
     return mapper.toResponse(roles.save(role));
   }
 
@@ -68,5 +75,15 @@ public class RoleService {
     return roles
         .findByToken(token)
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Role not found."));
+  }
+
+  private RolePermissionModel resolveRolePermission(String token) {
+    if (token == null || token.isBlank()) {
+      return null;
+    }
+    return rolePermissions
+        .findByToken(token)
+        .orElseThrow(
+            () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Role permission not found."));
   }
 }

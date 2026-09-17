@@ -4,56 +4,102 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.ArgumentMatchers.nullable;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import br.com.vanep.address.dto.AddressRequestDTO;
+import br.com.vanep.address.dto.AddressResponseDTO;
+import br.com.vanep.address.service.AddressService;
 import br.com.vanep.school.dto.SchoolRequestDTO;
 import br.com.vanep.school.dto.SchoolResponseDTO;
+import br.com.vanep.school.dto.SchoolUpdateRequestDTO;
 import br.com.vanep.school.mapper.SchoolMapper;
 import br.com.vanep.school.model.SchoolModel;
 import br.com.vanep.school.repository.SchoolRepository;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.openapitools.jackson.nullable.JsonNullable;
 import org.springframework.context.MessageSource;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
 @ExtendWith(MockitoExtension.class)
 class SchoolServiceTest {
+  private static final Long SCHOOL_ID = 7L;
+  private static final String TOKEN = "tok";
 
   @Mock private SchoolRepository repository;
   @Mock private SchoolMapper mapper;
+  @Mock private AddressService addressService;
   @Mock private MessageSource messages;
 
   private SchoolService service;
 
   @BeforeEach
   void setUp() {
-    service = new SchoolService(repository, mapper, messages);
+    service = new SchoolService(repository, mapper, addressService, messages);
+    lenient().when(messages.getMessage(any(), any(), any())).thenAnswer(inv -> inv.getArgument(0));
+    lenient().when(addressService.toResponsesByIds(any())).thenReturn(Map.of());
+    lenient().when(addressService.toResponseOrNull(nullable(Long.class))).thenReturn(null);
   }
 
   private SchoolModel schoolWithToken(String token) {
     SchoolModel school = new SchoolModel();
+    school.setId(SCHOOL_ID);
     school.setToken(token);
     school.setName("Escola Teste");
-    school.setCnpj("11222333000181");
     return school;
   }
 
   private SchoolResponseDTO responseFor(String token) {
     return new SchoolResponseDTO(
-        token, "Escola Teste", "11222333000181", null, null, null, true, null);
+        token, "Escola Teste", null, null, null, null, null, null, true, null);
   }
 
-  private SchoolRequestDTO requestFor(String name, String cnpj) {
-    return new SchoolRequestDTO(name, cnpj, null, null, null);
+  private SchoolRequestDTO requestFor(String name) {
+    return new SchoolRequestDTO(name, null);
+  }
+
+  private AddressRequestDTO addressRequest() {
+    return new AddressRequestDTO("city-campinas", "13015904", "Rua da Escola", "1481", null);
+  }
+
+  private AddressResponseDTO addressResponse() {
+    return new AddressResponseDTO(
+        "addr-tok",
+        "13015904",
+        "Rua da Escola",
+        "1481",
+        null,
+        "Centro",
+        "city-campinas",
+        "Campinas",
+        "SP",
+        true,
+        null);
+  }
+
+  private SchoolUpdateRequestDTO patch(
+      JsonNullable<String> name, JsonNullable<AddressRequestDTO> address) {
+    return new SchoolUpdateRequestDTO(name, address);
+  }
+
+  private SchoolUpdateRequestDTO nameOnly(String name) {
+    return patch(JsonNullable.of(name), JsonNullable.undefined());
   }
 
   @Test
@@ -61,7 +107,7 @@ class SchoolServiceTest {
     SchoolModel school = schoolWithToken("abc");
     SchoolResponseDTO response = responseFor("abc");
     when(repository.findAll(any(Pageable.class))).thenReturn(new PageImpl<>(List.of(school)));
-    when(mapper.toResponse(school)).thenReturn(response);
+    when(mapper.toResponse(school, null)).thenReturn(response);
 
     var result = service.findAll(Pageable.unpaged());
 
@@ -70,12 +116,12 @@ class SchoolServiceTest {
 
   @Test
   void findByTokenReturnsResponse() {
-    SchoolModel school = schoolWithToken("tok");
-    SchoolResponseDTO response = responseFor("tok");
-    when(repository.findByToken("tok")).thenReturn(Optional.of(school));
-    when(mapper.toResponse(school)).thenReturn(response);
+    SchoolModel school = schoolWithToken(TOKEN);
+    SchoolResponseDTO response = responseFor(TOKEN);
+    when(repository.findByToken(TOKEN)).thenReturn(Optional.of(school));
+    when(mapper.toResponse(school, null)).thenReturn(response);
 
-    assertThat(service.findByToken("tok")).isEqualTo(response);
+    assertThat(service.findByToken(TOKEN)).isEqualTo(response);
   }
 
   @Test
@@ -89,101 +135,138 @@ class SchoolServiceTest {
 
   @Test
   void createPersistsSchool() {
-    SchoolRequestDTO request = requestFor("Escola Teste", "11222333000181");
-    SchoolModel saved = schoolWithToken("tok");
-    SchoolResponseDTO response = responseFor("tok");
-    when(repository.existsByCnpj("11222333000181")).thenReturn(false);
+    SchoolRequestDTO request = requestFor("Escola Teste");
+    SchoolModel saved = schoolWithToken(TOKEN);
+    SchoolResponseDTO response = responseFor(TOKEN);
     when(repository.save(any(SchoolModel.class))).thenReturn(saved);
-    when(mapper.toResponse(saved)).thenReturn(response);
+    when(mapper.toResponse(saved, null)).thenReturn(response);
 
     SchoolResponseDTO result = service.create(request);
 
     assertThat(result).isEqualTo(response);
     verify(repository).save(any(SchoolModel.class));
+    verify(addressService, never()).upsertForSchool(any(), any());
   }
 
   @Test
-  void createThrows409WhenCnpjDuplicated() {
-    when(repository.existsByCnpj("11222333000181")).thenReturn(true);
-
-    assertThatThrownBy(() -> service.create(requestFor("Escola Teste", "11222333000181")))
-        .isInstanceOf(ResponseStatusException.class)
-        .hasMessageContaining("409");
-    verify(repository, never()).save(any(SchoolModel.class));
-  }
-
-  @Test
-  void createAllowsNullCnpj() {
-    SchoolModel saved = schoolWithToken("tok");
-    SchoolResponseDTO response = responseFor("tok");
+  void createWithAddressUpsertsAfterPersist() {
+    AddressRequestDTO address = addressRequest();
+    SchoolRequestDTO request = new SchoolRequestDTO("Escola Teste", address);
+    SchoolModel saved = schoolWithToken(TOKEN);
+    SchoolResponseDTO response = responseFor(TOKEN);
     when(repository.save(any(SchoolModel.class))).thenReturn(saved);
-    when(mapper.toResponse(saved)).thenReturn(response);
+    when(addressService.upsertForSchool(SCHOOL_ID, address)).thenReturn(addressResponse());
+    when(repository.findById(SCHOOL_ID)).thenReturn(Optional.of(saved));
+    when(mapper.toResponse(saved, null)).thenReturn(response);
 
-    SchoolResponseDTO result = service.create(requestFor("Escola Sem CNPJ", null));
+    SchoolResponseDTO result = service.create(request);
 
     assertThat(result).isEqualTo(response);
-    verify(repository, never()).existsByCnpj(any());
+    InOrder order = inOrder(repository, addressService);
+    order.verify(repository).save(any(SchoolModel.class));
+    order.verify(addressService).upsertForSchool(SCHOOL_ID, address);
   }
 
   @Test
   void updatePersistsFields() {
-    SchoolModel school = schoolWithToken("tok");
-    SchoolResponseDTO response = responseFor("tok");
-    when(repository.findByToken("tok")).thenReturn(Optional.of(school));
+    SchoolModel school = schoolWithToken(TOKEN);
+    SchoolResponseDTO response = responseFor(TOKEN);
+    when(repository.findByToken(TOKEN)).thenReturn(Optional.of(school));
     when(repository.save(school)).thenReturn(school);
-    when(mapper.toResponse(school)).thenReturn(response);
+    when(mapper.toResponse(school, null)).thenReturn(response);
 
-    SchoolResponseDTO result =
-        service.update(
-            "tok", new SchoolRequestDTO("Escola Atualizada", "11222333000181", null, null, null));
+    SchoolResponseDTO result = service.update(TOKEN, nameOnly("Escola Atualizada"));
 
     assertThat(result).isEqualTo(response);
     assertThat(school.getName()).isEqualTo("Escola Atualizada");
   }
 
   @Test
-  void updateThrows409WhenCnpjBelongsToAnotherSchool() {
-    SchoolModel school = schoolWithToken("tok");
-    when(repository.findByToken("tok")).thenReturn(Optional.of(school));
-    when(repository.existsByCnpj("99888777000166")).thenReturn(true);
+  void updatePresentNullAddressClearsAddress() {
+    SchoolModel school = schoolWithToken(TOKEN);
+    school.setAddressId(10L);
+    when(repository.findByToken(TOKEN)).thenReturn(Optional.of(school));
+    when(repository.save(school)).thenReturn(school);
+    when(repository.findById(SCHOOL_ID)).thenReturn(Optional.of(school));
+    when(mapper.toResponse(eq(school), isNull())).thenReturn(responseFor(TOKEN));
 
-    assertThatThrownBy(() -> service.update("tok", requestFor("Escola Teste", "99888777000166")))
+    service.update(TOKEN, patch(JsonNullable.undefined(), JsonNullable.of(null)));
+
+    verify(addressService).clearForSchool(SCHOOL_ID);
+    verify(addressService, never()).upsertForSchool(any(), any());
+  }
+
+  @Test
+  void updateNestedAddressUpsertsOwnedRow() {
+    SchoolModel school = schoolWithToken(TOKEN);
+    AddressRequestDTO request = addressRequest();
+    when(repository.findByToken(TOKEN)).thenReturn(Optional.of(school));
+    when(repository.save(school)).thenReturn(school);
+    when(addressService.upsertForSchool(SCHOOL_ID, request)).thenReturn(addressResponse());
+    when(repository.findById(SCHOOL_ID)).thenReturn(Optional.of(school));
+    when(mapper.toResponse(eq(school), isNull())).thenReturn(responseFor(TOKEN));
+
+    service.update(TOKEN, patch(JsonNullable.undefined(), JsonNullable.of(request)));
+
+    verify(addressService).upsertForSchool(SCHOOL_ID, request);
+  }
+
+  @Test
+  void updatePresentBlankNameThrows400AndLeavesStoredName() {
+    SchoolModel school = schoolWithToken(TOKEN);
+    when(repository.findByToken(TOKEN)).thenReturn(Optional.of(school));
+
+    assertThatThrownBy(() -> service.update(TOKEN, nameOnly("")))
         .isInstanceOf(ResponseStatusException.class)
-        .hasMessageContaining("409");
+        .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+        .isEqualTo(HttpStatus.BAD_REQUEST);
+    assertThat(school.getName()).isEqualTo("Escola Teste");
     verify(repository, never()).save(any(SchoolModel.class));
   }
 
   @Test
-  void updateKeepsSameCnpjWithoutConflict() {
-    SchoolModel school = schoolWithToken("tok");
-    SchoolResponseDTO response = responseFor("tok");
-    when(repository.findByToken("tok")).thenReturn(Optional.of(school));
+  void updatePresentNullNameThrows400() {
+    SchoolModel school = schoolWithToken(TOKEN);
+    when(repository.findByToken(TOKEN)).thenReturn(Optional.of(school));
+
+    assertThatThrownBy(() -> service.update(TOKEN, nameOnly(null)))
+        .isInstanceOf(ResponseStatusException.class)
+        .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+        .isEqualTo(HttpStatus.BAD_REQUEST);
+  }
+
+  @Test
+  void updateOmittedNameKeepsStoredName() {
+    SchoolModel school = schoolWithToken(TOKEN);
+    SchoolResponseDTO response = responseFor(TOKEN);
+    when(repository.findByToken(TOKEN)).thenReturn(Optional.of(school));
     when(repository.save(school)).thenReturn(school);
-    when(mapper.toResponse(school)).thenReturn(response);
+    when(mapper.toResponse(school, null)).thenReturn(response);
 
-    SchoolResponseDTO result = service.update("tok", requestFor("Escola Teste", "11222333000181"));
+    service.update(TOKEN, patch(JsonNullable.undefined(), JsonNullable.undefined()));
 
-    assertThat(result).isEqualTo(response);
-    verify(repository, never()).existsByCnpj(any());
+    assertThat(school.getName()).isEqualTo("Escola Teste");
   }
 
   @Test
   void updateThrows404WhenNotFound() {
     when(repository.findByToken("missing")).thenReturn(Optional.empty());
 
-    assertThatThrownBy(() -> service.update("missing", requestFor("x", null)))
+    assertThatThrownBy(() -> service.update("missing", nameOnly("x")))
         .isInstanceOf(ResponseStatusException.class)
         .hasMessageContaining("404");
   }
 
   @Test
-  void deleteSoftDeletesSchool() {
-    SchoolModel school = schoolWithToken("tok");
-    when(repository.findByToken("tok")).thenReturn(Optional.of(school));
+  void deleteSoftDeletesSchoolAfterClearingAddress() {
+    SchoolModel school = schoolWithToken(TOKEN);
+    when(repository.findByToken(TOKEN)).thenReturn(Optional.of(school));
 
-    service.delete("tok");
+    service.delete(TOKEN);
 
-    verify(repository).delete(school);
+    InOrder order = inOrder(addressService, repository);
+    order.verify(addressService).clearForSchool(SCHOOL_ID);
+    order.verify(repository).delete(school);
   }
 
   @Test
@@ -197,28 +280,29 @@ class SchoolServiceTest {
 
   @Test
   void restoreRecoversDeletedSchool() {
-    SchoolModel school = schoolWithToken("tok");
-    SchoolResponseDTO response = responseFor("tok");
-    when(repository.existsDeletedByToken("tok")).thenReturn(true);
-    when(repository.findByToken("tok")).thenReturn(Optional.of(school));
-    when(mapper.toResponse(school)).thenReturn(response);
+    SchoolModel school = schoolWithToken(TOKEN);
+    SchoolResponseDTO response = responseFor(TOKEN);
+    when(repository.existsDeletedByToken(TOKEN)).thenReturn(true);
+    when(repository.findByToken(TOKEN)).thenReturn(Optional.of(school));
+    when(mapper.toResponse(school, null)).thenReturn(response);
 
-    SchoolResponseDTO result = service.restore("tok");
+    SchoolResponseDTO result = service.restore(TOKEN);
 
     assertThat(result).isEqualTo(response);
-    verify(repository).restoreByToken("tok");
+    assertThat(result.address()).isNull();
+    verify(repository).restoreByToken(TOKEN);
   }
 
   @Test
   void restoreThrows409WhenAlreadyActive() {
-    SchoolModel school = schoolWithToken("tok");
-    when(repository.existsDeletedByToken("tok")).thenReturn(false);
-    when(repository.findByToken("tok")).thenReturn(Optional.of(school));
+    SchoolModel school = schoolWithToken(TOKEN);
+    when(repository.existsDeletedByToken(TOKEN)).thenReturn(false);
+    when(repository.findByToken(TOKEN)).thenReturn(Optional.of(school));
 
-    assertThatThrownBy(() -> service.restore("tok"))
+    assertThatThrownBy(() -> service.restore(TOKEN))
         .isInstanceOf(ResponseStatusException.class)
         .hasMessageContaining("409");
-    verify(repository, never()).restoreByToken(eq("tok"));
+    verify(repository, never()).restoreByToken(eq(TOKEN));
   }
 
   @Test

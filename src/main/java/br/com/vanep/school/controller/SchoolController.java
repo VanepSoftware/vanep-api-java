@@ -2,6 +2,7 @@ package br.com.vanep.school.controller;
 
 import br.com.vanep.school.dto.SchoolRequestDTO;
 import br.com.vanep.school.dto.SchoolResponseDTO;
+import br.com.vanep.school.dto.SchoolUpdateRequestDTO;
 import br.com.vanep.school.service.SchoolService;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
@@ -11,9 +12,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -48,10 +49,10 @@ public class SchoolController {
     return service.create(request);
   }
 
-  @PutMapping("/{token}")
+  @PatchMapping("/{token}")
   @PreAuthorize("hasAuthority('update_school')")
   public SchoolResponseDTO update(
-      @PathVariable String token, @RequestBody @Valid SchoolRequestDTO request) {
+      @PathVariable String token, @RequestBody @Valid SchoolUpdateRequestDTO request) {
     return service.update(token, request);
   }
 

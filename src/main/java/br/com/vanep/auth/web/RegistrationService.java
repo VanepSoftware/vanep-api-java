@@ -1,5 +1,7 @@
 package br.com.vanep.auth.web;
 
+import br.com.vanep.assistant.model.AssistantModel;
+import br.com.vanep.assistant.repository.AssistantRepository;
 import br.com.vanep.auth.verification.EmailVerificationService;
 import br.com.vanep.client.model.ClientModel;
 import br.com.vanep.client.repository.ClientRepository;
@@ -8,9 +10,9 @@ import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.role.RoleName;
 import br.com.vanep.role.repository.RoleRepository;
-import br.com.vanep.user.UserRepository;
-import br.com.vanep.user.UserType;
+import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
+import br.com.vanep.user.repository.UserRepository;
 import java.time.Instant;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -18,10 +20,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class RegistrationService {
-
   private final UserRepository users;
   private final ClientRepository clients;
   private final DriverRepository drivers;
+  private final AssistantRepository assistants;
   private final RoleRepository roles;
   private final PasswordEncoder passwordEncoder;
   private final EmailVerificationService emailVerification;
@@ -30,12 +32,14 @@ public class RegistrationService {
       UserRepository users,
       ClientRepository clients,
       DriverRepository drivers,
+      AssistantRepository assistants,
       RoleRepository roles,
       PasswordEncoder passwordEncoder,
       EmailVerificationService emailVerification) {
     this.users = users;
     this.clients = clients;
     this.drivers = drivers;
+    this.assistants = assistants;
     this.roles = roles;
     this.passwordEncoder = passwordEncoder;
     this.emailVerification = emailVerification;
@@ -58,10 +62,19 @@ public class RegistrationService {
     driver.setUser(user);
     driver.setCnpj(form.getCnpj());
     driver.setExperienceYears(form.getExperienceYears());
-    driver.setCity(form.getCity());
     driver.setBasePrice(form.getBasePrice());
     driver.setApprovalStatus(DriverApprovalStatus.PENDING);
     drivers.save(driver);
+    emailVerification.startVerification(user);
+    return user;
+  }
+
+  @Transactional
+  public UserModel registerAssistant(AssistantSignupForm form) {
+    UserModel user = createUser(UserType.ASSISTANT, RoleName.ASSISTANT, form);
+    AssistantModel assistant = new AssistantModel();
+    assistant.setUser(user);
+    assistants.save(assistant);
     emailVerification.startVerification(user);
     return user;
   }

@@ -1,19 +1,30 @@
 package br.com.vanep.dependent.service;
 
+import br.com.vanep.address.dto.AddressRequestDTO;
+import br.com.vanep.address.dto.AddressResponseDTO;
+import br.com.vanep.address.service.AddressService;
 import br.com.vanep.client.repository.ClientRepository;
 import br.com.vanep.dependent.dto.DependentCreateDTO;
 import br.com.vanep.dependent.dto.DependentResponseDTO;
+import br.com.vanep.dependent.dto.DependentSchoolDTO;
 import br.com.vanep.dependent.dto.DependentUpdateDTO;
 import br.com.vanep.dependent.mapper.DependentMapper;
 import br.com.vanep.dependent.model.DependentModel;
 import br.com.vanep.dependent.repository.DependentRepository;
-import br.com.vanep.user.UserRepository;
+import br.com.vanep.school.model.SchoolModel;
+import br.com.vanep.school.repository.SchoolRepository;
+import br.com.vanep.shared.enums.Shift;
 import br.com.vanep.user.model.UserModel;
+import br.com.vanep.user.repository.UserRepository;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
+import java.util.Objects;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
+import org.openapitools.jackson.nullable.JsonNullable;
+import org.springframework.context.MessageSource;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
@@ -26,18 +37,31 @@ public class DependentService {
 
   private final DependentRepository dependents;
   private final ClientRepository clients;
+  private final SchoolRepository schools;
   private final UserRepository users;
   private final DependentMapper mapper;
+  private final AddressService addressService;
+  private final MessageSource messages;
 
   public DependentService(
       DependentRepository dependents,
       ClientRepository clients,
+      SchoolRepository schools,
       UserRepository users,
-      DependentMapper mapper) {
+      DependentMapper mapper,
+      AddressService addressService,
+      MessageSource messages) {
     this.dependents = dependents;
     this.clients = clients;
+    this.schools = schools;
     this.users = users;
     this.mapper = mapper;
+    this.addressService = addressService;
+    this.messages = messages;
+  }
+
+  private String message(String key) {
+    return messages.getMessage(key, null, LocaleContextHolder.getLocale());
   }
 
   @Transactional
@@ -45,15 +69,15 @@ public class DependentService {
     Long clientId = resolveClientIdForCreate(jwt, dto);
     assertDocumentAvailable(dto.getDocument(), null);
 
-    DependentModel model =
-        mapper.toModel(
-            dto,
-            clientId,
-            resolveSchoolId(dto.getSchoolToken()).orElse(null),
-            resolveAddressId(dto.getAddressToken()).orElse(null));
+    DependentModel model = mapper.toModel(dto, clientId);
+    applySchoolOnCreate(dto.getSchoolToken(), model);
     applyDefaultOnCreate(model, dto, clientId);
 
     DependentModel saved = dependents.save(model);
+    if (dto.getAddress() != null) {
+      addressService.upsertForDependent(saved.getId(), dto.getAddress());
+      saved = requireById(saved.getId());
+    }
     return toResponse(saved);
   }
 
@@ -75,21 +99,13 @@ public class DependentService {
   @Transactional
   public DependentResponseDTO update(Jwt jwt, String token, DependentUpdateDTO dto) {
     DependentModel model = findActiveForAccess(jwt, token);
-    if (dto.getDocument() != null) {
-      assertDocumentAvailable(dto.getDocument(), token);
-    }
-
-    mapper.applyUpdate(dto, model);
-    applySchoolTokenUpdate(dto.getSchoolToken(), model);
-    applyAddressTokenUpdate(dto.getAddressToken(), model);
-    if (Boolean.TRUE.equals(dto.getIsDefault())) {
-      clearOtherDefaults(model.getClientId(), model.getToken());
-      model.setDefaultDependent(true);
-    } else if (Boolean.FALSE.equals(dto.getIsDefault())) {
-      model.setDefaultDependent(false);
-    }
+    applyScalarMerge(dto, model);
 
     DependentModel saved = dependents.save(model);
+    if (dto.address().isPresent()) {
+      applyAddressMerge(saved.getId(), dto.address().get());
+      saved = requireById(saved.getId());
+    }
     return toResponse(saved);
   }
 
@@ -99,6 +115,7 @@ public class DependentService {
     boolean wasDefault = model.isDefaultDependent();
     Long clientId = model.getClientId();
 
+    addressService.clearForDependent(model.getId());
     dependents.delete(model);
     promoteDefaultAfterDelete(clientId, wasDefault);
   }
@@ -117,30 +134,170 @@ public class DependentService {
     return toResponse(restored);
   }
 
+  private void applyScalarMerge(DependentUpdateDTO dto, DependentModel model) {
+    applyName(dto.name(), model);
+    applyNullable(dto.birthDate(), model::setBirthDate);
+    applyNullable(dto.gender(), model::setGender);
+    applyDocument(dto.document(), model);
+    applyNullable(dto.phone(), model::setPhone);
+    applyNullable(dto.email(), model::setEmail);
+    applyIsSelf(dto.isSelf(), model);
+    applyRequiredShift(dto.shift(), model);
+    applyDefaultFlag(dto.isDefault(), model);
+    applySchoolTokenMerge(dto.schoolToken(), model);
+  }
+
+  private void applyAddressMerge(Long dependentId, AddressRequestDTO address) {
+    if (address == null) {
+      addressService.clearForDependent(dependentId);
+      return;
+    }
+    addressService.upsertForDependent(dependentId, address);
+  }
+
+  private void applyName(JsonNullable<String> nameField, DependentModel model) {
+    if (!nameField.isPresent()) {
+      return;
+    }
+    String name = nameField.get();
+    if (name == null || name.isBlank()) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, message("dependent.name.blank"));
+    }
+    model.setName(name);
+  }
+
+  private <T> void applyNullable(JsonNullable<T> field, Consumer<T> setter) {
+    if (field.isPresent()) {
+      setter.accept(field.get());
+    }
+  }
+
+  private void applyDocument(JsonNullable<String> documentField, DependentModel model) {
+    if (!documentField.isPresent()) {
+      return;
+    }
+    String document = documentField.get();
+    if (document != null && !Objects.equals(document, model.getDocument())) {
+      assertDocumentAvailable(document, model.getToken());
+    }
+    model.setDocument(document);
+  }
+
+  private void applyIsSelf(JsonNullable<Boolean> field, DependentModel model) {
+    if (!field.isPresent()) {
+      return;
+    }
+    Boolean value = field.get();
+    if (value == null) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, message("dependent.field.null"));
+    }
+    model.setSelf(value);
+  }
+
+  private void applyRequiredShift(JsonNullable<Shift> shiftField, DependentModel model) {
+    if (!shiftField.isPresent()) {
+      return;
+    }
+    Shift shift = shiftField.get();
+    if (shift == null) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, message("dependent.field.null"));
+    }
+    model.setShift(shift);
+  }
+
+  private void applyDefaultFlag(JsonNullable<Boolean> isDefaultField, DependentModel model) {
+    if (!isDefaultField.isPresent()) {
+      return;
+    }
+    Boolean isDefault = isDefaultField.get();
+    if (isDefault == null) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, message("dependent.field.null"));
+    }
+    if (isDefault) {
+      clearOtherDefaults(model.getClientId(), model.getToken());
+      model.setDefaultDependent(true);
+    } else {
+      model.setDefaultDependent(false);
+    }
+  }
+
+  private void applySchoolOnCreate(String schoolToken, DependentModel model) {
+    if (schoolToken == null) {
+      return;
+    }
+    model.setSchoolId(requireSchoolId(schoolToken));
+  }
+
+  private void applySchoolTokenMerge(JsonNullable<String> schoolToken, DependentModel model) {
+    if (!schoolToken.isPresent()) {
+      return;
+    }
+    String token = schoolToken.get();
+    if (token == null) {
+      model.setSchoolId(null);
+      return;
+    }
+    model.setSchoolId(requireSchoolId(token));
+  }
+
+  private Long requireSchoolId(String schoolToken) {
+    if (!StringUtils.hasText(schoolToken)) {
+      throw new ResponseStatusException(
+          HttpStatus.BAD_REQUEST, message("dependent.school_token.blank"));
+    }
+    return schools
+        .findByToken(schoolToken)
+        .map(school -> school.getId())
+        .orElseThrow(
+            () -> new ResponseStatusException(HttpStatus.NOT_FOUND, message("school.not_found")));
+  }
+
   private DependentModel findActiveForAccess(Jwt jwt, String token) {
     DependentModel model = dependents.findByToken(token).orElseThrow(this::notFound);
     assertOwnership(jwt, model.getClientId());
     return model;
   }
 
+  private DependentModel requireById(Long id) {
+    return dependents.findById(id).orElseThrow(this::notFound);
+  }
+
   private DependentResponseDTO toResponse(DependentModel model) {
-    String clientToken = resolveClientToken(model.getClientId());
-    String schoolToken = resolveSchoolToken(model.getSchoolId()).orElse(null);
-    String addressToken = resolveAddressToken(model.getAddressId()).orElse(null);
-    return mapper.toResponse(model, clientToken, schoolToken, addressToken);
+    return mapper.toResponse(
+        model,
+        resolveClientToken(model.getClientId()),
+        toSchoolDto(model.getSchoolId()),
+        addressService.toResponseOrNull(model.getAddressId()));
   }
 
   private List<DependentResponseDTO> toResponses(List<DependentModel> models) {
     Map<Long, String> clientTokens = clientTokensById(models);
+    Map<Long, SchoolModel> schoolsById = schoolsById(models);
+    Map<Long, AddressResponseDTO> addresses =
+        addressService.toResponsesByIds(
+            models.stream()
+                .map(dependent -> dependent.getAddressId())
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList());
     return models.stream()
         .map(
             model ->
                 mapper.toResponse(
                     model,
                     clientTokens.get(model.getClientId()),
-                    resolveSchoolToken(model.getSchoolId()).orElse(null),
-                    resolveAddressToken(model.getAddressId()).orElse(null)))
+                    schoolDtoFor(model, schoolsById),
+                    model.getAddressId() == null ? null : addresses.get(model.getAddressId())))
         .toList();
+  }
+
+  private DependentSchoolDTO schoolDtoFor(
+      DependentModel model, Map<Long, SchoolModel> schoolsById) {
+    Long schoolId = model.getSchoolId();
+    if (schoolId == null) {
+      return null;
+    }
+    return toSchoolDto(schoolsById.get(schoolId));
   }
 
   private Map<Long, String> clientTokensById(List<DependentModel> models) {
@@ -156,50 +313,32 @@ public class DependentService {
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Client not found."));
   }
 
-  private Optional<Long> resolveSchoolId(String schoolToken) {
-    if (schoolToken == null || !StringUtils.hasText(schoolToken)) {
-      return Optional.empty();
+  private Map<Long, SchoolModel> schoolsById(List<DependentModel> models) {
+    List<Long> schoolIds =
+        models.stream()
+            .map(dependent -> dependent.getSchoolId())
+            .filter(Objects::nonNull)
+            .distinct()
+            .toList();
+    if (schoolIds.isEmpty()) {
+      return Map.of();
     }
-    throw new ResponseStatusException(
-        HttpStatus.BAD_REQUEST, "schoolToken is not supported in this phase.");
+    return schools.findAllById(schoolIds).stream()
+        .collect(Collectors.toMap(school -> school.getId(), school -> school));
   }
 
-  private Optional<Long> resolveAddressId(String addressToken) {
-    if (addressToken == null || !StringUtils.hasText(addressToken)) {
-      return Optional.empty();
+  private DependentSchoolDTO toSchoolDto(Long schoolId) {
+    if (schoolId == null) {
+      return null;
     }
-    throw new ResponseStatusException(
-        HttpStatus.BAD_REQUEST, "addressToken is not supported in this phase.");
+    return schools.findById(schoolId).map(this::toSchoolDto).orElse(null);
   }
 
-  private Optional<String> resolveSchoolToken(Long schoolId) {
-    return Optional.empty();
-  }
-
-  private Optional<String> resolveAddressToken(Long addressId) {
-    return Optional.empty();
-  }
-
-  private void applySchoolTokenUpdate(String schoolToken, DependentModel model) {
-    if (schoolToken == null) {
-      return;
+  private DependentSchoolDTO toSchoolDto(SchoolModel school) {
+    if (school == null) {
+      return null;
     }
-    if (!StringUtils.hasText(schoolToken)) {
-      model.setSchoolId(null);
-      return;
-    }
-    model.setSchoolId(resolveSchoolId(schoolToken).orElse(null));
-  }
-
-  private void applyAddressTokenUpdate(String addressToken, DependentModel model) {
-    if (addressToken == null) {
-      return;
-    }
-    if (!StringUtils.hasText(addressToken)) {
-      model.setAddressId(null);
-      return;
-    }
-    model.setAddressId(resolveAddressId(addressToken).orElse(null));
+    return new DependentSchoolDTO(school.getToken(), school.getName());
   }
 
   private void promoteDefaultAfterDelete(Long clientId, boolean wasDefault) {
@@ -249,7 +388,7 @@ public class DependentService {
             : dependents.existsByDocumentAndTokenNot(document, excludeToken);
     if (duplicate) {
       throw new ResponseStatusException(
-          HttpStatus.CONFLICT, "Document is already registered for another dependent.");
+          HttpStatus.CONFLICT, message("dependent.document.duplicate"));
     }
   }
 
@@ -303,6 +442,6 @@ public class DependentService {
   }
 
   private ResponseStatusException notFound() {
-    return new ResponseStatusException(HttpStatus.NOT_FOUND, "Dependent not found.");
+    return new ResponseStatusException(HttpStatus.NOT_FOUND, message("dependent.not_found"));
   }
 }
