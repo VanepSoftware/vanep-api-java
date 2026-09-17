@@ -2,6 +2,8 @@ package br.com.vanep.clientrating.service;
 
 import br.com.vanep.client.model.ClientModel;
 import br.com.vanep.client.repository.ClientRepository;
+import br.com.vanep.clientdriver.model.ClientDriverModel;
+import br.com.vanep.clientdriver.repository.ClientDriverRepository;
 import br.com.vanep.clientrating.dto.ClientRatingCreateRequestDTO;
 import br.com.vanep.clientrating.dto.ClientRatingResponseDTO;
 import br.com.vanep.clientrating.mapper.ClientRatingMapper;
@@ -28,6 +30,7 @@ public class ClientRatingService {
   private final ClientRatingRepository clientRatingRepository;
   private final DriverRepository driverRepository;
   private final ClientRepository clientRepository;
+  private final ClientDriverRepository linkRepository;
   private final UserRepository userRepository;
   private final ClientRatingMapper mapper;
   private final MessageSource messages;
@@ -36,12 +39,14 @@ public class ClientRatingService {
       ClientRatingRepository clientRatingRepository,
       DriverRepository driverRepository,
       ClientRepository clientRepository,
+      ClientDriverRepository linkRepository,
       UserRepository userRepository,
       ClientRatingMapper mapper,
       MessageSource messages) {
     this.clientRatingRepository = clientRatingRepository;
     this.driverRepository = driverRepository;
     this.clientRepository = clientRepository;
+    this.linkRepository = linkRepository;
     this.userRepository = userRepository;
     this.mapper = mapper;
     this.messages = messages;
@@ -51,8 +56,6 @@ public class ClientRatingService {
     return messages.getMessage(key, null, LocaleContextHolder.getLocale());
   }
 
-  // TODO: exigir que o motorista já tenha tido algum vínculo (viagem concluída) com o cliente
-  // antes de permitir a avaliação, uma vez que exista o relacionamento client_driver.
   @Transactional
   public ClientRatingResponseDTO create(ClientRatingCreateRequestDTO request, String callerEmail) {
     UserModel caller =
@@ -84,13 +87,20 @@ public class ClientRatingService {
           HttpStatus.BAD_REQUEST, message("client_rating.cannot_rate_self"));
     }
 
-    if (clientRatingRepository.existsByDriverIdAndClientId(driver.getId(), client.getId())) {
+    ClientDriverModel link =
+        linkRepository
+            .findByPair(client.getId(), driver.getId())
+            .orElseThrow(
+                () ->
+                    new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, message("client_rating.link.not_found")));
+
+    if (clientRatingRepository.existsByLinkId(link.getId())) {
       throw new ResponseStatusException(HttpStatus.CONFLICT, message("client_rating.duplicate"));
     }
 
     ClientRatingModel ratingModel = new ClientRatingModel();
-    ratingModel.setDriver(driver);
-    ratingModel.setClient(client);
+    ratingModel.setLink(link);
     ratingModel.setRating(request.rating());
     ratingModel.setComment(request.comment());
 
@@ -107,7 +117,7 @@ public class ClientRatingService {
           .findByClientToken(clientToken, pageable)
           .map(mapper::toResponse);
     }
-    return clientRatingRepository.findAll(pageable).map(mapper::toResponse);
+    return clientRatingRepository.findPage(pageable).map(mapper::toResponse);
   }
 
   @Transactional(readOnly = true)
@@ -118,7 +128,7 @@ public class ClientRatingService {
   @Transactional
   public void delete(String token) {
     ClientRatingModel ratingModel = requireByToken(token);
-    ClientModel client = ratingModel.getClient();
+    ClientModel client = ratingModel.getLink().getClient();
     clientRatingRepository.delete(ratingModel);
     recalculateClientAverage(client);
   }
@@ -128,7 +138,7 @@ public class ClientRatingService {
     if (clientRatingRepository.existsDeletedByToken(token)) {
       clientRatingRepository.restoreByToken(token);
       ClientRatingModel restored = requireByToken(token);
-      recalculateClientAverage(restored.getClient());
+      recalculateClientAverage(restored.getLink().getClient());
       return mapper.toResponse(restored);
     }
 
