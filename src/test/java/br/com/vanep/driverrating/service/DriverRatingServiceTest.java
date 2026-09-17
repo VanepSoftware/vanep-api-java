@@ -4,11 +4,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import br.com.vanep.client.model.ClientModel;
 import br.com.vanep.client.repository.ClientRepository;
+import br.com.vanep.clientdriver.enums.RelationshipStatus;
+import br.com.vanep.clientdriver.model.ClientDriverModel;
+import br.com.vanep.clientdriver.repository.ClientDriverRepository;
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.driverrating.dto.DriverRatingCreateRequestDTO;
@@ -25,6 +29,8 @@ import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.MessageSource;
@@ -38,9 +44,12 @@ class DriverRatingServiceTest {
   @Mock private DriverRatingRepository driverRatingRepository;
   @Mock private DriverRepository driverRepository;
   @Mock private ClientRepository clientRepository;
+  @Mock private ClientDriverRepository linkRepository;
   @Mock private UserRepository userRepository;
   @Mock private DriverRatingMapper mapper;
   @Mock private MessageSource messages;
+
+  @Captor private ArgumentCaptor<DriverRatingModel> saved;
 
   private DriverRatingService service;
 
@@ -51,6 +60,7 @@ class DriverRatingServiceTest {
             driverRatingRepository,
             driverRepository,
             clientRepository,
+            linkRepository,
             userRepository,
             mapper,
             messages);
@@ -82,6 +92,29 @@ class DriverRatingServiceTest {
     return client;
   }
 
+  private ClientDriverModel mockLink(Long id, ClientModel client, DriverModel driver) {
+    ClientDriverModel link = new ClientDriverModel();
+    link.setId(id);
+    link.setToken("link-token");
+    link.setClient(client);
+    link.setDriver(driver);
+    link.setStatus(RelationshipStatus.ACTIVE);
+    return link;
+  }
+
+  private DriverRatingResponseDTO anyResponse() {
+    return new DriverRatingResponseDTO(
+        "rating-token",
+        "driver-token",
+        "Driver Name",
+        "client-token",
+        "Client Name",
+        BigDecimal.valueOf(5.00),
+        "Great!",
+        null,
+        null);
+  }
+
   @Test
   void createSuccessfully() {
     UserModel caller = new UserModel();
@@ -90,25 +123,17 @@ class DriverRatingServiceTest {
 
     ClientModel client = mockClient(1L, 10L);
     DriverModel driver = mockDriver(2L, 20L);
+    ClientDriverModel link = mockLink(7L, client, driver);
 
     DriverRatingCreateRequestDTO dto =
         new DriverRatingCreateRequestDTO("driver-token", BigDecimal.valueOf(5.00), "Great!");
-    DriverRatingResponseDTO expectedResponse =
-        new DriverRatingResponseDTO(
-            "rating-token",
-            "driver-token",
-            "Driver Name",
-            "client-token",
-            "Client Name",
-            BigDecimal.valueOf(5.00),
-            "Great!",
-            null,
-            null);
+    DriverRatingResponseDTO expectedResponse = anyResponse();
 
     when(userRepository.findByEmail("client@vanep.com")).thenReturn(Optional.of(caller));
     when(clientRepository.findByUserId(10L)).thenReturn(Optional.of(client));
     when(driverRepository.findByToken("driver-token")).thenReturn(Optional.of(driver));
-    when(driverRatingRepository.existsByDriverIdAndClientId(2L, 1L)).thenReturn(false);
+    when(linkRepository.findByPair(1L, 2L)).thenReturn(Optional.of(link));
+    when(driverRatingRepository.existsByLinkId(7L)).thenReturn(false);
     when(driverRatingRepository.save(any(DriverRatingModel.class)))
         .thenAnswer(inv -> inv.getArgument(0));
     when(driverRatingRepository.calculateAverageRatingForDriver(2L))
@@ -122,13 +147,72 @@ class DriverRatingServiceTest {
   }
 
   @Test
+  void ratingHangsOnTheLinkAndNotOnThePair() {
+    UserModel caller = new UserModel();
+    caller.setId(10L);
+    caller.setEmail("client@vanep.com");
+
+    ClientModel client = mockClient(1L, 10L);
+    DriverModel driver = mockDriver(2L, 20L);
+    ClientDriverModel link = mockLink(7L, client, driver);
+
+    when(userRepository.findByEmail("client@vanep.com")).thenReturn(Optional.of(caller));
+    when(clientRepository.findByUserId(10L)).thenReturn(Optional.of(client));
+    when(driverRepository.findByToken("driver-token")).thenReturn(Optional.of(driver));
+    when(linkRepository.findByPair(1L, 2L)).thenReturn(Optional.of(link));
+    when(driverRatingRepository.existsByLinkId(7L)).thenReturn(false);
+    when(driverRatingRepository.save(any(DriverRatingModel.class)))
+        .thenAnswer(inv -> inv.getArgument(0));
+    when(driverRatingRepository.calculateAverageRatingForDriver(2L))
+        .thenReturn(Optional.of(BigDecimal.valueOf(5.00)));
+    when(mapper.toResponse(any())).thenReturn(anyResponse());
+
+    service.create(
+        new DriverRatingCreateRequestDTO("driver-token", BigDecimal.valueOf(5.00), "Great!"),
+        "client@vanep.com");
+
+    verify(driverRatingRepository).save(saved.capture());
+    assertThat(saved.getValue().getLink()).isSameAs(link);
+    assertThat(saved.getValue().getLink().getClient()).isSameAs(client);
+    assertThat(saved.getValue().getLink().getDriver()).isSameAs(driver);
+  }
+
+  @Test
+  void createThrowsNotFoundWhenThereIsNoLink() {
+    UserModel caller = new UserModel();
+    caller.setId(10L);
+    caller.setEmail("client@vanep.com");
+
+    ClientModel client = mockClient(1L, 10L);
+    DriverModel driver = mockDriver(2L, 20L);
+
+    when(userRepository.findByEmail("client@vanep.com")).thenReturn(Optional.of(caller));
+    when(clientRepository.findByUserId(10L)).thenReturn(Optional.of(client));
+    when(driverRepository.findByToken("driver-token")).thenReturn(Optional.of(driver));
+    when(linkRepository.findByPair(1L, 2L)).thenReturn(Optional.empty());
+    when(messages.getMessage(anyString(), any(), any())).thenAnswer(c -> c.getArgument(0));
+
+    assertThatThrownBy(
+            () ->
+                service.create(
+                    new DriverRatingCreateRequestDTO(
+                        "driver-token", BigDecimal.valueOf(5.00), "Nice"),
+                    "client@vanep.com"))
+        .isInstanceOf(ResponseStatusException.class)
+        .hasMessageContaining("404")
+        .hasMessageContaining("driver_rating.link.not_found");
+
+    verify(driverRatingRepository, never()).save(any());
+  }
+
+  @Test
   void createThrowsBadRequestWhenSelfRating() {
     UserModel caller = new UserModel();
     caller.setId(10L);
     caller.setEmail("driver@vanep.com");
 
     ClientModel client = mockClient(1L, 10L);
-    DriverModel driver = mockDriver(2L, 10L); // same user ID!
+    DriverModel driver = mockDriver(2L, 10L);
 
     DriverRatingCreateRequestDTO dto =
         new DriverRatingCreateRequestDTO("driver-token", BigDecimal.valueOf(5.00), "Self");
@@ -151,6 +235,7 @@ class DriverRatingServiceTest {
 
     ClientModel client = mockClient(1L, 10L);
     DriverModel driver = mockDriver(2L, 20L);
+    ClientDriverModel link = mockLink(7L, client, driver);
 
     DriverRatingCreateRequestDTO dto =
         new DriverRatingCreateRequestDTO("driver-token", BigDecimal.valueOf(5.00), "Again");
@@ -158,7 +243,8 @@ class DriverRatingServiceTest {
     when(userRepository.findByEmail("client@vanep.com")).thenReturn(Optional.of(caller));
     when(clientRepository.findByUserId(10L)).thenReturn(Optional.of(client));
     when(driverRepository.findByToken("driver-token")).thenReturn(Optional.of(driver));
-    when(driverRatingRepository.existsByDriverIdAndClientId(2L, 1L)).thenReturn(true);
+    when(linkRepository.findByPair(1L, 2L)).thenReturn(Optional.of(link));
+    when(driverRatingRepository.existsByLinkId(7L)).thenReturn(true);
     when(messages.getMessage(anyString(), any(), any())).thenReturn("Duplicate rating");
 
     assertThatThrownBy(() -> service.create(dto, "client@vanep.com"))
@@ -169,11 +255,9 @@ class DriverRatingServiceTest {
   @Test
   void findAllReturnsPagedList() {
     DriverRatingModel rating = new DriverRatingModel();
-    DriverRatingResponseDTO response =
-        new DriverRatingResponseDTO(
-            "tok", "dtok", "DName", "ctok", "CName", BigDecimal.valueOf(4.5), "Good", null, null);
+    DriverRatingResponseDTO response = anyResponse();
 
-    when(driverRatingRepository.findAll(any(Pageable.class)))
+    when(driverRatingRepository.findPage(any(Pageable.class)))
         .thenReturn(new PageImpl<>(List.of(rating)));
     when(mapper.toResponse(rating)).thenReturn(response);
 
@@ -185,9 +269,7 @@ class DriverRatingServiceTest {
   @Test
   void findAllFilteredByDriverToken() {
     DriverRatingModel rating = new DriverRatingModel();
-    DriverRatingResponseDTO response =
-        new DriverRatingResponseDTO(
-            "tok", "dtok", "DName", "ctok", "CName", BigDecimal.valueOf(4.5), "Good", null, null);
+    DriverRatingResponseDTO response = anyResponse();
 
     when(driverRatingRepository.findByDriverToken("dtok", Pageable.unpaged()))
         .thenReturn(new PageImpl<>(List.of(rating)));
@@ -201,9 +283,7 @@ class DriverRatingServiceTest {
   @Test
   void findByTokenReturnsResponse() {
     DriverRatingModel rating = new DriverRatingModel();
-    DriverRatingResponseDTO response =
-        new DriverRatingResponseDTO(
-            "tok", "dtok", "DName", "ctok", "CName", BigDecimal.valueOf(4.5), "Good", null, null);
+    DriverRatingResponseDTO response = anyResponse();
 
     when(driverRatingRepository.findByToken("tok")).thenReturn(Optional.of(rating));
     when(mapper.toResponse(rating)).thenReturn(response);
@@ -215,21 +295,11 @@ class DriverRatingServiceTest {
   void updatePersistsChangesAndRecalculatesAverage() {
     DriverModel driver = mockDriver(2L, 20L);
     DriverRatingModel ratingModel = new DriverRatingModel();
-    ratingModel.setDriver(driver);
+    ratingModel.setLink(mockLink(7L, mockClient(1L, 10L), driver));
 
     DriverRatingUpdateRequestDTO dto =
         new DriverRatingUpdateRequestDTO(BigDecimal.valueOf(4.00), "Updated comment");
-    DriverRatingResponseDTO response =
-        new DriverRatingResponseDTO(
-            "tok",
-            "dtok",
-            "DName",
-            "ctok",
-            "CName",
-            BigDecimal.valueOf(4.0),
-            "Updated comment",
-            null,
-            null);
+    DriverRatingResponseDTO response = anyResponse();
 
     when(driverRatingRepository.findByToken("tok")).thenReturn(Optional.of(ratingModel));
     when(driverRatingRepository.save(ratingModel)).thenReturn(ratingModel);
@@ -247,7 +317,7 @@ class DriverRatingServiceTest {
   void deleteRemovesRatingAndRecalculatesAverage() {
     DriverModel driver = mockDriver(2L, 20L);
     DriverRatingModel ratingModel = new DriverRatingModel();
-    ratingModel.setDriver(driver);
+    ratingModel.setLink(mockLink(7L, mockClient(1L, 10L), driver));
 
     when(driverRatingRepository.findByToken("tok")).thenReturn(Optional.of(ratingModel));
     when(driverRatingRepository.calculateAverageRatingForDriver(2L))
@@ -263,10 +333,8 @@ class DriverRatingServiceTest {
   void restoreRestoresDeletedRating() {
     DriverModel driver = mockDriver(2L, 20L);
     DriverRatingModel ratingModel = new DriverRatingModel();
-    ratingModel.setDriver(driver);
-    DriverRatingResponseDTO response =
-        new DriverRatingResponseDTO(
-            "tok", "dtok", "DName", "ctok", "CName", BigDecimal.valueOf(5.0), "Good", null, null);
+    ratingModel.setLink(mockLink(7L, mockClient(1L, 10L), driver));
+    DriverRatingResponseDTO response = anyResponse();
 
     when(driverRatingRepository.existsDeletedByToken("tok")).thenReturn(true);
     when(driverRatingRepository.findByToken("tok")).thenReturn(Optional.of(ratingModel));

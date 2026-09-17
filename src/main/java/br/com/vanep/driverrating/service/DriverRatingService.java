@@ -2,6 +2,8 @@ package br.com.vanep.driverrating.service;
 
 import br.com.vanep.client.model.ClientModel;
 import br.com.vanep.client.repository.ClientRepository;
+import br.com.vanep.clientdriver.model.ClientDriverModel;
+import br.com.vanep.clientdriver.repository.ClientDriverRepository;
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.driverrating.dto.DriverRatingCreateRequestDTO;
@@ -29,6 +31,7 @@ public class DriverRatingService {
   private final DriverRatingRepository driverRatingRepository;
   private final DriverRepository driverRepository;
   private final ClientRepository clientRepository;
+  private final ClientDriverRepository linkRepository;
   private final UserRepository userRepository;
   private final DriverRatingMapper mapper;
   private final MessageSource messages;
@@ -37,12 +40,14 @@ public class DriverRatingService {
       DriverRatingRepository driverRatingRepository,
       DriverRepository driverRepository,
       ClientRepository clientRepository,
+      ClientDriverRepository linkRepository,
       UserRepository userRepository,
       DriverRatingMapper mapper,
       MessageSource messages) {
     this.driverRatingRepository = driverRatingRepository;
     this.driverRepository = driverRepository;
     this.clientRepository = clientRepository;
+    this.linkRepository = linkRepository;
     this.userRepository = userRepository;
     this.mapper = mapper;
     this.messages = messages;
@@ -52,8 +57,6 @@ public class DriverRatingService {
     return messages.getMessage(key, null, LocaleContextHolder.getLocale());
   }
 
-  // TODO: exigir que o cliente já tenha tido algum vínculo (viagem concluída) com o motorista
-  // antes de permitir a avaliação, uma vez que exista o relacionamento client_driver.
   @Transactional
   public DriverRatingResponseDTO create(DriverRatingCreateRequestDTO request, String callerEmail) {
     UserModel caller =
@@ -84,13 +87,20 @@ public class DriverRatingService {
           HttpStatus.BAD_REQUEST, message("driver_rating.cannot_rate_self"));
     }
 
-    if (driverRatingRepository.existsByDriverIdAndClientId(driver.getId(), client.getId())) {
+    ClientDriverModel link =
+        linkRepository
+            .findByPair(client.getId(), driver.getId())
+            .orElseThrow(
+                () ->
+                    new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, message("driver_rating.link.not_found")));
+
+    if (driverRatingRepository.existsByLinkId(link.getId())) {
       throw new ResponseStatusException(HttpStatus.CONFLICT, message("driver_rating.duplicate"));
     }
 
     DriverRatingModel ratingModel = new DriverRatingModel();
-    ratingModel.setDriver(driver);
-    ratingModel.setClient(client);
+    ratingModel.setLink(link);
     ratingModel.setRating(request.rating());
     ratingModel.setComment(request.comment());
 
@@ -107,7 +117,7 @@ public class DriverRatingService {
           .findByDriverToken(driverToken, pageable)
           .map(mapper::toResponse);
     }
-    return driverRatingRepository.findAll(pageable).map(mapper::toResponse);
+    return driverRatingRepository.findPage(pageable).map(mapper::toResponse);
   }
 
   @Transactional(readOnly = true)
@@ -123,7 +133,7 @@ public class DriverRatingService {
     ratingModel.setComment(request.comment());
 
     DriverRatingModel saved = driverRatingRepository.save(ratingModel);
-    recalculateDriverAverage(saved.getDriver());
+    recalculateDriverAverage(saved.getLink().getDriver());
 
     return mapper.toResponse(saved);
   }
@@ -131,7 +141,7 @@ public class DriverRatingService {
   @Transactional
   public void delete(String token) {
     DriverRatingModel ratingModel = requireByToken(token);
-    DriverModel driver = ratingModel.getDriver();
+    DriverModel driver = ratingModel.getLink().getDriver();
     driverRatingRepository.delete(ratingModel);
     recalculateDriverAverage(driver);
   }
@@ -141,7 +151,7 @@ public class DriverRatingService {
     if (driverRatingRepository.existsDeletedByToken(token)) {
       driverRatingRepository.restoreByToken(token);
       DriverRatingModel restored = requireByToken(token);
-      recalculateDriverAverage(restored.getDriver());
+      recalculateDriverAverage(restored.getLink().getDriver());
       return mapper.toResponse(restored);
     }
 
