@@ -475,4 +475,17 @@ class ProfileControllerTest {
     String link = vars.getValue().get("link").toString();
     return link.substring(link.indexOf("token=") + "token=".length());
   }
+
+  @Test
+  void profileValidationErrorsKeepTheirOwnEnvelope() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/user/me/email-change")
+                .with(jwt().jwt(token -> token.claim("uid", uid).subject(EMAIL)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"email\":\"not-an-email\"}"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.field").value("email"))
+        .andExpect(jsonPath("$.errors").doesNotExist());
+  }
 }

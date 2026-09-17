@@ -7,6 +7,7 @@ import br.com.vanep.auth.dto.AssistantSignupRequestDTO;
 import br.com.vanep.auth.dto.ClientSignupRequestDTO;
 import br.com.vanep.auth.dto.DriverSignupFields;
 import br.com.vanep.auth.dto.DriverSignupRequestDTO;
+import br.com.vanep.auth.enums.AuthErrorCode;
 import br.com.vanep.auth.exception.SignupDuplicateException;
 import br.com.vanep.auth.validation.CpfValidator;
 import br.com.vanep.auth.verification.EmailVerificationService;
@@ -123,10 +124,12 @@ public class RegistrationService {
 
   void rejectDuplicates(String email, String normalizedDocument) {
     if (email != null && users.existsByEmail(email)) {
-      throw new SignupDuplicateException("email", "auth.signup.email.duplicate");
+      throw new SignupDuplicateException(
+          "email", "auth.signup.email.duplicate", AuthErrorCode.EMAIL_DUPLICATE);
     }
     if (!normalizedDocument.isEmpty() && users.existsByDocument(normalizedDocument)) {
-      throw new SignupDuplicateException("document", "auth.signup.document.duplicate");
+      throw new SignupDuplicateException(
+          "document", "auth.signup.document.duplicate", AuthErrorCode.DOCUMENT_DUPLICATE);
     }
   }
 }
