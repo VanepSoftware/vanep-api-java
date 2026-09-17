@@ -91,7 +91,13 @@ public enum PermissionEnum {
   CREATE_TRIP("create_trip"),
   UPDATE_TRIP("update_trip"),
   DELETE_TRIP("delete_trip"),
-  RESTORE_TRIP("restore_trip");
+  RESTORE_TRIP("restore_trip"),
+  LIST_CLIENT_DRIVERS("list_client_drivers"),
+  SHOW_CLIENT_DRIVER("show_client_driver"),
+  CREATE_CLIENT_DRIVER("create_client_driver"),
+  UPDATE_CLIENT_DRIVER("update_client_driver"),
+  DELETE_CLIENT_DRIVER("delete_client_driver"),
+  RESTORE_CLIENT_DRIVER("restore_client_driver");
 
   private final String value;
 
