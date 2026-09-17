@@ -10,6 +10,7 @@ delete from assistant_invite;
 delete from assistant;
 delete from trip;
 delete from driver_service_area;
+delete from client_driver;
 delete from driver_rating;
 delete from client_rating;
 delete from dependent;
