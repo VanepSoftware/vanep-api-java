@@ -1,6 +1,7 @@
 package br.com.vanep.auth.config;
 
 import br.com.vanep.auth.oauth.JwtTokenCustomizer;
+import br.com.vanep.auth.oauth.grant.MobileAuthorizationGrantTypes;
 import br.com.vanep.auth.oauth.grant.MobileRefreshTokenGenerator;
 import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.RSAKey;
@@ -26,6 +27,7 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
+import org.springframework.security.oauth2.server.authorization.InMemoryOAuth2AuthorizationService;
 import org.springframework.security.oauth2.server.authorization.JdbcOAuth2AuthorizationService;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService;
 import org.springframework.security.oauth2.server.authorization.client.InMemoryRegisteredClientRepository;
@@ -75,6 +77,9 @@ public class AuthorizationServerConfig {
     RegisteredClient.Builder mobileBuilder =
         buildPublicClient(mobileClientId, publicClientSettings, tokenSettings);
     applyRedirectUris(mobileBuilder, mobileRedirectUris);
+    // Only the native app gets the extension grants. This is configuration hygiene, not a
+    // security barrier: the defence is the uniform lockout plus the rate limit.
+    mobileBuilder.authorizationGrantType(MobileAuthorizationGrantTypes.PASSWORD);
     RegisteredClient mobileClient = mobileBuilder.build();
 
     return new InMemoryRegisteredClientRepository(webClient, mobileClient);
@@ -114,6 +119,16 @@ public class AuthorizationServerConfig {
   public OAuth2AuthorizationService authorizationService(
       JdbcTemplate jdbcTemplate, RegisteredClientRepository registeredClientRepository) {
     return new JdbcOAuth2AuthorizationService(jdbcTemplate, registeredClientRepository);
+  }
+
+  /**
+   * Declared as a bean so the mobile grants and the server's own endpoints share one store; without
+   * it each side would build its own in-memory instance and refresh would not find the token.
+   */
+  @Bean
+  @Profile("!docker & !prod & !local")
+  public OAuth2AuthorizationService inMemoryAuthorizationService() {
+    return new InMemoryOAuth2AuthorizationService();
   }
 
   @Bean

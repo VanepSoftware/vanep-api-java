@@ -1,12 +1,7 @@
 package br.com.vanep.auth.security;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
-import br.com.vanep.user.model.UserModel;
-import br.com.vanep.user.repository.UserRepository;
-import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -22,13 +17,13 @@ import org.springframework.security.core.Authentication;
 class AuthenticationEventsListenerTest {
 
   @Mock private LoginAttemptService attempts;
-  @Mock private UserRepository users;
+  @Mock private LoginActivityService loginActivity;
 
   private AuthenticationEventsListener listener;
 
   @BeforeEach
   void setUp() {
-    listener = new AuthenticationEventsListener(attempts, users);
+    listener = new AuthenticationEventsListener(attempts, loginActivity);
   }
 
   @Test
@@ -40,14 +35,11 @@ class AuthenticationEventsListenerTest {
   }
 
   @Test
-  void onInteractiveSuccessResetsAndStampsLastLogin() {
+  void onInteractiveSuccessDelegatesToTheSharedService() {
     Authentication auth = new TestingAuthenticationToken("a@vanep.com", null);
-    UserModel user = new UserModel();
-    when(users.findByEmail("a@vanep.com")).thenReturn(Optional.of(user));
 
     listener.onInteractiveSuccess(new InteractiveAuthenticationSuccessEvent(auth, getClass()));
 
-    verify(attempts).loginSucceeded("a@vanep.com");
-    assertThat(user.getLastLoginAt()).isNotNull();
+    verify(loginActivity).recordSuccessfulLogin("a@vanep.com");
   }
 }
