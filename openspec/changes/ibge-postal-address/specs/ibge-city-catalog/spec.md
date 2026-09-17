@@ -8,7 +8,7 @@ Oferece um catálogo curado de municípios brasileiros (IBGE) para o app escolhe
 
 O sistema SHALL persistir cada município IBGE como uma linha de `city` sob o `state` brasileiro curado da mesma UF, com `ibge_code` único (identificador IBGE de sete dígitos) e `normalized_name` no escopo daquele estado. O sistema MUST semear este catálogo a partir de um dump commitado no repositório. O sistema MUST NOT buscar a API HTTP do IBGE em runtime nem na suíte de testes. Uma linha de `city` MUST NOT carregar `place_id` do Google; a identidade do município é `ibge_code`.
 
-O seed MUST ser idempotente por `ibge_code`: rodar duas vezes MUST NOT duplicar linhas. O sistema MUST NOT importar distritos, subdistritos, microrregião, mesorregião nem região imediata. De cada objeto do dump o seeder MUST ler só `id` (sete dígitos → `ibge_code`), `nome` (`name`) e `microrregiao.mesorregiao.UF.sigla` (casa o `state` já semeado). `regiao-imediata` MUST ser ignorada: não é um segundo município. `normalized_name` MUST ser derivado de `nome` no model. `requires_district` MUST ficar nulo (herda do estado).
+O seed MUST ser idempotente por `ibge_code`: rodar duas vezes MUST NOT duplicar linhas. O sistema MUST NOT importar distritos, subdistritos, microrregião, mesorregião nem região imediata. De cada objeto do dump o seeder MUST ler só `id` (sete dígitos → `ibge_code`), `nome` (`name`) e a UF. A UF MUST vir de `microrregiao.mesorregiao.UF.sigla`; se essa árvore for nula, MUST usar `regiao-imediata.regiao-intermediaria.UF.sigla`. Se `id`, `nome` ou UF ainda faltarem, o seeder MUST pular o município e registrar um log, sem abortar o seed. `regiao-imediata` MUST NOT virar um segundo município. `normalized_name` MUST ser derivado de `nome` no model. `requires_district` MUST ficar nulo (herda do estado).
 
 Exemplo de um item do dump (`localidades/municipios`) e o que vira `city`:
 
@@ -60,7 +60,8 @@ Exemplo de um item do dump (`localidades/municipios`) e o que vira `city`:
 | `id` `5206206` | `city.ibge_code` = `5206206` (mesmo código do campo `ibge` do ViaCEP) |
 | `nome` `"Cristalina"` | `city.name` = `Cristalina`; `normalized_name` = `cristalina` |
 | `microrregiao.mesorregiao.UF.sigla` `"GO"` | `city.state` = linha do `StateSeeder` com UF `GO` |
-| `microrregiao` id/nome, `mesorregiao`, `UF.id`/`nome`, `regiao`, `regiao-imediata` | ignorados; **não** criam `city` nem `district` |
+| `regiao-imediata.regiao-intermediaria.UF.sigla` | UF fallback se `microrregiao` for nula |
+| `microrregiao` id/nome, `mesorregiao`, `UF.id`/`nome`, `regiao`, nomes de `regiao-imediata` | ignorados; **não** criam `city` nem `district` |
 
 Isso MUST persistir **uma** linha de `city` (Cristalina/GO), não duas. `token` é gerado pelo model. `google_place_id` não existe nessa tabela após a V34.
 
@@ -85,6 +86,17 @@ Isso MUST persistir **uma** linha de `city` (Cristalina/GO), não duas. `token` 
 
 - **WHEN** o seeder roda uma segunda vez
 - **THEN** o número de linhas de `city` permanece o mesmo
+
+#### Scenario: Seed usa UF da região imediata quando microrregião é nula
+
+- **WHEN** o dump contém o município `id` `5101837`, `nome` Boa Esperança do Norte, `microrregiao` nula e `regiao-imediata.regiao-intermediaria.UF.sigla` `MT`
+- **THEN** o sistema persiste uma linha de `city` com `ibge_code` `5101837`, name Boa Esperança do Norte e estado UF `MT`
+
+#### Scenario: Seed pula município sem UF após o fallback
+
+- **WHEN** um item do dump não tem `id`, `nome` ou UF nem em `microrregiao` nem em `regiao-imediata`
+- **THEN** o sistema não persiste essa linha
+- **AND** o seed dos demais municípios continua
 
 #### Scenario: Testes nunca chamam IBGE
 
