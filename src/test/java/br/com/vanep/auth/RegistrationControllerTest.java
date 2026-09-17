@@ -85,7 +85,7 @@ class RegistrationControllerTest {
                 .with(csrf())
                 .param("name", "Ana")
                 .param("email", "ana@vanep.com")
-                .param("password", "secret1")
+                .param("password", "Secret@1")
                 .param("document", "390.533.447-05")
                 .param("acceptTerms", "true"))
         .andExpect(status().is3xxRedirection())
@@ -105,7 +105,7 @@ class RegistrationControllerTest {
                 .with(csrf())
                 .param("name", "Bruno")
                 .param("email", "bruno@vanep.com")
-                .param("password", "secret1")
+                .param("password", "Secret@1")
                 .param("document", VALID_CPF_BRUNO)
                 .param("basePrice", "120.00")
                 .param("acceptTerms", "true"))
@@ -125,7 +125,7 @@ class RegistrationControllerTest {
                 .with(csrf())
                 .param("name", "Carla")
                 .param("email", "carla@vanep.com")
-                .param("password", "secret1")
+                .param("password", "Secret@1")
                 .param("document", VALID_CPF_CARLA)
                 .param("acceptTerms", "true"))
         .andExpect(status().is3xxRedirection())
@@ -147,7 +147,7 @@ class RegistrationControllerTest {
                 .with(csrf())
                 .param("name", "Ana")
                 .param("email", "ana@vanep.com")
-                .param("password", "secret1")
+                .param("password", "Secret@1")
                 .param("document", "11111111111")
                 .param("acceptTerms", "true"))
         .andExpect(status().isOk())
@@ -178,7 +178,7 @@ class RegistrationControllerTest {
                 .with(csrf())
                 .param("name", "Other")
                 .param("email", "other@vanep.com")
-                .param("password", "secret1")
+                .param("password", "Secret@1")
                 .param("document", VALID_CPF_EXISTING)
                 .param("acceptTerms", "true"))
         .andExpect(status().isOk())
@@ -193,6 +193,32 @@ class RegistrationControllerTest {
                         org.hamcrest.Matchers.containsString("CPF inválido"))));
 
     assertThat(users.count()).isEqualTo(1);
+  }
+
+  @Test
+  void rejectsPasswordWithoutUppercaseOrSpecialCharacter() throws Exception {
+    mockMvc
+        .perform(
+            post("/signup/client")
+                .with(csrf())
+                .param("name", "Ana")
+                .param("email", "ana@vanep.com")
+                .param("password", "secret1")
+                .param("document", "52998224725")
+                .param("acceptTerms", "true"))
+        .andExpect(status().isOk())
+        .andExpect(
+            content()
+                .string(
+                    org.hamcrest.Matchers.containsString(
+                        "A senha precisa ter ao menos uma letra maiúscula.")))
+        .andExpect(
+            content()
+                .string(
+                    org.hamcrest.Matchers.containsString(
+                        "A senha precisa ter ao menos um caractere especial.")));
+
+    assertThat(users.count()).isZero();
   }
 
   @Test
@@ -211,7 +237,7 @@ class RegistrationControllerTest {
                 .with(csrf())
                 .param("name", "Other")
                 .param("email", "dup@vanep.com")
-                .param("password", "secret1")
+                .param("password", "Secret@1")
                 .param("document", VALID_CPF_OTHER)
                 .param("acceptTerms", "true"))
         .andExpect(status().isOk())

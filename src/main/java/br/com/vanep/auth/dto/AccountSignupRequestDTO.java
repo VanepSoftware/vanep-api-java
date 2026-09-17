@@ -1,6 +1,7 @@
 package br.com.vanep.auth.dto;
 
 import br.com.vanep.auth.validation.Cpf;
+import br.com.vanep.auth.validation.StrongPassword;
 import br.com.vanep.user.enums.Gender;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Email;
@@ -24,6 +25,7 @@ public class AccountSignupRequestDTO {
 
   @NotBlank(message = "{auth.signup.password.required}")
   @Size(min = 6, message = "{auth.signup.password.min}")
+  @StrongPassword
   private String password;
 
   @NotBlank(message = "{auth.signup.document.required}")

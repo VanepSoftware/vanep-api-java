@@ -52,6 +52,16 @@ public class AuthErrorAdvice {
                 exception.getCode().value(), message(exception.getMessageKey())));
   }
 
+  @ExceptionHandler(InvalidSignupTicketException.class)
+  public ResponseEntity<AuthErrorResponseDTO> handleInvalidTicket(
+      InvalidSignupTicketException exception) {
+    return ResponseEntity.badRequest()
+        .body(
+            AuthErrorResponseDTO.of(
+                AuthErrorCode.INVALID_SIGNUP_TICKET.value(),
+                message("auth.error.invalid_signup_ticket")));
+  }
+
   @ExceptionHandler(InvalidAuthCodeException.class)
   public ResponseEntity<AuthErrorResponseDTO> handleInvalidCode(
       InvalidAuthCodeException exception) {

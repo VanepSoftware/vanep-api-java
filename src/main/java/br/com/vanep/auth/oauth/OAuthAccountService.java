@@ -1,7 +1,7 @@
 package br.com.vanep.auth.oauth;
 
+import br.com.vanep.auth.dto.SignupCompletionFields;
 import br.com.vanep.auth.web.RegistrationService;
-import br.com.vanep.auth.web.SignupForm;
 import br.com.vanep.role.RoleName;
 import br.com.vanep.role.repository.RoleRepository;
 import br.com.vanep.user.enums.AuthProvider;
@@ -76,13 +76,17 @@ public class OAuthAccountService {
 
   @Transactional
   public UserModel completeRegistration(
-      AuthProvider provider, String providerUid, String email, String name, SignupForm form) {
+      AuthProvider provider,
+      String providerUid,
+      String email,
+      String name,
+      SignupCompletionFields form) {
     UserModel user = new UserModel();
     user.setType(form.getType());
     roles
         .findByRoleName(roleForType(form.getType()))
         .ifPresent(role -> user.setRoleId(role.getId()));
-    user.setName(name != null && !name.isBlank() ? name : form.getName());
+    user.setName(name);
     user.setEmail(email);
     user.setDocument(form.getDocument());
     user.setPhone(form.getPhone());

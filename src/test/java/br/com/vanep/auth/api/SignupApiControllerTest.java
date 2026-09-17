@@ -67,7 +67,7 @@ class SignupApiControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     """
-                    {"name":"Ana","email":"ana@vanep.com","password":"secret1",
+                    {"name":"Ana","email":"ana@vanep.com","password":"Secret@1",
                      "document":"390.533.447-05","acceptTerms":true}
                     """))
         .andExpect(status().isCreated())
@@ -89,7 +89,7 @@ class SignupApiControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     """
-                    {"name":"Bruno","email":"bruno@vanep.com","password":"secret1",
+                    {"name":"Bruno","email":"bruno@vanep.com","password":"Secret@1",
                      "document":"52998224725","basePrice":120.00,"acceptTerms":true}
                     """))
         .andExpect(status().isCreated())
@@ -108,7 +108,7 @@ class SignupApiControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     """
-                    {"name":"Carla","email":"carla@vanep.com","password":"secret1",
+                    {"name":"Carla","email":"carla@vanep.com","password":"Secret@1",
                      "document":"11144477735","acceptTerms":true}
                     """))
         .andExpect(status().isCreated());
@@ -124,7 +124,7 @@ class SignupApiControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     """
-                    {"name":"  ","email":"ana@vanep.com","password":"secret1",
+                    {"name":"  ","email":"ana@vanep.com","password":"Secret@1",
                      "document":"11111111111","acceptTerms":true}
                     """))
         .andExpect(status().isBadRequest())
@@ -138,6 +138,29 @@ class SignupApiControllerTest {
   }
 
   @Test
+  void weakPasswordReportsEveryMissingRequirement() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/auth/signup/client")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {"name":"Ana","email":"ana@vanep.com","password":"secret",
+                     "document":"52998224725","acceptTerms":true}
+                    """))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("validation_error"))
+        .andExpect(
+            jsonPath("$.errors[?(@.field == 'password')].message")
+                .value(
+                    org.hamcrest.Matchers.containsInAnyOrder(
+                        "A senha precisa ter ao menos uma letra maiúscula.",
+                        "A senha precisa ter ao menos um caractere especial.")));
+
+    assertThat(users.count()).isZero();
+  }
+
+  @Test
   void driverWithoutBasePriceIsRejected() throws Exception {
     mockMvc
         .perform(
@@ -145,7 +168,7 @@ class SignupApiControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     """
-                    {"name":"Bruno","email":"bruno@vanep.com","password":"secret1",
+                    {"name":"Bruno","email":"bruno@vanep.com","password":"Secret@1",
                      "document":"52998224725","acceptTerms":true}
                     """))
         .andExpect(status().isBadRequest())
@@ -164,7 +187,7 @@ class SignupApiControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     """
-                    {"name":"Ana","email":"ana@vanep.com","password":"secret1",
+                    {"name":"Ana","email":"ana@vanep.com","password":"Secret@1",
                      "document":"39053344705","acceptTerms":false}
                     """))
         .andExpect(status().isBadRequest())
@@ -181,7 +204,7 @@ class SignupApiControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     """
-                    {"name":"Other","email":"existing@vanep.com","password":"secret1",
+                    {"name":"Other","email":"existing@vanep.com","password":"Secret@1",
                      "document":"11144477735","acceptTerms":true}
                     """))
         .andExpect(status().isConflict())
@@ -193,7 +216,7 @@ class SignupApiControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     """
-                    {"name":"Other","email":"other@vanep.com","password":"secret1",
+                    {"name":"Other","email":"other@vanep.com","password":"Secret@1",
                      "document":"529.982.247-25","acceptTerms":true}
                     """))
         .andExpect(status().isConflict())
@@ -211,7 +234,7 @@ class SignupApiControllerTest {
                 .header("Authorization", "Bearer not-a-valid-token")
                 .content(
                     """
-                    {"name":"Ana","email":"ana@vanep.com","password":"secret1",
+                    {"name":"Ana","email":"ana@vanep.com","password":"Secret@1",
                      "document":"39053344705","acceptTerms":true}
                     """))
         .andExpect(status().isCreated());
