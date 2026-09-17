@@ -3,6 +3,7 @@ package br.com.vanep.auth.oauth;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -33,6 +34,7 @@ class OAuthAccountServiceTest {
   @Mock private OAuthAccountRepository oauthAccounts;
   @Mock private RoleRepository roles;
   @Mock private RegistrationService registrationService;
+  @Mock private org.springframework.context.MessageSource messages;
   @InjectMocks private OAuthAccountService service;
 
   private RoleModel roleTaggedAs(RoleName roleName) {
@@ -49,8 +51,7 @@ class OAuthAccountServiceTest {
     user.setEmail("a@vanep.com");
     OAuthAccountModel account = new OAuthAccountModel();
     account.setUser(user);
-    when(oauthAccounts.findByProviderAndProviderUid(AuthProvider.GOOGLE, "sub-1"))
-        .thenReturn(Optional.of(account));
+    when(oauthAccounts.findLinkedUserId("GOOGLE", "sub-1")).thenReturn(Optional.of(1L));
     when(users.findById(1L)).thenReturn(Optional.of(user));
 
     OAuthResolution result =
@@ -66,12 +67,10 @@ class OAuthAccountServiceTest {
     UserModel deleted = new UserModel();
     deleted.setId(99L);
     deleted.setEmail("gone@vanep.com");
-    OAuthAccountModel account = new OAuthAccountModel();
-    account.setUser(deleted);
-    when(oauthAccounts.findByProviderAndProviderUid(AuthProvider.GOOGLE, "sub-x"))
-        .thenReturn(Optional.of(account));
+    when(oauthAccounts.findLinkedUserId("GOOGLE", "sub-x")).thenReturn(Optional.of(99L));
     // @SoftDelete: usuário desativado não é retornado por findById.
     when(users.findById(99L)).thenReturn(Optional.empty());
+    when(messages.getMessage(anyString(), any(), any())).thenReturn("disabled");
 
     assertThatThrownBy(
             () -> service.resolve(AuthProvider.GOOGLE, "sub-x", "gone@vanep.com", true, "G"))
@@ -80,8 +79,7 @@ class OAuthAccountServiceTest {
 
   @Test
   void resolveLinksAccountWhenVerifiedEmailUserExists() {
-    when(oauthAccounts.findByProviderAndProviderUid(AuthProvider.GOOGLE, "sub-2"))
-        .thenReturn(Optional.empty());
+    when(oauthAccounts.findLinkedUserId("GOOGLE", "sub-2")).thenReturn(Optional.empty());
     UserModel existing = new UserModel();
     existing.setEmail("b@vanep.com");
     when(users.findByEmail("b@vanep.com")).thenReturn(Optional.of(existing));
@@ -97,8 +95,7 @@ class OAuthAccountServiceTest {
 
   @Test
   void resolveDoesNotLinkWhenEmailNotVerified() {
-    when(oauthAccounts.findByProviderAndProviderUid(AuthProvider.GOOGLE, "sub-5"))
-        .thenReturn(Optional.empty());
+    when(oauthAccounts.findLinkedUserId("GOOGLE", "sub-5")).thenReturn(Optional.empty());
 
     OAuthResolution result =
         service.resolve(AuthProvider.GOOGLE, "sub-5", "b@vanep.com", false, "B");
@@ -110,8 +107,7 @@ class OAuthAccountServiceTest {
 
   @Test
   void resolveReturnsPendingWhenNothingMatches() {
-    when(oauthAccounts.findByProviderAndProviderUid(AuthProvider.GOOGLE, "sub-3"))
-        .thenReturn(Optional.empty());
+    when(oauthAccounts.findLinkedUserId("GOOGLE", "sub-3")).thenReturn(Optional.empty());
     when(users.findByEmail("c@vanep.com")).thenReturn(Optional.empty());
 
     OAuthResolution result =

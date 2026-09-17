@@ -80,6 +80,7 @@ public class AuthorizationServerConfig {
     // Only the native app gets the extension grants. This is configuration hygiene, not a
     // security barrier: the defence is the uniform lockout plus the rate limit.
     mobileBuilder.authorizationGrantType(MobileAuthorizationGrantTypes.PASSWORD);
+    mobileBuilder.authorizationGrantType(MobileAuthorizationGrantTypes.GOOGLE);
     RegisteredClient mobileClient = mobileBuilder.build();
 
     return new InMemoryRegisteredClientRepository(webClient, mobileClient);

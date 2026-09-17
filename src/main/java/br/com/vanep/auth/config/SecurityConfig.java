@@ -1,15 +1,21 @@
 package br.com.vanep.auth.config;
 
+import br.com.vanep.auth.oauth.GoogleIdTokenValidator;
+import br.com.vanep.auth.oauth.OAuthAccountService;
 import br.com.vanep.auth.oauth.OAuthLoginSuccessHandler;
 import br.com.vanep.auth.oauth.VanepOidcUserService;
 import br.com.vanep.auth.oauth.grant.MobileClientAuthenticationConverter;
 import br.com.vanep.auth.oauth.grant.MobileClientAuthenticationProvider;
+import br.com.vanep.auth.oauth.grant.MobileGoogleGrantAuthenticationConverter;
+import br.com.vanep.auth.oauth.grant.MobileGoogleGrantAuthenticationProvider;
 import br.com.vanep.auth.oauth.grant.MobileGrantTokenIssuer;
 import br.com.vanep.auth.oauth.grant.MobilePasswordGrantAuthenticationConverter;
 import br.com.vanep.auth.oauth.grant.MobilePasswordGrantAuthenticationProvider;
+import br.com.vanep.auth.oauth.grant.MobileTokenErrorResponseHandler;
 import br.com.vanep.auth.security.LoginActivityService;
 import br.com.vanep.auth.security.LoginAttemptService;
 import br.com.vanep.auth.security.VanepUserDetailsService;
+import br.com.vanep.auth.signup.SignupTicketService;
 import java.util.ArrayList;
 import java.util.Collection;
 import org.springframework.beans.factory.ObjectProvider;
@@ -78,6 +84,9 @@ public class SecurityConfig {
       PasswordEncoder passwordEncoder,
       LoginAttemptService loginAttempts,
       LoginActivityService loginActivity,
+      GoogleIdTokenValidator googleIdTokenValidator,
+      OAuthAccountService oauthAccounts,
+      SignupTicketService signupTickets,
       MessageSource messages,
       @Value("${vanep.oauth.mobile-client.id:vanep-mobile}") String mobileClientId)
       throws Exception {
@@ -107,6 +116,8 @@ public class SecurityConfig {
                             tokenEndpoint
                                 .accessTokenRequestConverter(
                                     new MobilePasswordGrantAuthenticationConverter())
+                                .accessTokenRequestConverter(
+                                    new MobileGoogleGrantAuthenticationConverter())
                                 .authenticationProvider(
                                     new MobilePasswordGrantAuthenticationProvider(
                                         userDetailsService,
@@ -114,7 +125,15 @@ public class SecurityConfig {
                                         tokenIssuer,
                                         loginAttempts,
                                         loginActivity,
-                                        messages))))
+                                        messages))
+                                .authenticationProvider(
+                                    new MobileGoogleGrantAuthenticationProvider(
+                                        googleIdTokenValidator,
+                                        oauthAccounts,
+                                        signupTickets,
+                                        tokenIssuer,
+                                        messages))
+                                .errorResponseHandler(new MobileTokenErrorResponseHandler())))
         .exceptionHandling(
             exceptions ->
                 exceptions.defaultAuthenticationEntryPointFor(
