@@ -190,11 +190,11 @@ Cada fase: branch própria a partir de `main`, uma PR (pt-BR, `Refs #177`; a úl
 > Depende de: 1b, 4a | Paralela com: 3b, 4c
 > Ordem: test → request DTO → controller
 
-- [ ] 11.1 Testes de slice falhando: `POST /api/auth/email/verify` `204` com código certo e `400 invalid_code` para e-mail inexistente, código errado/expirado/substituído/esgotado, conta verificada e conta com `pending_email`
-- [ ] 11.2 Testes de slice falhando: `resend` e `forgot` sempre `202` (conta elegível, inexistente, cooldown, limite diário), verificando envio ou não via mock do `MailService`
-- [ ] 11.3 Testes de slice falhando: `POST /api/auth/password/reset` `204` (senha nova aceita no grant, antiga rejeitada), `400 validation_error` para `newPassword` com 7 caracteres sem consumir o código, `204` com 8 caracteres (mesmo mínimo do reset web), `400 invalid_code` nos demais casos
-- [ ] 11.4 Request DTOs `EmailVerifyRequestDTO`, `EmailRequestDTO`, `PasswordResetRequestDTO`
-- [ ] 11.5 `EmailCodeApiController` com os quatro endpoints delegando aos services da 1b
+- [x] 11.1 Testes de slice falhando: `POST /api/auth/email/verify` `204` com código certo e `400 invalid_code` para e-mail inexistente, código errado/expirado/substituído/esgotado, conta verificada e conta com `pending_email`
+- [x] 11.2 Testes de slice falhando: `resend` e `forgot` sempre `202` (conta elegível, inexistente, cooldown, limite diário), verificando envio ou não via mock do `MailService`
+- [x] 11.3 Testes de slice falhando: `POST /api/auth/password/reset` `204` (senha nova aceita no grant, antiga rejeitada), `400 validation_error` para `newPassword` com 7 caracteres sem consumir o código, `204` com 8 caracteres (mesmo mínimo do reset web), `400 invalid_code` nos demais casos
+- [x] 11.4 Request DTOs `EmailVerifyRequestDTO`, `EmailRequestDTO`, `PasswordResetRequestDTO`
+- [x] 11.5 `EmailCodeApiController` com os quatro endpoints delegando aos services da 1b
 - [ ] 11.6 `make lint` + `./mvnw verify`; abrir PR 4b
 
 ## 12. Fase 4c — Conclusão de cadastro Google pela API (PR 4c)
