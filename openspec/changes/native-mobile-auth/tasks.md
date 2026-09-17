@@ -92,11 +92,11 @@ Cada fase: branch própria a partir de `main`, uma PR (pt-BR, `Refs #177`; a úl
 > Depende de: — | Paralela com: 0a, 0b, 1a, 3a
 > Ordem: test → security (converter/provider) → config (token generator)
 
-- [ ] 4.1 Testes de slice falhando: `authorization_code` + PKCE do `vanep-mobile` passa a devolver `refresh_token`; refresh só com `client_id=vanep-mobile` devolve novos tokens; reuso do refresh antigo → `invalid_grant`; `POST /oauth2/revoke` só com `client_id=vanep-mobile` + `token` → `200`, e o refresh seguinte → `invalid_grant` (não `invalid_client`); revoke com `client_id` desconhecido → `401 invalid_client`; `vanep-frontend` continua sem refresh; `client_id` desconhecido → `401 invalid_client`
-- [ ] 4.2 Teste de claims: token emitido após o bean explícito de `OAuth2TokenGenerator` contém `uid`, `user_type`, `roles`, `permissions` (e `driver_status` para motorista)
-- [ ] 4.3 Criar `MobileClientAuthenticationConverter` e `MobileClientAuthenticationProvider` (regras do design D2, cobrindo `/oauth2/token` e `/oauth2/revoke`)
-- [ ] 4.4 Criar `MobileRefreshTokenGenerator` e o bean `OAuth2TokenGenerator` delegante (`JwtGenerator` + `JwtTokenCustomizer`, access token, refresh mobile)
-- [ ] 4.5 Registrar a autenticação de cliente em `SecurityConfig.authorizationServerSecurityFilterChain` antes dos conversores padrão
+- [x] 4.1 Testes de slice falhando: `authorization_code` + PKCE do `vanep-mobile` passa a devolver `refresh_token`; refresh só com `client_id=vanep-mobile` devolve novos tokens; reuso do refresh antigo → `invalid_grant`; `POST /oauth2/revoke` só com `client_id=vanep-mobile` + `token` → `200`, e o refresh seguinte → `invalid_grant` (não `invalid_client`); revoke com `client_id` desconhecido → `401 invalid_client`; `vanep-frontend` continua sem refresh; `client_id` desconhecido → `401 invalid_client`
+- [x] 4.2 Teste de claims: token emitido após o bean explícito de `OAuth2TokenGenerator` contém `uid`, `user_type`, `roles`, `permissions` (e `driver_status` para motorista)
+- [x] 4.3 Criar `MobileClientAuthenticationConverter` e `MobileClientAuthenticationProvider` (regras do design D2, cobrindo `/oauth2/token` e `/oauth2/revoke`)
+- [x] 4.4 Criar `MobileRefreshTokenGenerator` e o bean `OAuth2TokenGenerator` delegante (`JwtGenerator` + `JwtTokenCustomizer`, access token, refresh mobile)
+- [x] 4.5 Registrar a autenticação de cliente em `SecurityConfig.authorizationServerSecurityFilterChain` antes dos conversores padrão
 - [ ] 4.6 `make lint` + `./mvnw verify`; abrir PR 2a
 
 ## 5. Fase 3a — Validação do `id_token` Google + `signup_ticket` (PR 3a)
