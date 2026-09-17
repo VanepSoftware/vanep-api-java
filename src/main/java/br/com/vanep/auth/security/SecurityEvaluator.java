@@ -1,6 +1,7 @@
 package br.com.vanep.auth.security;
 
 import br.com.vanep.client.repository.ClientRepository;
+import br.com.vanep.clientdriver.repository.ClientDriverRepository;
 import br.com.vanep.clientrating.repository.ClientRatingRepository;
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.drivercnh.repository.DriverCnhRepository;
@@ -16,6 +17,7 @@ public class SecurityEvaluator {
 
   private final DriverRepository driverRepository;
   private final ClientRepository clientRepository;
+  private final ClientDriverRepository clientDriverRepository;
   private final VehicleRepository vehicleRepository;
   private final DriverCnhRepository cnhRepository;
   private final DriverRatingRepository driverRatingRepository;
@@ -26,6 +28,7 @@ public class SecurityEvaluator {
   public SecurityEvaluator(
       DriverRepository driverRepository,
       ClientRepository clientRepository,
+      ClientDriverRepository clientDriverRepository,
       VehicleRepository vehicleRepository,
       DriverCnhRepository cnhRepository,
       DriverRatingRepository driverRatingRepository,
@@ -34,6 +37,7 @@ public class SecurityEvaluator {
       TripRepository tripRepository) {
     this.driverRepository = driverRepository;
     this.clientRepository = clientRepository;
+    this.clientDriverRepository = clientDriverRepository;
     this.vehicleRepository = vehicleRepository;
     this.cnhRepository = cnhRepository;
     this.driverRatingRepository = driverRatingRepository;
@@ -119,6 +123,21 @@ public class SecurityEvaluator {
                 tripRepository
                     .findDriverUserTokenByTripToken(token)
                     .map(driverUserToken -> driverUserToken.equals(uid)))
+        .orElse(false);
+  }
+
+  public boolean isClientDriverLinkParty(String token, Authentication authentication) {
+    return SecurityHelper.getCallerUid(authentication)
+        .map(
+            uid ->
+                clientDriverRepository
+                        .findClientUserTokenByLinkToken(token)
+                        .map(uid::equals)
+                        .orElse(false)
+                    || clientDriverRepository
+                        .findDriverUserTokenByLinkToken(token)
+                        .map(uid::equals)
+                        .orElse(false))
         .orElse(false);
   }
 }
