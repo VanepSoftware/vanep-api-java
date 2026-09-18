@@ -1,5 +1,6 @@
 package br.com.vanep.driverrating.controller;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -110,8 +111,7 @@ class DriverRatingControllerTest {
             new SimpleGrantedAuthority("show_driver_rating"),
             new SimpleGrantedAuthority("create_driver_rating"),
             new SimpleGrantedAuthority("update_driver_rating"),
-            new SimpleGrantedAuthority("delete_driver_rating"),
-            new SimpleGrantedAuthority("restore_driver_rating"));
+            new SimpleGrantedAuthority("delete_driver_rating"));
   }
 
   private JwtRequestPostProcessor clientJwt() {
@@ -243,23 +243,39 @@ class DriverRatingControllerTest {
   }
 
   @Test
-  void restoreReturns200ForAdmin() throws Exception {
-    // Delete first
+  void deletingRemovesTheRowPhysically() throws Exception {
     mockMvc
         .perform(delete("/api/driver-ratings/" + ratingToken).with(clientJwt()))
         .andExpect(status().isNoContent());
 
-    // Restore
-    mockMvc
-        .perform(post("/api/driver-ratings/" + ratingToken + "/restore").with(adminJwt()))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.token").value(ratingToken));
+    assertThat(driverRatings.count()).isZero();
   }
 
   @Test
-  void restoreForbidsNonAdmin() throws Exception {
+  void aPairCanBeRatedAgainAfterItsRatingIsDeleted() throws Exception {
     mockMvc
-        .perform(post("/api/driver-ratings/" + ratingToken + "/restore").with(clientJwt()))
-        .andExpect(status().isForbidden());
+        .perform(delete("/api/driver-ratings/" + ratingToken).with(clientJwt()))
+        .andExpect(status().isNoContent());
+
+    String requestBody =
+        """
+        {
+          "driverToken": "%s",
+          "rating": 3.00,
+          "comment": "Mudei de ideia"
+        }
+        """
+            .formatted(driverToken);
+
+    mockMvc
+        .perform(
+            post("/api/driver-ratings")
+                .with(clientJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(requestBody))
+        .andExpect(status().isCreated())
+        .andExpect(jsonPath("$.rating").value(3.0));
+
+    assertThat(driverRatings.count()).isEqualTo(1);
   }
 }

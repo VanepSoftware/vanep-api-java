@@ -258,25 +258,4 @@ class DriverRatingServiceTest {
     verify(driverRatingRepository).delete(ratingModel);
     verify(driverRepository).save(driver);
   }
-
-  @Test
-  void restoreRestoresDeletedRating() {
-    DriverModel driver = mockDriver(2L, 20L);
-    DriverRatingModel ratingModel = new DriverRatingModel();
-    ratingModel.setDriver(driver);
-    DriverRatingResponseDTO response =
-        new DriverRatingResponseDTO(
-            "tok", "dtok", "DName", "ctok", "CName", BigDecimal.valueOf(5.0), "Good", null, null);
-
-    when(driverRatingRepository.existsDeletedByToken("tok")).thenReturn(true);
-    when(driverRatingRepository.findByToken("tok")).thenReturn(Optional.of(ratingModel));
-    when(driverRatingRepository.calculateAverageRatingForDriver(2L))
-        .thenReturn(Optional.of(BigDecimal.valueOf(5.00)));
-    when(mapper.toResponse(ratingModel)).thenReturn(response);
-
-    DriverRatingResponseDTO result = service.restore("tok");
-
-    verify(driverRatingRepository).restoreByToken("tok");
-    assertThat(result).isEqualTo(response);
-  }
 }

@@ -136,23 +136,6 @@ public class DriverRatingService {
     recalculateDriverAverage(driver);
   }
 
-  @Transactional
-  public DriverRatingResponseDTO restore(String token) {
-    if (driverRatingRepository.existsDeletedByToken(token)) {
-      driverRatingRepository.restoreByToken(token);
-      DriverRatingModel restored = requireByToken(token);
-      recalculateDriverAverage(restored.getDriver());
-      return mapper.toResponse(restored);
-    }
-
-    if (driverRatingRepository.findByToken(token).isPresent()) {
-      throw new ResponseStatusException(
-          HttpStatus.CONFLICT, message("driver_rating.already_active"));
-    }
-
-    throw new ResponseStatusException(HttpStatus.NOT_FOUND, message("driver_rating.not_found"));
-  }
-
   private DriverRatingModel requireByToken(String token) {
     return driverRatingRepository
         .findByToken(token)
