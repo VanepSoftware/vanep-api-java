@@ -23,6 +23,10 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class PasswordResetService {
 
+  // An unknown e-mail still runs the token lookup. The 400 body is already uniform, but returning
+  // early skips a query, and the difference in response time tells registered accounts apart.
+  private static final Long NO_SUCH_USER_ID = -1L;
+
   private final PasswordResetTokenRepository tokens;
   private final UserRepository users;
   private final MailService mail;
@@ -123,15 +127,13 @@ public class PasswordResetService {
   public boolean resetByCode(String email, String code, String newPassword) {
     Optional<UserModel> maybeUser =
         users.findByEmail(email).filter(PasswordResetService::hasLocalPassword);
-    if (maybeUser.isEmpty() || code == null) {
+    Instant now = Instant.now();
+    Optional<PasswordResetTokenModel> maybeToken =
+        tokens.lockLatestActive(maybeUser.map(UserModel::getId).orElse(NO_SUCH_USER_ID), now);
+    if (maybeUser.isEmpty() || code == null || maybeToken.isEmpty()) {
       return false;
     }
     UserModel user = maybeUser.get();
-    Instant now = Instant.now();
-    Optional<PasswordResetTokenModel> maybeToken = tokens.lockLatestActive(user.getId(), now);
-    if (maybeToken.isEmpty()) {
-      return false;
-    }
     PasswordResetTokenModel token = maybeToken.get();
     if (!codes.matches(token.getCodeHash(), AuthCodePurpose.PASSWORD_RESET, user.getId(), code)) {
       registerFailedAttempt(token, now);
