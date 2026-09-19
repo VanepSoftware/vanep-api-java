@@ -50,4 +50,10 @@ public class SignupForm implements DriverSignupFields {
   public boolean isDriverFieldsComplete() {
     return type != UserType.DRIVER || (basePrice != null && basePrice.signum() > 0);
   }
+
+  /** Admin is a valid {@link UserType}, but it is provisioned internally, never by sign-up. */
+  @AssertTrue(message = "{auth.signup.type.notSelfService}")
+  public boolean isSelfServiceType() {
+    return type != UserType.ADMIN;
+  }
 }

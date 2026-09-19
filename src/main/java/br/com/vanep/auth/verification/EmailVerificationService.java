@@ -94,6 +94,18 @@ public class EmailVerificationService {
             message("auth.email.validity.hours", ttl.toHours())));
   }
 
+  /**
+   * The e-mail change send bypasses the throttling inside {@link #startVerification}, so the caller
+   * has to ask here first and reject the request explicitly instead of dropping the link silently.
+   *
+   * @return empty when a new send is allowed; otherwise when it becomes allowed
+   */
+  @Transactional(readOnly = true)
+  public Optional<Instant> issueRetryAfter(UserModel user) {
+    Instant now = Instant.now();
+    return issuePolicy.retryAfter(lastIssuedAt(user), issuedInWindow(user, now), now);
+  }
+
   private String issueToken(UserModel user, Instant now, String code) {
     tokens.consumeAllActive(user.getId(), now);
     String raw = SecureTokens.generate();
