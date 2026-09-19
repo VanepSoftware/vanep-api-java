@@ -96,6 +96,19 @@ class GoogleSignupCompleteApiTest {
   }
 
   @Test
+  void anAdminTypeIsRejectedAndLeavesTheTicketUnused() throws Exception {
+    String ticket = issuedTicket();
+
+    mockMvc
+        .perform(complete(ticket, "ADMIN", VALID_CPF, null))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("validation_error"));
+
+    assertThat(users.count()).isZero();
+    mockMvc.perform(complete(ticket, "CLIENT", VALID_CPF, null)).andExpect(status().isCreated());
+  }
+
+  @Test
   void anUnknownExpiredOrUsedTicketCreatesNothing() throws Exception {
     mockMvc
         .perform(complete("never-issued", "CLIENT", VALID_CPF, null))
