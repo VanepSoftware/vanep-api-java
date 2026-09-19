@@ -1,4 +1,4 @@
-package br.com.vanep.auth.web;
+package br.com.vanep.auth.dto;
 
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -8,7 +8,7 @@ import lombok.Setter;
 
 @Getter
 @Setter
-public class DriverSignupForm extends AccountSignupForm {
+public class DriverSignupRequestDTO extends AccountSignupRequestDTO implements DriverSignupFields {
   private String cnpj;
 
   private Integer experienceYears;
