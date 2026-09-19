@@ -127,6 +127,29 @@ class GoogleLoginTest {
   }
 
   @Test
+  void signupCompleteRejectsAdminType() throws Exception {
+    mockMvc
+        .perform(
+            post("/signup/complete")
+                .with(
+                    oidcLogin()
+                        .idToken(
+                            t ->
+                                t.subject("g-10")
+                                    .claim("email", "admin@gmail.com")
+                                    .claim("name", "Admin")))
+                .with(csrf())
+                .locale(Locale.forLanguageTag("pt-BR"))
+                .param("type", "ADMIN")
+                .param("document", "52998224725")
+                .param("acceptTerms", "true"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(org.hamcrest.Matchers.containsString("administrador")));
+
+    assertThat(users.findByEmail("admin@gmail.com")).isEmpty();
+  }
+
+  @Test
   void signupCompleteRejectsInvalidForm() throws Exception {
     mockMvc
         .perform(

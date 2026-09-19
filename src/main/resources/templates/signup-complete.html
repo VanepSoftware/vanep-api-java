@@ -41,6 +41,11 @@
               th:if="${#fields.hasErrors('driverFieldsComplete')}"
               th:errors="*{driverFieldsComplete}"
             ></div>
+            <div
+              class="form-error"
+              th:if="${#fields.hasErrors('selfServiceType')}"
+              th:errors="*{selfServiceType}"
+            ></div>
           </div>
 
           <div class="field">

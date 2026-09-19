@@ -49,4 +49,26 @@ class AuthCodeIssuePolicyTest {
   void countsFromTheStartOfTheRollingWindow() {
     assertThat(policy.dailyWindowStart(NOW)).isEqualTo(NOW.minus(Duration.ofHours(24)));
   }
+
+  @Test
+  void retryAfterIsEmptyWhenASendIsAllowed() {
+    assertThat(policy.retryAfter(null, 0, NOW)).isEmpty();
+    assertThat(policy.retryAfter(NOW.minus(Duration.ofSeconds(60)), 1, NOW)).isEmpty();
+  }
+
+  @Test
+  void retryAfterEndsTheResendCooldown() {
+    Instant lastIssuedAt = NOW.minus(Duration.ofSeconds(59));
+
+    assertThat(policy.retryAfter(lastIssuedAt, 1, NOW))
+        .contains(lastIssuedAt.plus(Duration.ofSeconds(60)));
+  }
+
+  @Test
+  void retryAfterClearsTheDailyCapOneWindowAfterTheLastSend() {
+    Instant lastIssuedAt = NOW.minus(Duration.ofHours(2));
+
+    assertThat(policy.retryAfter(lastIssuedAt, 10, NOW))
+        .contains(lastIssuedAt.plus(Duration.ofHours(24)));
+  }
 }
