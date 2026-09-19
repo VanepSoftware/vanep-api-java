@@ -1,5 +1,6 @@
 package br.com.vanep.auth.dto;
 
+import br.com.vanep.auth.validation.StrongPassword;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -12,4 +13,5 @@ public record PasswordResetRequestDTO(
     // Same minimum the web reset form enforces; sign-up keeps its own 6.
     @NotBlank(message = "{auth.signup.password.required}")
         @Size(min = 8, message = "{auth.password.reset.min}")
+        @StrongPassword
         String newPassword) {}

@@ -165,12 +165,12 @@ class EmailCodeApiControllerTest {
     persistResetCode(user, CODE);
 
     mockMvc
-        .perform(resetRequest(EMAIL, CODE, "brand-new-password"))
+        .perform(resetRequest(EMAIL, CODE, "Brand-new-password1"))
         .andExpect(status().isNoContent());
 
     assertThat(
             passwordEncoder.matches(
-                "brand-new-password", users.findByEmail(EMAIL).orElseThrow().getPassword()))
+                "Brand-new-password1", users.findByEmail(EMAIL).orElseThrow().getPassword()))
         .isTrue();
     assertThat(
             passwordEncoder.matches(PASSWORD, users.findByEmail(EMAIL).orElseThrow().getPassword()))
@@ -183,12 +183,31 @@ class EmailCodeApiControllerTest {
     persistResetCode(user, CODE);
 
     mockMvc
-        .perform(resetRequest(EMAIL, CODE, "1234567"))
+        .perform(resetRequest(EMAIL, CODE, "Abc-123"))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.code").value("validation_error"))
         .andExpect(jsonPath("$.errors[?(@.field == 'newPassword')]").exists());
 
-    mockMvc.perform(resetRequest(EMAIL, CODE, "12345678")).andExpect(status().isNoContent());
+    mockMvc.perform(resetRequest(EMAIL, CODE, "Abc-1234")).andExpect(status().isNoContent());
+  }
+
+  @Test
+  void aWeakNewPasswordIsRejectedWithoutConsumingTheCode() throws Exception {
+    UserModel user = persistUser(true);
+    persistResetCode(user, CODE);
+
+    mockMvc
+        .perform(resetRequest(EMAIL, CODE, "alllowercase"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("validation_error"))
+        .andExpect(jsonPath("$.errors[?(@.field == 'newPassword')]").exists());
+
+    mockMvc
+        .perform(resetRequest(EMAIL, CODE, "Nospecialchar1"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.errors[?(@.field == 'newPassword')]").exists());
+
+    mockMvc.perform(resetRequest(EMAIL, CODE, "Strong-pass1")).andExpect(status().isNoContent());
   }
 
   @Test
@@ -197,12 +216,12 @@ class EmailCodeApiControllerTest {
     persistResetCode(user, CODE);
 
     mockMvc
-        .perform(resetRequest(EMAIL, "000000", "brand-new-password"))
+        .perform(resetRequest(EMAIL, "000000", "Brand-new-password1"))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.code").value("invalid_code"));
 
     mockMvc
-        .perform(resetRequest("nobody@vanep.com", CODE, "brand-new-password"))
+        .perform(resetRequest("nobody@vanep.com", CODE, "Brand-new-password1"))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.code").value("invalid_code"));
   }
