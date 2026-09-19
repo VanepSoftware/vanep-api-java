@@ -33,6 +33,7 @@ import org.springframework.context.NoSuchMessageException;
 class EmailVerificationServiceTest {
 
   private static final long USER_ID = 7L;
+  private static final long NO_SUCH_USER_ID = -1L;
   private static final String EMAIL = "person@vanep.com";
 
   @Mock private EmailVerificationTokenRepository tokens;
@@ -202,7 +203,18 @@ class EmailVerificationServiceTest {
     when(users.findByEmail("nobody@vanep.com")).thenReturn(Optional.empty());
     assertThat(service.verifyByCode("nobody@vanep.com", "123456")).isFalse();
 
-    verify(tokens, never()).lockLatestActive(any(), any());
+    verify(tokens, never()).lockLatestActive(eq(USER_ID), any());
+  }
+
+  @Test
+  void aRejectedEmailStillRunsTheTokenLookupSoTheResponseTimeDoesNotLeakIt() {
+    when(users.findByEmail("nobody@vanep.com")).thenReturn(Optional.empty());
+    when(tokens.lockLatestActive(eq(NO_SUCH_USER_ID), any(Instant.class)))
+        .thenReturn(Optional.empty());
+
+    assertThat(service.verifyByCode("nobody@vanep.com", "123456")).isFalse();
+
+    verify(tokens).lockLatestActive(eq(NO_SUCH_USER_ID), any(Instant.class));
   }
 
   private EmailVerificationTokenModel activeTokenFor(String code) {

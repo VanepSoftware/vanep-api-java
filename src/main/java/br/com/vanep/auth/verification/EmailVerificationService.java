@@ -24,6 +24,10 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class EmailVerificationService {
 
+  // An unknown e-mail still runs the token lookup. The 400 body is already uniform, but returning
+  // early skips a query, and the difference in response time tells registered accounts apart.
+  private static final Long NO_SUCH_USER_ID = -1L;
+
   private final EmailVerificationTokenRepository tokens;
   private final UserRepository users;
   private final MailService mail;
@@ -94,6 +98,18 @@ public class EmailVerificationService {
             message("auth.email.validity.hours", ttl.toHours())));
   }
 
+  /**
+   * The e-mail change send bypasses the throttling inside {@link #startVerification}, so the caller
+   * has to ask here first and reject the request explicitly instead of dropping the link silently.
+   *
+   * @return empty when a new send is allowed; otherwise when it becomes allowed
+   */
+  @Transactional(readOnly = true)
+  public Optional<Instant> issueRetryAfter(UserModel user) {
+    Instant now = Instant.now();
+    return issuePolicy.retryAfter(lastIssuedAt(user), issuedInWindow(user, now), now);
+  }
+
   private String issueToken(UserModel user, Instant now, String code) {
     tokens.consumeAllActive(user.getId(), now);
     String raw = SecureTokens.generate();
@@ -150,15 +166,13 @@ public class EmailVerificationService {
             .findByEmail(email)
             .filter(user -> !user.isVerified())
             .filter(user -> !hasPendingEmail(user));
-    if (maybeUser.isEmpty() || code == null) {
+    Instant now = Instant.now();
+    Optional<EmailVerificationTokenModel> maybeToken =
+        tokens.lockLatestActive(maybeUser.map(UserModel::getId).orElse(NO_SUCH_USER_ID), now);
+    if (maybeUser.isEmpty() || code == null || maybeToken.isEmpty()) {
       return false;
     }
     UserModel user = maybeUser.get();
-    Instant now = Instant.now();
-    Optional<EmailVerificationTokenModel> maybeToken = tokens.lockLatestActive(user.getId(), now);
-    if (maybeToken.isEmpty()) {
-      return false;
-    }
     EmailVerificationTokenModel token = maybeToken.get();
     if (!codes.matches(
         token.getCodeHash(), AuthCodePurpose.EMAIL_VERIFICATION, user.getId(), code)) {

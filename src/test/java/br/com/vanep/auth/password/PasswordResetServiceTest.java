@@ -33,6 +33,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 class PasswordResetServiceTest {
 
   private static final long USER_ID = 11L;
+  private static final long NO_SUCH_USER_ID = -1L;
   private static final String EMAIL = "person@vanep.com";
 
   @Mock private PasswordResetTokenRepository tokens;
@@ -186,7 +187,18 @@ class PasswordResetServiceTest {
     when(users.findByEmail(EMAIL)).thenReturn(Optional.of(googleOnly));
     assertThat(service.resetByCode(EMAIL, "654321", "new-password")).isFalse();
 
-    verify(tokens, never()).lockLatestActive(any(), any());
+    verify(tokens, never()).lockLatestActive(eq(USER_ID), any());
+  }
+
+  @Test
+  void aRejectedEmailStillRunsTheTokenLookupSoTheResponseTimeDoesNotLeakIt() {
+    when(users.findByEmail("nobody@vanep.com")).thenReturn(Optional.empty());
+    when(tokens.lockLatestActive(eq(NO_SUCH_USER_ID), any(Instant.class)))
+        .thenReturn(Optional.empty());
+
+    assertThat(service.resetByCode("nobody@vanep.com", "654321", "new-password")).isFalse();
+
+    verify(tokens).lockLatestActive(eq(NO_SUCH_USER_ID), any(Instant.class));
   }
 
   private PasswordResetTokenModel activeTokenFor(String code) {
