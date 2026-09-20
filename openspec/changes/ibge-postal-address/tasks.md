@@ -71,3 +71,18 @@
 - [ ] 6.3 DTO de resposta: `neighborhood`; não exigir `googlePlaceId`
 - [ ] 6.4 MessageSource conforme precisar; manter onboarding `PERSONAL_ADDRESS` atrelado a `users.address_id`
 - [ ] 6.5 `make lint` + `./mvnw verify`; abrir PR
+
+## 7. Fase 7 — Endereço de embarque do dependente por `cityToken` (PR 7)
+
+> Objetivo: **BREAKING** `POST/PATCH /api/dependent` = mesmo contrato do endereço pessoal (`cityToken` + `street` + `zipCode` + campos postais opcionais). Desfaz a regressão a `placeId` da PR #173 (`dependent-address-by-place`) só para dependente — escola continua `placeId`.
+> Branch: `feat/ibge-postal-address-dependent` a partir de `feat/ibge-postal-address-personal-address`
+> Depende de: 6 | Paralelo com: —
+
+- [ ] 7.1 Testes falhando: unit de `AddressCatalogResolverService.applyCity` (extraído do bloco hoje inline em `PersonalAddressService`); unit de `AddressService.upsertForDependent(Long, DependentAddressRequestDTO)` (cria linha nova; atualiza linha existente; `cityToken` desconhecido → `404` `city.not_found`; conflito de posse cruzada com escola continua `409` `address.already_owned`); slice de `DependentController`: `201`/`200` com `cityToken`+`street`+CEP de 8 dígitos; CEP omitido/inválido `400`; `street` em branco `400`; `cityToken` desconhecido `404`; `placeId` não é mais aceito; `neighborhood` persiste e volta na resposta; DELETE do dependente limpa o endereço; PATCH só com `name` não altera o endereço existente (teste de regressão nomeado, regra 44 da constituição)
+- [ ] 7.2 `DependentAddressRequestDTO` em `address.dto` (`cityToken`/`street`/`zipCode` `@NotBlank`, `zipCode` `@Pattern` 8 dígitos, `number`/`complement`/`neighborhood` opcionais)
+- [ ] 7.3 Extrair `AddressCatalogResolverService` de `PersonalAddressService.replaceMyAddress`; `PersonalAddressService` passa a delegar (sem mudança de comportamento — testes existentes da fase 6 continuam verdes sem alteração)
+- [ ] 7.4 `AddressService`: novo `upsertForDependent(Long, DependentAddressRequestDTO)` usando o colaborador acima; remove o overload `(Long, AddressRequestDTO)` (código morto do lado dependente); `upsertForSchool` inalterado
+- [ ] 7.5 `AddressResponseDTO` + `AddressMapper` ganham `neighborhood`
+- [ ] 7.6 `DependentCreateDTO.address` e `DependentUpdateDTO.address` trocam de `AddressRequestDTO` para `DependentAddressRequestDTO`; `DependentService.applyAddressMerge` e a chamada em `create` ajustam a assinatura
+- [ ] 7.7 MessageSource EN + pt-BR: `dependent_address.city_token.required`, `.street.required`, `.zip_code.required`, `.zip_code.invalid`, `.neighborhood.too_long`
+- [ ] 7.8 `make lint` + `./mvnw verify`; abrir PR
