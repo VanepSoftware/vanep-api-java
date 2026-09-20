@@ -14,8 +14,8 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -48,8 +48,8 @@ public class ClientController {
     return service.findByToken(token);
   }
 
-  @PutMapping("/{token}")
-  @PreAuthorize("@sec.isClientOwner(#token, authentication)")
+  @PatchMapping("/{token}")
+  @PreAuthorize("hasAuthority('update_client') or @sec.isClientOwner(#token, authentication)")
   public ClientResponseDTO update(
       @PathVariable String token, @Valid @RequestBody ClientUpdateRequestDTO request) {
     return service.update(token, request);

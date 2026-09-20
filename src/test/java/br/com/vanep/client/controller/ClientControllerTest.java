@@ -6,7 +6,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -109,6 +109,13 @@ class ClientControllerTest {
             new SimpleGrantedAuthority("list_clients"),
             new SimpleGrantedAuthority("show_client"),
             new SimpleGrantedAuthority("delete_client"));
+  }
+
+  private JwtRequestPostProcessor adminWithUpdateJwt() {
+    return jwt()
+        .jwt(t -> t.claim("uid", "admin-uid").claim("roles", List.of("ROLE_ADMIN")))
+        .authorities(
+            new SimpleGrantedAuthority("ROLE_ADMIN"), new SimpleGrantedAuthority("update_client"));
   }
 
   private JwtRequestPostProcessor ownerJwt() {
@@ -259,7 +266,7 @@ class ClientControllerTest {
   void updateRequiresAuthentication() throws Exception {
     mockMvc
         .perform(
-            put("/api/clients/" + clientToken)
+            patch("/api/clients/" + clientToken)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{}"))
         .andExpect(status().isUnauthorized());
@@ -269,7 +276,7 @@ class ClientControllerTest {
   void updateReturns200ForOwnerWithoutAddressToken() throws Exception {
     mockMvc
         .perform(
-            put("/api/clients/" + clientToken)
+            patch("/api/clients/" + clientToken)
                 .with(ownerJwt())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"photo\":\"https://example.com/photo.jpg\"}"))
@@ -292,7 +299,7 @@ class ClientControllerTest {
 
     mockMvc
         .perform(
-            put("/api/clients/" + clientToken)
+            patch("/api/clients/" + clientToken)
                 .with(ownerJwt())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
@@ -314,7 +321,7 @@ class ClientControllerTest {
   void updateReturns403ForOtherClient() throws Exception {
     mockMvc
         .perform(
-            put("/api/clients/" + clientToken)
+            patch("/api/clients/" + clientToken)
                 .with(otherClientJwt())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{}"))
@@ -322,10 +329,10 @@ class ClientControllerTest {
   }
 
   @Test
-  void updateReturns403ForAdmin() throws Exception {
+  void updateReturns403ForAdminWithoutUpdatePermission() throws Exception {
     mockMvc
         .perform(
-            put("/api/clients/" + clientToken)
+            patch("/api/clients/" + clientToken)
                 .with(adminJwt())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{}"))
@@ -333,10 +340,23 @@ class ClientControllerTest {
   }
 
   @Test
+  void updateReturns200ForAdminWithUpdatePermission() throws Exception {
+    mockMvc
+        .perform(
+            patch("/api/clients/" + clientToken)
+                .with(adminWithUpdateJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"Nome Editado\",\"photo\":\"https://example.com/p.jpg\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.token").value(clientToken))
+        .andExpect(jsonPath("$.name").value("Nome Editado"));
+  }
+
+  @Test
   void updateReturns403ForNonExistentToken() throws Exception {
     mockMvc
         .perform(
-            put("/api/clients/doesnotexist")
+            patch("/api/clients/doesnotexist")
                 .with(ownerJwt())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{}"))

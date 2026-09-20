@@ -17,6 +17,7 @@ import br.com.vanep.client.repository.ClientRepository;
 import br.com.vanep.user.dto.UserMeResponseDTO;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
+import br.com.vanep.user.repository.UserRepository;
 import br.com.vanep.user.service.UserService;
 import java.util.List;
 import java.util.Map;
@@ -26,6 +27,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.openapitools.jackson.nullable.JsonNullable;
 import org.springframework.context.MessageSource;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
@@ -39,12 +41,13 @@ class ClientServiceTest {
   @Mock private UserService userService;
   @Mock private AddressService addressService;
   @Mock private MessageSource messages;
+  @Mock private UserRepository users;
 
   private ClientService service;
 
   @BeforeEach
   void setUp() {
-    service = new ClientService(repository, mapper, userService, addressService, messages);
+    service = new ClientService(repository, users, mapper, userService, addressService, messages);
     lenient().when(messages.getMessage(any(), any(), any())).thenAnswer(inv -> inv.getArgument(0));
   }
 
@@ -164,7 +167,8 @@ class ClientServiceTest {
     when(addressService.toResponseOrNull(5L)).thenReturn(address);
     when(mapper.toResponse(client, address)).thenReturn(response);
 
-    ClientResponseDTO result = service.update("tok", new ClientUpdateRequestDTO("photo.jpg"));
+    ClientResponseDTO result =
+        service.update("tok", updateWith(JsonNullable.of("photo.jpg"), null, null, null));
 
     assertThat(result).isEqualTo(response);
     assertThat(client.getPhoto()).isEqualTo("photo.jpg");
@@ -175,7 +179,7 @@ class ClientServiceTest {
   void updateThrows404WhenNotFound() {
     when(repository.findByToken("missing")).thenReturn(Optional.empty());
 
-    assertThatThrownBy(() -> service.update("missing", new ClientUpdateRequestDTO(null)))
+    assertThatThrownBy(() -> service.update("missing", updateWith(null, null, null, null)))
         .isInstanceOf(ResponseStatusException.class)
         .extracting(ex -> ((ResponseStatusException) ex).getStatusCode().value())
         .isEqualTo(404);
@@ -238,5 +242,118 @@ class ClientServiceTest {
     assertThat(result.address()).isEqualTo(address);
     assertThat(result.address().cityToken()).isEqualTo("city-campinas");
     assertThat(result.address().stateUf()).isEqualTo("SP");
+  }
+
+  @Test
+  void patchingOnlyPhotoLeavesEveryOtherStoredFieldUnchanged() {
+    ClientModel client = clientWith("Ana", "ana@vanep.com", true);
+    when(repository.findByToken("tok")).thenReturn(Optional.of(client));
+    when(repository.save(any(ClientModel.class))).thenAnswer(call -> call.getArgument(0));
+
+    service.update("tok", updateWith(JsonNullable.of("nova.jpg"), null, null, null));
+
+    assertThat(client.getPhoto()).isEqualTo("nova.jpg");
+    assertThat(client.getUser().getName()).isEqualTo("Ana");
+    assertThat(client.getUser().getEmail()).isEqualTo("ana@vanep.com");
+    assertThat(client.isActive()).isTrue();
+  }
+
+  @Test
+  void adminCanRenameTheClient() {
+    ClientModel client = clientWith("Ana", "ana@vanep.com", true);
+    when(repository.findByToken("tok")).thenReturn(Optional.of(client));
+    when(repository.save(any(ClientModel.class))).thenAnswer(call -> call.getArgument(0));
+
+    service.update("tok", updateWith(null, JsonNullable.of("Ana Souza"), null, null));
+
+    assertThat(client.getUser().getName()).isEqualTo("Ana Souza");
+  }
+
+  @Test
+  void deactivatingTheClientIsPersisted() {
+    ClientModel client = clientWith("Ana", "ana@vanep.com", true);
+    when(repository.findByToken("tok")).thenReturn(Optional.of(client));
+    when(repository.save(any(ClientModel.class))).thenAnswer(call -> call.getArgument(0));
+
+    service.update("tok", updateWith(null, null, null, JsonNullable.of(false)));
+
+    assertThat(client.isActive()).isFalse();
+  }
+
+  @Test
+  void aBlankNameIsRefused() {
+    ClientModel client = clientWith("Ana", "ana@vanep.com", true);
+    when(repository.findByToken("tok")).thenReturn(Optional.of(client));
+
+    assertThatThrownBy(
+            () -> service.update("tok", updateWith(null, JsonNullable.of("  "), null, null)))
+        .isInstanceOf(ResponseStatusException.class)
+        .hasMessageContaining("400");
+  }
+
+  @Test
+  void clearingNameExplicitlyIsRefused() {
+    ClientModel client = clientWith("Ana", "ana@vanep.com", true);
+    when(repository.findByToken("tok")).thenReturn(Optional.of(client));
+
+    assertThatThrownBy(
+            () -> service.update("tok", updateWith(null, JsonNullable.of(null), null, null)))
+        .isInstanceOf(ResponseStatusException.class)
+        .hasMessageContaining("400");
+  }
+
+  @Test
+  void clearingActiveExplicitlyIsRefused() {
+    ClientModel client = clientWith("Ana", "ana@vanep.com", true);
+    when(repository.findByToken("tok")).thenReturn(Optional.of(client));
+
+    assertThatThrownBy(
+            () -> service.update("tok", updateWith(null, null, null, JsonNullable.of(null))))
+        .isInstanceOf(ResponseStatusException.class)
+        .hasMessageContaining("400");
+  }
+
+  @Test
+  void anEmailAlreadyTakenByAnotherUserIsRefused() {
+    ClientModel client = clientWith("Ana", "ana@vanep.com", true);
+    when(repository.findByToken("tok")).thenReturn(Optional.of(client));
+    when(users.existsByEmail("ocupado@vanep.com")).thenReturn(true);
+
+    assertThatThrownBy(
+            () ->
+                service.update(
+                    "tok", updateWith(null, null, JsonNullable.of("ocupado@vanep.com"), null)))
+        .isInstanceOf(ResponseStatusException.class)
+        .hasMessageContaining("409");
+  }
+
+  @Test
+  void resendingTheSameEmailIsNotADuplicate() {
+    ClientModel client = clientWith("Ana", "ana@vanep.com", true);
+    when(repository.findByToken("tok")).thenReturn(Optional.of(client));
+    when(repository.save(any(ClientModel.class))).thenAnswer(call -> call.getArgument(0));
+
+    service.update("tok", updateWith(null, null, JsonNullable.of("ana@vanep.com"), null));
+
+    assertThat(client.getUser().getEmail()).isEqualTo("ana@vanep.com");
+  }
+
+  private static ClientModel clientWith(String name, String email, boolean active) {
+    UserModel user = new UserModel();
+    user.setName(name);
+    user.setEmail(email);
+
+    ClientModel client = new ClientModel();
+    client.setUser(user);
+    client.setActive(active);
+    return client;
+  }
+
+  private static ClientUpdateRequestDTO updateWith(
+      JsonNullable<String> photo,
+      JsonNullable<String> name,
+      JsonNullable<String> email,
+      JsonNullable<Boolean> active) {
+    return new ClientUpdateRequestDTO(name, email, photo, null, active);
   }
 }

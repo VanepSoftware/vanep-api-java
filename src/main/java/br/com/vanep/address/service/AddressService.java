@@ -5,8 +5,6 @@ import br.com.vanep.address.dto.AddressResponseDTO;
 import br.com.vanep.address.mapper.AddressMapper;
 import br.com.vanep.address.model.AddressModel;
 import br.com.vanep.address.repository.AddressRepository;
-import br.com.vanep.city.model.CityModel;
-import br.com.vanep.city.repository.CityRepository;
 import br.com.vanep.dependent.model.DependentModel;
 import br.com.vanep.dependent.repository.DependentRepository;
 import br.com.vanep.school.model.SchoolModel;
@@ -25,7 +23,7 @@ import org.springframework.web.server.ResponseStatusException;
 @Service
 public class AddressService {
   private final AddressRepository addressRepository;
-  private final CityRepository cityRepository;
+  private final AddressPlaceResolverService placeResolver;
   private final AddressMapper mapper;
   private final MessageSource messages;
   private final DependentRepository dependents;
@@ -33,13 +31,13 @@ public class AddressService {
 
   public AddressService(
       AddressRepository addressRepository,
-      CityRepository cityRepository,
+      AddressPlaceResolverService placeResolver,
       AddressMapper mapper,
       MessageSource messages,
       DependentRepository dependents,
       SchoolRepository schools) {
     this.addressRepository = addressRepository;
-    this.cityRepository = cityRepository;
+    this.placeResolver = placeResolver;
     this.mapper = mapper;
     this.messages = messages;
     this.dependents = dependents;
@@ -131,12 +129,12 @@ public class AddressService {
                   () ->
                       new ResponseStatusException(
                           HttpStatus.NOT_FOUND, message("address.not_found")));
-      applyRequest(address, request);
+      applyToExistingAddress(address, request);
       return mapper.toResponse(addressRepository.save(address));
     }
 
     AddressModel address = new AddressModel();
-    applyRequest(address, request);
+    applyToNewAddress(address, request);
     AddressModel saved = addressRepository.save(address);
     linkToOwner.accept(saved.getId());
     return mapper.toResponse(saved);
@@ -170,18 +168,28 @@ public class AddressService {
             () -> new ResponseStatusException(HttpStatus.NOT_FOUND, message("school.not_found")));
   }
 
-  private void applyRequest(AddressModel address, AddressRequestDTO request) {
-    address.setCity(requireCityByToken(request.cityToken()));
-    address.setZipCode(request.zipCode());
-    address.setStreet(request.street());
+  private void applyToNewAddress(AddressModel address, AddressRequestDTO request) {
+    if (!hasText(request.placeId())) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, message("address.place_required"));
+    }
+    resolvePlaceInto(address, request);
+  }
+
+  private void applyToExistingAddress(AddressModel address, AddressRequestDTO request) {
+    if (hasText(request.placeId())) {
+      resolvePlaceInto(address, request);
+      return;
+    }
     address.setNumber(request.number());
     address.setComplement(request.complement());
   }
 
-  private CityModel requireCityByToken(String cityToken) {
-    return cityRepository
-        .findByToken(cityToken)
-        .orElseThrow(
-            () -> new ResponseStatusException(HttpStatus.NOT_FOUND, message("city.not_found")));
+  private void resolvePlaceInto(AddressModel address, AddressRequestDTO request) {
+    placeResolver.applyPlace(
+        address, request.placeId(), request.sessionToken(), request.number(), request.complement());
+  }
+
+  static boolean hasText(String value) {
+    return value != null && !value.isBlank();
   }
 }
