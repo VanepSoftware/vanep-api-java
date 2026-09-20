@@ -10,10 +10,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import br.com.vanep.assistant.enums.AssistantStatus;
 import br.com.vanep.assistant.repository.AssistantRepository;
+import br.com.vanep.client.repository.ClientRepository;
+import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.user.enums.AuthProvider;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.repository.OAuthAccountRepository;
 import br.com.vanep.user.repository.UserRepository;
+import java.util.Locale;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,6 +37,8 @@ class GoogleLoginTest {
   @Autowired private UserRepository users;
   @Autowired private OAuthAccountRepository oauthAccounts;
   @Autowired private AssistantRepository assistants;
+  @Autowired private ClientRepository clients;
+  @Autowired private DriverRepository drivers;
 
   private MockMvc mockMvc;
 
@@ -94,6 +99,54 @@ class GoogleLoginTest {
     assertThat(created).isPresent();
     assertThat(created.get().getDocument()).isEqualTo("39053344705");
     assertThat(oauthAccounts.findByProviderAndProviderUid(AuthProvider.GOOGLE, "g-2")).isPresent();
+    assertThat(clients.findByUserId(created.get().getId())).isPresent();
+  }
+
+  @Test
+  void signupCompleteAsDriverIsRejectedUntilTheScreenAsksForTheDriverFields() throws Exception {
+    mockMvc
+        .perform(
+            post("/signup/complete")
+                .with(
+                    oidcLogin()
+                        .idToken(
+                            t ->
+                                t.subject("g-9")
+                                    .claim("email", "driver@gmail.com")
+                                    .claim("name", "Driver")))
+                .with(csrf())
+                .locale(Locale.forLanguageTag("pt-BR"))
+                .param("type", "DRIVER")
+                .param("document", "52998224725")
+                .param("acceptTerms", "true"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(org.hamcrest.Matchers.containsString("valor base")));
+
+    assertThat(users.findByEmail("driver@gmail.com")).isEmpty();
+    assertThat(drivers.count()).isZero();
+  }
+
+  @Test
+  void signupCompleteRejectsAdminType() throws Exception {
+    mockMvc
+        .perform(
+            post("/signup/complete")
+                .with(
+                    oidcLogin()
+                        .idToken(
+                            t ->
+                                t.subject("g-10")
+                                    .claim("email", "admin@gmail.com")
+                                    .claim("name", "Admin")))
+                .with(csrf())
+                .locale(Locale.forLanguageTag("pt-BR"))
+                .param("type", "ADMIN")
+                .param("document", "52998224725")
+                .param("acceptTerms", "true"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(org.hamcrest.Matchers.containsString("administrador")));
+
+    assertThat(users.findByEmail("admin@gmail.com")).isEmpty();
   }
 
   @Test

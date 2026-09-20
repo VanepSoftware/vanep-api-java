@@ -13,7 +13,7 @@ public class DriverSignupForm extends AccountSignupForm {
 
   private Integer experienceYears;
 
-  @NotNull(message = "Informe o valor base.")
-  @Positive(message = "O valor base deve ser positivo.")
+  @NotNull(message = "{auth.signup.basePrice.required}")
+  @Positive(message = "{auth.signup.basePrice.positive}")
   private BigDecimal basePrice;
 }

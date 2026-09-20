@@ -99,13 +99,36 @@ class PasswordRecoveryFlowTest {
             post("/reset-password")
                 .with(csrf())
                 .param("token", raw)
-                .param("password", "newpass12")
-                .param("confirmPassword", "newpass12"))
+                .param("password", "Newpass-12")
+                .param("confirmPassword", "Newpass-12"))
         .andExpect(status().is3xxRedirection())
         .andExpect(redirectedUrl("/login?reset"));
 
     UserModel reloaded = users.findById(user.getId()).orElseThrow();
-    assertThat(passwordEncoder.matches("newpass12", reloaded.getPassword())).isTrue();
+    assertThat(passwordEncoder.matches("Newpass-12", reloaded.getPassword())).isTrue();
+  }
+
+  @Test
+  void resetFormRejectsAPasswordWithoutUppercaseOrSpecialCharacter() throws Exception {
+    UserModel user = saveUser(true);
+    String raw = SecureTokens.generate();
+    PasswordResetTokenModel token = new PasswordResetTokenModel();
+    token.setUserId(user.getId());
+    token.setTokenHash(SecureTokens.hash(raw));
+    token.setExpiresAt(Instant.now().plusSeconds(3600));
+    resetTokens.save(token);
+
+    mockMvc
+        .perform(
+            post("/reset-password")
+                .with(csrf())
+                .param("token", raw)
+                .param("password", "newpass12")
+                .param("confirmPassword", "newpass12"))
+        .andExpect(status().isOk());
+
+    UserModel reloaded = users.findById(user.getId()).orElseThrow();
+    assertThat(passwordEncoder.matches("newpass12", reloaded.getPassword())).isFalse();
   }
 
   @Test

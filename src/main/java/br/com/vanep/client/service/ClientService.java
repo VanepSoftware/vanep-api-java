@@ -9,6 +9,7 @@ import br.com.vanep.client.model.ClientModel;
 import br.com.vanep.client.repository.ClientRepository;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
+import br.com.vanep.user.repository.UserRepository;
 import br.com.vanep.user.service.UserService;
 import java.util.Objects;
 import org.springframework.context.MessageSource;
@@ -23,6 +24,7 @@ import org.springframework.web.server.ResponseStatusException;
 @Service
 public class ClientService {
   private final ClientRepository clients;
+  private final UserRepository users;
   private final ClientMapper mapper;
   private final UserService userService;
   private final AddressService addressService;
@@ -30,11 +32,13 @@ public class ClientService {
 
   public ClientService(
       ClientRepository clients,
+      UserRepository users,
       ClientMapper mapper,
       UserService userService,
       AddressService addressService,
       MessageSource messages) {
     this.clients = clients;
+    this.users = users;
     this.mapper = mapper;
     this.userService = userService;
     this.addressService = addressService;
@@ -80,10 +84,47 @@ public class ClientService {
   @Transactional
   public ClientResponseDTO update(String token, ClientUpdateRequestDTO request) {
     ClientModel client = requireByToken(token);
-    if (request.photo() != null) {
-      client.setPhoto(request.photo());
+    UserModel user = client.getUser();
+
+    if (request.name().isPresent()) {
+      user.setName(requireText(request.name().get(), "client.name.required"));
     }
+    if (request.email().isPresent()) {
+      applyEmail(user, requireText(request.email().get(), "client.email.required"));
+    }
+    if (request.active().isPresent()) {
+      Boolean active = request.active().get();
+      if (active == null) {
+        throw badRequest("client.active.required");
+      }
+      client.setActive(active);
+    }
+    if (request.photo().isPresent()) {
+      client.setPhoto(request.photo().get());
+    }
+    if (request.rating().isPresent()) {
+      client.setRating(request.rating().get());
+    }
+
     return toListResponse(clients.save(client));
+  }
+
+  void applyEmail(UserModel user, String email) {
+    if (!email.equalsIgnoreCase(user.getEmail()) && users.existsByEmail(email)) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT, message("client.email.duplicate"));
+    }
+    user.setEmail(email);
+  }
+
+  String requireText(String value, String messageKey) {
+    if (value == null || value.isBlank()) {
+      throw badRequest(messageKey);
+    }
+    return value;
+  }
+
+  ResponseStatusException badRequest(String messageKey) {
+    return new ResponseStatusException(HttpStatus.BAD_REQUEST, message(messageKey));
   }
 
   @Transactional

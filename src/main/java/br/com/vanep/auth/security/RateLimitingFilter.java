@@ -9,7 +9,6 @@ import java.util.Set;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
-import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 @Component
@@ -32,17 +31,24 @@ public class RateLimitingFilter extends OncePerRequestFilter {
     this.rateLimiter = rateLimiter;
   }
 
+  private static final String LIMITED_PATH_PREFIX = "/api/auth/";
+
   @Override
   protected boolean shouldNotFilter(HttpServletRequest request) {
-    return !HttpMethod.POST.matches(request.getMethod())
-        || !LIMITED_PATHS.contains(request.getRequestURI());
+    return !HttpMethod.POST.matches(request.getMethod()) || !isLimited(request.getRequestURI());
+  }
+
+  private static boolean isLimited(String path) {
+    return LIMITED_PATHS.contains(path) || path.startsWith(LIMITED_PATH_PREFIX);
   }
 
   @Override
   protected void doFilterInternal(
       HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
       throws ServletException, IOException {
-    String key = clientIp(request) + "|" + request.getRequestURI();
+    // Never read a forwarding header here: the caller controls it. Only the trusted
+    // proxy configured in server.tomcat.remoteip may rewrite getRemoteAddr().
+    String key = request.getRemoteAddr() + "|" + request.getRequestURI();
     if (!rateLimiter.tryAcquire(key)) {
       response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
       response.setContentType("text/plain;charset=UTF-8");
@@ -50,13 +56,5 @@ public class RateLimitingFilter extends OncePerRequestFilter {
       return;
     }
     filterChain.doFilter(request, response);
-  }
-
-  private static String clientIp(HttpServletRequest request) {
-    String forwarded = request.getHeader("X-Forwarded-For");
-    if (StringUtils.hasText(forwarded)) {
-      return forwarded.split(",")[0].trim();
-    }
-    return request.getRemoteAddr();
   }
 }

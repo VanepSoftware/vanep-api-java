@@ -79,6 +79,7 @@ public class UserProfileService {
 
     Instant now = Instant.now();
     assertCooldown(user.getLastEmailChangeAt(), now, "email", "user.profile.email.cooldown");
+    assertConfirmationSendAllowed(user);
 
     user.setPendingEmail(newEmail);
     users.save(user);
@@ -142,6 +143,20 @@ public class UserProfileService {
     if (value == null) {
       throw ProfileBadRequestException.fieldNull(message("user.profile.field.null"), field);
     }
+  }
+
+  /**
+   * {@code lastEmailChangeAt} only moves when a change is confirmed, so without this the same
+   * pending e-mail could be requested — and mailed — in a loop.
+   */
+  void assertConfirmationSendAllowed(UserModel user) {
+    emailVerification
+        .issueRetryAfter(user)
+        .ifPresent(
+            retryAfter -> {
+              throw new ProfileCooldownException(
+                  message("user.profile.email.resend.cooldown"), "email", retryAfter);
+            });
   }
 
   void assertCooldown(Instant lastChangeAt, Instant now, String field, String messageKey) {

@@ -7,7 +7,6 @@ import br.com.vanep.shared.enums.Shift;
 import br.com.vanep.trip.dto.TripCreateRequestDTO;
 import br.com.vanep.trip.dto.TripResponseDTO;
 import br.com.vanep.trip.dto.TripUpdateRequestDTO;
-import br.com.vanep.trip.enums.TripCoherenceViolation;
 import br.com.vanep.trip.enums.TripStatus;
 import br.com.vanep.trip.mapper.TripMapper;
 import br.com.vanep.trip.model.TripModel;
@@ -143,7 +142,7 @@ public class TripService {
     Long driverId =
         driverToken == null || driverToken.isBlank()
             ? null
-            : drivers.findByToken(driverToken).map(DriverModel::getId).orElse(-1L);
+            : drivers.findByToken(driverToken).map(driver -> driver.getId()).orElse(-1L);
     return trips.findPage(driverId, pageable).map(this::response);
   }
 
@@ -198,7 +197,7 @@ public class TripService {
   private void requireCoherent(TripStatus status, Instant startedAt, Instant finishedAt) {
     coherence
         .validate(status, startedAt, finishedAt)
-        .map(TripCoherenceViolation::messageKey)
+        .map(violation -> violation.messageKey())
         .ifPresent(
             key -> {
               throw badRequest(key);
