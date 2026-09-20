@@ -52,9 +52,10 @@ public final class MobileGoogleGrantAuthenticationProvider implements Authentica
         (MobileGoogleGrantAuthenticationToken) authentication;
     OAuth2ClientAuthenticationToken clientPrincipal = authenticatedClient(request);
     RegisteredClient registeredClient = clientPrincipal.getRegisteredClient();
-    if (!registeredClient
-        .getAuthorizationGrantTypes()
-        .contains(MobileAuthorizationGrantTypes.GOOGLE)) {
+    if (registeredClient == null
+        || !registeredClient
+            .getAuthorizationGrantTypes()
+            .contains(MobileAuthorizationGrantTypes.GOOGLE)) {
       throw new OAuth2AuthenticationException(
           new OAuth2Error(OAuth2ErrorCodes.UNAUTHORIZED_CLIENT));
     }

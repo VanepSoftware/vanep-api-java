@@ -68,12 +68,13 @@ public final class MobileClientAuthenticationConverter implements Authentication
 
   private String soleClientId(HttpServletRequest request) {
     String[] clientIds = request.getParameterValues(OAuth2ParameterNames.CLIENT_ID);
-    boolean authenticatesByClientIdAlone =
-        clientIds != null
-            && clientIds.length == 1
-            && StringUtils.hasText(clientIds[0])
-            && !StringUtils.hasText(request.getParameter(OAuth2ParameterNames.CLIENT_SECRET))
-            && !StringUtils.hasText(request.getHeader(HttpHeaders.AUTHORIZATION));
-    return authenticatesByClientIdAlone ? clientIds[0] : null;
+    if (clientIds == null
+        || clientIds.length != 1
+        || !StringUtils.hasText(clientIds[0])
+        || StringUtils.hasText(request.getParameter(OAuth2ParameterNames.CLIENT_SECRET))
+        || StringUtils.hasText(request.getHeader(HttpHeaders.AUTHORIZATION))) {
+      return null;
+    }
+    return clientIds[0];
   }
 }

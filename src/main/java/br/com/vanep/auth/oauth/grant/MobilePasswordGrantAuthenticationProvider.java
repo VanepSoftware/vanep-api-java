@@ -84,9 +84,10 @@ public final class MobilePasswordGrantAuthenticationProvider implements Authenti
         (MobilePasswordGrantAuthenticationToken) authentication;
     OAuth2ClientAuthenticationToken clientPrincipal = authenticatedClient(request);
     RegisteredClient registeredClient = clientPrincipal.getRegisteredClient();
-    if (!registeredClient
-        .getAuthorizationGrantTypes()
-        .contains(MobileAuthorizationGrantTypes.PASSWORD)) {
+    if (registeredClient == null
+        || !registeredClient
+            .getAuthorizationGrantTypes()
+            .contains(MobileAuthorizationGrantTypes.PASSWORD)) {
       throw new OAuth2AuthenticationException(
           new OAuth2Error(OAuth2ErrorCodes.UNAUTHORIZED_CLIENT));
     }

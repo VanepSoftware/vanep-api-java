@@ -168,7 +168,7 @@ public class EmailVerificationService {
             .filter(user -> !hasPendingEmail(user));
     Instant now = Instant.now();
     Optional<EmailVerificationTokenModel> maybeToken =
-        tokens.lockLatestActive(maybeUser.map(UserModel::getId).orElse(NO_SUCH_USER_ID), now);
+        tokens.lockLatestActive(maybeUser.map(user -> user.getId()).orElse(NO_SUCH_USER_ID), now);
     if (maybeUser.isEmpty() || code == null || maybeToken.isEmpty()) {
       return false;
     }
@@ -222,7 +222,7 @@ public class EmailVerificationService {
   private Instant lastIssuedAt(UserModel user) {
     return tokens
         .findFirstByUserIdOrderByCreatedAtDesc(user.getId())
-        .map(EmailVerificationTokenModel::getCreatedAt)
+        .map(token -> token.getCreatedAt())
         .orElse(null);
   }
 }

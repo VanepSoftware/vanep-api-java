@@ -129,7 +129,7 @@ public class PasswordResetService {
         users.findByEmail(email).filter(PasswordResetService::hasLocalPassword);
     Instant now = Instant.now();
     Optional<PasswordResetTokenModel> maybeToken =
-        tokens.lockLatestActive(maybeUser.map(UserModel::getId).orElse(NO_SUCH_USER_ID), now);
+        tokens.lockLatestActive(maybeUser.map(user -> user.getId()).orElse(NO_SUCH_USER_ID), now);
     if (maybeUser.isEmpty() || code == null || maybeToken.isEmpty()) {
       return false;
     }
@@ -172,7 +172,7 @@ public class PasswordResetService {
   private Instant lastIssuedAt(UserModel user) {
     return tokens
         .findFirstByUserIdOrderByCreatedAtDesc(user.getId())
-        .map(PasswordResetTokenModel::getCreatedAt)
+        .map(token -> token.getCreatedAt())
         .orElse(null);
   }
 }
