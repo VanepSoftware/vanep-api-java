@@ -1,6 +1,10 @@
 package br.com.vanep.auth.verification;
 
+import br.com.vanep.auth.enums.AuthCodePurpose;
 import br.com.vanep.auth.mail.MailService;
+import br.com.vanep.auth.token.AuthCodeIssueDecision;
+import br.com.vanep.auth.token.AuthCodeIssuePolicy;
+import br.com.vanep.auth.token.SecureCodes;
 import br.com.vanep.auth.token.SecureTokens;
 import br.com.vanep.auth.verification.model.EmailVerificationTokenModel;
 import br.com.vanep.user.exception.ProfileEmailDuplicateException;
@@ -20,10 +24,17 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class EmailVerificationService {
 
+  // An unknown e-mail still runs the token lookup. The 400 body is already uniform, but returning
+  // early skips a query, and the difference in response time tells registered accounts apart.
+  private static final Long NO_SUCH_USER_ID = -1L;
+
   private final EmailVerificationTokenRepository tokens;
   private final UserRepository users;
   private final MailService mail;
   private final MessageSource messages;
+  private final SecureCodes codes;
+  private final AuthCodeIssuePolicy issuePolicy;
+  private final int maxAttempts;
   private final Duration ttl;
   private final String baseUrl;
 
@@ -32,40 +43,89 @@ public class EmailVerificationService {
       UserRepository users,
       MailService mail,
       MessageSource messages,
+      SecureCodes codes,
+      AuthCodeIssuePolicy issuePolicy,
+      @Value("${vanep.auth.code.max-attempts:5}") int maxAttempts,
       @Value("${vanep.mail.verification-ttl-hours:24}") long ttlHours,
       @Value("${vanep.app.base-url:http://localhost:8080}") String baseUrl) {
     this.tokens = tokens;
     this.users = users;
     this.mail = mail;
     this.messages = messages;
+    this.codes = codes;
+    this.issuePolicy = issuePolicy;
+    this.maxAttempts = maxAttempts;
     this.ttl = Duration.ofHours(ttlHours);
     this.baseUrl = baseUrl;
   }
 
-  private String message(String key) {
-    return messages.getMessage(key, null, LocaleContextHolder.getLocale());
+  private String message(String key, Object... args) {
+    return messages.getMessage(key, args, LocaleContextHolder.getLocale());
   }
 
   @Transactional
   public void startVerification(UserModel user) {
-    tokens.consumeAllActive(user.getId(), Instant.now());
+    Instant now = Instant.now();
+    // The e-mail change confirmation carries no code, so the code limits do not apply to it:
+    // throttling it would silently drop the only link the profile screen relies on.
+    if (hasPendingEmail(user)) {
+      String rawToken = issueToken(user, now, null);
+      mail.send(
+          user.getPendingEmail(),
+          message("user.profile.email.change.subject"),
+          "email/email-change",
+          Map.of("name", user.getName(), "link", verificationLink(rawToken)));
+      return;
+    }
+    if (issuePolicy.decide(lastIssuedAt(user), issuedInWindow(user, now), now)
+        == AuthCodeIssueDecision.SKIP) {
+      return;
+    }
+    String code = codes.generate();
+    String rawToken = issueToken(user, now, code);
+    mail.send(
+        user.getEmail(),
+        message("auth.email.verification.subject"),
+        "email/verification",
+        Map.of(
+            "name",
+            user.getName(),
+            "link",
+            verificationLink(rawToken),
+            "code",
+            code,
+            "ttl",
+            message("auth.email.validity.hours", ttl.toHours())));
+  }
 
+  /**
+   * The e-mail change send bypasses the throttling inside {@link #startVerification}, so the caller
+   * has to ask here first and reject the request explicitly instead of dropping the link silently.
+   *
+   * @return empty when a new send is allowed; otherwise when it becomes allowed
+   */
+  @Transactional(readOnly = true)
+  public Optional<Instant> issueRetryAfter(UserModel user) {
+    Instant now = Instant.now();
+    return issuePolicy.retryAfter(lastIssuedAt(user), issuedInWindow(user, now), now);
+  }
+
+  private String issueToken(UserModel user, Instant now, String code) {
+    tokens.consumeAllActive(user.getId(), now);
     String raw = SecureTokens.generate();
     EmailVerificationTokenModel token = new EmailVerificationTokenModel();
     token.setUserId(user.getId());
     token.setTokenHash(SecureTokens.hash(raw));
-    token.setExpiresAt(Instant.now().plus(ttl));
+    if (code != null) {
+      token.setCodeHash(codes.hmac(AuthCodePurpose.EMAIL_VERIFICATION, user.getId(), code));
+    }
+    token.setExpiresAt(now.plus(ttl));
     tokens.save(token);
+    return raw;
+  }
 
-    String link = baseUrl + "/verify-email?token=" + raw;
-    boolean emailChange = user.getPendingEmail() != null && !user.getPendingEmail().isBlank();
-    String destination = emailChange ? user.getPendingEmail() : user.getEmail();
-    String subject =
-        emailChange
-            ? message("user.profile.email.change.subject")
-            : message("auth.email.verification.subject");
-    String template = emailChange ? "email/email-change" : "email/verification";
-    mail.send(destination, subject, template, Map.of("name", user.getName(), "link", link));
+  private String verificationLink(String rawToken) {
+    return baseUrl + "/verify-email?token=" + rawToken;
   }
 
   @Transactional
@@ -98,6 +158,39 @@ public class EmailVerificationService {
     return true;
   }
 
+  /** The code and the link are one credential: using either consumes the other. */
+  @Transactional
+  public boolean verifyByCode(String email, String code) {
+    Optional<UserModel> maybeUser =
+        users
+            .findByEmail(email)
+            .filter(user -> !user.isVerified())
+            .filter(user -> !hasPendingEmail(user));
+    Instant now = Instant.now();
+    Optional<EmailVerificationTokenModel> maybeToken =
+        tokens.lockLatestActive(maybeUser.map(user -> user.getId()).orElse(NO_SUCH_USER_ID), now);
+    if (maybeUser.isEmpty() || code == null || maybeToken.isEmpty()) {
+      return false;
+    }
+    UserModel user = maybeUser.get();
+    EmailVerificationTokenModel token = maybeToken.get();
+    if (!codes.matches(
+        token.getCodeHash(), AuthCodePurpose.EMAIL_VERIFICATION, user.getId(), code)) {
+      registerFailedAttempt(token, now);
+      return false;
+    }
+    user.setVerified(true);
+    token.setConsumedAt(now);
+    return true;
+  }
+
+  private void registerFailedAttempt(EmailVerificationTokenModel token, Instant now) {
+    token.setFailedAttempts(token.getFailedAttempts() + 1);
+    if (token.getFailedAttempts() >= maxAttempts) {
+      token.setConsumedAt(now);
+    }
+  }
+
   void promotePendingEmail(UserModel user, String pending, Instant now) {
     if (users.existsByEmail(pending)) {
       throw new ProfileEmailDuplicateException(message("auth.signup.email.duplicate"));
@@ -116,5 +209,20 @@ public class EmailVerificationService {
   @Transactional
   public void resend(String email) {
     users.findByEmail(email).filter(user -> !user.isVerified()).ifPresent(this::startVerification);
+  }
+
+  private static boolean hasPendingEmail(UserModel user) {
+    return user.getPendingEmail() != null && !user.getPendingEmail().isBlank();
+  }
+
+  private long issuedInWindow(UserModel user, Instant now) {
+    return tokens.countByUserIdAndCreatedAtAfter(user.getId(), issuePolicy.dailyWindowStart(now));
+  }
+
+  private Instant lastIssuedAt(UserModel user) {
+    return tokens
+        .findFirstByUserIdOrderByCreatedAtDesc(user.getId())
+        .map(token -> token.getCreatedAt())
+        .orElse(null);
   }
 }

@@ -1,6 +1,7 @@
 package br.com.vanep.auth.web;
 
 import br.com.vanep.auth.validation.Cpf;
+import br.com.vanep.auth.validation.StrongPassword;
 import br.com.vanep.user.enums.Gender;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Email;
@@ -15,18 +16,19 @@ import org.springframework.format.annotation.DateTimeFormat;
 @Setter
 public class AccountSignupForm {
 
-  @NotBlank(message = "Informe seu nome.")
+  @NotBlank(message = "{auth.signup.name.required}")
   private String name;
 
-  @NotBlank(message = "Informe seu e-mail.")
-  @Email(message = "E-mail inválido.")
+  @NotBlank(message = "{auth.signup.email.required}")
+  @Email(message = "{auth.signup.email.invalid}")
   private String email;
 
-  @NotBlank(message = "Informe uma senha.")
-  @Size(min = 6, message = "A senha deve ter ao menos 6 caracteres.")
+  @NotBlank(message = "{auth.signup.password.required}")
+  @Size(min = 6, message = "{auth.signup.password.min}")
+  @StrongPassword
   private String password;
 
-  @NotBlank(message = "Informe seu documento (CPF).")
+  @NotBlank(message = "{auth.signup.document.required}")
   @Cpf
   private String document;
 
@@ -37,6 +39,6 @@ public class AccountSignupForm {
 
   private Gender gender;
 
-  @AssertTrue(message = "É necessário aceitar os termos de uso.")
+  @AssertTrue(message = "{auth.signup.terms.required}")
   private boolean acceptTerms;
 }

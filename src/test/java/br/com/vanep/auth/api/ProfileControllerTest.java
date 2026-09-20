@@ -25,6 +25,8 @@ import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
@@ -35,6 +37,7 @@ import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.context.jdbc.Sql;
@@ -54,6 +57,7 @@ class ProfileControllerTest {
   @Autowired private WebApplicationContext context;
   @Autowired private UserRepository users;
   @Autowired private EmailVerificationTokenRepository verificationTokens;
+  @Autowired private JdbcTemplate jdbc;
   @MockitoSpyBean private MailService mail;
 
   private MockMvc mockMvc;
@@ -400,6 +404,7 @@ class ProfileControllerTest {
   @Test
   void emailChangeAThenBOldLinkFailsAndLatestConfirmsB() throws Exception {
     String tokenA = requestEmailChangeAndCaptureToken("a@vanep.com");
+    elapseResendCooldown();
     String tokenB = requestEmailChangeAndCaptureToken("b@vanep.com");
 
     UserModel afterReplace = users.findByToken(uid).orElseThrow();
@@ -460,6 +465,32 @@ class ProfileControllerTest {
     assertThat(reloaded.getPendingEmail()).isEqualTo("dup-confirm@vanep.com");
   }
 
+  @Test
+  void emailChangeTwiceInARowIsRejectedByTheResendCooldown() throws Exception {
+    requestEmailChangeAndCaptureToken("first@vanep.com");
+
+    mockMvc
+        .perform(
+            post("/api/user/me/email-change")
+                .with(jwt().jwt(token -> token.claim("uid", uid).subject(EMAIL)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"email\":\"second@vanep.com\"}"))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("cooldown"))
+        .andExpect(jsonPath("$.field").value("email"))
+        .andExpect(jsonPath("$.retryAfter").value(notNullValue()));
+
+    UserModel reloaded = users.findByToken(uid).orElseThrow();
+    assertThat(reloaded.getPendingEmail()).isEqualTo("first@vanep.com");
+    assertThat(verificationTokens.findAll()).hasSize(1);
+  }
+
+  private void elapseResendCooldown() {
+    jdbc.update(
+        "update email_verification_token set created_at = ?",
+        OffsetDateTime.ofInstant(Instant.now().minus(1, ChronoUnit.HOURS), ZoneOffset.UTC));
+  }
+
   private String requestEmailChangeAndCaptureToken(String newEmail) throws Exception {
     mockMvc
         .perform(
@@ -474,5 +505,18 @@ class ProfileControllerTest {
         .send(eq(newEmail), anyString(), eq("email/email-change"), vars.capture());
     String link = vars.getValue().get("link").toString();
     return link.substring(link.indexOf("token=") + "token=".length());
+  }
+
+  @Test
+  void profileValidationErrorsKeepTheirOwnEnvelope() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/user/me/email-change")
+                .with(jwt().jwt(token -> token.claim("uid", uid).subject(EMAIL)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"email\":\"not-an-email\"}"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.field").value("email"))
+        .andExpect(jsonPath("$.errors").doesNotExist());
   }
 }

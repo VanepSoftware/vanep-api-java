@@ -45,7 +45,7 @@ Bean Validation failures MUST return `400` with `code=validation_error` and one 
 ### Requirement: Sign-up by account type
 
 The system SHALL expose `POST /api/auth/signup/client`, `POST /api/auth/signup/driver` and `POST /api/auth/signup/assistant`. They MUST accept the same fields and apply the same validation as the web sign-up forms:
-- **Required:** `name`, `email` (valid format), `password` (at least 6 characters), `document` (valid CPF), and `acceptTerms` equal to `true`.
+- **Required:** `name`, `email` (valid format), `password` (at least 6 characters, one uppercase letter and one special character), `document` (valid CPF), and `acceptTerms` equal to `true`.
 - **Optional:** `phone`, `birthDate` (ISO date) and `gender`.
 - **Driver only:** optional `cnpj` and `experienceYears`, plus a required positive `basePrice`.
 
@@ -65,6 +65,12 @@ On success the system MUST:
 
 - **WHEN** a driver sign-up is posted without `basePrice`
 - **THEN** the system returns `400` with `code=validation_error` and an entry for `basePrice`
+
+#### Scenario: Weak password
+
+- **WHEN** a sign-up is posted with a password that has no uppercase letter and no special character
+- **THEN** the system returns `400` with `code=validation_error`
+- **AND** `errors` contains one `password` entry for each missing requirement
 
 #### Scenario: Terms not accepted
 

@@ -25,6 +25,7 @@ import br.com.vanep.user.repository.UserRepository;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -432,6 +433,31 @@ class UserProfileServiceTest {
               assertThat(pce.getMessage()).isEqualTo("user.profile.email.cooldown");
             });
     assertThat(user.getPendingEmail()).isNull();
+    verify(emailVerification, never()).startVerification(any());
+  }
+
+  @Test
+  void requestEmailChangeWhileConfirmationCooldownIsOpenReturns409() {
+    UserModel user = sampleUser();
+    Instant retryAfter = Instant.now().plus(1, ChronoUnit.MINUTES);
+    when(userService.requireByToken("uid-1")).thenReturn(user);
+    when(users.existsByEmail("new@vanep.com")).thenReturn(false);
+    when(emailVerification.issueRetryAfter(user)).thenReturn(Optional.of(retryAfter));
+
+    assertThatThrownBy(
+            () ->
+                service.requestEmailChange("uid-1", new UserEmailChangeRequestDTO("new@vanep.com")))
+        .isInstanceOf(ProfileCooldownException.class)
+        .satisfies(
+            ex -> {
+              ProfileCooldownException pce = (ProfileCooldownException) ex;
+              assertThat(pce.getCode()).isEqualTo(ProfileErrorCode.COOLDOWN);
+              assertThat(pce.getField()).isEqualTo("email");
+              assertThat(pce.getRetryAfter()).isEqualTo(retryAfter);
+              assertThat(pce.getMessage()).isEqualTo("user.profile.email.resend.cooldown");
+            });
+    assertThat(user.getPendingEmail()).isNull();
+    verify(users, never()).save(any(UserModel.class));
     verify(emailVerification, never()).startVerification(any());
   }
 
