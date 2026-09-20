@@ -40,7 +40,7 @@ O sistema MUST NOT persistir `google_place_id` em `city` ou `state`. Essas colun
 
 #### Scenario: Drop no schema
 
-- **WHEN** a Flyway `V34` é aplicada
+- **WHEN** a migration desta change é aplicada
 - **THEN** `city.google_place_id` e `state.google_place_id` não existem
 - **AND** `district.google_place_id` ainda existe
 

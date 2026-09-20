@@ -1,6 +1,6 @@
 ## Contexto
 
-O `PUT /api/user/me/address` hoje aceita só `placeId` (+ `sessionToken`, `number`, `complement` opcionais). O `PersonalAddressService` chama Place Details, exige um componente de rua e faz `findOrCreate` na árvore. `city` nasce lazy do Google; o `StateSeeder` já cura as UFs. ViaCEP é não-objetivo documentado de `owned-address-model`. Testes cravam URLs de saída em `http://localhost:1` (regra 50). Próxima Flyway depois da `V33` é `V34`. Motivação em `proposal.md`.
+O `PUT /api/user/me/address` hoje aceita só `placeId` (+ `sessionToken`, `number`, `complement` opcionais). O `PersonalAddressService` delega a `AddressPlaceResolverService.applyPlace` (extraído pela PR #173), que chama Place Details, exige um componente de rua e faz `findOrCreate` na árvore. `city` nasce lazy do Google; o `StateSeeder` já cura as UFs. ViaCEP é não-objetivo documentado de `owned-address-model`. Testes cravam URLs de saída em `http://localhost:1` (regra 50). A `main` já está em `V35` (auth nativo, N-177 usou `V34` e `V35`); a próxima Flyway desta change é `V36`. Motivação em `proposal.md`.
 
 `GET /api/cities` e `GET /api/states` hoje são admin (`list_cities` / `list_states`). Esta change **reusa esses paths** como picker autenticado: município IBGE é dado de referência, não catálogo operacional. Motivação em `proposal.md`.
 
@@ -72,7 +72,7 @@ Não criar `/api/geo` nem `CityCatalogController`. Reusar `CityController` / `St
 
 ### D4 — ViaCEP só no GET; PUT nunca chama Correios
 
-`ViaCepClient` + bean `RestClient`, base URL `vanep.viacep.base-url` (env). Perfil de teste: `http://localhost:1/viacep`. CEP desconhecido: ViaCEP `{ "erro": true }` → 404. Falha de transporte → 503. `ibge` sem linha de cidade → 404 (buraco no catálogo). Rate limit: bean `RateLimiter` dedicado (mesmo padrão do `placesRateLimiter`).
+`ViaCepClient` + bean `RestClient`, base URL `vanep.viacep.base-url` (env). Perfil de teste: `http://localhost:1/viacep`. CEP desconhecido: ViaCEP `{ "erro": true }` → 404. Falha de transporte → 503. `ibge` sem linha de cidade → 404 (buraco no catálogo). Rate limit: bean `RateLimiter` dedicado (mesmo padrão do `placesRateLimiter`), chave `cep-lookup:` + token do usuário do JWT — como o `school-resolve:` do `SchoolResolveService`. Nunca chavear por IP nem ler `X-Forwarded-For`: o refactor de auth da `main` (N-177) fechou esse furo no `RateLimitingFilter`, que agora usa só `getRemoteAddr()` com o proxy confiável configurado em `server.tomcat.remoteip`. O `RateLimitingFilter` só cobre `POST /api/auth/**`; o CEP é um `GET` sob `/api/**` e tem o limiter próprio.
 
 O PUT `/api/user/me/address` resolve `cityToken` só no banco.
 
@@ -82,7 +82,7 @@ O PUT `/api/user/me/address` resolve `cityToken` só no banco.
 
 `PersonalAddressRequestDTO`: `cityToken` `@NotBlank`, `street` `@NotBlank @Size(max=255)`, `zipCode` `@NotBlank` + `@Pattern` (8 dígitos). `number` / `complement` / `neighborhood` opcionais com os size caps atuais. Jackson ignora `placeId` desconhecido. PUT não chama ViaCEP: obrigatório é só validação do body.
 
-> Nota (fase 7): quando este design foi escrito, a suposição era que `AddressRequestDTO` de dependente/escola já usava esse mesmo contrato `cityToken`. Não é mais verdade — a PR #173 (`dependent-address-by-place`, mergeada depois) regrediu os dois para `placeId`/Google porque o app não tinha como obter um `cityToken` (`GET /api/cities` era 403 pro papel CLIENT). A fase 7 (D9) desfaz isso só para dependente; escola permanece em `placeId`.
+> Nota (fase 7): quando este design foi escrito, a suposição era que `AddressRequestDTO` de dependente/escola já usava esse mesmo contrato `cityToken`. Não é mais verdade — a PR #173 (`dependent-address-by-place`, hoje na `main`) regrediu os dois para `placeId`/Google porque o app não tinha como obter um `cityToken` (`GET /api/cities` era 403 pro papel CLIENT). A fase 7 (D9) desfaz isso só para dependente; escola permanece em `placeId`. Ao fim das fases 6 e 7, `AddressPlaceResolverService` só é chamado pelo caminho de escola.
 
 `PersonalAddressService.replaceMyAddress`: carrega a cidade pelo token → 404 `city.not_found`; grava rua e campos postais; `district_id = null`; `google_place_id = null`; não chama `PlacesClient`.
 
@@ -100,14 +100,14 @@ A V23 adicionou `google_place_id` em `state` e `city` “para rastrear origem”
 
 Uma change futura de Geocoding/alias é **N nomes ou place ids Google → um `ibge_code`**. Coluna unique 1:1 em `city` é o schema errado para isso. Estado já tem UF. `district.google_place_id` fica: esse nível não tem código oficial e é o único nó da árvore que o Geocoding pode canonicalizar depois. `address` e `school` mantêm a coluna (identidade do place escolhido).
 
-Dropar na `V34` junto com `ibge_code` (momento mais barato; não editar V23). Não é breaking HTTP.
+Dropar na `V36` junto com `ibge_code` (momento mais barato; não editar V23). Não é breaking HTTP.
 
 **Alternativas:** deixar as colunas null “pro Geocoding” (convite a preencher o 1:1 errado depois); dropar numa migration seguinte (mesmo trabalho, mais tarde).
 
 ### D8 — PRs faseados
 
 ```
-V34 + models (drop city/state google_place_id)
+V36 + models (drop city/state google_place_id)
     │
     ▼
 CitySeeder + dump
@@ -126,9 +126,11 @@ ViaCEP GET     PUT endereço pessoal
 
 Fases 3 e 4 podem seguir em paralelo depois do seeder. Fase 5 depende da 2 (`ibge_code` para casar). Fase 6 depende da 1 (`neighborhood`) e pode ir sem ViaCEP. Fase 7 depende da 6 — reaproveita o colaborador de resolução por cidade que a fase 6 introduz em `PersonalAddressService` (ver D9); precisa também da 3 (picker) já estar no ar, mas essa dependência é de produto/mobile, não de merge order no backend.
 
+**Ordem de merge recomendada: 1, 2, 3, 5, 6, 7 e a 4 por último.** A fase 4 (resolver só casa cidade) quebra todo teste que ainda depende de o Google criar `city`. Hoje isso inclui `PersonalAddressControllerTest`, `OnboardingStepsTest` e `DependentControllerTest`/`AddressServiceTest` (casos de dependente), que as fases 6 e 7 **reescrevem por completo** para `cityToken`. Se a 4 entrasse antes, teria de consertar esses testes só para as fases 6/7 jogarem o conserto fora (e conflitarem). Com a 4 por último, ela só toca o que sobrevive: escola, área de atuação, busca e o próprio resolver. As fases 6 e 7 não dependem da 4, então a reordem é só de merge, não de branch.
+
 | Fase | Conteúdo | Depende de | Paralelo com |
 |------|----------|------------|--------------|
-| 1 | `V34` + `CityModel.ibgeCode` + `AddressModel.neighborhood`; drop `google_place_id` em `city` e `state` | — | — |
+| 1 | `V36` + `CityModel.ibgeCode` + `AddressModel.neighborhood`; drop `google_place_id` em `city` e `state` | — | — |
 | 2 | Dump IBGE + `CitySeeder` + testes do seeder (fixture pequena) | 1 | — |
 | 3 | Abrir `GET /api/states` e `GET /api/cities?uf=&search=` (`isAuthenticated()`) | 2 | 4 |
 | 4 | Resolver só match de cidade; 400 no miss (persistência + busca) | 2 | 3 |
@@ -140,17 +142,25 @@ Fases 3 e 4 podem seguir em paralelo depois do seeder. Fase 5 depende da 2 (`ibg
 
 A PR #173 (`dependent-address-by-place`) trocou `AddressRequestDTO` (compartilhado por dependente e escola) de `cityToken` para `placeId`, porque na época o app cliente não tinha como produzir um `cityToken` válido — `GET /api/cities` exigia `list_cities` (403 pro papel CLIENT) e não tinha busca por nome. As fases 2 e 3 desta própria change resolvem exatamente isso: catálogo semeado e `GET /api/cities?uf=&search=` só com `isAuthenticated()`. Mantida a regressão, o dependente ficaria como o único fluxo de endereço do produto ainda preso ao Google, sem motivo — o bloqueio original não existe mais.
 
-**Escopo — só dependente, não escola.** `AddressRequestDTO` / `AddressService.upsertForDependent` / `upsertForSchool` hoje são um serviço só, com a mesma checagem cruzada de posse (`rejectIfOwnedByAnotherActiveOwner` conta dependentes **e** escolas). Migrar os dois de uma vez amplia o escopo além do pedido; escola não tem tela no app cliente hoje, então fica no `placeId` existente. Isso bifurca o ponto de entrada:
+**Escopo — só dependente, não escola.** Em `main`, `AddressRequestDTO` / `AddressService.upsertForDependent` / `upsertForSchool` são um serviço só, e o esqueleto privado `upsertOwnedAddress(currentAddressId, AddressRequestDTO, rejectIfOwnedByAnother, linkToOwner)` guarda a checagem cruzada de posse (`rejectIfOwnedByAnotherActiveOwner` conta dependentes **e** escolas). Migrar os dois de uma vez amplia o escopo além do pedido; escola não tem tela no app cliente hoje, então fica no `placeId` existente. Isso bifurca o ponto de entrada:
 
-- **Novo** `DependentAddressRequestDTO` (`address.dto`): mesmo shape do `PersonalAddressRequestDTO` — `cityToken` `@NotBlank`, `street` `@NotBlank`, `zipCode` `@NotBlank @Pattern` (8 dígitos), `number`/`complement`/`neighborhood` opcionais.
-- **Novo** `AddressService.upsertForDependent(Long, DependentAddressRequestDTO)`, substituindo o overload `(Long, AddressRequestDTO)` — dependente para de passar por `AddressPlaceResolverService`. `upsertForSchool` fica como está.
+- **Novo** `DependentAddressRequestDTO` (`address.dto`), mesmo shape do `PersonalAddressRequestDTO` e com o mesmo `@JsonIgnoreProperties(ignoreUnknown = true)`: `cityToken` `@NotBlank`, `street` `@NotBlank @Size(max=255)`, `zipCode` `@NotBlank @Pattern` (8 dígitos), `number`/`complement`/`neighborhood` opcionais com os caps atuais. `placeId` e `sessionToken` enviados são ignorados.
+- `AddressService.upsertForDependent(Long, DependentAddressRequestDTO)` **troca a assinatura** do método existente (não é um overload; o de `AddressRequestDTO` deixa de existir para dependente). Dependente para de passar por `AddressPlaceResolverService`. `upsertForSchool(Long, AddressRequestDTO)` fica como está.
+- `upsertOwnedAddress` **deixa de receber `AddressRequestDTO`** e passa a receber a escrita como parâmetro (um `Consumer<AddressModel>` para linha nova e outro para linha existente). Assim o esqueleto de posse/link continua único e não conhece nenhum dos dois DTOs. Dependente passa o mesmo consumer para os dois casos (`applyCity` sobrescreve tudo); escola passa `applyToNewAddress` / `applyToExistingAddress` como hoje (place, com amend de número/complemento).
 - A checagem de posse cruzada (`rejectIfOwnedByAnotherActiveOwner`) não muda — continua contando dependentes e escolas ativos sobre o mesmo `address.id`, independente de qual contrato criou a linha.
 
-**Colaborador reaproveitado.** `PersonalAddressService.replaceMyAddress` (fase 6) já tem o bloco "carrega `CityModel` pelo token → seta city/district=null/googlePlaceId=null/street/zipCode/number/complement/neighborhood". Esse bloco migra para um novo `AddressCatalogResolverService.applyCity(...)`, chamado pelos dois: `PersonalAddressService` (sem mudança de comportamento) e o novo caminho de `AddressService.upsertForDependent`. Mesmo padrão que a PR #173 usou para extrair `AddressPlaceResolverService` do lado `placeId` (regra 6, regra 32).
+**`address` do dependente é substituição completa, sem amend parcial.** A PR #173 deu ao dependente um amend "só número/complemento sem reenviar o place", por um motivo válido naquele contrato: o app não tinha o `placeId` de um endereço já gravado (a resposta não o expõe). Aqui o motivo não existe: `AddressResponseDTO` já devolve `cityToken`, rua, CEP, número, complemento e (com este D9) bairro, então o app monta o formulário a partir da leitura e reenvia tudo. Manter também um amend parcial exigiria `cityToken`/`street`/`zipCode` opcionais no DTO (contradizendo o `@NotBlank` acima) e validação de obrigatoriedade no `@Service`, além de deixar campos aninhados `String` onde omitido e `"x": null` colapsam no mesmo `null` — exatamente o que a regra 16 proíbe. Quando `address` está presente no PATCH ele é um objeto completo, e a regra 10 manda o `@Valid` aninhado valer — o mesmo formato do `PUT /api/user/me/address` (regra 16: sub-recurso com corpo completo `@Valid`). Consequências:
 
-**Resposta ganha `neighborhood`.** `AddressResponseDTO`/`AddressMapper` (usado por dependente e escola) não expõe `neighborhood` hoje, embora a coluna exista desde a fase 1. Sem isso, o app conseguiria gravar o bairro do dependente mas nunca leria de volta. Adicionar o campo é aditivo e não quebra escola (fica `null` lá, como hoje).
+- Linha existente: sobrescrita inteira, mesmo `address.id`; `number`/`complement`/`neighborhood` omitidos ficam nulos.
+- `address` incompleto → 400 (Bean Validation), com ou sem endereço prévio.
+- PATCH sem `address` deixa o endereço intacto (teste nomeado, regra 16); `address: null` continua limpando, como já faz `applyAddressMerge`.
+- `address.place_required` deixa de ser usada pelo dependente (fica só para escola).
 
-**Alternativas:** migrar dependente e escola juntos (mais DRY na checagem de posse, mas amplia o escopo pedido sem necessidade); manter `AddressRequestDTO` único e sobrecarregar `cityToken` *e* `placeId` nele (contrato ambíguo — reabre exatamente o problema que a fase 6 do endereço pessoal evitou ao não aceitar os dois).
+**Colaborador reaproveitado.** `PersonalAddressService.replaceMyAddress` (fase 6) já tem o bloco "carrega `CityModel` pelo token → seta city/district=null/googlePlaceId=null/street/zipCode/number/complement/neighborhood (com `blankToNull`)". Esse bloco migra para um novo `AddressCatalogResolverService.applyCity(AddressModel, cityToken, street, zipCode, number, complement, neighborhood)`, chamado pelos dois: `PersonalAddressService` (sem mudança de comportamento) e o novo caminho de `AddressService.upsertForDependent`. É o espelho de `AddressPlaceResolverService.applyPlace(address, placeId, sessionToken, number, complement)`, com parâmetros soltos em vez de DTO, o mesmo padrão que a PR #173 usou (regra 6, regra 32). O `city.not_found` 404 nasce no colaborador.
+
+**Resposta ganha `neighborhood`.** `AddressResponseDTO`/`AddressMapper` (usado por dependente e escola) não expõe `neighborhood` hoje, embora a coluna exista desde a fase 1. Sem isso, o app conseguiria gravar o bairro do dependente mas nunca leria de volta (e não montaria o formulário de edição). Adicionar o campo é aditivo e não quebra escola (fica `null` lá, como hoje).
+
+**Alternativas:** migrar dependente e escola juntos (mais DRY na checagem de posse, mas amplia o escopo pedido sem necessidade); manter `AddressRequestDTO` único e sobrecarregar `cityToken` *e* `placeId` nele (contrato ambíguo — reabre exatamente o problema que a fase 6 do endereço pessoal evitou ao não aceitar os dois); manter o amend parcial da PR #173 com `cityToken`/`street`/`zipCode` opcionais (contradiz a regra 16 e o `@NotBlank`; sem motivo, já que a leitura devolve o formulário todo).
 
 ## Riscos / trade-offs
 
@@ -161,16 +171,18 @@ A PR #173 (`dependent-address-by-place`) trocou `AddressRequestDTO` (compartilha
 - **[Risco] ViaCEP fora do ar** → 503 no GET; PUT e picker seguem. Não acoplar save ao Correios.
 - **[Risco] `GET /api/cities` sem `uf`** → breaking para quem listava o catálogo admin inteiro; nenhum cliente de produção assumido. Sem `uf` é `400` de propósito (5.570 municípios).
 - **[Risco] Reintroduzir `google_place_id` em `city` no Geocoding** → unique 1:1 é o modelo errado; alias N→1. D7 dropa de propósito.
-- **[Risco] BREAKING no `POST/PATCH /api/dependent`** (fase 7) → o branch `feat/8-dependent-address` do `vanep-mobile`, escrito contra o contrato `placeId` da PR #173, precisa migrar para `cityToken` antes do release; coordenar como no D9/personal-address (sem contrato duplo).
+- **[Risco] BREAKING no `POST/PATCH /api/dependent`** (fase 7) → o branch `feat/8-dependent-address` do `vanep-mobile`, escrito contra o contrato `placeId` da PR #173, precisa migrar para `cityToken` antes do release; coordenar como no D9/personal-address (sem contrato duplo). Além da troca de campos, o app perde o amend "só número": passa a reenviar o formulário completo montado a partir da leitura.
+- **[Risco] Colisão de versão Flyway** → branches de fase escritas antes do N-177 entrar na `main` (ex. `feat/ibge-postal-address-schema`) têm um arquivo `V34__...` que agora **duplica** a versão `V34` da `main`. O `git merge` não acusa (nomes de arquivo diferentes); o Flyway recusa subir com duas migrations na mesma versão. Renomear para `V36__...` antes de mergear a fase 1; a `V34` local nunca foi aplicada fora do banco do dev (que precisa ser recriado ou reparado). Regra 2 não impede: o arquivo não foi aplicado em ambiente compartilhado.
+- **[Risco] Fase 4 antes das 6/7** → reescreve testes que as 6/7 apagam (ver D8); mitigado pela ordem de merge com a 4 por último.
 
 ## Plano de migração
 
-1. `V34`: `city.ibge_code varchar(7)` unique where `deleted_at is null`; `address.neighborhood varchar(128)`; drop `city.google_place_id` e `state.google_place_id` mais `city_google_place_id_active_key` / `state_google_place_id_active_key`. Não editar V23 (regra 2).
+1. `V36`: `city.ibge_code varchar(7)` unique where `deleted_at is null`; `address.neighborhood varchar(128)`; drop `city.google_place_id` e `state.google_place_id` mais `city_google_place_id_active_key` / `state_google_place_id_active_key`. Não editar V23 (regra 2).
 2. Deploy do seeder (dev/prod). Cidades lazy Google existentes sem `ibge_code`: **sem dado de produção** assumido; se um banco local tiver resto Google, recriar ou casar por nome e setar `ibge_code` na mão. Sem backfill heróico nesta change.
 3. Deploy do resolver (Google para de criar cidade) **depois** do seeder ter rodado, senão o primeiro Place Details dá 400 em Brasília.
 4. Deploy CEP + PUT postal; o app troca no mesmo trem de release.
 
-Rollback: nova migration para reverter a V34 se já aplicada (dropar `ibge_code` / `neighborhood`, repor `google_place_id` só se um rollback do D7 for mesmo necessário — sempre foi null); não editar V34 (regra 2). Rollback do resolver restauraria `findOrCreateCity` — não enviar o resolver antes do catálogo estar populado.
+Rollback: nova migration para reverter a V36 se já aplicada (dropar `ibge_code` / `neighborhood`, repor `google_place_id` só se um rollback do D7 for mesmo necessário — sempre foi null); não editar V36 (regra 2). Rollback do resolver restauraria `findOrCreateCity` — não enviar o resolver antes do catálogo estar populado.
 
 ## Questões em aberto
 

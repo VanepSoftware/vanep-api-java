@@ -63,7 +63,7 @@ Exemplo de um item do dump (`localidades/municipios`) e o que vira `city`:
 | `regiao-imediata.regiao-intermediaria.UF.sigla` | UF fallback se `microrregiao` for nula |
 | `microrregiao` id/nome, `mesorregiao`, `UF.id`/`nome`, `regiao`, nomes de `regiao-imediata` | ignorados; **não** criam `city` nem `district` |
 
-Isso MUST persistir **uma** linha de `city` (Cristalina/GO), não duas. `token` é gerado pelo model. `google_place_id` não existe nessa tabela após a V34.
+Isso MUST persistir **uma** linha de `city` (Cristalina/GO), não duas. `token` é gerado pelo model. `google_place_id` não existe nessa tabela após a migration desta change.
 
 #### Scenario: Seed cria Brasília sob DF
 
