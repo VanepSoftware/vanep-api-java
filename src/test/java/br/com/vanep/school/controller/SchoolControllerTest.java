@@ -18,6 +18,9 @@ import br.com.vanep.city.model.CityModel;
 import br.com.vanep.city.repository.CityRepository;
 import br.com.vanep.country.model.CountryModel;
 import br.com.vanep.country.repository.CountryRepository;
+import br.com.vanep.places.client.PlacesClient;
+import br.com.vanep.places.dto.AddressComponentDTO;
+import br.com.vanep.places.dto.PlaceDetailsResponseDTO;
 import br.com.vanep.school.model.SchoolModel;
 import br.com.vanep.school.repository.SchoolRepository;
 import br.com.vanep.state.model.StateModel;
@@ -25,12 +28,14 @@ import br.com.vanep.state.repository.StateRepository;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.BDDMockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -121,14 +126,34 @@ class SchoolControllerTest {
     return address;
   }
 
-  private String addressJson(String street, String number) {
-    return "{\"cityToken\":\""
-        + cityToken
-        + "\",\"zipCode\":\"13015904\",\"street\":\""
-        + street
-        + "\",\"number\":\""
-        + number
-        + "\",\"district\":\"Centro\"}";
+  @MockitoBean private PlacesClient places;
+
+  private void givenResolvedPlace(String street) {
+    BDDMockito.given(
+            places.findPlaceDetails(
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+        .willReturn(
+            new PlaceDetailsResponseDTO(
+                "place-1",
+                street + ", Campinas - SP",
+                List.of(
+                    new AddressComponentDTO("Brazil", "BR", List.of("country", "political")),
+                    new AddressComponentDTO(
+                        "Sao Paulo", "SP", List.of("administrative_area_level_1", "political")),
+                    new AddressComponentDTO(
+                        "Campinas",
+                        "Campinas",
+                        List.of("administrative_area_level_2", "political")),
+                    new AddressComponentDTO("13015904", "13015904", List.of("postal_code")),
+                    new AddressComponentDTO(street, street, List.of("route")))));
+  }
+
+  private String placeAddressJson(String number) {
+    return "{\"placeId\":\"place-1\",\"sessionToken\":\"session-1\",\"number\":\"" + number + "\"}";
+  }
+
+  private String amendAddressJson(String number) {
+    return "{\"number\":\"" + number + "\"}";
   }
 
   @Test
@@ -223,6 +248,8 @@ class SchoolControllerTest {
 
   @Test
   void createWithNestedAddressReturns201AndOmitsAddressId() throws Exception {
+    givenResolvedPlace("Rua da Escola");
+
     mockMvc
         .perform(
             post("/api/schools")
@@ -230,7 +257,7 @@ class SchoolControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     "{\"name\":\"Escola Com Endereco\",\"address\":"
-                        + addressJson("Rua da Escola", "100")
+                        + placeAddressJson("100")
                         + "}"))
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.address.street").value("Rua da Escola"))
@@ -332,10 +359,11 @@ class SchoolControllerTest {
             patch("/api/schools/" + schoolToken)
                 .with(adminJwt())
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"address\":" + addressJson("Rua da Escola", "99") + "}"))
+                .content("{\"address\":" + amendAddressJson("99") + "}"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.address.token").value(owned.getToken()))
         .andExpect(jsonPath("$.address.number").value("99"))
+        .andExpect(jsonPath("$.address.street").value(owned.getStreet()))
         .andExpect(jsonPath("$.addressId").doesNotExist());
   }
 

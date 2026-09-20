@@ -167,7 +167,7 @@ class DependentServiceTest {
   }
 
   private AddressRequestDTO addressRequest() {
-    return new AddressRequestDTO("city-campinas", "13015904", "Rua Barão de Jaguara", "1481", null);
+    return new AddressRequestDTO("place-campinas", "session-1", "1481", null);
   }
 
   private DependentModel dependent(boolean isDefault) {
