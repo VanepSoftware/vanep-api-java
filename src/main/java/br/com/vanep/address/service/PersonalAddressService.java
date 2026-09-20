@@ -5,11 +5,6 @@ import br.com.vanep.address.dto.PersonalAddressResponseDTO;
 import br.com.vanep.address.model.AddressModel;
 import br.com.vanep.address.repository.AddressRepository;
 import br.com.vanep.district.model.DistrictModel;
-import br.com.vanep.location.StreetAddressExtractor;
-import br.com.vanep.location.dto.ResolvedLocationChainDTO;
-import br.com.vanep.location.service.LocationResolverService;
-import br.com.vanep.places.client.PlacesClient;
-import br.com.vanep.places.dto.PlaceDetailsResponseDTO;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
 import java.util.Optional;
@@ -22,20 +17,17 @@ import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class PersonalAddressService {
-  private final PlacesClient places;
-  private final LocationResolverService resolver;
+  private final AddressPlaceResolverService placeResolver;
   private final AddressRepository addresses;
   private final UserRepository users;
   private final MessageSource messages;
 
   public PersonalAddressService(
-      PlacesClient places,
-      LocationResolverService resolver,
+      AddressPlaceResolverService placeResolver,
       AddressRepository addresses,
       UserRepository users,
       MessageSource messages) {
-    this.places = places;
-    this.resolver = resolver;
+    this.placeResolver = placeResolver;
     this.addresses = addresses;
     this.users = users;
     this.messages = messages;
@@ -45,32 +37,14 @@ public class PersonalAddressService {
   public PersonalAddressResponseDTO replaceMyAddress(
       String callerUid, PersonalAddressRequestDTO request) {
     UserModel caller = requireCaller(callerUid);
-    PlaceDetailsResponseDTO details =
-        places.findPlaceDetails(request.placeId(), request.sessionToken());
-
-    String street =
-        StreetAddressExtractor.findStreet(details)
-            .orElseThrow(() -> badRequest("location.address.street_required"));
-
-    ResolvedLocationChainDTO chain = resolver.resolveAndPersist(details);
 
     AddressModel address =
         Optional.ofNullable(caller.getAddressId())
             .flatMap(addresses::findById)
             .orElseGet(AddressModel::new);
 
-    address.setCity(chain.city());
-    address.setDistrict(chain.deepestDistrict().orElse(null));
-    address.setGooglePlaceId(details.id());
-    address.setStreet(street);
-    address.setZipCode(StreetAddressExtractor.findZipCode(details).orElse(null));
-
-    address.setNumber(
-        Optional.ofNullable(request.number())
-            .filter(value -> !value.isBlank())
-            .or(() -> StreetAddressExtractor.findNumber(details))
-            .orElse(null));
-    address.setComplement(request.complement());
+    placeResolver.applyPlace(
+        address, request.placeId(), request.sessionToken(), request.number(), request.complement());
 
     AddressModel saved = addresses.save(address);
     caller.setAddressId(saved.getId());
@@ -124,10 +98,6 @@ public class PersonalAddressService {
         address.getCity().getState().getUf(),
         address.getCity().getState().getCountry().getIsoCode(),
         address.getGooglePlaceId());
-  }
-
-  private ResponseStatusException badRequest(String key) {
-    return new ResponseStatusException(HttpStatus.BAD_REQUEST, message(key));
   }
 
   private String message(String key) {
