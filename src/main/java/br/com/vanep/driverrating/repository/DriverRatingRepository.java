@@ -11,16 +11,35 @@ import org.springframework.data.repository.query.Param;
 
 public interface DriverRatingRepository extends JpaRepository<DriverRatingModel, Long> {
 
+  String FETCH_PARTIES =
+      "join fetch rating.link link "
+          + "join fetch link.client client join fetch client.user "
+          + "join fetch link.driver driver join fetch driver.user ";
+
   Optional<DriverRatingModel> findByToken(String token);
 
-  Page<DriverRatingModel> findByDriverToken(String driverToken, Pageable pageable);
+  @Query(
+      value = "select rating from DriverRatingModel rating " + FETCH_PARTIES,
+      countQuery = "select count(rating) from DriverRatingModel rating")
+  Page<DriverRatingModel> findPage(Pageable pageable);
 
-  boolean existsByDriverIdAndClientId(Long driverId, Long clientId);
+  @Query(
+      value =
+          "select rating from DriverRatingModel rating "
+              + FETCH_PARTIES
+              + "where driver.token = :driverToken",
+      countQuery =
+          "select count(rating) from DriverRatingModel rating "
+              + "where rating.link.driver.token = :driverToken")
+  Page<DriverRatingModel> findByDriverToken(
+      @Param("driverToken") String driverToken, Pageable pageable);
 
-  @Query("SELECT AVG(dr.rating) FROM DriverRatingModel dr WHERE dr.driver.id = :driverId")
+  boolean existsByLinkId(Long linkId);
+
+  @Query("SELECT AVG(dr.rating) FROM DriverRatingModel dr WHERE dr.link.driver.id = :driverId")
   Optional<BigDecimal> calculateAverageRatingForDriver(@Param("driverId") Long driverId);
 
   @Query(
-      "SELECT u.token FROM DriverRatingModel dr JOIN dr.client c JOIN c.user u WHERE dr.token = :token")
+      "SELECT u.token FROM DriverRatingModel dr JOIN dr.link l JOIN l.client c JOIN c.user u WHERE dr.token = :token")
   Optional<String> findClientUserTokenByRatingToken(@Param("token") String token);
 }

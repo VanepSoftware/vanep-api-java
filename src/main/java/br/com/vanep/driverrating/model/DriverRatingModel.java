@@ -1,7 +1,6 @@
 package br.com.vanep.driverrating.model;
 
-import br.com.vanep.client.model.ClientModel;
-import br.com.vanep.driver.model.DriverModel;
+import br.com.vanep.clientdriver.model.ClientDriverModel;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -34,12 +33,8 @@ public class DriverRatingModel {
   private String token;
 
   @ManyToOne(fetch = FetchType.EAGER, optional = false)
-  @JoinColumn(name = "driver_id", nullable = false)
-  private DriverModel driver;
-
-  @ManyToOne(fetch = FetchType.EAGER, optional = false)
-  @JoinColumn(name = "client_id", nullable = false)
-  private ClientModel client;
+  @JoinColumn(name = "client_driver_id", nullable = false)
+  private ClientDriverModel link;
 
   @Column(nullable = false, precision = 3, scale = 2)
   private BigDecimal rating;
