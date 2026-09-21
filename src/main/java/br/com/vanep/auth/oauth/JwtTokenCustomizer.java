@@ -46,8 +46,6 @@ public class JwtTokenCustomizer implements OAuth2TokenCustomizer<JwtEncodingCont
     UserModel user = maybe.get();
     context.getClaims().claim("uid", user.getToken());
     context.getClaims().claim("user_type", user.getType().name());
-    // The JDBC authorization store reads claims back through a Jackson allowlist that accepts
-    // ArrayList but not the immutable List.of/copyOf, so a refresh would fail with a 500.
     context.getClaims().claim("roles", new ArrayList<>(List.of("ROLE_" + user.getType().name())));
     context.getClaims().claim("permissions", resolvePermissions(user));
     if (user.getType() == UserType.DRIVER) {
