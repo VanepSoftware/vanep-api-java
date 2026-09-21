@@ -4,6 +4,7 @@ import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.driverdocument.enums.DocumentStatusEnum;
 import br.com.vanep.driverdocument.enums.DocumentTypeEnum;
 import br.com.vanep.driverdocument.enums.ReviewMethodEnum;
+import br.com.vanep.media.model.MediaFileModel;
 import br.com.vanep.user.model.UserModel;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -49,8 +50,9 @@ public class DriverDocumentModel {
   @Column(name = "document_type", nullable = false, length = 50)
   private DocumentTypeEnum documentType;
 
-  @Column(name = "file_url", nullable = false, length = 512)
-  private String fileUrl;
+  @ManyToOne(fetch = FetchType.EAGER)
+  @JoinColumn(name = "file_media_id")
+  private MediaFileModel file;
 
   @Column(name = "expires_at")
   private LocalDate expiresAt;

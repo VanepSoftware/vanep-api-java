@@ -95,14 +95,14 @@
 > Goal: os dois arquivos privados. Fecha a change e destrava o painel.
 > Depends on: Phase 4 | Parallel with: —
 
-- [ ] 5.1 Criar branch `feat/207-driver-files` **de dentro de** `feat/207-vehicle-photos`
-- [ ] 5.2 Testes de autorização **por arquivo privado**: o motorista lê o próprio documento; um terceiro toma 403 com corpo vazio; o admin lê
-- [ ] 5.3 Teste nomeado do PDF: `DOCUMENT` aceita PDF e imagem, e nasce `PRIVATE`
-- [ ] 5.4 Migration: `driver_cnh.photo_url` e `driver_document.file_url` viram FK **anulável**
-- [ ] 5.5 **O fluxo de criação do documento inverte** (D10): `file_url` era `@NotBlank` e `not null`. Passa a ser criar o documento e subir o arquivo depois. Documento sem arquivo vira estado legítimo — é o "pendente de envio" que o painel precisa listar
-- [ ] 5.6 `POST /api/driver-cnhs/{token}/photo` e `POST /api/driver-documents/{token}/file`
-- [ ] 5.7 Remover `photoUrl` do `DriverCnhRequestDTO` e `fileUrl` do `DriverDocumentRequestDTO`
-- [ ] 5.8 `make lint` + `./mvnw verify`; abrir PR apontando `--base feat/207-vehicle-photos`, com `Closes #207`
+- [x] 5.1 Criar branch `feat/207-driver-files` **de dentro de** `feat/207-vehicle-photos`
+- [x] 5.2 Testes de autorização **por arquivo privado**: o motorista lê o próprio documento; um terceiro toma 403 com corpo vazio; o admin lê
+- [x] 5.3 Teste nomeado do PDF: `DOCUMENT` aceita PDF e imagem, e nasce `PRIVATE`
+- [x] 5.4 Migration `V45`: `driver_cnh.photo_url` e `driver_document.file_url` viram FK **anulável**. **Aplicada contra o PostgreSQL** (R5); confirmado que `file_media_id` aceita nulo
+- [x] 5.5 **O fluxo de criação do documento inverte** (D10): `file_url` era `@NotBlank` e `not null`. Passa a ser criar o documento e subir o arquivo depois. Documento sem arquivo vira estado legítimo — é o "pendente de envio" que o painel precisa listar
+- [x] 5.6 `POST /api/driver-cnhs/{token}/photo` e `POST /api/driver-documents/{token}/file`
+- [x] 5.7 Remover `photoUrl` do `DriverCnhRequestDTO` e `fileUrl` do `DriverDocumentRequestDTO`
+- [x] 5.8 `make lint` + `./mvnw verify` (1092 testes); PR apontando `--base feat/207-vehicle-photos`, com `Closes #207`
 
 ## 6. Encerramento
 

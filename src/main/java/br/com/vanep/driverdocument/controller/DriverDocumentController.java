@@ -5,12 +5,17 @@ import br.com.vanep.driverdocument.dto.DriverDocumentResponseDTO;
 import br.com.vanep.driverdocument.dto.DriverDocumentStatusUpdateRequestDTO;
 import br.com.vanep.driverdocument.enums.DocumentStatusEnum;
 import br.com.vanep.driverdocument.enums.DocumentTypeEnum;
+import br.com.vanep.driverdocument.service.DriverDocumentFileService;
 import br.com.vanep.driverdocument.service.DriverDocumentService;
+import br.com.vanep.media.web.MediaResponder;
 import jakarta.validation.Valid;
+import org.springframework.core.io.InputStreamResource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -22,17 +27,26 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api/driver-documents")
 public class DriverDocumentController {
 
   private final DriverDocumentService service;
+  private final DriverDocumentFileService fileService;
+  private final MediaResponder mediaResponder;
 
-  public DriverDocumentController(DriverDocumentService service) {
+  public DriverDocumentController(
+      DriverDocumentService service,
+      DriverDocumentFileService fileService,
+      MediaResponder mediaResponder) {
     this.service = service;
+    this.fileService = fileService;
+    this.mediaResponder = mediaResponder;
   }
 
   @PostMapping
@@ -90,5 +104,20 @@ public class DriverDocumentController {
   @PreAuthorize("hasAuthority('restore_driver_document')")
   public DriverDocumentResponseDTO restore(@PathVariable String token) {
     return service.restore(token);
+  }
+
+  @PostMapping(value = "/{token}/file", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+  @ResponseStatus(HttpStatus.CREATED)
+  @PreAuthorize(
+      "hasAuthority('update_driver_document') or @sec.isDriverDocumentOwner(#token, authentication)")
+  public void uploadFile(@PathVariable String token, @RequestPart("file") MultipartFile file) {
+    fileService.replace(token, file);
+  }
+
+  @GetMapping("/{token}/file")
+  @PreAuthorize(
+      "hasAuthority('show_driver_document') or @sec.isDriverDocumentOwner(#token, authentication)")
+  public ResponseEntity<InputStreamResource> downloadFile(@PathVariable String token) {
+    return mediaResponder.respond(fileService.requireFile(token));
   }
 }
