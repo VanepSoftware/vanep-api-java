@@ -39,6 +39,12 @@ O endpoint MUST ter rate limit por usuário autenticado.
 - **WHEN** o ViaCEP devolve um `ibge` que não casa com nenhum `city.ibge_code`
 - **THEN** o sistema devolve `404` com mensagem pt-BR resolvida pelo MessageSource
 
+#### Scenario: ViaCEP sem código IBGE
+
+- **WHEN** o ViaCEP responde sem `ibge` ou com `ibge` vazio
+- **THEN** o sistema devolve `404` com mensagem pt-BR resolvida pelo MessageSource
+- **AND** não devolve uma cidade do catálogo que também esteja sem `ibge_code`
+
 #### Scenario: Lookup sem autenticação
 
 - **WHEN** uma requisição sem Bearer token válido chama `GET /api/cep/{cep}`

@@ -32,7 +32,7 @@ Controllers MUST permanecer magros; a persistência MUST viver num `@Service`.
 
 #### Scenario: Token de cidade desconhecido
 
-- **WHEN** `cityToken` não casa com uma cidade ativa
+- **WHEN** `cityToken` não casa com nenhuma cidade do catálogo
 - **THEN** o sistema devolve `404` com chave MessageSource `city.not_found`
 
 #### Scenario: Nome de cidade do cliente é ignorado

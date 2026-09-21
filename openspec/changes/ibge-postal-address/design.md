@@ -76,6 +76,8 @@ Não criar `/api/geo` nem `CityCatalogController`. Reusar `CityController` / `St
 
 O PUT `/api/user/me/address` resolve `cityToken` só no banco.
 
+`CepLookupService` **não** é `@Transactional`: a chamada HTTP ao ViaCEP (timeouts de conexão e leitura) segurava uma conexão do pool durante toda a espera. `city.state` é `EAGER` e o repositório já abre a própria transação de leitura. `ibge` nulo ou vazio na resposta é tratado como cidade fora do catálogo (`404`), nunca consultado por `findByIbgeCode(null)`, que casaria uma cidade qualquer sem `ibge_code`.
+
 **Alternativa:** o app chama viacep.com.br — funciona, mas a API não consegue devolver `cityToken` sem um segundo round-trip e perdemos o match por código no servidor.
 
 ### D5 — Contrato postal do PUT
@@ -126,7 +128,7 @@ ViaCEP GET     PUT endereço pessoal
 
 Fases 3 e 4 podem seguir em paralelo depois do seeder. Fase 5 depende da 2 (`ibge_code` para casar). Fase 6 depende da 1 (`neighborhood`) e pode ir sem ViaCEP. Fase 7 depende da 6 — reaproveita o colaborador de resolução por cidade que a fase 6 introduz em `PersonalAddressService` (ver D9); precisa também da 3 (picker) já estar no ar, mas essa dependência é de produto/mobile, não de merge order no backend.
 
-**Ordem de merge recomendada: 1, 2, 3, 5, 6, 7 e a 4 por último.** A fase 4 (resolver só casa cidade) quebra todo teste que ainda depende de o Google criar `city`. Hoje isso inclui `PersonalAddressControllerTest`, `OnboardingStepsTest` e `DependentControllerTest`/`AddressServiceTest` (casos de dependente), que as fases 6 e 7 **reescrevem por completo** para `cityToken`. Se a 4 entrasse antes, teria de consertar esses testes só para as fases 6/7 jogarem o conserto fora (e conflitarem). Com a 4 por último, ela só toca o que sobrevive: escola, área de atuação, busca e o próprio resolver. As fases 6 e 7 não dependem da 4, então a reordem é só de merge, não de branch.
+**Ordem de merge recomendada: 1, 2, 3, 5, 6, 7 e a 4 por último.** A fase 4 (resolver só casa cidade) quebra todo teste que ainda depende de o Google criar `city`. Dos testes existentes, dependiam disso `PersonalAddressControllerTest` e `OnboardingStepsTest`, que a fase 6 **reescreve por completo** para `cityToken`, além dos de resolver, busca de motorista, área de atuação e `SchoolResolve`. `DependentControllerTest`, `AddressServiceTest` e `SchoolControllerTest` já inserem a cidade antes de resolver o place e não quebram. Se a 4 entrasse antes da 6, teria de consertar os dois primeiros só para a fase 6 jogar o conserto fora (e conflitarem). Com a 4 por último, ela só toca o que sobrevive: busca, área de atuação, escola e o próprio resolver. As fases 6 e 7 não dependem da 4, então a reordem é só de merge, não de branch.
 
 | Fase | Conteúdo | Depende de | Paralelo com |
 |------|----------|------------|--------------|

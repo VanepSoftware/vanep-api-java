@@ -30,7 +30,7 @@ Este contrato substitui, só para dependente, o de `place-backed-owned-address` 
 
 #### Scenario: Token de cidade desconhecido
 
-- **WHEN** `cityToken` do `address` do dependente não casa com uma cidade ativa
+- **WHEN** `cityToken` do `address` do dependente não casa com nenhuma cidade do catálogo
 - **THEN** o sistema devolve `404` com chave MessageSource `city.not_found`
 
 #### Scenario: Place id não é mais aceito

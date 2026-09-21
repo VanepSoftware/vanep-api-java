@@ -105,7 +105,7 @@ Isso MUST persistir **uma** linha de `city` (Cristalina/GO), não duas. `token` 
 
 ### Requirement: Picker autenticado de cidades por UF
 
-O sistema SHALL expor `GET /api/cities` para o chamador autenticado. A query `uf` (código de duas letras) MUST ser obrigatória. A query `search` MAY filtrar pelo `normalized_name`. A resposta MUST usar DTOs explícitos com tokens opacos de `city`, nunca ids numéricos. O sistema MUST NOT exigir as permissões `list_cities` ou `list_states`. O sistema MUST NOT criar um path `/api/geo`.
+O sistema SHALL expor `GET /api/cities` para o chamador autenticado. A query `uf` (código de duas letras) MUST ser obrigatória. A query `search` MAY filtrar pelo `normalized_name`, ignorando acento e caixa. O sistema MUST listar apenas cidades ativas: uma cidade inativa MUST NOT aparecer, com ou sem `search`. A resposta MUST usar DTOs explícitos com tokens opacos de `city`, nunca ids numéricos. O sistema MUST NOT exigir as permissões `list_cities` ou `list_states`. O sistema MUST NOT criar um path `/api/geo`.
 
 O sistema SHALL expor `GET /api/states` para o mesmo chamador autenticado (código + nome + token). UF desconhecida em `GET /api/cities` MUST devolver `404` com chave MessageSource. `GET /api/cities` sem `uf` MUST devolver `400` com chave MessageSource.
 
@@ -121,6 +121,12 @@ Sem `search`, o sistema MUST ainda devolver municípios daquela UF (paginado). O
 
 - **WHEN** um chamador autenticado chama `GET /api/cities?uf=DF` sem `search`
 - **THEN** o sistema devolve a página de municípios do DF
+
+#### Scenario: Cidade inativa não aparece
+
+- **WHEN** existe uma cidade inativa na UF
+- **AND** um chamador autenticado chama `GET /api/cities?uf=DF`, com ou sem `search` que a casaria
+- **THEN** o sistema não devolve essa cidade
 
 #### Scenario: uf ausente
 

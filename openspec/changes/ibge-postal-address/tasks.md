@@ -27,9 +27,9 @@
 > Branch: `feat/ibge-postal-address-picker` a partir de `feat/ibge-postal-address-seeder`
 > Depende de: 2 | Paralelo com: 4
 
-- [ ] 3.1 Testes slice falhando: `401` sem token; `GET /api/states` devolve UFs para cliente autenticado (sem `list_states`); `GET /api/cities?uf=DF&search=brasilia` devolve token de Brasília; sem `uf` → `400`; UF desconhecida `404`; `search` omitido lista a UF paginada
+- [ ] 3.1 Testes slice falhando: `401` sem token; `GET /api/states` devolve UFs para cliente autenticado (sem `list_states`); `GET /api/cities?uf=DF&search=brasilia` devolve token de Brasília; sem `uf` → `400`; UF desconhecida `404`; `search` omitido lista a UF paginada; `search` ignora acento e caixa; cidade inativa não aparece, com e sem `search`
 - [ ] 3.2 Chaves MessageSource EN + `messages_pt_BR.properties` para UF desconhecida e `uf` ausente
-- [ ] 3.3 `CityController` / `StateController`: `@PreAuthorize("isAuthenticated()")`; `GET /api/cities` exige `uf`; `search` opcional em `normalized_name`; DTOs com tokens opacos. Sem `CityCatalogController`
+- [ ] 3.3 `CityController` / `StateController`: `@PreAuthorize("isAuthenticated()")`; `GET /api/cities` exige `uf`; `search` opcional em `normalized_name`; só cidades ativas (`active = true`); DTOs com tokens opacos. Sem `CityCatalogController`
 - [ ] 3.4 Autorização explícita (regras 20–21): `@PreAuthorize("isAuthenticated()")` nos controllers; a cadeia `/api/**` (`@Order(3)` do `SecurityConfig`, `anyRequest().authenticated()`) já exige JWT, então não há matcher novo — só conferir que nada de `/api/auth/**` (cadeia pública do N-177) alcança esses paths. `list_cities` / `list_states` não são mais exigidas nesses GETs
 - [ ] 3.5 Atualizar testes admin existentes de city/state que esperavam `403` sem `list_cities` / `list_states`
 - [ ] 3.6 `make lint` + testes desta fase; abrir PR
@@ -42,10 +42,10 @@
 > **Mergear por último** (depois de 6 e 7, ver D8): esta fase quebra todo teste que ainda espera `city` criada pelo Google. Se a branch ficar pronta antes, o conserto dos testes de endereço pessoal e dependente é descartado no rebase sobre a 6/7.
 
 - [ ] 4.1 Testes unitários falhando: persistir sob Brasília existente cria só Taguatinga; persistir com nome de cidade `Embu` sob SP (sem esse `normalized_name`) lança e não insere nada; `resolveAnchor` lança em cidade sem match em vez de optional vazio
-- [ ] 4.2 Slice falhando: `PUT` área de atuação / `POST` school resolve / `GET` busca de motorista com componente de cidade sem match → `400` MessageSource; busca com cidade casada e sem motoristas continua `200` página vazia
+- [ ] 4.2 Slice falhando: `PUT` área de atuação / `POST` school resolve / `GET` busca de motorista com componente de cidade sem match → `400` MessageSource; busca com cidade casada e sem motoristas continua `200` página vazia; `POST` de escola com place em cidade sem match → `400` e nenhuma linha de `city`, `district`, `address` nem `school` (rollback)
 - [ ] 4.3 Chave MessageSource para cidade Google sem correspondência no IBGE (EN + pt-BR); logar UF, nome Google da cidade, place id
-- [ ] 4.4 Mudar o caminho de cidade do `LocationResolverService` para só find; manter `findOrCreateDistrict`; mapear a exceção nos services de busca/escola/área de atuação
-- [ ] 4.5 Atualizar testes existentes que assumiam que o Google criava `city` — MUST inserir a cidade IBGE antes (Brasília / São Paulo): `LocationResolverServiceTest`, `AddressPlaceResolverServiceTest`, `AddressServiceTest` (só os casos de escola; os de dependente saem na fase 7), `SchoolControllerTest`, `SchoolResolveControllerTest`, `SchoolResolveServiceTest`, `DriverServiceAreaControllerTest`, `DriverSearchControllerTest`. `PersonalAddressControllerTest`/`OnboardingStepsTest` (fase 6) e `DependentControllerTest` (fase 7) já não dependem disso quando esta fase entra por último
+- [ ] 4.4 Mudar o caminho de cidade do `LocationResolverService` para só find; manter `findOrCreateDistrict`; a exceção vira `400` no `LocationErrorAdvice` global (mesma chave `location.city.unmatched` na persistência e na busca), sem `try/catch` nos services
+- [ ] 4.5 Atualizar testes existentes que assumiam que o Google criava `city` — MUST inserir a cidade IBGE antes (Brasília / São Paulo): `LocationResolverServiceTest`, `DriverSearchControllerTest`, `DriverServiceAreaControllerTest`, `SchoolResolveControllerTest`, `PersonalAddressControllerTest` e `OnboardingStepsTest` (estes dois a fase 6 reescreve por completo). `AddressServiceTest`, `DependentControllerTest` e `SchoolControllerTest` já inserem a cidade antes e não mudam
 - [ ] 4.6 `make lint` + `./mvnw verify`; abrir PR
 
 ## 5. Fase 5 — Lookup ViaCEP (PR 5)
@@ -56,9 +56,9 @@
 
 - [ ] 5.1 Commitar fixtures JSON gravadas do ViaCEP em `src/test/resources`; cravar `vanep.viacep.base-url` em `http://localhost:1/...` no `application-test.properties` (regra 50)
 - [ ] 5.2 Testes unitários falhando do `ViaCepClient`: mapeia `ibge` `5300108`; `{ "erro": true }` → não encontrado; falha de conexão → exceção de lookup
-- [ ] 5.3 Slice falhando: `401`; CEP de oito dígitos de Brasília `200` + `cityToken`; formato inválido `400`; ViaCEP desconhecido `404`; transporte `503`; `ibge_code` ausente no catálogo `404`; rate limit `429` sem chamar ViaCEP
+- [ ] 5.3 Slice falhando: `401`; CEP de oito dígitos de Brasília `200` + `cityToken`; formato inválido `400`; ViaCEP desconhecido `404`; transporte `503`; `ibge_code` ausente no catálogo `404`; `ibge` nulo ou vazio na resposta do ViaCEP também `404` `cep.ibge.not_found`; rate limit `429` sem chamar ViaCEP
 - [ ] 5.4 Config env + `.env.example`: `vanep.viacep.base-url`, timeout, knobs de rate-limit (regras 1/3)
-- [ ] 5.5 Implementar client (`RestClient`), service, `CepLookupController`, bean de rate limiter (chave `cep-lookup:` + uid do JWT, nunca IP nem `X-Forwarded-For`), chaves MessageSource
+- [ ] 5.5 Implementar client (`RestClient`), service, `CepLookupController`, bean de rate limiter (chave `cep-lookup:` + uid do JWT, nunca IP nem `X-Forwarded-For`), chaves MessageSource; `CepLookupService` sem `@Transactional` (a chamada HTTP não segura conexão do pool)
 - [ ] 5.6 `make lint` + testes desta fase; abrir PR
 
 ## 6. Fase 6 — Endereço pessoal (PR 6)
@@ -70,7 +70,7 @@
 - [ ] 6.1 Slice falhando: `200` com `cityToken` + street + CEP de 8 dígitos; CEP omitido `400`; CEP inválido `400`; street em branco `400`; token desconhecido `404` `city.not_found`; `cityName` extra ignorado; `placeId` não é aceito como contrato; `neighborhood` persiste e volta; `district_id` e `google_place_id` null; `401`; DELETE + PUT ainda cria linha nova; resposta da busca continua sem neighborhood/street de motoristas
 - [ ] 6.2 Trocar `PersonalAddressRequestDTO`; `PersonalAddressService` deixa de depender de `AddressPlaceResolverService` (extraído pela PR #173; segue existindo, agora só para escola) e nunca mais chama `PlacesClient` / `LocationResolverService`
 - [ ] 6.3 DTO de resposta: `neighborhood`; não exigir `googlePlaceId`
-- [ ] 6.4 MessageSource conforme precisar; manter onboarding `PERSONAL_ADDRESS` atrelado a `users.address_id`; reescrever para `cityToken` os testes que montam endereço pessoal por `placeId` (`PersonalAddressControllerTest`, `OnboardingStepsTest`), sem stub de `PlacesClient`
+- [ ] 6.4 MessageSource conforme precisar; manter onboarding `PERSONAL_ADDRESS` atrelado a `users.address_id`; reescrever para `cityToken` os testes que montam endereço pessoal por `placeId` (`PersonalAddressControllerTest`, `OnboardingStepsTest`), sem stub de `PlacesClient`; manter `location.address.street_required` nos bundles (a escola ainda a usa via `AddressPlaceResolverService`); o `PUT` com `cityToken` de cidade inativa segue aceito (só o picker filtra por ativas)
 - [ ] 6.5 `make lint` + `./mvnw verify`; abrir PR
 
 ## 7. Fase 7 — Endereço de embarque do dependente por `cityToken` (PR 7)
