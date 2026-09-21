@@ -17,6 +17,8 @@ public interface CityRepository extends JpaRepository<CityModel, Long> {
 
   Optional<CityModel> findByStateIdAndNormalizedName(Long stateId, String normalizedName);
 
+  Optional<CityModel> findByIbgeCode(String ibgeCode);
+
   boolean existsByNameIgnoreCaseAndStateId(String name, Long stateId);
 
   @Modifying
