@@ -6,6 +6,7 @@ import br.com.vanep.role.repository.RoleRepository;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.security.oauth2.server.authorization.OAuth2TokenType;
@@ -45,7 +46,7 @@ public class JwtTokenCustomizer implements OAuth2TokenCustomizer<JwtEncodingCont
     UserModel user = maybe.get();
     context.getClaims().claim("uid", user.getToken());
     context.getClaims().claim("user_type", user.getType().name());
-    context.getClaims().claim("roles", List.of("ROLE_" + user.getType().name()));
+    context.getClaims().claim("roles", new ArrayList<>(List.of("ROLE_" + user.getType().name())));
     context.getClaims().claim("permissions", resolvePermissions(user));
     if (user.getType() == UserType.DRIVER) {
       drivers
@@ -65,12 +66,12 @@ public class JwtTokenCustomizer implements OAuth2TokenCustomizer<JwtEncodingCont
 
   private List<String> resolvePermissions(UserModel user) {
     if (user.getRoleId() == null) {
-      return List.of();
+      return new ArrayList<>();
     }
     return roles
         .findById(user.getRoleId())
         .map(role -> role.getRolePermission())
-        .map(bundle -> List.copyOf(bundle.getPermissions()))
-        .orElse(List.of());
+        .map(bundle -> new ArrayList<>(bundle.getPermissions()))
+        .orElseGet(ArrayList::new);
   }
 }
