@@ -53,16 +53,16 @@
 > Goal: o primeiro dono aponta para a mídia, de ponta a ponta. É o molde das fases seguintes.
 > Depends on: Phase 1 | Parallel with: —
 
-- [ ] 2.1 Criar branch `feat/207-driver-photo` **de dentro de** `feat/207-media-core`
-- [ ] 2.2 Testes: upload → 201 e o motorista passa a devolver a URL; substituir → a mídia anterior some do banco **e do disco**; sem posse → 403; tipo inválido → 400; acima do limite → 413
-- [ ] 2.2b **Teste nomeado afirmando que o corpo do 403 está VAZIO**, não só que o status é 403 (D8)
-- [ ] 2.2c `GET /api/drivers/{token}/photo` entrega os bytes, reusando `@sec.isDriverOwner` — a autorização é a da própria feature (D3)
-- [ ] 2.3 **Teste nomeado provando a chamada única** (D1): `GET /api/drivers/{token}` traz a foto sem nenhuma requisição adicional
-- [ ] 2.4 Migration: `driver.photo` vira `photo_media_id` com FK anulável para `media_file`
-- [ ] 2.5 **Aplicar manualmente contra o PostgreSQL** (R5)
-- [ ] 2.6 `POST /api/drivers/{token}/photo` em `multipart/form-data` e `GET` no mesmo caminho para os bytes (D2, D3)
-- [ ] 2.7 `DriverResponseDTO.photo` **mantém nome e tipo** e passa a carregar a URL (D9)
-- [ ] 2.8 **Remover `photo` do `DriverUpdateRequestDTO`** — quem grava agora é o upload (R3)
+- [x] 2.1 Criar branch `feat/207-driver-photo` **de dentro de** `feat/207-media-core`
+- [x] 2.2 Testes: upload → 201 e o motorista passa a devolver a URL; substituir → a mídia anterior some do banco **e do disco**; sem posse → 403; tipo inválido → 400; acima do limite → 413
+- [x] 2.2b **Teste nomeado afirmando que o corpo do 403 está VAZIO**, não só que o status é 403 (D8)
+- [x] 2.2c `GET /api/drivers/{token}/photo` entrega os bytes, reusando `@sec.isDriverOwner` — a autorização é a da própria feature (D3)
+- [x] 2.3 **Teste nomeado provando a chamada única** (D1): `GET /api/drivers/{token}` traz a foto sem nenhuma requisição adicional
+- [x] 2.4 Migration: `driver.photo` vira `photo_media_id` com FK anulável para `media_file`
+- [x] 2.5 **Aplicar manualmente contra o PostgreSQL** (R5)
+- [x] 2.6 `POST /api/drivers/{token}/photo` em `multipart/form-data` e `GET` no mesmo caminho para os bytes (D2, D3)
+- [x] 2.7 `DriverResponseDTO.photo` **mantém nome e tipo** e passa a carregar a URL (D9)
+- [x] 2.8 **Remover `photo` do `DriverUpdateRequestDTO`** — quem grava agora é o upload (R3)
 - [ ] 2.9 `make lint` + `./mvnw verify`; abrir PR apontando `--base feat/207-media-core`
 
 ## 3. Phase 3 — `client.photo` e `assistant.photo` (PR 3)

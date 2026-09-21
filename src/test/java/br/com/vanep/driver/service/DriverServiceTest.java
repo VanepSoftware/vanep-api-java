@@ -134,7 +134,6 @@ class DriverServiceTest {
 
     DriverUpdateRequestDTO req =
         new DriverUpdateRequestDTO(
-            "photo.jpg",
             "bio text",
             "123",
             5,
@@ -147,7 +146,6 @@ class DriverServiceTest {
     DriverResponseDTO result = service.update("tok", req);
 
     assertThat(result).isEqualTo(response);
-    assertThat(driver.getPhoto()).isEqualTo("photo.jpg");
     assertThat(driver.getBio()).isEqualTo("bio text");
     assertThat(driver.getCnpj()).isEqualTo("123");
     assertThat(driver.getExperienceYears()).isEqualTo(5);

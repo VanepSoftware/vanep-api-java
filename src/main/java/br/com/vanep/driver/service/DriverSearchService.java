@@ -10,6 +10,7 @@ import br.com.vanep.driverservicearea.model.DriverServiceAreaModel;
 import br.com.vanep.driverservicearea.repository.DriverServiceAreaRepository;
 import br.com.vanep.location.dto.ResolvedLocationChainDTO;
 import br.com.vanep.location.service.LocationResolverService;
+import br.com.vanep.media.web.MediaUrl;
 import br.com.vanep.places.client.PlacesClient;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -193,7 +194,7 @@ public class DriverSearchService {
     return new DriverSearchResponseDTO(
         driver.getToken(),
         driver.getUser().getName(),
-        driver.getPhoto(),
+        MediaUrl.of("/api/drivers", driver.getToken(), "photo", driver.getPhoto()),
         driver.getRating(),
         driver.getBasePrice(),
         driver.getExperienceYears(),

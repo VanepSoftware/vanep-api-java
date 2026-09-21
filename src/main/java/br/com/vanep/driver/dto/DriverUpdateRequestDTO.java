@@ -8,7 +8,6 @@ import java.time.LocalTime;
 import java.util.List;
 
 public record DriverUpdateRequestDTO(
-    String photo,
     String bio,
     String cnpj,
     @Min(value = 0, message = "{driver.experienceYears.min}") Integer experienceYears,

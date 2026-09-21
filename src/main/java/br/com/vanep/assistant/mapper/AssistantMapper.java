@@ -8,6 +8,7 @@ import br.com.vanep.assistant.dto.AssistantPendingInviteDTO;
 import br.com.vanep.assistant.model.AssistantInviteModel;
 import br.com.vanep.assistant.model.AssistantModel;
 import br.com.vanep.driver.model.DriverModel;
+import br.com.vanep.media.web.MediaUrl;
 import br.com.vanep.user.dto.UserMeResponseDTO;
 import org.springframework.stereotype.Component;
 
@@ -45,6 +46,8 @@ public class AssistantMapper {
 
   public AssistantDriverSummaryDTO toDriverSummary(DriverModel driver) {
     return new AssistantDriverSummaryDTO(
-        driver.getUser().getName(), driver.getPhoto(), driver.getRating());
+        driver.getUser().getName(),
+        MediaUrl.of("/api/drivers", driver.getToken(), "photo", driver.getPhoto()),
+        driver.getRating());
   }
 }

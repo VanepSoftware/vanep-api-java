@@ -3,7 +3,6 @@
 -- DELETE nativo ignora o soft delete e zera as tabelas de verdade.
 -- Ordem respeita as FKs (filhos antes de users).
 delete from oauth_account;
-delete from media_file;
 delete from signup_ticket;
 delete from password_reset_token;
 delete from email_verification_token;
@@ -20,6 +19,7 @@ delete from vehicle;
 delete from driver_cnh;
 delete from driver_document;
 delete from driver;
+delete from media_file;
 delete from users;
 delete from roles;
 delete from role_permissions;
