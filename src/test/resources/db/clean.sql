@@ -2,6 +2,7 @@
 -- (@SoftDelete), então as linhas permaneceriam e violariam os índices únicos.
 -- DELETE nativo ignora o soft delete e zera as tabelas de verdade.
 -- Ordem respeita as FKs (filhos antes de users).
+delete from media_file;
 delete from oauth_account;
 delete from signup_ticket;
 delete from password_reset_token;
