@@ -12,8 +12,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import br.com.vanep.address.dto.AddressRequestDTO;
 import br.com.vanep.address.dto.AddressResponseDTO;
+import br.com.vanep.address.dto.DependentAddressRequestDTO;
 import br.com.vanep.address.service.AddressService;
 import br.com.vanep.client.model.ClientModel;
 import br.com.vanep.client.repository.ClientRepository;
@@ -158,6 +158,7 @@ class DependentServiceTest {
         "Rua Barão de Jaguara",
         "1481",
         null,
+        null,
         "Centro",
         "city-campinas",
         "Campinas",
@@ -166,8 +167,9 @@ class DependentServiceTest {
         null);
   }
 
-  private AddressRequestDTO addressRequest() {
-    return new AddressRequestDTO("place-campinas", "session-1", "1481", null);
+  private DependentAddressRequestDTO addressRequest() {
+    return new DependentAddressRequestDTO(
+        "city-campinas", "Rua Barão de Jaguara", "13015904", "1481", null, "Centro");
   }
 
   private DependentModel dependent(boolean isDefault) {
@@ -195,7 +197,7 @@ class DependentServiceTest {
       JsonNullable<Boolean> isSelf,
       JsonNullable<Boolean> isDefault,
       JsonNullable<Shift> shift,
-      JsonNullable<AddressRequestDTO> address,
+      JsonNullable<DependentAddressRequestDTO> address,
       JsonNullable<String> schoolToken) {
     return new DependentUpdateDTO(
         name,
@@ -508,7 +510,7 @@ class DependentServiceTest {
   @Test
   void updateNestedAddressUpsertsOwnedRow() {
     DependentModel model = dependent(true);
-    AddressRequestDTO request = addressRequest();
+    DependentAddressRequestDTO request = addressRequest();
 
     stubOwnershipResolution();
     stubResponseMapping();

@@ -2,6 +2,7 @@ package br.com.vanep.dependent.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.nullValue;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -22,8 +23,6 @@ import br.com.vanep.country.repository.CountryRepository;
 import br.com.vanep.dependent.model.DependentModel;
 import br.com.vanep.dependent.repository.DependentRepository;
 import br.com.vanep.places.client.PlacesClient;
-import br.com.vanep.places.dto.AddressComponentDTO;
-import br.com.vanep.places.dto.PlaceDetailsResponseDTO;
 import br.com.vanep.school.model.SchoolModel;
 import br.com.vanep.school.repository.SchoolRepository;
 import br.com.vanep.shared.enums.Shift;
@@ -38,7 +37,6 @@ import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.BDDMockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
@@ -165,32 +163,34 @@ class DependentControllerTest {
 
   @MockitoBean private PlacesClient places;
 
-  private void givenResolvedPlace(String street) {
-    BDDMockito.given(
-            places.findPlaceDetails(
-                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
-        .willReturn(
-            new PlaceDetailsResponseDTO(
-                "place-1",
-                street + ", Campinas - SP",
-                List.of(
-                    new AddressComponentDTO("Brazil", "BR", List.of("country", "political")),
-                    new AddressComponentDTO(
-                        "Sao Paulo", "SP", List.of("administrative_area_level_1", "political")),
-                    new AddressComponentDTO(
-                        "Campinas",
-                        "Campinas",
-                        List.of("administrative_area_level_2", "political")),
-                    new AddressComponentDTO("13015904", "13015904", List.of("postal_code")),
-                    new AddressComponentDTO(street, street, List.of("route")))));
+  private String catalogAddressJson(String number) {
+    return catalogAddressJson(cityToken, "Rua do Embarque", "13015904", number);
   }
 
-  private String placeAddressJson(String number) {
-    return "{\"placeId\":\"place-1\",\"sessionToken\":\"session-1\",\"number\":\"" + number + "\"}";
+  private String catalogAddressJson(
+      String cityTokenValue, String street, String zipCode, String number) {
+    return "{\"cityToken\":\""
+        + cityTokenValue
+        + "\",\"street\":\""
+        + street
+        + "\",\"zipCode\":\""
+        + zipCode
+        + "\",\"number\":\""
+        + number
+        + "\"}";
   }
 
-  private String amendAddressJson(String number) {
-    return "{\"number\":\"" + number + "\"}";
+  private CityModel saveCity(String name, String uf) {
+    CountryModel country = countries.findAll().getFirst();
+    StateModel state = new StateModel();
+    state.setName(name + " State");
+    state.setUf(uf);
+    state.setCountry(country);
+    state = states.save(state);
+    CityModel city = new CityModel();
+    city.setState(state);
+    city.setName(name);
+    return cities.save(city);
   }
 
   private JwtRequestPostProcessor jwtFor(String email, String role) {
@@ -280,17 +280,18 @@ class DependentControllerTest {
   @Test
   void createWithNestedAddressPersistsExclusiveRowDistinctFromClientHome() throws Exception {
     AddressModel home = persistClientHomeAddress();
-    givenResolvedPlace("Rua do Embarque");
 
     mockMvc
         .perform(
             post("/api/dependent")
                 .with(ownerJwt())
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"name\":\"Lucas Souza\",\"address\":" + placeAddressJson("200") + "}"))
+                .content(
+                    "{\"name\":\"Lucas Souza\",\"address\":" + catalogAddressJson("200") + "}"))
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.address.street").value("Rua do Embarque"))
         .andExpect(jsonPath("$.address.number").value("200"))
+        .andExpect(jsonPath("$.address.zipCode").value("13015904"))
         .andExpect(jsonPath("$.address.cityToken").value(cityToken))
         .andExpect(jsonPath("$.address.token").isNotEmpty())
         .andExpect(jsonPath("$.addressToken").doesNotExist());
@@ -298,8 +299,138 @@ class DependentControllerTest {
     DependentModel saved = dependents.findByClientId(ownerClientId).getFirst();
     assertThat(saved.getAddressId()).isNotNull();
     assertThat(saved.getAddressId()).isNotEqualTo(home.getId());
-    assertThat(addresses.findById(saved.getAddressId()).orElseThrow().getToken())
-        .isNotEqualTo(home.getToken());
+    AddressModel stored = addresses.findById(saved.getAddressId()).orElseThrow();
+    assertThat(stored.getToken()).isNotEqualTo(home.getToken());
+    assertThat(stored.getDistrict()).isNull();
+    assertThat(stored.getGooglePlaceId()).isNull();
+  }
+
+  @Test
+  void createWithNeighborhoodPersistsItAndReturnsItWithoutCreatingADistrict() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/dependent")
+                .with(ownerJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"name\":\"Lucas Souza\",\"address\":{\"cityToken\":\""
+                        + cityToken
+                        + "\",\"street\":\"Rua do Embarque\",\"zipCode\":\"13015904\","
+                        + "\"neighborhood\":\"Bela Vista\"}}"))
+        .andExpect(status().isCreated())
+        .andExpect(jsonPath("$.address.neighborhood").value("Bela Vista"))
+        .andExpect(jsonPath("$.address.district").value(nullValue()));
+
+    DependentModel saved = dependents.findByClientId(ownerClientId).getFirst();
+    assertThat(addresses.findById(saved.getAddressId()).orElseThrow().getNeighborhood())
+        .isEqualTo("Bela Vista");
+  }
+
+  @Test
+  void getReturnsThePickupNeighborhood() throws Exception {
+    DependentModel own = createDependent(ownerClientId, "Own Kid", true);
+    AddressModel pickup = persistPickupAddress(own, "10");
+    pickup.setNeighborhood("Centro");
+    addresses.save(pickup);
+
+    mockMvc
+        .perform(get("/api/dependent/" + own.getToken()).with(ownerJwt()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.address.neighborhood").value("Centro"));
+  }
+
+  @Test
+  void createAddressWithoutZipCodeReturns400AndPersistsNothing() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/dependent")
+                .with(ownerJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"name\":\"Lucas Souza\",\"address\":{\"cityToken\":\""
+                        + cityToken
+                        + "\",\"street\":\"Rua do Embarque\"}}"))
+        .andExpect(status().isBadRequest());
+
+    assertThat(dependents.findByClientId(ownerClientId)).isEmpty();
+    assertThat(addresses.count()).isZero();
+  }
+
+  @Test
+  void createAddressWithInvalidZipCodeReturns400() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/dependent")
+                .with(ownerJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"name\":\"Lucas Souza\",\"address\":"
+                        + catalogAddressJson(cityToken, "Rua do Embarque", "13015-904", "1")
+                        + "}"))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void createAddressWithBlankStreetReturns400() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/dependent")
+                .with(ownerJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"name\":\"Lucas Souza\",\"address\":"
+                        + catalogAddressJson(cityToken, "  ", "13015904", "1")
+                        + "}"))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void createAddressWithUnknownCityTokenReturns404AndPersistsNothing() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/dependent")
+                .with(ownerJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"name\":\"Lucas Souza\",\"address\":"
+                        + catalogAddressJson("doesnotexist", "Rua do Embarque", "13015904", "1")
+                        + "}"))
+        .andExpect(status().isNotFound());
+
+    assertThat(dependents.findByClientId(ownerClientId)).isEmpty();
+    assertThat(addresses.count()).isZero();
+  }
+
+  @Test
+  void createAddressIgnoresPlaceIdAndNeverCallsPlaces() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/dependent")
+                .with(ownerJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"name\":\"Lucas Souza\",\"address\":{\"placeId\":\"place-1\","
+                        + "\"sessionToken\":\"session-1\",\"cityToken\":\""
+                        + cityToken
+                        + "\",\"street\":\"Rua do Embarque\",\"zipCode\":\"13015904\"}}"))
+        .andExpect(status().isCreated())
+        .andExpect(jsonPath("$.address.street").value("Rua do Embarque"));
+
+    verifyNoInteractions(places);
+  }
+
+  @Test
+  void createAddressWithOnlyAPlaceIdReturns400AndNeverCallsPlaces() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/dependent")
+                .with(ownerJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"Lucas Souza\",\"address\":{\"placeId\":\"place-1\"}}"))
+        .andExpect(status().isBadRequest());
+
+    verifyNoInteractions(places);
+    assertThat(dependents.findByClientId(ownerClientId)).isEmpty();
   }
 
   @Test
@@ -476,7 +607,7 @@ class DependentControllerTest {
   }
 
   @Test
-  void patchNestedAddressUpdatesOwnedRowInPlace() throws Exception {
+  void patchNestedAddressReplacesTheOwnedRowInPlace() throws Exception {
     DependentModel own = createDependent(ownerClientId, "Own Kid", true);
     AddressModel pickup = persistPickupAddress(own, "10");
 
@@ -485,11 +616,107 @@ class DependentControllerTest {
             patch("/api/dependent/" + own.getToken())
                 .with(ownerJwt())
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"address\":" + amendAddressJson("99") + "}"))
+                .content(
+                    "{\"address\":"
+                        + catalogAddressJson(cityToken, "Avenida Nova", "13015000", "99")
+                        + "}"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.address.token").value(pickup.getToken()))
         .andExpect(jsonPath("$.address.number").value("99"))
-        .andExpect(jsonPath("$.address.street").value(pickup.getStreet()));
+        .andExpect(jsonPath("$.address.street").value("Avenida Nova"))
+        .andExpect(jsonPath("$.address.zipCode").value("13015000"));
+
+    assertThat(dependents.findByToken(own.getToken()).orElseThrow().getAddressId())
+        .isEqualTo(pickup.getId());
+  }
+
+  @Test
+  void patchNestedAddressSwitchesTheCityKeepingTheSameRow() throws Exception {
+    DependentModel own = createDependent(ownerClientId, "Own Kid", true);
+    AddressModel pickup = persistPickupAddress(own, "10");
+    CityModel santos = saveCity("Santos", "RJ");
+
+    mockMvc
+        .perform(
+            patch("/api/dependent/" + own.getToken())
+                .with(ownerJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"address\":"
+                        + catalogAddressJson(santos.getToken(), "Rua do Porto", "11010000", "5")
+                        + "}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.address.token").value(pickup.getToken()))
+        .andExpect(jsonPath("$.address.cityToken").value(santos.getToken()))
+        .andExpect(jsonPath("$.address.cityName").value("Santos"));
+  }
+
+  @Test
+  void patchNestedAddressNullsTheOptionalFieldsThatWereOmitted() throws Exception {
+    DependentModel own = createDependent(ownerClientId, "Own Kid", true);
+    AddressModel pickup = persistPickupAddress(own, "10");
+    pickup.setComplement("Bloco B");
+    pickup.setNeighborhood("Centro");
+    addresses.save(pickup);
+
+    mockMvc
+        .perform(
+            patch("/api/dependent/" + own.getToken())
+                .with(ownerJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"address\":{\"cityToken\":\""
+                        + cityToken
+                        + "\",\"street\":\"Rua do Embarque\",\"zipCode\":\"13015904\"}}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.address.number").value(nullValue()))
+        .andExpect(jsonPath("$.address.complement").value(nullValue()))
+        .andExpect(jsonPath("$.address.neighborhood").value(nullValue()));
+
+    AddressModel reloaded = addresses.findById(pickup.getId()).orElseThrow();
+    assertThat(reloaded.getComplement()).isNull();
+    assertThat(reloaded.getNeighborhood()).isNull();
+  }
+
+  @Test
+  void patchPartialAddressReturns400AndKeepsTheStoredAddress() throws Exception {
+    DependentModel own = createDependent(ownerClientId, "Own Kid", true);
+    AddressModel pickup = persistPickupAddress(own, "10");
+
+    mockMvc
+        .perform(
+            patch("/api/dependent/" + own.getToken())
+                .with(ownerJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"address\":{\"number\":\"99\"}}"))
+        .andExpect(status().isBadRequest());
+
+    AddressModel reloaded = addresses.findById(pickup.getId()).orElseThrow();
+    assertThat(reloaded.getNumber()).isEqualTo("10");
+    assertThat(reloaded.getStreet()).isEqualTo("Rua do Embarque");
+  }
+
+  @Test
+  void patchAddressAlsoOwnedByASchoolReturns409AndKeepsTheRow() throws Exception {
+    DependentModel own = createDependent(ownerClientId, "Own Kid", true);
+    AddressModel pickup = persistPickupAddress(own, "10");
+    SchoolModel school = persistSchool("Escola Compartilhada");
+    school.setAddressId(pickup.getId());
+    schools.save(school);
+
+    mockMvc
+        .perform(
+            patch("/api/dependent/" + own.getToken())
+                .with(ownerJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"address\":"
+                        + catalogAddressJson(cityToken, "Avenida Nova", "13015000", "99")
+                        + "}"))
+        .andExpect(status().isConflict());
+
+    assertThat(addresses.findById(pickup.getId()).orElseThrow().getStreet())
+        .isEqualTo("Rua do Embarque");
   }
 
   @Test

@@ -74,6 +74,7 @@ class ClientServiceTest {
         "Rua Barão de Jaguara",
         "1481",
         "Apto 12",
+        null,
         "Centro",
         "city-campinas",
         "Campinas",

@@ -4,8 +4,6 @@ import br.com.vanep.address.dto.PersonalAddressRequestDTO;
 import br.com.vanep.address.dto.PersonalAddressResponseDTO;
 import br.com.vanep.address.model.AddressModel;
 import br.com.vanep.address.repository.AddressRepository;
-import br.com.vanep.city.model.CityModel;
-import br.com.vanep.city.repository.CityRepository;
 import br.com.vanep.district.model.DistrictModel;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
@@ -19,17 +17,17 @@ import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class PersonalAddressService {
-  private final CityRepository cities;
+  private final AddressCatalogResolverService catalogResolver;
   private final AddressRepository addresses;
   private final UserRepository users;
   private final MessageSource messages;
 
   public PersonalAddressService(
-      CityRepository cities,
+      AddressCatalogResolverService catalogResolver,
       AddressRepository addresses,
       UserRepository users,
       MessageSource messages) {
-    this.cities = cities;
+    this.catalogResolver = catalogResolver;
     this.addresses = addresses;
     this.users = users;
     this.messages = messages;
@@ -39,21 +37,19 @@ public class PersonalAddressService {
   public PersonalAddressResponseDTO replaceMyAddress(
       String callerUid, PersonalAddressRequestDTO request) {
     UserModel caller = requireCaller(callerUid);
-    CityModel city = requireCityByToken(request.cityToken());
-
     AddressModel address =
         Optional.ofNullable(caller.getAddressId())
             .flatMap(addresses::findById)
             .orElseGet(AddressModel::new);
 
-    address.setCity(city);
-    address.setDistrict(null);
-    address.setGooglePlaceId(null);
-    address.setStreet(request.street());
-    address.setZipCode(request.zipCode());
-    address.setNumber(blankToNull(request.number()));
-    address.setComplement(blankToNull(request.complement()));
-    address.setNeighborhood(blankToNull(request.neighborhood()));
+    catalogResolver.applyCity(
+        address,
+        request.cityToken(),
+        request.street(),
+        request.zipCode(),
+        request.number(),
+        request.complement(),
+        request.neighborhood());
 
     AddressModel saved = addresses.save(address);
     caller.setAddressId(saved.getId());
@@ -92,13 +88,6 @@ public class PersonalAddressService {
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
   }
 
-  private CityModel requireCityByToken(String cityToken) {
-    return cities
-        .findByToken(cityToken)
-        .orElseThrow(
-            () -> new ResponseStatusException(HttpStatus.NOT_FOUND, message("city.not_found")));
-  }
-
   PersonalAddressResponseDTO toResponse(AddressModel address) {
     DistrictModel district = address.getDistrict();
     return new PersonalAddressResponseDTO(
@@ -114,13 +103,6 @@ public class PersonalAddressService {
         address.getCity().getToken(),
         address.getCity().getState().getUf(),
         address.getCity().getState().getCountry().getIsoCode());
-  }
-
-  private static String blankToNull(String value) {
-    if (value == null || value.isBlank()) {
-      return null;
-    }
-    return value;
   }
 
   private String message(String key) {
