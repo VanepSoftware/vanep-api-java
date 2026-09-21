@@ -17,6 +17,12 @@ FROM eclipse-temurin:25-jre-jammy
 WORKDIR /app
 
 RUN groupadd --system spring && useradd --system --gid spring spring
+
+# Without a writable .dev the dev JWK fallback cannot persist its generated RSA key, so every
+# container start signs with a new key and invalidates every access token already issued.
+# Production must still set VANEP_OAUTH_JWK_PRIVATE_KEY — this only keeps dev sane.
+RUN mkdir -p /app/.dev && chown -R spring:spring /app/.dev
+
 USER spring:spring
 
 COPY --from=builder /out/app.jar app.jar

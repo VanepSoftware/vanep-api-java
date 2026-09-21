@@ -51,9 +51,14 @@ services:
       # Mail vem do .env (env_file). Sem MAIL_HOST definido, o profile docker usa
       # mailpit como default (dev). Em produção, defina MAIL_* no .env (SMTP real).
       JAVA_OPTS: "${JAVA_OPTS:--XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0}"
+    volumes:
+      # Mantém a JWK de dev entre recriações do container. Em produção a chave vem de
+      # VANEP_OAUTH_JWK_PRIVATE_KEY e este volume fica sem uso.
+      - vanep-oauth-dev-key:/app/.dev
     depends_on:
       postgres:
         condition: service_healthy
 
 volumes:
   vanep-postgres-data:
+  vanep-oauth-dev-key:
