@@ -19,13 +19,16 @@ Isso já bloqueia trabalho: a validação manual de documento no painel (`vanep-
 
 **Onde os arquivos ficam.** A #207 especifica Firebase Storage. Na revisão a decisão mudou: **ficam no disco da VPS por enquanto**, porque o Firebase exige o plano Blaze e ativá-lo é decisão de faturamento que o time não quer tomar agora. O pedido foi desenhar de um jeito que a migração depois seja fácil.
 
-**Quem aponta para quem.** A primeira versão desta change tinha uma tabela `media_file` polimórfica (`owner_type` + `owner_id`) e uma API genérica `POST /api/media`. A revisão das PRs #217 e #218 derrubou isso:
+**Quem aponta para quem.** A primeira versão desta change tinha uma tabela `media_file` polimórfica (`owner_type` + `owner_id`) e uma API genérica `POST /api/media`. A revisão do @JoaoBittencourt1 nas PRs #217 e #218 derrubou isso. São três comentários:
 
-> *"você fez uma API pra retornar as mídias, isso acaba gerando duas requests toda vez que formos ter que renderizar uma imagem no front ou mobile. O certo seria o arquivo já vir retornado na API que tem a imagem."*
+> *"entendo criar uma tabela de media_file, faz sentido, mas nao deveria alterar nada nas outras colunas das outras tabelas pra receber o enderecamento das imagens e renderizar mais facil?"*
+> — #217, em `V40__create_media_file_table.sql`
 >
-> *"não pode ser um endpoint só que retorna tudo com base num filtro"*
+> *"voce nao deveria precisar de um enum de media owner pra essa task... acho que isso se complementa com meu outro comentario"*
+> — #217, em `MediaOwnerType.java`
 >
-> *"você não deveria precisar de um enum de media owner pra essa task"*
+> *"voce fez uma api pra retornar as midias, isso acaba gerando duas request toda vez que formos ter que renderizar uma imagem no front ou mobile, o certo seria o arquivo/ localizacao dele ja vir retornado na api que tem/ deveria ter a imagem. exemplo: se eu puxar a api de driver(user) ela ja deveria retornar imagem do motorista, e o mesmo pra upload de imagem, sem depender de eu puxar uma segunda api so pra isso"*
+> — #218, em `MediaFileController.java`
 
 A direção se inverte: **o dono aponta para a mídia**, não o contrário. `GET /api/drivers/{token}` passa a devolver a foto, e o upload vira `POST /api/drivers/{token}/photo`.
 
@@ -40,7 +43,7 @@ E a cardinalidade confirma: os seis campos são **um arquivo por slot**. Nenhum 
 - As seis colunas `varchar` viram **`*_media_id` com FK** para `media_file`
 - **Upload por dono**: `POST /api/drivers/{token}/photo`, `POST /api/driver-documents/{token}/file`, e assim por diante
 - Os DTOs de resposta existentes passam a devolver a **URL pronta** no mesmo campo de hoje (`photo`), sem mudar o formato do JSON
-- `GET /api/media/{token}/download` entrega os bytes — é o **único** endpoint genérico que sobra, e é o que mantém o endereço estável quando o storage mudar
+- **Download também por dono**: `GET /api/drivers/{token}/photo` entrega os bytes. Não sobra nenhum endpoint genérico de mídia; o que é compartilhado é o `MediaResponder`, e é ele que mantém as rotas estáveis quando o storage mudar
 - Os cinco DTOs de request perdem o campo de URL: quem grava passa a ser o upload
 
 **Fora de escopo:**

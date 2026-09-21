@@ -50,7 +50,9 @@ POST /api/vehicles/{token}/photo-front
 POST /api/driver-documents/{token}/file
 ```
 
-A frase da revisão foi *"não pode ser um endpoint só que retorna tudo com base num filtro"*. Um endpoint endereçado por `ownerType` + `ownerToken` é exatamente isso, e ele empurra para o cliente a tarefa de saber o tipo do dono — que o servidor já sabe pela rota.
+A revisão pediu que o upload seguisse a mesma regra da leitura: *"e o mesmo pra upload de imagem, sem depender de eu puxar uma segunda api so pra isso"*. Um endpoint endereçado por `ownerType` + `ownerToken` é a segunda API, e ainda empurra para o cliente a tarefa de saber o tipo do dono — que o servidor já sabe pela rota.
+
+**Ponto a confirmar com o revisor.** "Sem depender de uma segunda API" também admite a leitura de que o upload deveria entrar no próprio `PATCH /api/drivers/{token}`, em multipart, e não numa sub-rota. Aqui foi escolhida a sub-rota, porque misturar JSON e multipart no mesmo endpoint de atualização parcial confunde o contrato, e porque a queixa central era renderizar imagem com duas chamadas — que a sub-rota já resolve.
 
 ### D3 — O download também é por dono; o que se compartilha é a implementação
 
@@ -62,7 +64,7 @@ GET /api/vehicles/{token}/photo-front
 GET /api/driver-documents/{token}/file
 ```
 
-A primeira versão deste design propunha um endereço único (`/api/media/{token}/download`) com o argumento de que a migração para o Firebase tocaria um lugar só. **O argumento estava errado**, e a revisão apontou por quê: o que precisa ser compartilhado é a *implementação*, não a URL.
+A primeira versão deste design propunha um endereço único (`/api/media/{token}/download`) com o argumento de que a migração para o Firebase tocaria um lugar só. **O argumento estava errado.** O que a revisão exige é que a imagem venha da API do próprio dono; disso decorre que o que precisa ser compartilhado é a *implementação*, não a URL.
 
 Um `MediaResponder` decide entre transmitir o byte e responder `302` para a URL assinada. Os oito controllers injetam esse componente e chamam uma linha. No dia da migração, muda o `MediaResponder` — um lugar, exatamente como no desenho anterior.
 
