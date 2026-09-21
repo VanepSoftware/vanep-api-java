@@ -92,7 +92,9 @@ public enum PermissionEnum {
   UPDATE_TRIP("update_trip"),
   DELETE_TRIP("delete_trip"),
   RESTORE_TRIP("restore_trip"),
-  CREATE_MEDIA("create_media");
+  CREATE_MEDIA("create_media"),
+  SHOW_MEDIA("show_media"),
+  DELETE_MEDIA("delete_media");
 
   private final String value;
 

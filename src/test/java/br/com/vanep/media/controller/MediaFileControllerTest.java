@@ -3,6 +3,8 @@ package br.com.vanep.media.controller;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -11,6 +13,7 @@ import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.media.enums.MediaPurpose;
 import br.com.vanep.media.repository.MediaFileRepository;
+import br.com.vanep.media.storage.StorageService;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
@@ -42,9 +45,12 @@ class MediaFileControllerTest {
   @Autowired private UserRepository users;
   @Autowired private DriverRepository drivers;
   @Autowired private MediaFileRepository mediaFiles;
+  @Autowired private StorageService storage;
 
   private MockMvc mockMvc;
   private String driverToken;
+  private String driverUid;
+  private String strangerUid;
 
   @BeforeEach
   void setUp() {
@@ -52,6 +58,8 @@ class MediaFileControllerTest {
 
     DriverModel driver = createDriver("fabio@vanep.com", "15350946056");
     driverToken = driver.getToken();
+    driverUid = driver.getUser().getToken();
+    strangerUid = createDriver("gustavo@vanep.com", "01234567890").getUser().getToken();
   }
 
   private static byte[] jpeg() {
@@ -110,6 +118,16 @@ class MediaFileControllerTest {
         .andExpect(jsonPath("$.id").doesNotExist());
 
     assertThat(mediaFiles.findAll()).hasSize(1);
+  }
+
+  @Test
+  void theDownloadUrlAlwaysPointsAtOurOwnBackend() throws Exception {
+    String token = uploadPhoto();
+
+    mockMvc
+        .perform(get("/api/media/" + token).with(adminJwt()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.downloadUrl").value("/api/media/" + token + "/download"));
   }
 
   @Test
@@ -172,6 +190,80 @@ class MediaFileControllerTest {
     assertThat(mediaFiles.findAll()).isEmpty();
   }
 
+  @Test
+  void theOwnerDownloadsTheirOwnFile() throws Exception {
+    String token = uploadPhoto();
+
+    MvcResult result =
+        mockMvc
+            .perform(get("/api/media/" + token + "/download").with(ownerJwt()))
+            .andExpect(status().isOk())
+            .andReturn();
+
+    assertThat(result.getResponse().getContentAsByteArray()).isEqualTo(jpeg());
+  }
+
+  @Test
+  void anAdminDownloadsSomeoneElsesFile() throws Exception {
+    String token = uploadPhoto();
+
+    mockMvc
+        .perform(get("/api/media/" + token + "/download").with(adminJwt()))
+        .andExpect(status().isOk());
+  }
+
+  @Test
+  void anUnrelatedUserIsRefusedWithoutReceivingAnyContent() throws Exception {
+    String token = uploadPhoto();
+
+    MvcResult result =
+        mockMvc
+            .perform(get("/api/media/" + token + "/download").with(strangerJwt()))
+            .andExpect(status().isForbidden())
+            .andReturn();
+
+    assertThat(result.getResponse().getContentAsByteArray()).isEmpty();
+  }
+
+  @Test
+  void deletingRemovesTheRowAndTheStoredObject() throws Exception {
+    String token = uploadPhoto();
+    String objectKey = mediaFiles.findByToken(token).orElseThrow().getObjectKey();
+    assertThat(storage.exists(objectKey)).isTrue();
+
+    mockMvc
+        .perform(delete("/api/media/" + token).with(adminJwt()))
+        .andExpect(status().isNoContent());
+
+    assertThat(mediaFiles.findByToken(token)).isEmpty();
+    assertThat(storage.exists(objectKey)).isFalse();
+  }
+
+  @Test
+  void deletingIsRefusedForAnUnrelatedUser() throws Exception {
+    String token = uploadPhoto();
+    String objectKey = mediaFiles.findByToken(token).orElseThrow().getObjectKey();
+
+    mockMvc
+        .perform(delete("/api/media/" + token).with(strangerJwt()))
+        .andExpect(status().isForbidden());
+
+    assertThat(mediaFiles.findByToken(token)).isPresent();
+    assertThat(storage.exists(objectKey)).isTrue();
+  }
+
+  @Test
+  void aRemovedFileIsNoLongerServed() throws Exception {
+    String token = uploadPhoto();
+    mockMvc
+        .perform(delete("/api/media/" + token).with(adminJwt()))
+        .andExpect(status().isNoContent());
+
+    mockMvc
+        .perform(get("/api/media/" + token + "/download").with(adminJwt()))
+        .andExpect(status().isNotFound());
+  }
+
   private DriverModel createDriver(String email, String document) {
     UserModel user = new UserModel();
     user.setType(UserType.DRIVER);
@@ -192,6 +284,21 @@ class MediaFileControllerTest {
     return jwt()
         .jwt(token -> token.claim("uid", "admin-uid").claim("roles", List.of("ROLE_ADMIN")))
         .authorities(
-            new SimpleGrantedAuthority("ROLE_ADMIN"), new SimpleGrantedAuthority("create_media"));
+            new SimpleGrantedAuthority("ROLE_ADMIN"),
+            new SimpleGrantedAuthority("create_media"),
+            new SimpleGrantedAuthority("show_media"),
+            new SimpleGrantedAuthority("delete_media"));
+  }
+
+  private JwtRequestPostProcessor ownerJwt() {
+    return jwt()
+        .jwt(token -> token.claim("uid", driverUid).claim("roles", List.of("ROLE_DRIVER")))
+        .authorities(new SimpleGrantedAuthority("ROLE_DRIVER"));
+  }
+
+  private JwtRequestPostProcessor strangerJwt() {
+    return jwt()
+        .jwt(token -> token.claim("uid", strangerUid).claim("roles", List.of("ROLE_DRIVER")))
+        .authorities(new SimpleGrantedAuthority("ROLE_DRIVER"));
   }
 }

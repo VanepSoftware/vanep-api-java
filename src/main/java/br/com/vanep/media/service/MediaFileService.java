@@ -9,6 +9,7 @@ import br.com.vanep.media.repository.MediaFileRepository;
 import br.com.vanep.media.storage.StorageService;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.MessageSource;
@@ -100,6 +101,18 @@ public class MediaFileService {
   @Transactional(readOnly = true)
   public MediaFileModel requireMedia(String token) {
     return repository.findByToken(token).orElseThrow(() -> notFound("media.not_found"));
+  }
+
+  @Transactional(readOnly = true)
+  public InputStream openContent(MediaFileModel media) {
+    return storage.open(media.getObjectKey());
+  }
+
+  @Transactional
+  public void delete(String token) {
+    MediaFileModel media = requireMedia(token);
+    repository.delete(media);
+    storage.delete(media.getObjectKey());
   }
 
   private String objectKey(

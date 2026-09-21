@@ -6,6 +6,8 @@ import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.drivercnh.repository.DriverCnhRepository;
 import br.com.vanep.driverdocument.repository.DriverDocumentRepository;
 import br.com.vanep.driverrating.repository.DriverRatingRepository;
+import br.com.vanep.media.repository.MediaFileRepository;
+import br.com.vanep.media.service.MediaOwnerResolver;
 import br.com.vanep.trip.repository.TripRepository;
 import br.com.vanep.vehicle.repository.VehicleRepository;
 import org.springframework.security.core.Authentication;
@@ -22,6 +24,8 @@ public class SecurityEvaluator {
   private final ClientRatingRepository clientRatingRepository;
   private final DriverDocumentRepository driverDocumentRepository;
   private final TripRepository tripRepository;
+  private final MediaFileRepository mediaFileRepository;
+  private final MediaOwnerResolver mediaOwnerResolver;
 
   public SecurityEvaluator(
       DriverRepository driverRepository,
@@ -31,7 +35,9 @@ public class SecurityEvaluator {
       DriverRatingRepository driverRatingRepository,
       ClientRatingRepository clientRatingRepository,
       DriverDocumentRepository driverDocumentRepository,
-      TripRepository tripRepository) {
+      TripRepository tripRepository,
+      MediaFileRepository mediaFileRepository,
+      MediaOwnerResolver mediaOwnerResolver) {
     this.driverRepository = driverRepository;
     this.clientRepository = clientRepository;
     this.vehicleRepository = vehicleRepository;
@@ -40,6 +46,8 @@ public class SecurityEvaluator {
     this.clientRatingRepository = clientRatingRepository;
     this.driverDocumentRepository = driverDocumentRepository;
     this.tripRepository = tripRepository;
+    this.mediaFileRepository = mediaFileRepository;
+    this.mediaOwnerResolver = mediaOwnerResolver;
   }
 
   public boolean isDriverOwner(String token, Authentication authentication) {
@@ -119,6 +127,20 @@ public class SecurityEvaluator {
                 tripRepository
                     .findDriverUserTokenByTripToken(token)
                     .map(driverUserToken -> driverUserToken.equals(uid)))
+        .orElse(false);
+  }
+
+  public boolean isMediaOwner(String token, Authentication authentication) {
+    return SecurityHelper.getCallerUid(authentication)
+        .flatMap(
+            uid ->
+                mediaFileRepository
+                    .findByToken(token)
+                    .flatMap(
+                        media ->
+                            mediaOwnerResolver.resolveOwnerUserToken(
+                                media.getOwnerType(), media.getOwnerId()))
+                    .map(ownerUid -> ownerUid.equals(uid)))
         .orElse(false);
   }
 }
