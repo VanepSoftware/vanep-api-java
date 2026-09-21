@@ -20,7 +20,4 @@ public record VehicleRequestDTO(
     @NotBlank(message = "A cor do veículo é obrigatória.") String color,
     @NotNull(message = "A capacidade de assentos é obrigatória.")
         @Min(value = 1, message = "A capacidade deve ser de pelo menos 1 assento.")
-        Integer capacity,
-    String photoFrontUrl,
-    String photoSideUrl,
-    String photoDocumentUrl) {}
+        Integer capacity) {}

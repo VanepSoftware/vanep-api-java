@@ -21,7 +21,7 @@
 - [x] 0.4 **Q1 respondido pelo @JoaoBittencourt1**: download por dono, compartilhando a implementação e não a URL. O argumento dele venceu o meu, e a autorização ainda fica mais barata (D3)
 - [ ] 0.5 **Conferir em produção que as seis colunas de URL estão vazias** (R4). O plano assume isso; se houver dado, a migração precisa de backfill
 - [ ] 0.6 **Avisar o time que o backup muda de natureza** (R2), antes do primeiro upload real
-- [ ] 0.7 Fechar as PRs #217, #218 e #219 explicando o redesenho
+- [x] 0.7 PRs #217, #218 e #219 fechadas explicando o redesenho; a pilha nova é #222 → #223 → #224
 
 ## 1. Phase 1 — o motor compartilhado (PR 1)
 
@@ -46,7 +46,7 @@
 - [x] 1.15 Configuração por env sem default silencioso; `.env.example` documentando que a raiz fica fora do container e **não pode ser servida pelo nginx** (R6)
 - [x] 1.16 Limites de multipart no `application.properties`, acompanhando o maior limite da aplicação
 - [x] 1.17 `media_file` no `clean.sql`, na ordem correta de FK
-- [ ] 1.18 `make lint` + `./mvnw verify`; abrir PR fase 1 em pt-BR, `--base main` (regras 44 e 47)
+- [x] 1.18 `make lint` + `./mvnw verify`; PR #222 aberta, `--base main`
 
 ## 2. Phase 2 — `driver.photo` estabelece o padrão (PR 2)
 
@@ -63,7 +63,7 @@
 - [x] 2.6 `POST /api/drivers/{token}/photo` em `multipart/form-data` e `GET` no mesmo caminho para os bytes (D2, D3)
 - [x] 2.7 `DriverResponseDTO.photo` **mantém nome e tipo** e passa a carregar a URL (D9)
 - [x] 2.8 **Remover `photo` do `DriverUpdateRequestDTO`** — quem grava agora é o upload (R3)
-- [ ] 2.9 `make lint` + `./mvnw verify`; abrir PR apontando `--base feat/207-media-core`
+- [x] 2.9 `make lint` + `./mvnw verify`; PR #223 aberta, `--base feat/207-media-core`
 
 ## 3. Phase 3 — `client.photo` e `assistant.photo` (PR 3)
 
@@ -75,20 +75,20 @@
 - [x] 3.3 Migration `V43`: `client.photo` e `assistant.photo` viram FK. **Aplicada contra o PostgreSQL** (R5): a FK recusa `photo_media_id` inexistente e aceita nulo
 - [x] 3.4 `POST /api/clients/{token}/photo` e `POST /api/assistants/{token}/photo`
 - [x] 3.5 **⚠️ Remover `photo` do `ClientUpdateRequestDTO`** (R3). Ele veio da #90, mergeada há poucos dias, e o formulário do painel (`vanep-frontend#24`) manda esse campo
-- [ ] 3.6 **Abrir issue no `vanep-frontend`**: o campo "Foto" da edição de cliente vira upload de arquivo. Sem isso, aquela tela passa a mandar um campo que o backend não aceita mais
-- [ ] 3.7 `make lint` + `./mvnw verify` ✅ (1062 testes, jacoco ok); PR pendente de aprovação para subir — `--base feat/207-driver-photo`
+- [x] 3.6 **Issue aberta no `vanep-frontend` (#26)**: o campo "Foto" da edição de cliente vira upload de arquivo. Sem isso, aquela tela passa a mandar um campo que o backend não aceita mais
+- [x] 3.7 `make lint` + `./mvnw verify` (1062 testes); PR #224 aberta, `--base feat/207-driver-photo`
 
 ## 4. Phase 4 — as três fotos do veículo (PR 4)
 
 > Goal: o primeiro dono com mais de um slot.
 > Depends on: Phase 3 | Parallel with: —
 
-- [ ] 4.1 Criar branch `feat/207-vehicle-photos` **de dentro de** `feat/207-people-photo`
-- [ ] 4.2 Testes: os três slots são independentes; subir a lateral não mexe na frontal
-- [ ] 4.3 Migration: `photo_front_url`, `photo_side_url` e `photo_document_url` viram FK
-- [ ] 4.4 `POST /api/vehicles/{token}/photo-front`, `/photo-side` e `/photo-document`
-- [ ] 4.5 Remover os três campos do `VehicleRequestDTO` (R3)
-- [ ] 4.6 `make lint` + `./mvnw verify`; abrir PR apontando `--base feat/207-people-photo`
+- [x] 4.1 Criar branch `feat/207-vehicle-photos` **de dentro de** `feat/207-people-photo`
+- [x] 4.2 Testes: os três slots são independentes; subir a lateral não mexe na frontal
+- [x] 4.3 Migration `V44`: `photo_front_url`, `photo_side_url` e `photo_document_url` viram FK. **Aplicada contra o PostgreSQL** (R5)
+- [x] 4.4 `POST /api/vehicles/{token}/photo-front`, `/photo-side` e `/photo-document`
+- [x] 4.5 Remover os três campos do `VehicleRequestDTO` (R3)
+- [x] 4.6 `make lint` + `./mvnw verify` (1073 testes); PR apontando `--base feat/207-people-photo`
 
 ## 5. Phase 5 — CNH e documento do motorista (PR 5)
 

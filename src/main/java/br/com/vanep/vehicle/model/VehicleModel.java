@@ -1,6 +1,7 @@
 package br.com.vanep.vehicle.model;
 
 import br.com.vanep.driver.model.DriverModel;
+import br.com.vanep.media.model.MediaFileModel;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -56,14 +57,17 @@ public class VehicleModel {
   @Column(nullable = false)
   private Integer capacity;
 
-  @Column(name = "photo_front_url")
-  private String photoFrontUrl;
+  @ManyToOne(fetch = FetchType.EAGER)
+  @JoinColumn(name = "photo_front_media_id")
+  private MediaFileModel photoFront;
 
-  @Column(name = "photo_side_url")
-  private String photoSideUrl;
+  @ManyToOne(fetch = FetchType.EAGER)
+  @JoinColumn(name = "photo_side_media_id")
+  private MediaFileModel photoSide;
 
-  @Column(name = "photo_document_url")
-  private String photoDocumentUrl;
+  @ManyToOne(fetch = FetchType.EAGER)
+  @JoinColumn(name = "photo_document_media_id")
+  private MediaFileModel photoDocument;
 
   @Column(name = "is_active", nullable = false)
   private boolean active = true;
