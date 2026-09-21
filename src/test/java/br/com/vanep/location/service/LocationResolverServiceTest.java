@@ -11,6 +11,7 @@ import br.com.vanep.district.model.DistrictModel;
 import br.com.vanep.district.repository.DistrictRepository;
 import br.com.vanep.location.dto.ResolvedLocationChainDTO;
 import br.com.vanep.location.exception.UnknownAddressComponentException;
+import br.com.vanep.location.exception.UnmatchedCityException;
 import br.com.vanep.location.exception.UnsupportedCountryException;
 import br.com.vanep.location.exception.UnsupportedStateException;
 import br.com.vanep.places.dto.AddressComponentDTO;
@@ -51,6 +52,7 @@ class LocationResolverServiceTest {
     brasil.setCurrency("BRL");
     countries.save(brasil);
     stateSeeder.seed();
+    seedIbgeCity("DF", "Brasília", "5300108");
   }
 
   private PlaceDetailsResponseDTO fixture(String name) throws IOException {
@@ -74,6 +76,50 @@ class LocationResolverServiceTest {
         component("Distrito Federal", "DF", "administrative_area_level_1", "political"),
         component("Brasília", "Brasília", "administrative_area_level_2", "political"),
         component("Taguatinga", "Taguatinga", "administrative_area_level_4", "political"));
+  }
+
+  private PlaceDetailsResponseDTO embu() {
+    return place(
+        component("Brazil", "BR", "country", "political"),
+        component("São Paulo", "SP", "administrative_area_level_1", "political"),
+        component("Embu", "Embu", "administrative_area_level_2", "political"),
+        component("Centro", "Centro", "sublocality_level_1", "sublocality", "political"));
+  }
+
+  private CityModel seedIbgeCity(String uf, String name, String ibgeCode) {
+    CityModel city = new CityModel();
+    city.setState(states.findByUf(uf).orElseThrow());
+    city.setName(name);
+    city.setIbgeCode(ibgeCode);
+    return cities.save(city);
+  }
+
+  @Test
+  void persistsOnlyTheDistrictUnderAnExistingIbgeCity() {
+    long citiesBefore = cities.count();
+
+    ResolvedLocationChainDTO chain = resolver.resolveAndPersist(taguatingaOnly());
+
+    assertThat(chain.city().getName()).isEqualTo("Brasília");
+    assertThat(chain.city().getIbgeCode()).isEqualTo("5300108");
+    assertThat(chain.districts())
+        .extracting(district -> district.getName())
+        .containsExactly("Taguatinga");
+    assertThat(cities.count()).isEqualTo(citiesBefore);
+  }
+
+  @Test
+  void rejectsAnUnmatchedGoogleCityWithoutInsertingAnything() {
+    seedIbgeCity("SP", "São Paulo", "3550308");
+    long citiesBefore = cities.count();
+    long districtsBefore = districts.count();
+
+    assertThatThrownBy(() -> resolver.resolveAndPersist(embu()))
+        .isInstanceOf(UnmatchedCityException.class);
+
+    assertThat(cities.count()).isEqualTo(citiesBefore);
+    assertThat(districts.count()).isEqualTo(districtsBefore);
+    assertThat(cities.findFirstByNameIgnoreCase("Embu")).isEmpty();
   }
 
   @Test
@@ -139,9 +185,11 @@ class LocationResolverServiceTest {
             component(
                 "San Francisco", "San Francisco", "administrative_area_level_2", "political"));
 
+    long citiesBefore = cities.count();
+
     assertThatThrownBy(() -> resolver.resolveAndPersist(abroad))
         .isInstanceOf(UnsupportedCountryException.class);
-    assertThat(cities.count()).isZero();
+    assertThat(cities.count()).isEqualTo(citiesBefore);
   }
 
   @Test
@@ -152,14 +200,17 @@ class LocationResolverServiceTest {
             component("Nova Unidade", "ZZ", "administrative_area_level_1", "political"),
             component("Cidade Nova", "Cidade Nova", "administrative_area_level_2", "political"));
 
+    long citiesBefore = cities.count();
+
     assertThatThrownBy(() -> resolver.resolveAndPersist(unknownUf))
         .isInstanceOf(UnsupportedStateException.class);
     assertThat(states.findByUf("ZZ")).isEmpty();
-    assertThat(cities.count()).isZero();
+    assertThat(cities.count()).isEqualTo(citiesBefore);
   }
 
   @Test
   void readsTheCuratedDistrictPolicyFromTheSeededStates() throws IOException {
+    seedIbgeCity("GO", "Formosa", "5208004");
     resolver.resolveAndPersist(fixture("df-taguatinga-qnl5"));
     resolver.resolveAndPersist(fixture("interior-formosa-go"));
 
@@ -204,10 +255,12 @@ class LocationResolverServiceTest {
   }
 
   @Test
-  void anchorCreatesNothingWhenTheCityIsUnknown() throws IOException {
+  void anchorThrowsWhenTheGoogleCityDoesNotMatch() {
+    seedIbgeCity("SP", "São Paulo", "3550308");
     long before = cities.count() + districts.count() + states.count();
 
-    assertThat(resolver.resolveAnchor(fixture("df-taguatinga-qnl5"))).isEmpty();
+    assertThatThrownBy(() -> resolver.resolveAnchor(embu()))
+        .isInstanceOf(UnmatchedCityException.class);
 
     assertThat(cities.count() + districts.count() + states.count()).isEqualTo(before);
   }
@@ -265,15 +318,18 @@ class LocationResolverServiceTest {
             component("Brasília", "Brasília", "administrative_area_level_2", "political"),
             component("Zona Rural", "Zona Rural", "colloquial_area"));
 
+    long citiesBefore = cities.count();
+
     assertThatThrownBy(() -> resolver.resolveAndPersist(withUnknownType))
         .isInstanceOf(UnknownAddressComponentException.class);
 
-    assertThat(cities.count()).isZero();
+    assertThat(cities.count()).isEqualTo(citiesBefore);
     assertThat(districts.count()).isZero();
   }
 
   @Test
   void doesNotCreateADistrictNamedAfterItsOwnCity() throws IOException {
+    seedIbgeCity("GO", "Formosa", "5208004");
     ResolvedLocationChainDTO chain = resolver.resolveAndPersist(fixture("interior-formosa-go"));
 
     assertThat(chain.city().getName()).isEqualTo("Formosa");
@@ -284,6 +340,7 @@ class LocationResolverServiceTest {
 
   @Test
   void resolvesASaoPauloNeighbourhoodAsADirectChildOfTheCity() throws IOException {
+    seedIbgeCity("SP", "São Paulo", "3550308");
     ResolvedLocationChainDTO chain = resolver.resolveAndPersist(fixture("sp-capital-pinheiros"));
 
     assertThat(chain.city().getName()).isEqualTo("São Paulo");
@@ -295,11 +352,17 @@ class LocationResolverServiceTest {
 
   @Test
   void keepsCitiesOfDifferentStatesApart() throws IOException {
+    seedIbgeCity("SP", "São Paulo", "3550308");
+    seedIbgeCity("SP", "Itapetininga", "3522307");
+    long citiesBefore = cities.count();
+
     resolver.resolveAndPersist(fixture("sp-capital-pinheiros"));
     resolver.resolveAndPersist(fixture("interior-itapetininga"));
 
-    assertThat(cities.count()).isEqualTo(2);
+    assertThat(cities.count()).isEqualTo(citiesBefore);
     CityModel saoPaulo = cities.findFirstByNameIgnoreCase("São Paulo").orElseThrow();
     assertThat(saoPaulo.getState().getUf()).isEqualTo("SP");
+    assertThat(cities.findFirstByNameIgnoreCase("Itapetininga").orElseThrow().getState().getUf())
+        .isEqualTo("SP");
   }
 }

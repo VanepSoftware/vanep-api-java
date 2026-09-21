@@ -41,12 +41,12 @@
 > Depende de: 2 | Paralelo com: 3
 > **Mergear por último** (depois de 6 e 7, ver D8): esta fase quebra todo teste que ainda espera `city` criada pelo Google. Se a branch ficar pronta antes, o conserto dos testes de endereço pessoal e dependente é descartado no rebase sobre a 6/7.
 
-- [ ] 4.1 Testes unitários falhando: persistir sob Brasília existente cria só Taguatinga; persistir com nome de cidade `Embu` sob SP (sem esse `normalized_name`) lança e não insere nada; `resolveAnchor` lança em cidade sem match em vez de optional vazio
-- [ ] 4.2 Slice falhando: `PUT` área de atuação / `POST` school resolve / `GET` busca de motorista com componente de cidade sem match → `400` MessageSource; busca com cidade casada e sem motoristas continua `200` página vazia; `POST` de escola com place em cidade sem match → `400` e nenhuma linha de `city`, `district`, `address` nem `school` (rollback)
-- [ ] 4.3 Chave MessageSource para cidade Google sem correspondência no IBGE (EN + pt-BR); logar UF, nome Google da cidade, place id
-- [ ] 4.4 Mudar o caminho de cidade do `LocationResolverService` para só find; manter `findOrCreateDistrict`; a exceção vira `400` no `LocationErrorAdvice` global (mesma chave `location.city.unmatched` na persistência e na busca), sem `try/catch` nos services
-- [ ] 4.5 Atualizar testes existentes que assumiam que o Google criava `city` — MUST inserir a cidade IBGE antes (Brasília / São Paulo): `LocationResolverServiceTest`, `DriverSearchControllerTest`, `DriverServiceAreaControllerTest`, `SchoolResolveControllerTest`, `PersonalAddressControllerTest` e `OnboardingStepsTest` (estes dois a fase 6 reescreve por completo). `AddressServiceTest`, `DependentControllerTest` e `SchoolControllerTest` já inserem a cidade antes e não mudam
-- [ ] 4.6 `make lint` + `./mvnw verify`; abrir PR
+- [x] 4.1 Testes unitários falhando: persistir sob Brasília existente cria só Taguatinga; persistir com nome de cidade `Embu` sob SP (sem esse `normalized_name`) lança e não insere nada; `resolveAnchor` lança em cidade sem match em vez de optional vazio
+- [x] 4.2 Slice falhando: `PUT` área de atuação / `POST` school resolve / `GET` busca de motorista com componente de cidade sem match → `400` MessageSource; busca com cidade casada e sem motoristas continua `200` página vazia; `POST` de escola com place em cidade sem match → `400` e nenhuma linha de `city`, `district`, `address` nem `school` (rollback)
+- [x] 4.3 Chave MessageSource para cidade Google sem correspondência no IBGE (EN + pt-BR); logar UF, nome Google da cidade, place id
+- [x] 4.4 Mudar o caminho de cidade do `LocationResolverService` para só find; manter `findOrCreateDistrict`; a exceção vira `400` no `LocationErrorAdvice` global (mesma chave `location.city.unmatched` na persistência e na busca), sem `try/catch` nos services
+- [x] 4.5 Atualizar testes existentes que assumiam que o Google criava `city` — MUST inserir a cidade IBGE antes (Brasília / São Paulo): `LocationResolverServiceTest`, `DriverSearchControllerTest`, `DriverServiceAreaControllerTest`, `SchoolResolveControllerTest`, `PersonalAddressControllerTest` e `OnboardingStepsTest` (estes dois a fase 6 reescreve por completo). `AddressServiceTest`, `DependentControllerTest` e `SchoolControllerTest` já inserem a cidade antes e não mudam
+- [x] 4.6 `make lint` + `./mvnw verify`; abrir PR
 
 ## 5. Fase 5 — Lookup ViaCEP (PR 5)
 

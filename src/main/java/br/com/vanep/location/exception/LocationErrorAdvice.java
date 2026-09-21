@@ -32,6 +32,11 @@ public class LocationErrorAdvice {
     return problem(HttpStatus.BAD_REQUEST, "location.country.unsupported");
   }
 
+  @ExceptionHandler(UnmatchedCityException.class)
+  public ProblemDetail handleUnmatchedCity(UnmatchedCityException exception) {
+    return problem(HttpStatus.BAD_REQUEST, "location.city.unmatched");
+  }
+
   @ExceptionHandler(UnknownAddressComponentException.class)
   public ProblemDetail handleUnknownComponent(UnknownAddressComponentException exception) {
     return problem(HttpStatus.BAD_REQUEST, "location.component.unknown_type");

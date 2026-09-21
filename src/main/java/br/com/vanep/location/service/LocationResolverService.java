@@ -12,6 +12,7 @@ import br.com.vanep.location.dto.LocationComponentDTO;
 import br.com.vanep.location.dto.ResolvedLocationChainDTO;
 import br.com.vanep.location.enums.LocationLevel;
 import br.com.vanep.location.exception.PlaceNotResolvableException;
+import br.com.vanep.location.exception.UnmatchedCityException;
 import br.com.vanep.location.exception.UnsupportedCountryException;
 import br.com.vanep.location.exception.UnsupportedStateException;
 import br.com.vanep.places.dto.PlaceDetailsResponseDTO;
@@ -20,11 +21,15 @@ import br.com.vanep.state.repository.StateRepository;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class LocationResolverService {
+  private static final Logger log = LoggerFactory.getLogger(LocationResolverService.class);
+
   private final CountryRepository countries;
   private final StateRepository states;
   private final CityRepository cities;
@@ -48,7 +53,8 @@ public class LocationResolverService {
     CountryModel country = requireSupportedCountry(components);
     StateModel state =
         requireSupportedState(country, requireComponent(components, LocationLevel.STATE));
-    CityModel city = findOrCreateCity(state, requireComponent(components, LocationLevel.CITY));
+    CityModel city =
+        requireMatchedCity(state, requireComponent(components, LocationLevel.CITY), details.id());
 
     List<DistrictModel> chain = new ArrayList<>();
     DistrictModel parent = null;
@@ -76,20 +82,15 @@ public class LocationResolverService {
     if (state.isEmpty()) {
       return Optional.empty();
     }
-    Optional<CityModel> city =
-        cities.findByStateIdAndNormalizedName(
-            state.get().getId(),
-            LocationNameNormalizer.normalize(
-                requireComponent(components, LocationLevel.CITY).name()));
-    if (city.isEmpty()) {
-      return Optional.empty();
-    }
+    CityModel city =
+        requireMatchedCity(
+            state.get(), requireComponent(components, LocationLevel.CITY), details.id());
 
     List<DistrictModel> chain = new ArrayList<>();
     DistrictModel parent = null;
     for (LocationComponentDTO component :
         AddressComponentClassifier.districtsFromShallowToDeep(components)) {
-      Optional<DistrictModel> existing = findDistrict(city.get(), parent, component);
+      Optional<DistrictModel> existing = findDistrict(city, parent, component);
       if (existing.isEmpty()) {
         break;
       }
@@ -101,7 +102,7 @@ public class LocationResolverService {
         new ResolvedLocationChainDTO(
             country.get(),
             state.get(),
-            city.get(),
+            city,
             chain,
             AddressComponentClassifier.hasDistrictComponent(components)));
   }
@@ -145,17 +146,21 @@ public class LocationResolverService {
         .orElseThrow(() -> new PlaceNotResolvableException(level.name()));
   }
 
-  private CityModel findOrCreateCity(StateModel state, LocationComponentDTO component) {
+  private CityModel requireMatchedCity(
+      StateModel state, LocationComponentDTO component, String placeId) {
     String normalized = LocationNameNormalizer.normalize(component.name());
     return cities
         .findByStateIdAndNormalizedName(state.getId(), normalized)
-        .orElseGet(
-            () -> {
-              CityModel city = new CityModel();
-              city.setState(state);
-              city.setName(component.name());
-              return cities.save(city);
-            });
+        .orElseThrow(() -> unmatchedCity(state.getUf(), component.name(), placeId));
+  }
+
+  private UnmatchedCityException unmatchedCity(String uf, String googleCityName, String placeId) {
+    log.warn(
+        "Google city component did not match an IBGE city (uf={}, googleCityName={}, placeId={}).",
+        uf,
+        googleCityName,
+        placeId);
+    return new UnmatchedCityException(uf, googleCityName, placeId);
   }
 
   private Optional<DistrictModel> findDistrict(
