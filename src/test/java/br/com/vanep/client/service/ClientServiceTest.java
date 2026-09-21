@@ -156,7 +156,7 @@ class ClientServiceTest {
   }
 
   @Test
-  void updatePersistsPhotoWithoutTouchingAddress() {
+  void updatePersistsTheNameWithoutTouchingAddress() {
     ClientModel client = clientWithToken("tok");
     client.getUser().setAddressId(5L);
     AddressResponseDTO address = addressResponse("addr-tok");
@@ -168,10 +168,10 @@ class ClientServiceTest {
     when(mapper.toResponse(client, address)).thenReturn(response);
 
     ClientResponseDTO result =
-        service.update("tok", updateWith(JsonNullable.of("photo.jpg"), null, null, null));
+        service.update("tok", updateWith(JsonNullable.of("Novo Nome"), null, null));
 
     assertThat(result).isEqualTo(response);
-    assertThat(client.getPhoto()).isEqualTo("photo.jpg");
+    assertThat(client.getUser().getName()).isEqualTo("Novo Nome");
     assertThat(client.getUser().getAddressId()).isEqualTo(5L);
   }
 
@@ -179,7 +179,7 @@ class ClientServiceTest {
   void updateThrows404WhenNotFound() {
     when(repository.findByToken("missing")).thenReturn(Optional.empty());
 
-    assertThatThrownBy(() -> service.update("missing", updateWith(null, null, null, null)))
+    assertThatThrownBy(() -> service.update("missing", updateWith(null, null, null)))
         .isInstanceOf(ResponseStatusException.class)
         .extracting(ex -> ((ResponseStatusException) ex).getStatusCode().value())
         .isEqualTo(404);
@@ -245,15 +245,14 @@ class ClientServiceTest {
   }
 
   @Test
-  void patchingOnlyPhotoLeavesEveryOtherStoredFieldUnchanged() {
+  void patchingOnlyOneFieldLeavesEveryOtherStoredFieldUnchanged() {
     ClientModel client = clientWith("Ana", "ana@vanep.com", true);
     when(repository.findByToken("tok")).thenReturn(Optional.of(client));
     when(repository.save(any(ClientModel.class))).thenAnswer(call -> call.getArgument(0));
 
-    service.update("tok", updateWith(JsonNullable.of("nova.jpg"), null, null, null));
+    service.update("tok", updateWith(JsonNullable.of("Ana Souza"), null, null));
 
-    assertThat(client.getPhoto()).isEqualTo("nova.jpg");
-    assertThat(client.getUser().getName()).isEqualTo("Ana");
+    assertThat(client.getUser().getName()).isEqualTo("Ana Souza");
     assertThat(client.getUser().getEmail()).isEqualTo("ana@vanep.com");
     assertThat(client.isActive()).isTrue();
   }
@@ -264,7 +263,7 @@ class ClientServiceTest {
     when(repository.findByToken("tok")).thenReturn(Optional.of(client));
     when(repository.save(any(ClientModel.class))).thenAnswer(call -> call.getArgument(0));
 
-    service.update("tok", updateWith(null, JsonNullable.of("Ana Souza"), null, null));
+    service.update("tok", updateWith(JsonNullable.of("Ana Souza"), null, null));
 
     assertThat(client.getUser().getName()).isEqualTo("Ana Souza");
   }
@@ -275,7 +274,7 @@ class ClientServiceTest {
     when(repository.findByToken("tok")).thenReturn(Optional.of(client));
     when(repository.save(any(ClientModel.class))).thenAnswer(call -> call.getArgument(0));
 
-    service.update("tok", updateWith(null, null, null, JsonNullable.of(false)));
+    service.update("tok", updateWith(null, null, JsonNullable.of(false)));
 
     assertThat(client.isActive()).isFalse();
   }
@@ -285,8 +284,7 @@ class ClientServiceTest {
     ClientModel client = clientWith("Ana", "ana@vanep.com", true);
     when(repository.findByToken("tok")).thenReturn(Optional.of(client));
 
-    assertThatThrownBy(
-            () -> service.update("tok", updateWith(null, JsonNullable.of("  "), null, null)))
+    assertThatThrownBy(() -> service.update("tok", updateWith(JsonNullable.of("  "), null, null)))
         .isInstanceOf(ResponseStatusException.class)
         .hasMessageContaining("400");
   }
@@ -296,8 +294,7 @@ class ClientServiceTest {
     ClientModel client = clientWith("Ana", "ana@vanep.com", true);
     when(repository.findByToken("tok")).thenReturn(Optional.of(client));
 
-    assertThatThrownBy(
-            () -> service.update("tok", updateWith(null, JsonNullable.of(null), null, null)))
+    assertThatThrownBy(() -> service.update("tok", updateWith(JsonNullable.of(null), null, null)))
         .isInstanceOf(ResponseStatusException.class)
         .hasMessageContaining("400");
   }
@@ -307,8 +304,7 @@ class ClientServiceTest {
     ClientModel client = clientWith("Ana", "ana@vanep.com", true);
     when(repository.findByToken("tok")).thenReturn(Optional.of(client));
 
-    assertThatThrownBy(
-            () -> service.update("tok", updateWith(null, null, null, JsonNullable.of(null))))
+    assertThatThrownBy(() -> service.update("tok", updateWith(null, null, JsonNullable.of(null))))
         .isInstanceOf(ResponseStatusException.class)
         .hasMessageContaining("400");
   }
@@ -321,8 +317,7 @@ class ClientServiceTest {
 
     assertThatThrownBy(
             () ->
-                service.update(
-                    "tok", updateWith(null, null, JsonNullable.of("ocupado@vanep.com"), null)))
+                service.update("tok", updateWith(null, JsonNullable.of("ocupado@vanep.com"), null)))
         .isInstanceOf(ResponseStatusException.class)
         .hasMessageContaining("409");
   }
@@ -333,7 +328,7 @@ class ClientServiceTest {
     when(repository.findByToken("tok")).thenReturn(Optional.of(client));
     when(repository.save(any(ClientModel.class))).thenAnswer(call -> call.getArgument(0));
 
-    service.update("tok", updateWith(null, null, JsonNullable.of("ana@vanep.com"), null));
+    service.update("tok", updateWith(null, JsonNullable.of("ana@vanep.com"), null));
 
     assertThat(client.getUser().getEmail()).isEqualTo("ana@vanep.com");
   }
@@ -350,10 +345,7 @@ class ClientServiceTest {
   }
 
   private static ClientUpdateRequestDTO updateWith(
-      JsonNullable<String> photo,
-      JsonNullable<String> name,
-      JsonNullable<String> email,
-      JsonNullable<Boolean> active) {
-    return new ClientUpdateRequestDTO(name, email, photo, null, active);
+      JsonNullable<String> name, JsonNullable<String> email, JsonNullable<Boolean> active) {
+    return new ClientUpdateRequestDTO(name, email, null, active);
   }
 }

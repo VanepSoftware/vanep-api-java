@@ -70,13 +70,13 @@
 > Goal: repetir o padrão nas duas pessoas restantes.
 > Depends on: Phase 2 | Parallel with: —
 
-- [ ] 3.1 Criar branch `feat/207-people-photo` **de dentro de** `feat/207-driver-photo`
-- [ ] 3.2 Testes espelhando a fase 2, para cliente e assistente
-- [ ] 3.3 Migration: `client.photo` e `assistant.photo` viram FK
-- [ ] 3.4 `POST /api/clients/{token}/photo` e `POST /api/assistants/{token}/photo`
-- [ ] 3.5 **⚠️ Remover `photo` do `ClientUpdateRequestDTO`** (R3). Ele veio da #90, mergeada há poucos dias, e o formulário do painel (`vanep-frontend#24`) manda esse campo
+- [x] 3.1 Criar branch `feat/207-people-photo` **de dentro de** `feat/207-driver-photo`
+- [x] 3.2 Testes espelhando a fase 2, para cliente e assistente
+- [x] 3.3 Migration `V43`: `client.photo` e `assistant.photo` viram FK. **Aplicada contra o PostgreSQL** (R5): a FK recusa `photo_media_id` inexistente e aceita nulo
+- [x] 3.4 `POST /api/clients/{token}/photo` e `POST /api/assistants/{token}/photo`
+- [x] 3.5 **⚠️ Remover `photo` do `ClientUpdateRequestDTO`** (R3). Ele veio da #90, mergeada há poucos dias, e o formulário do painel (`vanep-frontend#24`) manda esse campo
 - [ ] 3.6 **Abrir issue no `vanep-frontend`**: o campo "Foto" da edição de cliente vira upload de arquivo. Sem isso, aquela tela passa a mandar um campo que o backend não aceita mais
-- [ ] 3.7 `make lint` + `./mvnw verify`; abrir PR apontando `--base feat/207-driver-photo`
+- [ ] 3.7 `make lint` + `./mvnw verify` ✅ (1062 testes, jacoco ok); PR pendente de aprovação para subir — `--base feat/207-driver-photo`
 
 ## 4. Phase 4 — as três fotos do veículo (PR 4)
 

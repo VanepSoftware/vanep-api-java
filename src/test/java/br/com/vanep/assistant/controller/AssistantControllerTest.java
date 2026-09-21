@@ -324,7 +324,6 @@ class AssistantControllerTest {
   @Test
   void getMeReturnsSummaryForAssistant() throws Exception {
     AssistantModel assistant = createAssistant("profile@vanep.com", "17181920212");
-    assistant.setPhoto("https://cdn.example/photo.jpg");
     assistants.save(assistant);
 
     mockMvc
@@ -334,7 +333,7 @@ class AssistantControllerTest {
         .andExpect(jsonPath("$.user.name").value("Assistant"))
         .andExpect(jsonPath("$.user.email").value("profile@vanep.com"))
         .andExpect(jsonPath("$.user.type").value("ASSISTANT"))
-        .andExpect(jsonPath("$.photo").value("https://cdn.example/photo.jpg"))
+        .andExpect(jsonPath("$.photo").doesNotExist())
         .andExpect(jsonPath("$.status").value("UNLINKED"))
         .andExpect(jsonPath("$.activatedAt").doesNotExist())
         .andExpect(jsonPath("$.email").doesNotExist());

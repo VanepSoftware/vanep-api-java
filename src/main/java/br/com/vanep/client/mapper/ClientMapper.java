@@ -4,6 +4,7 @@ import br.com.vanep.address.dto.AddressResponseDTO;
 import br.com.vanep.client.dto.ClientMeSummaryResponseDTO;
 import br.com.vanep.client.dto.ClientResponseDTO;
 import br.com.vanep.client.model.ClientModel;
+import br.com.vanep.media.web.MediaUrl;
 import br.com.vanep.user.dto.UserMeResponseDTO;
 import org.springframework.stereotype.Component;
 
@@ -15,7 +16,7 @@ public class ClientMapper {
         client.getToken(),
         client.getUser().getName(),
         client.getUser().getEmail(),
-        client.getPhoto(),
+        photoUrl(client),
         client.getRating(),
         address,
         client.isActive(),
@@ -25,6 +26,10 @@ public class ClientMapper {
   public ClientMeSummaryResponseDTO toMeSummary(
       ClientModel client, UserMeResponseDTO user, AddressResponseDTO address) {
     return new ClientMeSummaryResponseDTO(
-        client.getToken(), client.getPhoto(), client.getRating(), client.isActive(), user, address);
+        client.getToken(), photoUrl(client), client.getRating(), client.isActive(), user, address);
+  }
+
+  private String photoUrl(ClientModel client) {
+    return MediaUrl.of("/api/clients", client.getToken(), "photo", client.getPhoto());
   }
 }

@@ -28,7 +28,7 @@ public class AssistantMapper {
         assistant.getToken(),
         assistant.getUser().getName(),
         assistant.getUser().getEmail(),
-        assistant.getPhoto(),
+        photoUrl(assistant),
         assistant.getStatus(),
         assistant.getActivatedAt());
   }
@@ -36,7 +36,7 @@ public class AssistantMapper {
   public AssistantMeSummaryResponseDTO toMeSummary(
       AssistantModel assistant, UserMeResponseDTO user, AssistantPendingInviteDTO pendingInvite) {
     return new AssistantMeSummaryResponseDTO(
-        assistant.getToken(), assistant.getPhoto(), assistant.getStatus(), pendingInvite, user);
+        assistant.getToken(), photoUrl(assistant), assistant.getStatus(), pendingInvite, user);
   }
 
   public AssistantPendingInviteDTO toPendingInvite(AssistantInviteModel invite) {
@@ -49,5 +49,9 @@ public class AssistantMapper {
         driver.getUser().getName(),
         MediaUrl.of("/api/drivers", driver.getToken(), "photo", driver.getPhoto()),
         driver.getRating());
+  }
+
+  private String photoUrl(AssistantModel assistant) {
+    return MediaUrl.of("/api/assistants", assistant.getToken(), "photo", assistant.getPhoto());
   }
 }

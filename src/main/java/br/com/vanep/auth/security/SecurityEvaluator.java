@@ -1,5 +1,6 @@
 package br.com.vanep.auth.security;
 
+import br.com.vanep.assistant.repository.AssistantRepository;
 import br.com.vanep.client.repository.ClientRepository;
 import br.com.vanep.clientdriver.repository.ClientDriverRepository;
 import br.com.vanep.clientrating.repository.ClientRatingRepository;
@@ -24,6 +25,7 @@ public class SecurityEvaluator {
   private final ClientRatingRepository clientRatingRepository;
   private final DriverDocumentRepository driverDocumentRepository;
   private final TripRepository tripRepository;
+  private final AssistantRepository assistantRepository;
 
   public SecurityEvaluator(
       DriverRepository driverRepository,
@@ -34,7 +36,8 @@ public class SecurityEvaluator {
       DriverRatingRepository driverRatingRepository,
       ClientRatingRepository clientRatingRepository,
       DriverDocumentRepository driverDocumentRepository,
-      TripRepository tripRepository) {
+      TripRepository tripRepository,
+      AssistantRepository assistantRepository) {
     this.driverRepository = driverRepository;
     this.clientRepository = clientRepository;
     this.clientDriverRepository = clientDriverRepository;
@@ -44,6 +47,7 @@ public class SecurityEvaluator {
     this.clientRatingRepository = clientRatingRepository;
     this.driverDocumentRepository = driverDocumentRepository;
     this.tripRepository = tripRepository;
+    this.assistantRepository = assistantRepository;
   }
 
   public boolean isDriverOwner(String token, Authentication authentication) {
@@ -138,6 +142,21 @@ public class SecurityEvaluator {
                         .findDriverUserTokenByLinkToken(token)
                         .map(uid::equals)
                         .orElse(false))
+        .orElse(false);
+  }
+
+  // An assistant has two parties: the assistant themselves and the driver who manages them.
+  public boolean isAssistantParty(String token, Authentication authentication) {
+    return SecurityHelper.getCallerUid(authentication)
+        .flatMap(
+            uid ->
+                assistantRepository
+                    .findByToken(token)
+                    .map(
+                        assistant ->
+                            uid.equals(assistant.getUser().getToken())
+                                || (assistant.getDriver() != null
+                                    && uid.equals(assistant.getDriver().getUser().getToken()))))
         .orElse(false);
   }
 }
