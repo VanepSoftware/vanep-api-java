@@ -53,13 +53,13 @@
 ## 3. Checklist of Tasks
 
 ### Phase 1 — Foundation
-- [ ] 1.1 Add `UNDER_REVIEW` to `DriverApprovalStatus.java`.
-- [ ] 1.2 Add `VEHICLE_INSPECTION` and `MUNICIPAL_AUTHORIZATION` to `DocumentTypeEnum.java`.
-- [ ] 1.3 Add `APPROVE_DRIVER("approve_driver")` to `PermissionEnum.java`.
-- [ ] 1.4 Create Flyway migration `V46__add_driver_onboarding_and_review_columns.sql`.
-- [ ] 1.5 Update `DriverModel.java` with `submittedAt`, `rejectionReason`, `reviewedAt` and `reviewedBy` (`UserModel`).
-- [ ] 1.6 Verify and adjust any existing seeders/tests if necessary.
-- [ ] 1.7 Validate using `./mvnw test-compile` and `./mvnw spotless:check`.
+- [x] 1.1 Add `UNDER_REVIEW` to `DriverApprovalStatus.java`.
+- [x] 1.2 Add `VEHICLE_INSPECTION` and `MUNICIPAL_AUTHORIZATION` to `DocumentTypeEnum.java`.
+- [x] 1.3 Add `APPROVE_DRIVER("approve_driver")` to `PermissionEnum.java`.
+- [x] 1.4 Create Flyway migration `V46__add_driver_onboarding_and_review_columns.sql`.
+- [x] 1.5 Update `DriverModel.java` with `submittedAt`, `rejectionReason`, `reviewedAt` and `reviewedBy` (`UserModel`).
+- [x] 1.6 Verify and adjust any existing seeders/tests if necessary.
+- [x] 1.7 Validate using `./mvnw test-compile` and `./mvnw spotless:check`.
 - [ ] 1.8 Open PR 1: `feat(driver): phase 1 — onboarding foundation & schema`.
 
 ### Phase 2 — OAuth Driver Initialization
