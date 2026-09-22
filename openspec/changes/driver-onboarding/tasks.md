@@ -9,17 +9,22 @@
 
 | Phase | Contents | Depends on | Parallel with |
 | :--- | :--- | :--- | :--- |
-| **Phase 1** | Foundation (Enums `DriverApprovalStatus` & `DocumentTypeEnum`, Migration `V46`, `DriverModel` update, `PermissionEnum`) | — | — |
-| **Phase 2** | OAuth Driver Initialization (`OAuthAccountService` creation of `DriverModel`, unit tests) | Phase 1 | — |
-| **Phase 3** | Driver Onboarding Query & Submission (`DriverOnboardingService`, `DriverOnboardingController`, DTOs, messages, unit & slice tests) | Phase 2 | — |
-| **Phase 4** | Administrative Review (`approve` & `reject` endpoints, `DriverRejectionRequestDTO`, seeder update, unit & slice tests) | Phase 3 | — |
+| **Phase 1** | OpenSpec Specification (proposal, design, specs, tasks) | — | — |
+| **Phase 2** | Foundation (Enums `DriverApprovalStatus` & `DocumentTypeEnum`, Migration `V46`, `DriverModel` update, `PermissionEnum`) | Phase 1 | — |
+| **Phase 3** | OAuth Driver Initialization (null-safety and default basePrice in `RegistrationService`, unit tests) | Phase 2 | — |
+| **Phase 4** | Driver Onboarding Query & Submission (`DriverOnboardingService`, `DriverOnboardingController`, DTOs, messages, unit & slice tests) | Phase 3 | — |
+| **Phase 5** | Administrative Review (`approve` & `reject` endpoints, `DriverRejectionRequestDTO`, seeder update, unit & slice tests) | Phase 4 | — |
 
 ---
 
 ## 2. Dependency Graph & Layer Assignment
 
 ```
-[Phase 1: Foundation]
+[Phase 1: OpenSpec Specification]
+  - proposal.md, design.md, spec.md, tasks.md
+       │
+       ▼
+[Phase 2: Foundation]
   - DriverApprovalStatus (UNDER_REVIEW)
   - DocumentTypeEnum (VEHICLE_INSPECTION, MUNICIPAL_AUTHORIZATION)
   - PermissionEnum (approve_driver)
@@ -27,12 +32,12 @@
   - DriverModel (JPA mapping)
        │
        ▼
-[Phase 2: OAuth Driver Initialization]
-  - OAuthAccountService (instantiate DriverModel on DRIVER signup)
-  - OAuthAccountServiceTest
+[Phase 3: OAuth Driver Initialization]
+  - RegistrationService.createRoleRecord (null-safety & default zero basePrice on DRIVER signup)
+  - RegistrationServiceTest unit tests
        │
        ▼
-[Phase 3: Driver Onboarding Query & Submission Engine]
+[Phase 4: Driver Onboarding Query & Submission Engine]
   - DTOs (DriverOnboardingStatusResponseDTO, DriverOnboardingStepDTO, DriverOnboardingDocumentsStepDTO)
   - MessageSource keys (messages.properties & messages_pt_BR.properties)
   - DriverOnboardingService (getOnboardingStatus, submitOnboarding)
@@ -40,7 +45,7 @@
   - DriverOnboardingServiceTest & DriverOnboardingControllerTest
        │
        ▼
-[Phase 4: Administrative Review Endpoints]
+[Phase 5: Administrative Review Endpoints]
   - DriverRejectionRequestDTO
   - DriverOnboardingService.approve / reject
   - DriverOnboardingController (POST /{token}/approve, POST /{token}/reject)
@@ -52,46 +57,50 @@
 
 ## 3. Checklist of Tasks
 
-### Phase 1 — Foundation
-- [x] 1.1 Add `UNDER_REVIEW` to `DriverApprovalStatus.java`.
-- [x] 1.2 Add `VEHICLE_INSPECTION` and `MUNICIPAL_AUTHORIZATION` to `DocumentTypeEnum.java`.
-- [x] 1.3 Add `APPROVE_DRIVER("approve_driver")` to `PermissionEnum.java`.
-- [x] 1.4 Create Flyway migration `V46__add_driver_onboarding_and_review_columns.sql`.
-- [x] 1.5 Update `DriverModel.java` with `submittedAt`, `rejectionReason`, `reviewedAt` and `reviewedBy` (`UserModel`).
-- [x] 1.6 Verify and adjust any existing seeders/tests if necessary.
-- [x] 1.7 Validate using `./mvnw test-compile` and `./mvnw spotless:check`.
-- [ ] 1.8 Open PR 1: `feat(driver): phase 1 — onboarding foundation & schema`.
+### Phase 1 — OpenSpec Specification
+- [x] 1.1 Create `proposal.md`, `design.md`, `specs/driver-onboarding/spec.md`, and `tasks.md`.
+- [x] 1.2 Open PR 1: `docs(openspec): proposta de onboarding do motorista (UC02)`.
 
-### Phase 2 — OAuth Driver Initialization
-- [ ] 2.1 Update `OAuthAccountService.java` to instantiate and save a `DriverModel` (status `PENDING`, `basePrice = 0.00`) when `form.getType() == UserType.DRIVER`.
-- [ ] 2.2 Create unit tests in `OAuthAccountServiceTest.java` verifying that completing registration as `DRIVER` creates both `UserModel` and `DriverModel`.
-- [ ] 2.3 Validate using `./mvnw verify`.
-- [ ] 2.4 Open PR 2: `feat(auth): phase 2 — initialize driver profile in oauth flow`.
+### Phase 2 — Foundation
+- [x] 2.1 Add `UNDER_REVIEW` to `DriverApprovalStatus.java`.
+- [x] 2.2 Add `VEHICLE_INSPECTION` and `MUNICIPAL_AUTHORIZATION` to `DocumentTypeEnum.java`.
+- [x] 2.3 Add `APPROVE_DRIVER("approve_driver")` to `PermissionEnum.java`.
+- [x] 2.4 Create Flyway migration `V46__add_driver_onboarding_and_review_columns.sql`.
+- [x] 2.5 Update `DriverModel.java` with `submittedAt`, `rejectionReason`, `reviewedAt` and `reviewedBy` (`UserModel`).
+- [x] 2.6 Verify and adjust any existing seeders/tests if necessary.
+- [x] 2.7 Validate using `./mvnw test-compile` and `./mvnw spotless:check`.
+- [x] 2.8 Open PR 2: `feat(driver): phase 2 — onboarding foundation e schema de analise`.
 
-### Phase 3 — Driver Onboarding Query & Submission Engine
-- [ ] 3.1 Create response DTOs: `DriverOnboardingStatusResponseDTO`, `DriverOnboardingStepDTO`, `DriverOnboardingDocumentsStepDTO`, `DriverDocumentSummaryDTO` in `br.com.vanep.driver.dto`.
-- [ ] 3.2 Add MessageSource keys for onboarding validation errors in `src/main/resources/messages.properties` and `messages_pt_BR.properties`.
-- [ ] 3.3 Create `DriverOnboardingService.java` in `br.com.vanep.driver.service` with:
+### Phase 3 — OAuth Driver Initialization
+- [x] 3.1 Update `RegistrationService.java` to safeguard `DriverModel` creation with null-safe driver fields and default `basePrice = 0.00` when driver fields or price are omitted in OAuth signup.
+- [x] 3.2 Add unit tests in `RegistrationServiceTest.java` verifying driver creation with null fields and default `basePrice = 0.00`.
+- [x] 3.3 Validate using `./mvnw test` and `./mvnw spotless:check`.
+- [ ] 3.4 Open PR 3: `feat(auth): phase 3 — inicializacao de perfil de motorista no fluxo oauth`.
+
+### Phase 4 — Driver Onboarding Query & Submission Engine
+- [ ] 4.1 Create response DTOs: `DriverOnboardingStatusResponseDTO`, `DriverOnboardingStepDTO`, `DriverOnboardingDocumentsStepDTO`, `DriverDocumentSummaryDTO` in `br.com.vanep.driver.dto`.
+- [ ] 4.2 Add MessageSource keys for onboarding validation errors in `src/main/resources/messages.properties` and `messages_pt_BR.properties`.
+- [ ] 4.3 Create `DriverOnboardingService.java` in `br.com.vanep.driver.service` with:
   - `getOnboardingStatus(String callerUid)` calculating checklist across `DriverModel`, `VehicleModel`, `DriverCnhModel` (requiring valid date and `photo != null`), and `DriverDocumentModel` (requiring `file != null` and `status != REJECTED`).
   - `submitOnboarding(String callerUid)` validating all 4 dimensions (including CNH photo and attached document files) and transitioning to `UNDER_REVIEW`.
-- [ ] 3.4 Create `DriverOnboardingController.java` in `br.com.vanep.driver.controller` exposing:
+- [ ] 4.4 Create `DriverOnboardingController.java` in `br.com.vanep.driver.controller` exposing:
   - `GET /api/drivers/me/onboarding`
   - `POST /api/drivers/me/submit-onboarding`
-- [ ] 3.5 Write unit tests `DriverOnboardingServiceTest.java` covering all validation branches (missing vehicle, missing CNH, expired CNH, CNH without photo, missing documents, document record without attached file, incomplete profile, successful submission).
-- [ ] 3.6 Write slice tests `DriverOnboardingControllerTest.java` (MockMvc) verifying security rules, HTTP 200, HTTP 422 on validation failures.
-- [ ] 3.7 Validate formatting and test coverage using `./mvnw spotless:check` and `./mvnw verify`.
-- [ ] 3.8 Open PR 3: `feat(driver): phase 3 — onboarding status and submission endpoints`.
+- [ ] 4.5 Write unit tests `DriverOnboardingServiceTest.java` covering all validation branches (missing vehicle, missing CNH, expired CNH, CNH without photo, missing documents, document record without attached file, incomplete profile, successful submission).
+- [ ] 4.6 Write slice tests `DriverOnboardingControllerTest.java` (MockMvc) verifying security rules, HTTP 200, HTTP 422 on validation failures.
+- [ ] 4.7 Validate formatting and test coverage using `./mvnw spotless:check` and `./mvnw verify`.
+- [ ] 4.8 Open PR 4: `feat(driver): phase 4 — onboarding status and submission endpoints`.
 
-### Phase 4 — Administrative Review Endpoints
-- [ ] 4.1 Create `DriverRejectionRequestDTO.java` with validation (`@NotBlank`, `@Size(max = 255)`).
-- [ ] 4.2 Add admin review methods to `DriverOnboardingService.java`:
+### Phase 5 — Administrative Review Endpoints
+- [ ] 5.1 Create `DriverRejectionRequestDTO.java` with validation (`@NotBlank`, `@Size(max = 255)`).
+- [ ] 5.2 Add admin review methods to `DriverOnboardingService.java`:
   - `approve(String driverToken, String adminUid)`: transitions `UNDER_REVIEW` -> `APPROVED`, activates driver, records reviewer.
   - `reject(String driverToken, DriverRejectionRequestDTO request, String adminUid)`: transitions `UNDER_REVIEW` -> `REJECTED`, records reason and reviewer.
-- [ ] 4.3 Add admin endpoints to `DriverOnboardingController.java`:
+- [ ] 5.3 Add admin endpoints to `DriverOnboardingController.java`:
   - `POST /api/drivers/{token}/approve` with `@PreAuthorize("hasAuthority('approve_driver')")`.
   - `POST /api/drivers/{token}/reject` with `@PreAuthorize("hasAuthority('approve_driver')")`.
-- [ ] 4.4 Update `DataSeeder.java` to grant `approve_driver` permission to `ROLE_ADMIN`.
-- [ ] 4.5 Extend `DriverOnboardingServiceTest.java` with unit tests for approval, rejection, and invalid state transitions.
-- [ ] 4.6 Extend `DriverOnboardingControllerTest.java` with slice tests for admin review endpoints (verifying 403 for unauthorized users, 200 on approval/rejection, 400 on blank reason).
-- [ ] 4.7 Validate entire test suite and formatting using `./mvnw spotless:check` and `./mvnw verify`.
-- [ ] 4.8 Open PR 4: `feat(driver): phase 4 — administrative onboarding review`.
+- [ ] 5.4 Update `DataSeeder.java` to grant `approve_driver` permission to `ROLE_ADMIN`.
+- [ ] 5.5 Extend `DriverOnboardingServiceTest.java` with unit tests for approval, rejection, and invalid state transitions.
+- [ ] 5.6 Extend `DriverOnboardingControllerTest.java` with slice tests for admin review endpoints (verifying 403 for unauthorized users, 200 on approval/rejection, 400 on blank reason).
+- [ ] 5.7 Validate entire test suite and formatting using `./mvnw spotless:check` and `./mvnw verify`.
+- [ ] 5.8 Open PR 5: `feat(driver): phase 5 — administrative onboarding review`.
