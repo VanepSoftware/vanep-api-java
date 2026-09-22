@@ -50,6 +50,9 @@ public class AddressModel {
   @Column(length = 128)
   private String complement;
 
+  @Column(length = 128)
+  private String neighborhood;
+
   @ManyToOne(fetch = FetchType.EAGER)
   @JoinColumn(name = "district_id")
   private DistrictModel district;
