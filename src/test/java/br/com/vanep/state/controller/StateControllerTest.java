@@ -1,5 +1,6 @@
 package br.com.vanep.state.controller;
 
+import static org.hamcrest.Matchers.notNullValue;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -68,7 +69,7 @@ class StateControllerTest {
             new SimpleGrantedAuthority("show_state"));
   }
 
-  private JwtRequestPostProcessor noPermissionJwt() {
+  private JwtRequestPostProcessor authenticatedClientJwt() {
     return jwt()
         .jwt(
             t ->
@@ -84,8 +85,14 @@ class StateControllerTest {
   }
 
   @Test
-  void listForbidsUserWithoutPermission() throws Exception {
-    mockMvc.perform(get("/api/states").with(noPermissionJwt())).andExpect(status().isForbidden());
+  void listReturnsUfsForAuthenticatedClientWithoutListStates() throws Exception {
+    mockMvc
+        .perform(get("/api/states").with(authenticatedClientJwt()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content[0].token").value(stateToken))
+        .andExpect(jsonPath("$.content[0].uf").value("SP"))
+        .andExpect(jsonPath("$.content[0].name").value("São Paulo"))
+        .andExpect(jsonPath("$.content[0].id").doesNotExist());
   }
 
   @Test
@@ -113,10 +120,13 @@ class StateControllerTest {
   }
 
   @Test
-  void getByTokenReturns403ForUserWithoutPermission() throws Exception {
+  void getByTokenReturns200ForAuthenticatedClientWithoutShowState() throws Exception {
     mockMvc
-        .perform(get("/api/states/" + stateToken).with(noPermissionJwt()))
-        .andExpect(status().isForbidden());
+        .perform(get("/api/states/" + stateToken).with(authenticatedClientJwt()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.token").value(stateToken))
+        .andExpect(jsonPath("$.token", notNullValue()))
+        .andExpect(jsonPath("$.id").doesNotExist());
   }
 
   @Test

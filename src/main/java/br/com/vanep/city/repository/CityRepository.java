@@ -3,6 +3,8 @@ package br.com.vanep.city.repository;
 import br.com.vanep.city.model.CityModel;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -14,6 +16,11 @@ public interface CityRepository extends JpaRepository<CityModel, Long> {
   Optional<CityModel> findFirstByNameIgnoreCase(String name);
 
   List<CityModel> findByStateId(Long stateId);
+
+  Page<CityModel> findByStateIdAndActiveTrue(Long stateId, Pageable pageable);
+
+  Page<CityModel> findByStateIdAndActiveTrueAndNormalizedNameContaining(
+      Long stateId, String normalizedName, Pageable pageable);
 
   Optional<CityModel> findByStateIdAndNormalizedName(Long stateId, String normalizedName);
 

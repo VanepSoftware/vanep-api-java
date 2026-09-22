@@ -27,12 +27,12 @@
 > Branch: `feat/ibge-postal-address-picker` a partir de `feat/ibge-postal-address-seeder`
 > Depende de: 2 | Paralelo com: 4
 
-- [ ] 3.1 Testes slice falhando: `401` sem token; `GET /api/states` devolve UFs para cliente autenticado (sem `list_states`); `GET /api/cities?uf=DF&search=brasilia` devolve token de Brasília; sem `uf` → `400`; UF desconhecida `404`; `search` omitido lista a UF paginada; `search` ignora acento e caixa; cidade inativa não aparece, com e sem `search`
-- [ ] 3.2 Chaves MessageSource EN + `messages_pt_BR.properties` para UF desconhecida e `uf` ausente
-- [ ] 3.3 `CityController` / `StateController`: `@PreAuthorize("isAuthenticated()")`; `GET /api/cities` exige `uf`; `search` opcional em `normalized_name`; só cidades ativas (`active = true`); DTOs com tokens opacos. Sem `CityCatalogController`
-- [ ] 3.4 Autorização explícita (regras 20–21): `@PreAuthorize("isAuthenticated()")` nos controllers; a cadeia `/api/**` (`@Order(3)` do `SecurityConfig`, `anyRequest().authenticated()`) já exige JWT, então não há matcher novo — só conferir que nada de `/api/auth/**` (cadeia pública do N-177) alcança esses paths. `list_cities` / `list_states` não são mais exigidas nesses GETs
-- [ ] 3.5 Atualizar testes admin existentes de city/state que esperavam `403` sem `list_cities` / `list_states`
-- [ ] 3.6 `make lint` + testes desta fase; abrir PR
+- [x] 3.1 Testes slice falhando: `401` sem token; `GET /api/states` devolve UFs para cliente autenticado (sem `list_states`); `GET /api/cities?uf=DF&search=brasilia` devolve token de Brasília; sem `uf` → `400`; UF desconhecida `404`; `search` omitido lista a UF paginada; `search` ignora acento e caixa; cidade inativa não aparece, com e sem `search`
+- [x] 3.2 Chaves MessageSource EN + `messages_pt_BR.properties` para UF desconhecida e `uf` ausente
+- [x] 3.3 `CityController` / `StateController`: `@PreAuthorize("isAuthenticated()")`; `GET /api/cities` exige `uf`; `search` opcional em `normalized_name`; só cidades ativas (`active = true`); DTOs com tokens opacos. Sem `CityCatalogController`
+- [x] 3.4 Autorização explícita (regras 20–21): `@PreAuthorize("isAuthenticated()")` nos controllers; a cadeia `/api/**` (`@Order(3)` do `SecurityConfig`, `anyRequest().authenticated()`) já exige JWT, então não há matcher novo — só conferir que nada de `/api/auth/**` (cadeia pública do N-177) alcança esses paths. `list_cities` / `list_states` não são mais exigidas nesses GETs
+- [x] 3.5 Atualizar testes admin existentes de city/state que esperavam `403` sem `list_cities` / `list_states`
+- [x] 3.6 `make lint` + testes desta fase; abrir PR
 
 ## 4. Fase 4 — Google casa cidade IBGE, nunca cria cidade (PR 4)
 
