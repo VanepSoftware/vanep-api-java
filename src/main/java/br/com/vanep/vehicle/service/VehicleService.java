@@ -87,9 +87,6 @@ public class VehicleService {
     vehicle.setManufactureYear(request.manufactureYear());
     vehicle.setColor(request.color());
     vehicle.setCapacity(request.capacity());
-    vehicle.setPhotoFrontUrl(request.photoFrontUrl());
-    vehicle.setPhotoSideUrl(request.photoSideUrl());
-    vehicle.setPhotoDocumentUrl(request.photoDocumentUrl());
 
     return mapper.toResponse(vehicleRepository.save(vehicle));
   }
@@ -138,9 +135,6 @@ public class VehicleService {
     vehicle.setManufactureYear(request.manufactureYear());
     vehicle.setColor(request.color());
     vehicle.setCapacity(request.capacity());
-    vehicle.setPhotoFrontUrl(request.photoFrontUrl());
-    vehicle.setPhotoSideUrl(request.photoSideUrl());
-    vehicle.setPhotoDocumentUrl(request.photoDocumentUrl());
 
     return mapper.toResponse(vehicleRepository.save(vehicle));
   }

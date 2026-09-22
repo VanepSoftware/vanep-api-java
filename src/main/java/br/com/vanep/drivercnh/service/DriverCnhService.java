@@ -163,7 +163,6 @@ public class DriverCnhService {
     cnh.setFirstLicenseDate(request.firstLicenseDate());
     cnh.setSecurityNumber(request.securityNumber());
     cnh.setIssuingState(request.issuingState());
-    cnh.setPhotoUrl(request.photoUrl());
   }
 
   private DriverCnhModel requireByToken(String token) {

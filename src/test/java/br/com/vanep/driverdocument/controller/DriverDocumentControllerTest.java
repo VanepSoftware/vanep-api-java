@@ -102,7 +102,6 @@ class DriverDocumentControllerTest {
     DriverDocumentModel doc = new DriverDocumentModel();
     doc.setDriver(driver);
     doc.setDocumentType(DocumentTypeEnum.CRLV);
-    doc.setFileUrl("https://storage.vanep.com.br/crlv.pdf");
     doc.setExpiresAt(LocalDate.of(2027, 1, 1));
     doc.setStatus(DocumentStatusEnum.PENDING);
     doc = documents.save(doc);
@@ -175,8 +174,7 @@ class DriverDocumentControllerTest {
     String body =
         """
         {
-          "documentType": "CRLV",
-          "fileUrl": "https://storage.vanep.com.br/doc.pdf"
+          "documentType": "CRLV"
         }
         """;
     mockMvc
@@ -193,8 +191,7 @@ class DriverDocumentControllerTest {
     String body =
         """
         {
-          "documentType": "RESIDENCE_PROOF",
-          "fileUrl": "https://storage.vanep.com.br/residence.pdf"
+          "documentType": "RESIDENCE_PROOF"
         }
         """;
 
@@ -207,7 +204,7 @@ class DriverDocumentControllerTest {
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.token").exists())
         .andExpect(jsonPath("$.documentType").value("RESIDENCE_PROOF"))
-        .andExpect(jsonPath("$.fileUrl").value("https://storage.vanep.com.br/residence.pdf"))
+        .andExpect(jsonPath("$.fileUrl").doesNotExist())
         .andExpect(jsonPath("$.status").value("PENDING"));
   }
 
@@ -257,7 +254,6 @@ class DriverDocumentControllerTest {
         """
         {
           "documentType": "CRLV",
-          "fileUrl": "https://storage.vanep.com.br/new-crlv.pdf",
           "expiresAt": "2028-01-01"
         }
         """;
@@ -270,7 +266,7 @@ class DriverDocumentControllerTest {
                 .content(body))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.token").value(docToken))
-        .andExpect(jsonPath("$.fileUrl").value("https://storage.vanep.com.br/new-crlv.pdf"))
+        .andExpect(jsonPath("$.fileUrl").doesNotExist())
         .andExpect(jsonPath("$.status").value("PENDING"));
   }
 

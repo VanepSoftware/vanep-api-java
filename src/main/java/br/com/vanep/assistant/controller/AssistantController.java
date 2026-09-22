@@ -7,11 +7,16 @@ import br.com.vanep.assistant.dto.AssistantMeSummaryResponseDTO;
 import br.com.vanep.assistant.dto.AssistantPendingInviteDTO;
 import br.com.vanep.assistant.service.AssistantInviteService;
 import br.com.vanep.assistant.service.AssistantLinkService;
+import br.com.vanep.assistant.service.AssistantPhotoService;
 import br.com.vanep.assistant.service.AssistantProfileService;
 import br.com.vanep.auth.security.SecurityHelper;
+import br.com.vanep.media.web.MediaResponder;
 import jakarta.validation.Valid;
 import java.util.List;
+import org.springframework.core.io.InputStreamResource;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -22,8 +27,10 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api/assistants")
@@ -32,11 +39,17 @@ public class AssistantController {
   private final AssistantInviteService inviteService;
   private final AssistantLinkService linkService;
   private final AssistantProfileService profileService;
+  private final AssistantPhotoService photoService;
+  private final MediaResponder mediaResponder;
 
   public AssistantController(
       AssistantInviteService inviteService,
       AssistantLinkService linkService,
-      AssistantProfileService profileService) {
+      AssistantProfileService profileService,
+      AssistantPhotoService photoService,
+      MediaResponder mediaResponder) {
+    this.photoService = photoService;
+    this.mediaResponder = mediaResponder;
     this.inviteService = inviteService;
     this.linkService = linkService;
     this.profileService = profileService;
@@ -120,5 +133,18 @@ public class AssistantController {
       "hasAuthority('revoke_assistant') and @assistantSecurity.isDriverOfAssistant(#token, authentication)")
   public void revokeByDriver(@PathVariable String token, @AuthenticationPrincipal Jwt jwt) {
     linkService.revokeByDriver(jwt.getSubject(), token);
+  }
+
+  @PostMapping(value = "/{token}/photo", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+  @ResponseStatus(HttpStatus.CREATED)
+  @PreAuthorize("@sec.isAssistantParty(#token, authentication)")
+  public void uploadPhoto(@PathVariable String token, @RequestPart("file") MultipartFile file) {
+    photoService.replace(token, file);
+  }
+
+  @GetMapping("/{token}/photo")
+  @PreAuthorize("@sec.isAssistantParty(#token, authentication)")
+  public ResponseEntity<InputStreamResource> downloadPhoto(@PathVariable String token) {
+    return mediaResponder.respond(photoService.requirePhoto(token));
   }
 }

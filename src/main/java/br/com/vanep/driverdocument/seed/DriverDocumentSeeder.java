@@ -47,7 +47,6 @@ public class DriverDocumentSeeder {
     DriverDocumentModel doc1 = new DriverDocumentModel();
     doc1.setDriver(driver);
     doc1.setDocumentType(DocumentTypeEnum.CRLV);
-    doc1.setFileUrl("https://storage.vanep.com.br/docs/crlv_fabio.pdf");
     doc1.setExpiresAt(LocalDate.of(2026, 12, 31));
     doc1.setStatus(DocumentStatusEnum.APPROVED);
     documents.save(doc1);
@@ -55,7 +54,6 @@ public class DriverDocumentSeeder {
     DriverDocumentModel doc2 = new DriverDocumentModel();
     doc2.setDriver(driver);
     doc2.setDocumentType(DocumentTypeEnum.CRIMINAL_RECORD);
-    doc2.setFileUrl("https://storage.vanep.com.br/docs/criminal_fabio.pdf");
     doc2.setExpiresAt(LocalDate.of(2026, 10, 15));
     doc2.setStatus(DocumentStatusEnum.PENDING);
     documents.save(doc2);

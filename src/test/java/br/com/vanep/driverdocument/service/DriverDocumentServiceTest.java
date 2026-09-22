@@ -67,10 +67,7 @@ class DriverDocumentServiceTest {
 
     request =
         new DriverDocumentRequestDTO(
-            "driver-token-123",
-            DocumentTypeEnum.CRLV,
-            "https://storage.vanep.com.br/crlv.pdf",
-            LocalDate.of(2027, 1, 1));
+            "driver-token-123", DocumentTypeEnum.CRLV, LocalDate.of(2027, 1, 1));
   }
 
   @Test
@@ -97,7 +94,6 @@ class DriverDocumentServiceTest {
     DriverDocumentModel saved = new DriverDocumentModel();
     saved.setDriver(driver);
     saved.setDocumentType(DocumentTypeEnum.CRLV);
-    saved.setFileUrl("https://storage.vanep.com.br/crlv.pdf");
     when(driverDocumentRepository.save(any(DriverDocumentModel.class))).thenReturn(saved);
 
     service.create(request, "driver@vanep.com");

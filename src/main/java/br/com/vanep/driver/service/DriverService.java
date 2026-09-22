@@ -85,7 +85,6 @@ public class DriverService {
   }
 
   private void applyUpdate(DriverModel driver, DriverUpdateRequestDTO request) {
-    driver.setPhoto(request.photo());
     driver.setBio(request.bio());
     driver.setCnpj(request.cnpj());
     driver.setExperienceYears(request.experienceYears());

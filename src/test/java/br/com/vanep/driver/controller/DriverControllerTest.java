@@ -182,7 +182,6 @@ class DriverControllerTest {
     String requestBody =
         """
         {
-          "photo": "http://photo.url",
           "bio": "Expert driver",
           "cnpj": "11222333000181",
           "experienceYears": 10,
@@ -203,7 +202,7 @@ class DriverControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(requestBody))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.photo").value("http://photo.url"))
+        .andExpect(jsonPath("$.photo").doesNotExist())
         .andExpect(jsonPath("$.bio").value("Expert driver"))
         .andExpect(jsonPath("$.basePrice").value(120.50))
         .andExpect(jsonPath("$.workDays[0]").value("Monday"))

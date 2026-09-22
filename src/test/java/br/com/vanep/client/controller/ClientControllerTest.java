@@ -273,7 +273,7 @@ class ClientControllerTest {
   }
 
   @Test
-  void updateReturns200ForOwnerWithoutAddressToken() throws Exception {
+  void updateNoLongerWritesThePhotoFromAString() throws Exception {
     mockMvc
         .perform(
             patch("/api/clients/" + clientToken)
@@ -282,7 +282,7 @@ class ClientControllerTest {
                 .content("{\"photo\":\"https://example.com/photo.jpg\"}"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.token").value(clientToken))
-        .andExpect(jsonPath("$.photo").value("https://example.com/photo.jpg"))
+        .andExpect(jsonPath("$.photo").doesNotExist())
         .andExpect(jsonPath("$.address").value(nullValue()))
         .andExpect(jsonPath("$.addressToken").doesNotExist());
   }
@@ -302,12 +302,9 @@ class ClientControllerTest {
             patch("/api/clients/" + clientToken)
                 .with(ownerJwt())
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    "{\"photo\":\"https://example.com/photo.jpg\",\"addressToken\":\""
-                        + catalog.getToken()
-                        + "\"}"))
+                .content("{\"addressToken\":\"" + catalog.getToken() + "\"}"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.photo").value("https://example.com/photo.jpg"))
+        .andExpect(jsonPath("$.photo").doesNotExist())
         .andExpect(jsonPath("$.address").value(nullValue()))
         .andExpect(jsonPath("$.addressToken").doesNotExist());
 
@@ -346,7 +343,7 @@ class ClientControllerTest {
             patch("/api/clients/" + clientToken)
                 .with(adminWithUpdateJwt())
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"name\":\"Nome Editado\",\"photo\":\"https://example.com/p.jpg\"}"))
+                .content("{\"name\":\"Nome Editado\"}"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.token").value(clientToken))
         .andExpect(jsonPath("$.name").value("Nome Editado"));

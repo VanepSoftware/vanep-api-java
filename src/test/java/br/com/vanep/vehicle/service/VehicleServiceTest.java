@@ -60,17 +60,7 @@ class VehicleServiceTest {
     driver.setToken("driver-token-123");
 
     request =
-        new VehicleRequestDTO(
-            "driver-token-123",
-            "ABC1D23",
-            "Ford",
-            "Transit",
-            2022,
-            "White",
-            15,
-            "front.jpg",
-            "side.jpg",
-            "doc.jpg");
+        new VehicleRequestDTO("driver-token-123", "ABC1D23", "Ford", "Transit", 2022, "White", 15);
   }
 
   @Test

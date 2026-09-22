@@ -19,6 +19,7 @@ delete from vehicle;
 delete from driver_cnh;
 delete from driver_document;
 delete from driver;
+delete from media_file;
 delete from users;
 delete from roles;
 delete from role_permissions;

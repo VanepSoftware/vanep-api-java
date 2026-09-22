@@ -99,9 +99,6 @@ public class ClientService {
       }
       client.setActive(active);
     }
-    if (request.photo().isPresent()) {
-      client.setPhoto(request.photo().get());
-    }
     if (request.rating().isPresent()) {
       client.setRating(request.rating().get());
     }
