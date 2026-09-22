@@ -25,6 +25,7 @@ import br.com.vanep.school.model.SchoolModel;
 import br.com.vanep.school.repository.SchoolRepository;
 import br.com.vanep.state.model.StateModel;
 import br.com.vanep.state.repository.StateRepository;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import org.junit.jupiter.api.BeforeEach;
@@ -134,23 +135,22 @@ class SchoolControllerTest {
   }
 
   private void givenResolvedPlace(String street, String googleCityName) {
+    List<AddressComponentDTO> components = new ArrayList<>();
+    components.add(new AddressComponentDTO("Brazil", "BR", List.of("country", "political")));
+    components.add(
+        new AddressComponentDTO(
+            "Sao Paulo", "SP", List.of("administrative_area_level_1", "political")));
+    components.add(
+        new AddressComponentDTO(
+            googleCityName, googleCityName, List.of("administrative_area_level_2", "political")));
+    components.add(new AddressComponentDTO("13015904", "13015904", List.of("postal_code")));
+    if (street != null) {
+      components.add(new AddressComponentDTO(street, street, List.of("route")));
+    }
     BDDMockito.given(
             places.findPlaceDetails(
                 org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
-        .willReturn(
-            new PlaceDetailsResponseDTO(
-                "place-1",
-                street + ", " + googleCityName + " - SP",
-                List.of(
-                    new AddressComponentDTO("Brazil", "BR", List.of("country", "political")),
-                    new AddressComponentDTO(
-                        "Sao Paulo", "SP", List.of("administrative_area_level_1", "political")),
-                    new AddressComponentDTO(
-                        googleCityName,
-                        googleCityName,
-                        List.of("administrative_area_level_2", "political")),
-                    new AddressComponentDTO("13015904", "13015904", List.of("postal_code")),
-                    new AddressComponentDTO(street, street, List.of("route")))));
+        .willReturn(new PlaceDetailsResponseDTO("place-1", googleCityName + " - SP", components));
   }
 
   private String placeAddressJson(String number) {
@@ -297,6 +297,24 @@ class SchoolControllerTest {
     assertThat(cities.count()).isEqualTo(citiesBefore);
     assertThat(addresses.count()).isEqualTo(addressesBefore);
     assertThat(schools.count()).isEqualTo(schoolsBefore);
+  }
+
+  @Test
+  void createReturns400WithTranslatedMessageWhenPlaceHasNoStreet() throws Exception {
+    givenResolvedPlace(null, "Campinas");
+
+    mockMvc
+        .perform(
+            post("/api/schools")
+                .with(adminJwt())
+                .locale(Locale.forLanguageTag("pt-BR"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"name\":\"Escola Sem Rua\",\"address\":" + placeAddressJson("100") + "}"))
+        .andExpect(status().isBadRequest())
+        .andExpect(
+            jsonPath("$.detail")
+                .value("Escolha um endereço mais específico: este local não tem logradouro."));
   }
 
   @Test
