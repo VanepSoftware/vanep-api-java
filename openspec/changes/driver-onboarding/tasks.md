@@ -9,7 +9,7 @@
 
 | Phase | Contents | Depends on | Parallel with |
 | :--- | :--- | :--- | :--- |
-| **Phase 1** | Foundation (Enums `DriverApprovalStatus` & `DocumentTypeEnum`, Migration `V46`, `DriverModel` update, `PermissionEnum`) | — | — |
+| **Phase 1** | Foundation (Enums `DriverApprovalStatus` & `DocumentTypeEnum`, Migration `V47`, `DriverModel` update, `PermissionEnum`) | — | — |
 | **Phase 2** | OAuth Driver Initialization (`OAuthAccountService` creation of `DriverModel`, unit tests) | Phase 1 | — |
 | **Phase 3** | Driver Onboarding Query & Submission (`DriverOnboardingService`, `DriverOnboardingController`, DTOs, messages, unit & slice tests) | Phase 2 | — |
 | **Phase 4** | Administrative Review (`approve` & `reject` endpoints, `DriverRejectionRequestDTO`, seeder update, unit & slice tests) | Phase 3 | — |
@@ -23,7 +23,7 @@
   - DriverApprovalStatus (UNDER_REVIEW)
   - DocumentTypeEnum (VEHICLE_INSPECTION, MUNICIPAL_AUTHORIZATION)
   - PermissionEnum (approve_driver)
-  - Migration V46 (driver columns: submitted_at, rejection_reason, reviewed_at, reviewed_by)
+  - Migration V47 (driver columns: submitted_at, rejection_reason, reviewed_at, reviewed_by)
   - DriverModel (JPA mapping)
        │
        ▼
@@ -53,13 +53,13 @@
 ## 3. Checklist of Tasks
 
 ### Phase 1 — Foundation
-- [ ] 1.1 Add `UNDER_REVIEW` to `DriverApprovalStatus.java`.
-- [ ] 1.2 Add `VEHICLE_INSPECTION` and `MUNICIPAL_AUTHORIZATION` to `DocumentTypeEnum.java`.
-- [ ] 1.3 Add `APPROVE_DRIVER("approve_driver")` to `PermissionEnum.java`.
-- [ ] 1.4 Create Flyway migration `V46__add_driver_onboarding_and_review_columns.sql`.
-- [ ] 1.5 Update `DriverModel.java` with `submittedAt`, `rejectionReason`, `reviewedAt` and `reviewedBy` (`UserModel`).
-- [ ] 1.6 Verify and adjust any existing seeders/tests if necessary.
-- [ ] 1.7 Validate using `./mvnw test-compile` and `./mvnw spotless:check`.
+- [x] 1.1 Add `UNDER_REVIEW` to `DriverApprovalStatus.java`.
+- [x] 1.2 Add `VEHICLE_INSPECTION` and `MUNICIPAL_AUTHORIZATION` to `DocumentTypeEnum.java`.
+- [x] 1.3 Add `APPROVE_DRIVER("approve_driver")` to `PermissionEnum.java`.
+- [x] 1.4 Create Flyway migration `V47__add_driver_onboarding_and_review_columns.sql`.
+- [x] 1.5 Update `DriverModel.java` with `submittedAt`, `rejectionReason`, `reviewedAt` and `reviewedBy` (`UserModel`).
+- [x] 1.6 Verify and adjust any existing seeders/tests if necessary.
+- [x] 1.7 Validate using `./mvnw test-compile` and `./mvnw spotless:check`.
 - [ ] 1.8 Open PR 1: `feat(driver): phase 1 — onboarding foundation & schema`.
 
 ### Phase 2 — OAuth Driver Initialization
