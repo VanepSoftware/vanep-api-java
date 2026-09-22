@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import br.com.vanep.city.model.CityModel;
 import br.com.vanep.city.repository.CityRepository;
 import br.com.vanep.country.model.CountryModel;
 import br.com.vanep.country.repository.CountryRepository;
@@ -21,6 +22,7 @@ import br.com.vanep.driverservicearea.model.DriverServiceAreaModel;
 import br.com.vanep.driverservicearea.repository.DriverServiceAreaRepository;
 import br.com.vanep.location.service.LocationResolverService;
 import br.com.vanep.places.client.PlacesClient;
+import br.com.vanep.places.dto.AddressComponentDTO;
 import br.com.vanep.places.dto.PlaceDetailsResponseDTO;
 import br.com.vanep.places.exception.PlaceNotFoundException;
 import br.com.vanep.state.repository.StateRepository;
@@ -33,11 +35,14 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.BDDMockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.MessageSource;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor;
@@ -64,6 +69,7 @@ class DriverSearchControllerTest {
   @Autowired private DistrictRepository districts;
   @Autowired private LocationResolverService resolver;
   @Autowired private DriverServiceAreaRepository areas;
+  @Autowired private MessageSource messages;
 
   @MockitoBean private PlacesClient places;
 
@@ -82,6 +88,7 @@ class DriverSearchControllerTest {
     countries.save(brasil);
 
     stateSeeder.seed();
+    seedIbgeCity("DF", "Brasília", "5300108");
 
     UserModel client = new UserModel();
     client.setType(UserType.CLIENT);
@@ -186,6 +193,30 @@ class DriverSearchControllerTest {
                         || component.types().contains("administrative_area_level_1")
                         || component.types().contains("administrative_area_level_2"))
             .toList());
+  }
+
+  private CityModel seedIbgeCity(String uf, String name, String ibgeCode) {
+    CityModel city = new CityModel();
+    city.setState(states.findByUf(uf).orElseThrow());
+    city.setName(name);
+    city.setIbgeCode(ibgeCode);
+    return cities.save(city);
+  }
+
+  private PlaceDetailsResponseDTO unmatchedEmbu() {
+    return new PlaceDetailsResponseDTO(
+        "place-embu",
+        "Embu, SP",
+        List.of(
+            new AddressComponentDTO("Brazil", "BR", List.of("country", "political")),
+            new AddressComponentDTO(
+                "São Paulo", "SP", List.of("administrative_area_level_1", "political")),
+            new AddressComponentDTO(
+                "Embu", "Embu", List.of("administrative_area_level_2", "political"))));
+  }
+
+  private String message(String key) {
+    return messages.getMessage(key, null, LocaleContextHolder.getLocale());
   }
 
   private void stubPlaces() throws IOException {
@@ -468,7 +499,18 @@ class DriverSearchControllerTest {
   }
 
   @Test
-  void returnsEmptyWhenTheCityIsNotInTheTreeYet() throws Exception {
+  void rejectsAnUnmatchedGoogleCityWithCatalogMessage() throws Exception {
+    stubPlaces();
+    BDDMockito.given(places.findPlaceDetails("embu", null)).willReturn(unmatchedEmbu());
+
+    mockMvc
+        .perform(get("/api/drivers/search").with(as(clientUid)).param("placeId", "embu"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.detail").value(message("location.city.unmatched")));
+  }
+
+  @Test
+  void returnsEmptyWhenTheMatchedCityHasNoDrivers() throws Exception {
     stubPlaces();
 
     mockMvc
