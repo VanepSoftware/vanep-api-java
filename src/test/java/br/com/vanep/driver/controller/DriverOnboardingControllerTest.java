@@ -98,6 +98,25 @@ class DriverOnboardingControllerTest {
     clientUser.setTermsAcceptedAt(Instant.now());
     clientUser = users.save(clientUser);
     clientUserUid = clientUser.getToken();
+
+    UserModel adminUser = new UserModel();
+    adminUser.setType(UserType.ADMIN);
+    adminUser.setName("Admin");
+    adminUser.setEmail("admin@vanep.com");
+    adminUser.setDocument("99988877766");
+    adminUser.setVerified(true);
+    adminUser.setTermsAcceptedAt(Instant.now());
+    adminUser = users.save(adminUser);
+    adminUserUid = adminUser.getToken();
+  }
+
+  private String adminUserUid;
+
+  private JwtRequestPostProcessor adminJwt(String uid) {
+    return jwt()
+        .jwt(t -> t.claim("uid", uid).claim("roles", List.of("ROLE_ADMIN")))
+        .authorities(
+            new SimpleGrantedAuthority("ROLE_ADMIN"), new SimpleGrantedAuthority("approve_driver"));
   }
 
   private JwtRequestPostProcessor driverJwt(String uid) {
@@ -262,6 +281,98 @@ class DriverOnboardingControllerTest {
             post("/api/drivers/me/submit-onboarding")
                 .with(driverJwt(driverUserUid))
                 .contentType(MediaType.APPLICATION_JSON))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void approveDriverForbiddenForRegularDriverOrClient() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/drivers/" + driver.getToken() + "/approve").with(driverJwt(driverUserUid)))
+        .andExpect(status().isForbidden());
+
+    mockMvc
+        .perform(
+            post("/api/drivers/" + driver.getToken() + "/approve").with(clientJwt(clientUserUid)))
+        .andExpect(status().isForbidden());
+  }
+
+  @Test
+  void approveDriverSuccessForAdmin() throws Exception {
+    driver.setApprovalStatus(DriverApprovalStatus.UNDER_REVIEW);
+    driver.setActive(false);
+    driver = drivers.save(driver);
+
+    mockMvc
+        .perform(
+            post("/api/drivers/" + driver.getToken() + "/approve").with(adminJwt(adminUserUid)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.approvalStatus").value("APPROVED"))
+        .andExpect(jsonPath("$.active").value(true));
+  }
+
+  @Test
+  void approveDriverWhenNotUnderReviewReturns400() throws Exception {
+    driver.setApprovalStatus(DriverApprovalStatus.PENDING);
+    driver = drivers.save(driver);
+
+    mockMvc
+        .perform(
+            post("/api/drivers/" + driver.getToken() + "/approve").with(adminJwt(adminUserUid)))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void rejectDriverForbiddenForRegularDriver() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/drivers/" + driver.getToken() + "/reject")
+                .with(driverJwt(driverUserUid))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"reason\": \"Documentos pendentes\"}"))
+        .andExpect(status().isForbidden());
+  }
+
+  @Test
+  void rejectDriverValidationFailsWhenReasonBlank() throws Exception {
+    driver.setApprovalStatus(DriverApprovalStatus.UNDER_REVIEW);
+    driver = drivers.save(driver);
+
+    mockMvc
+        .perform(
+            post("/api/drivers/" + driver.getToken() + "/reject")
+                .with(adminJwt(adminUserUid))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"reason\": \"\"}"))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void rejectDriverSuccessForAdmin() throws Exception {
+    driver.setApprovalStatus(DriverApprovalStatus.UNDER_REVIEW);
+    driver = drivers.save(driver);
+
+    mockMvc
+        .perform(
+            post("/api/drivers/" + driver.getToken() + "/reject")
+                .with(adminJwt(adminUserUid))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"reason\": \"Foto da CNH ilegível\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.approvalStatus").value("REJECTED"));
+  }
+
+  @Test
+  void rejectDriverWhenNotUnderReviewReturns400() throws Exception {
+    driver.setApprovalStatus(DriverApprovalStatus.APPROVED);
+    driver = drivers.save(driver);
+
+    mockMvc
+        .perform(
+            post("/api/drivers/" + driver.getToken() + "/reject")
+                .with(adminJwt(adminUserUid))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"reason\": \"Foto ilegível\"}"))
         .andExpect(status().isBadRequest());
   }
 }
