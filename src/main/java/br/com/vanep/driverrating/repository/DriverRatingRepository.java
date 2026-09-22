@@ -6,34 +6,40 @@ import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface DriverRatingRepository extends JpaRepository<DriverRatingModel, Long> {
 
+  String FETCH_PARTIES =
+      "join fetch rating.link link "
+          + "join fetch link.client client join fetch client.user "
+          + "join fetch link.driver driver join fetch driver.user ";
+
   Optional<DriverRatingModel> findByToken(String token);
 
-  Page<DriverRatingModel> findByDriverToken(String driverToken, Pageable pageable);
-
-  boolean existsByDriverIdAndClientId(Long driverId, Long clientId);
-
-  @Query("SELECT AVG(dr.rating) FROM DriverRatingModel dr WHERE dr.driver.id = :driverId")
-  Optional<BigDecimal> calculateAverageRatingForDriver(@Param("driverId") Long driverId);
-
   @Query(
-      "SELECT u.token FROM DriverRatingModel dr JOIN dr.client c JOIN c.user u WHERE dr.token = :token")
-  Optional<String> findClientUserTokenByRatingToken(@Param("token") String token);
-
-  @Modifying
-  @Query(
-      value = "UPDATE driver_rating SET deleted_at = NULL WHERE token = :token",
-      nativeQuery = true)
-  int restoreByToken(@Param("token") String token);
+      value = "select rating from DriverRatingModel rating " + FETCH_PARTIES,
+      countQuery = "select count(rating) from DriverRatingModel rating")
+  Page<DriverRatingModel> findPage(Pageable pageable);
 
   @Query(
       value =
-          "SELECT count(*) > 0 FROM driver_rating WHERE token = :token AND deleted_at IS NOT NULL",
-      nativeQuery = true)
-  boolean existsDeletedByToken(@Param("token") String token);
+          "select rating from DriverRatingModel rating "
+              + FETCH_PARTIES
+              + "where driver.token = :driverToken",
+      countQuery =
+          "select count(rating) from DriverRatingModel rating "
+              + "where rating.link.driver.token = :driverToken")
+  Page<DriverRatingModel> findByDriverToken(
+      @Param("driverToken") String driverToken, Pageable pageable);
+
+  boolean existsByLinkId(Long linkId);
+
+  @Query("SELECT AVG(dr.rating) FROM DriverRatingModel dr WHERE dr.link.driver.id = :driverId")
+  Optional<BigDecimal> calculateAverageRatingForDriver(@Param("driverId") Long driverId);
+
+  @Query(
+      "SELECT u.token FROM DriverRatingModel dr JOIN dr.link l JOIN l.client c JOIN c.user u WHERE dr.token = :token")
+  Optional<String> findClientUserTokenByRatingToken(@Param("token") String token);
 }

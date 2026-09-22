@@ -12,6 +12,7 @@ delete from trip;
 delete from driver_service_area;
 delete from driver_rating;
 delete from client_rating;
+delete from client_driver;
 delete from dependent;
 delete from client;
 delete from vehicle;
