@@ -6,6 +6,9 @@ import br.com.vanep.driver.dto.DriverDocumentSummaryDTO;
 import br.com.vanep.driver.dto.DriverOnboardingDocumentsStepDTO;
 import br.com.vanep.driver.dto.DriverOnboardingStatusResponseDTO;
 import br.com.vanep.driver.dto.DriverOnboardingStepDTO;
+import br.com.vanep.driver.dto.DriverRejectionRequestDTO;
+import br.com.vanep.driver.dto.DriverResponseDTO;
+import br.com.vanep.driver.mapper.DriverMapper;
 import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.drivercnh.model.DriverCnhModel;
 import br.com.vanep.drivercnh.repository.DriverCnhRepository;
@@ -48,6 +51,7 @@ public class DriverOnboardingService {
   private final DriverDocumentRepository driverDocumentRepository;
   private final DriverServiceAreaRepository driverServiceAreaRepository;
   private final UserService userService;
+  private final DriverMapper mapper;
   private final MessageSource messages;
 
   public DriverOnboardingService(
@@ -57,6 +61,7 @@ public class DriverOnboardingService {
       DriverDocumentRepository driverDocumentRepository,
       DriverServiceAreaRepository driverServiceAreaRepository,
       UserService userService,
+      DriverMapper mapper,
       MessageSource messages) {
     this.driverRepository = driverRepository;
     this.vehicleRepository = vehicleRepository;
@@ -64,6 +69,7 @@ public class DriverOnboardingService {
     this.driverDocumentRepository = driverDocumentRepository;
     this.driverServiceAreaRepository = driverServiceAreaRepository;
     this.userService = userService;
+    this.mapper = mapper;
     this.messages = messages;
   }
 
@@ -246,6 +252,45 @@ public class DriverOnboardingService {
         MediaUrl.of("/api/driver-documents", doc.getToken(), "file", doc.getFile()));
   }
 
+  @Transactional
+  public DriverResponseDTO approve(String driverToken, String adminUid) {
+    UserModel adminUser = userService.requireByToken(adminUid);
+    DriverModel driver = requireDriverByToken(driverToken);
+
+    if (driver.getApprovalStatus() != DriverApprovalStatus.UNDER_REVIEW) {
+      throw new ResponseStatusException(
+          HttpStatus.BAD_REQUEST, message("driver.onboarding.not_under_review"));
+    }
+
+    driver.setApprovalStatus(DriverApprovalStatus.APPROVED);
+    driver.setActive(true);
+    driver.setReviewedAt(Instant.now());
+    driver.setReviewedBy(adminUser);
+    DriverModel saved = driverRepository.save(driver);
+
+    return mapper.toResponse(saved);
+  }
+
+  @Transactional
+  public DriverResponseDTO reject(
+      String driverToken, DriverRejectionRequestDTO request, String adminUid) {
+    UserModel adminUser = userService.requireByToken(adminUid);
+    DriverModel driver = requireDriverByToken(driverToken);
+
+    if (driver.getApprovalStatus() != DriverApprovalStatus.UNDER_REVIEW) {
+      throw new ResponseStatusException(
+          HttpStatus.BAD_REQUEST, message("driver.onboarding.not_under_review"));
+    }
+
+    driver.setApprovalStatus(DriverApprovalStatus.REJECTED);
+    driver.setRejectionReason(request.reason());
+    driver.setReviewedAt(Instant.now());
+    driver.setReviewedBy(adminUser);
+    DriverModel saved = driverRepository.save(driver);
+
+    return mapper.toResponse(saved);
+  }
+
   private DriverModel requireDriverByUserId(Long userId) {
     return driverRepository
         .findByUserId(userId)
@@ -253,5 +298,12 @@ public class DriverOnboardingService {
             () ->
                 new ResponseStatusException(
                     HttpStatus.NOT_FOUND, message("user.driver_profile.not_found")));
+  }
+
+  private DriverModel requireDriverByToken(String token) {
+    return driverRepository
+        .findByToken(token)
+        .orElseThrow(
+            () -> new ResponseStatusException(HttpStatus.NOT_FOUND, message("driver.not_found")));
   }
 }

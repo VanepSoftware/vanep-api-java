@@ -12,6 +12,9 @@ import br.com.vanep.city.model.CityModel;
 import br.com.vanep.driver.DriverApprovalStatus;
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.dto.DriverOnboardingStatusResponseDTO;
+import br.com.vanep.driver.dto.DriverRejectionRequestDTO;
+import br.com.vanep.driver.dto.DriverResponseDTO;
+import br.com.vanep.driver.mapper.DriverMapper;
 import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.drivercnh.model.DriverCnhModel;
 import br.com.vanep.drivercnh.repository.DriverCnhRepository;
@@ -49,6 +52,7 @@ class DriverOnboardingServiceTest {
   @Mock private DriverDocumentRepository driverDocumentRepository;
   @Mock private DriverServiceAreaRepository driverServiceAreaRepository;
   @Mock private UserService userService;
+  @Mock private DriverMapper mapper;
   @Mock private MessageSource messages;
 
   private DriverOnboardingService service;
@@ -66,6 +70,7 @@ class DriverOnboardingServiceTest {
             driverDocumentRepository,
             driverServiceAreaRepository,
             userService,
+            mapper,
             messages);
 
     lenient()
@@ -347,5 +352,147 @@ class DriverOnboardingServiceTest {
     assertThat(driver.getApprovalStatus()).isEqualTo(DriverApprovalStatus.UNDER_REVIEW);
     assertThat(driver.getSubmittedAt()).isNotNull();
     assertThat(driver.getRejectionReason()).isNull();
+  }
+
+  @Test
+  void approveDriverSuccessTransitionsToApproved() {
+    driver.setApprovalStatus(DriverApprovalStatus.UNDER_REVIEW);
+    driver.setActive(false);
+
+    UserModel adminUser = new UserModel();
+    adminUser.setId(99L);
+    adminUser.setToken("admin-uid");
+
+    when(userService.requireByToken("admin-uid")).thenReturn(adminUser);
+    when(driverRepository.findByToken("driver-token-20")).thenReturn(Optional.of(driver));
+    when(driverRepository.save(any(DriverModel.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    DriverResponseDTO expectedResponse =
+        new DriverResponseDTO(
+            "driver-token-20",
+            "Driver",
+            "d@v.com",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            BigDecimal.valueOf(150),
+            null,
+            null,
+            null,
+            null,
+            DriverApprovalStatus.APPROVED,
+            true,
+            false,
+            null,
+            null);
+    when(mapper.toResponse(driver)).thenReturn(expectedResponse);
+
+    DriverResponseDTO response = service.approve("driver-token-20", "admin-uid");
+
+    assertThat(response).isEqualTo(expectedResponse);
+    assertThat(driver.getApprovalStatus()).isEqualTo(DriverApprovalStatus.APPROVED);
+    assertThat(driver.isActive()).isTrue();
+    assertThat(driver.getReviewedAt()).isNotNull();
+    assertThat(driver.getReviewedBy()).isEqualTo(adminUser);
+    verify(driverRepository).save(driver);
+  }
+
+  @Test
+  void approveDriverThrowsNotFoundWhenDriverMissing() {
+    when(userService.requireByToken("admin-uid")).thenReturn(new UserModel());
+    when(driverRepository.findByToken("unknown")).thenReturn(Optional.empty());
+
+    assertThatThrownBy(() -> service.approve("unknown", "admin-uid"))
+        .isInstanceOf(ResponseStatusException.class)
+        .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+        .isEqualTo(HttpStatus.NOT_FOUND);
+  }
+
+  @Test
+  void approveDriverThrowsBadRequestWhenNotUnderReview() {
+    driver.setApprovalStatus(DriverApprovalStatus.PENDING);
+    when(userService.requireByToken("admin-uid")).thenReturn(new UserModel());
+    when(driverRepository.findByToken("driver-token-20")).thenReturn(Optional.of(driver));
+
+    assertThatThrownBy(() -> service.approve("driver-token-20", "admin-uid"))
+        .isInstanceOf(ResponseStatusException.class)
+        .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+        .isEqualTo(HttpStatus.BAD_REQUEST);
+  }
+
+  @Test
+  void rejectDriverSuccessTransitionsToRejectedWithReason() {
+    driver.setApprovalStatus(DriverApprovalStatus.UNDER_REVIEW);
+
+    UserModel adminUser = new UserModel();
+    adminUser.setId(99L);
+    adminUser.setToken("admin-uid");
+
+    when(userService.requireByToken("admin-uid")).thenReturn(adminUser);
+    when(driverRepository.findByToken("driver-token-20")).thenReturn(Optional.of(driver));
+    when(driverRepository.save(any(DriverModel.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    DriverResponseDTO expectedResponse =
+        new DriverResponseDTO(
+            "driver-token-20",
+            "Driver",
+            "d@v.com",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            BigDecimal.valueOf(150),
+            null,
+            null,
+            null,
+            null,
+            DriverApprovalStatus.REJECTED,
+            true,
+            false,
+            null,
+            null);
+    when(mapper.toResponse(driver)).thenReturn(expectedResponse);
+
+    DriverRejectionRequestDTO request = new DriverRejectionRequestDTO("Foto da CNH ilegível");
+    DriverResponseDTO response = service.reject("driver-token-20", request, "admin-uid");
+
+    assertThat(response).isEqualTo(expectedResponse);
+    assertThat(driver.getApprovalStatus()).isEqualTo(DriverApprovalStatus.REJECTED);
+    assertThat(driver.getRejectionReason()).isEqualTo("Foto da CNH ilegível");
+    assertThat(driver.getReviewedAt()).isNotNull();
+    assertThat(driver.getReviewedBy()).isEqualTo(adminUser);
+    verify(driverRepository).save(driver);
+  }
+
+  @Test
+  void rejectDriverThrowsNotFoundWhenDriverMissing() {
+    when(userService.requireByToken("admin-uid")).thenReturn(new UserModel());
+    when(driverRepository.findByToken("unknown")).thenReturn(Optional.empty());
+
+    DriverRejectionRequestDTO request = new DriverRejectionRequestDTO("Motivo qualquer");
+    assertThatThrownBy(() -> service.reject("unknown", request, "admin-uid"))
+        .isInstanceOf(ResponseStatusException.class)
+        .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+        .isEqualTo(HttpStatus.NOT_FOUND);
+  }
+
+  @Test
+  void rejectDriverThrowsBadRequestWhenNotUnderReview() {
+    driver.setApprovalStatus(DriverApprovalStatus.APPROVED);
+    when(userService.requireByToken("admin-uid")).thenReturn(new UserModel());
+    when(driverRepository.findByToken("driver-token-20")).thenReturn(Optional.of(driver));
+
+    DriverRejectionRequestDTO request = new DriverRejectionRequestDTO("Motivo qualquer");
+    assertThatThrownBy(() -> service.reject("driver-token-20", request, "admin-uid"))
+        .isInstanceOf(ResponseStatusException.class)
+        .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+        .isEqualTo(HttpStatus.BAD_REQUEST);
   }
 }

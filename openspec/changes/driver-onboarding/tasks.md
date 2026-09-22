@@ -89,18 +89,18 @@
 - [x] 4.5 Write unit tests `DriverOnboardingServiceTest.java` covering all validation branches (missing vehicle, missing CNH, expired CNH, missing documents, incomplete profile, successful submission).
 - [x] 4.6 Write slice tests `DriverOnboardingControllerTest.java` (MockMvc) verifying security rules, HTTP 200, HTTP 422 on validation failures.
 - [x] 4.7 Validate formatting and test coverage using `./mvnw spotless:check` and `./mvnw verify`.
-- [ ] 4.8 Open PR 4: `feat(driver): phase 4 — onboarding status and submission endpoints`.
+- [x] 4.8 Open PR 4: `feat(driver): phase 4 — onboarding status and submission endpoints`.
 
 ### Phase 5 — Administrative Review Endpoints
-- [ ] 5.1 Create `DriverRejectionRequestDTO.java` with validation (`@NotBlank`, `@Size(max = 255)`).
-- [ ] 5.2 Add admin review methods to `DriverOnboardingService.java`:
+- [x] 5.1 Create `DriverRejectionRequestDTO.java` with validation (`@NotBlank`, `@Size(max = 255)`).
+- [x] 5.2 Add admin review methods to `DriverOnboardingService.java`:
   - `approve(String driverToken, String adminUid)`: transitions `UNDER_REVIEW` -> `APPROVED`, activates driver, records reviewer.
   - `reject(String driverToken, DriverRejectionRequestDTO request, String adminUid)`: transitions `UNDER_REVIEW` -> `REJECTED`, records reason and reviewer.
-- [ ] 5.3 Add admin endpoints to `DriverOnboardingController.java`:
+- [x] 5.3 Add admin endpoints to `DriverOnboardingController.java`:
   - `POST /api/drivers/{token}/approve` with `@PreAuthorize("hasAuthority('approve_driver')")`.
   - `POST /api/drivers/{token}/reject` with `@PreAuthorize("hasAuthority('approve_driver')")`.
-- [ ] 5.4 Update `DataSeeder.java` to grant `approve_driver` permission to `ROLE_ADMIN`.
-- [ ] 5.5 Extend `DriverOnboardingServiceTest.java` with unit tests for approval, rejection, and invalid state transitions.
-- [ ] 5.6 Extend `DriverOnboardingControllerTest.java` with slice tests for admin review endpoints (verifying 403 for unauthorized users, 200 on approval/rejection, 400 on blank reason).
-- [ ] 5.7 Validate entire test suite and formatting using `./mvnw spotless:check` and `./mvnw verify`.
+- [x] 5.4 Update `DataSeeder.java` to grant `approve_driver` permission to `ROLE_ADMIN`.
+- [x] 5.5 Extend `DriverOnboardingServiceTest.java` with unit tests for approval, rejection, and invalid state transitions.
+- [x] 5.6 Extend `DriverOnboardingControllerTest.java` with slice tests for admin review endpoints (verifying 403 for unauthorized users, 200 on approval/rejection, 400 on blank reason).
+- [x] 5.7 Validate entire test suite and formatting using `./mvnw spotless:check` and `./mvnw verify`.
 - [ ] 5.8 Open PR 5: `feat(driver): phase 5 — administrative onboarding review`.
