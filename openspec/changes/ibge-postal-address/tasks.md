@@ -15,11 +15,11 @@
 > Branch: `feat/ibge-postal-address-seeder` a partir de `feat/ibge-postal-address-schema`
 > Depende de: 1 | Paralelo com: —
 
-- [ ] 2.1 **Uma vez, na mão:** baixar o JSON IBGE `localidades/municipios` e commitar em `src/main/resources/seed/ibge-municipalities.json` (regra 50 — não pela suíte de testes)
-- [ ] 2.2 Testes unitários falhando do `CitySeeder` com fixture **pequena** commitada (Brasília + outro município): cria linhas com `ibge_code`; segunda execução é idempotente; mapeia UF para o `state` existente
-- [ ] 2.3 Implementar `CitySeeder` depois do `StateSeeder` no `DataSeeder`; upsert por `ibge_code`; nunca HTTP para IBGE em runtime
-- [ ] 2.4 Ligar `vanep.seed.enabled` para local/prod carregar o dump completo; testes seguem com fixture pequena / inserts explícitos
-- [ ] 2.5 `make lint` + `./mvnw verify`; abrir PR
+- [x] 2.1 **Uma vez, na mão:** baixar o JSON IBGE `localidades/municipios` e commitar em `src/main/resources/seed/ibge-municipalities.json` (regra 50 — não pela suíte de testes)
+- [x] 2.2 Testes unitários falhando do `CitySeeder` com fixture **pequena** commitada (Brasília + outro município): cria linhas com `ibge_code`; segunda execução é idempotente; mapeia UF para o `state` existente
+- [x] 2.3 Implementar `CitySeeder` depois do `StateSeeder` no `DataSeeder`; upsert por `ibge_code`; nunca HTTP para IBGE em runtime
+- [x] 2.4 Ligar `vanep.seed.enabled` para local/prod carregar o dump completo; testes seguem com fixture pequena / inserts explícitos
+- [x] 2.5 `make lint` + `./mvnw verify`; abrir PR
 
 ## 3. Fase 3 — Picker autenticado em `/api/states` e `/api/cities` (PR 3)
 
