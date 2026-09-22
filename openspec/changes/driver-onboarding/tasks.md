@@ -75,20 +75,20 @@
 - [x] 3.1 Update `RegistrationService.java` to safeguard `DriverModel` creation with null-safe driver fields and default `basePrice = 0.00` when driver fields or price are omitted in OAuth signup.
 - [x] 3.2 Add unit tests in `RegistrationServiceTest.java` verifying driver creation with null fields and default `basePrice = 0.00`.
 - [x] 3.3 Validate using `./mvnw test` and `./mvnw spotless:check`.
-- [ ] 3.4 Open PR 3: `feat(auth): phase 3 — inicializacao de perfil de motorista no fluxo oauth`.
+- [x] 3.4 Open PR 3: `feat(auth): phase 3 — inicializacao de perfil de motorista no fluxo oauth`.
 
 ### Phase 4 — Driver Onboarding Query & Submission Engine
-- [ ] 4.1 Create response DTOs: `DriverOnboardingStatusResponseDTO`, `DriverOnboardingStepDTO`, `DriverOnboardingDocumentsStepDTO`, `DriverDocumentSummaryDTO` in `br.com.vanep.driver.dto`.
-- [ ] 4.2 Add MessageSource keys for onboarding validation errors in `src/main/resources/messages.properties` and `messages_pt_BR.properties`.
-- [ ] 4.3 Create `DriverOnboardingService.java` in `br.com.vanep.driver.service` with:
+- [x] 4.1 Create response DTOs: `DriverOnboardingStatusResponseDTO`, `DriverOnboardingStepDTO`, `DriverOnboardingDocumentsStepDTO`, `DriverDocumentSummaryDTO` in `br.com.vanep.driver.dto`.
+- [x] 4.2 Add MessageSource keys for onboarding validation errors in `src/main/resources/messages.properties` and `messages_pt_BR.properties`.
+- [x] 4.3 Create `DriverOnboardingService.java` in `br.com.vanep.driver.service` with:
   - `getOnboardingStatus(String callerUid)` calculating checklist across `DriverModel`, `VehicleModel`, `DriverCnhModel`, and `DriverDocumentModel`.
   - `submitOnboarding(String callerUid)` validating all 4 dimensions and transitioning to `UNDER_REVIEW`.
-- [ ] 4.4 Create `DriverOnboardingController.java` in `br.com.vanep.driver.controller` exposing:
+- [x] 4.4 Create `DriverOnboardingController.java` in `br.com.vanep.driver.controller` exposing:
   - `GET /api/drivers/me/onboarding`
   - `POST /api/drivers/me/submit-onboarding`
-- [ ] 4.5 Write unit tests `DriverOnboardingServiceTest.java` covering all validation branches (missing vehicle, missing CNH, expired CNH, missing documents, incomplete profile, successful submission).
-- [ ] 4.6 Write slice tests `DriverOnboardingControllerTest.java` (MockMvc) verifying security rules, HTTP 200, HTTP 422 on validation failures.
-- [ ] 4.7 Validate formatting and test coverage using `./mvnw spotless:check` and `./mvnw verify`.
+- [x] 4.5 Write unit tests `DriverOnboardingServiceTest.java` covering all validation branches (missing vehicle, missing CNH, expired CNH, missing documents, incomplete profile, successful submission).
+- [x] 4.6 Write slice tests `DriverOnboardingControllerTest.java` (MockMvc) verifying security rules, HTTP 200, HTTP 422 on validation failures.
+- [x] 4.7 Validate formatting and test coverage using `./mvnw spotless:check` and `./mvnw verify`.
 - [ ] 4.8 Open PR 4: `feat(driver): phase 4 — onboarding status and submission endpoints`.
 
 ### Phase 5 — Administrative Review Endpoints
