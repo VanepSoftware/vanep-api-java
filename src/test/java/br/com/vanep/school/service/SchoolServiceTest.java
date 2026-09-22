@@ -85,6 +85,7 @@ class SchoolServiceTest {
         "Rua da Escola",
         "1481",
         null,
+        null,
         "Centro",
         "city-campinas",
         "Campinas",

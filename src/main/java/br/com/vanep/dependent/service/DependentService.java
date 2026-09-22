@@ -1,7 +1,7 @@
 package br.com.vanep.dependent.service;
 
-import br.com.vanep.address.dto.AddressRequestDTO;
 import br.com.vanep.address.dto.AddressResponseDTO;
+import br.com.vanep.address.dto.DependentAddressRequestDTO;
 import br.com.vanep.address.service.AddressService;
 import br.com.vanep.client.repository.ClientRepository;
 import br.com.vanep.dependent.dto.DependentCreateDTO;
@@ -147,7 +147,7 @@ public class DependentService {
     applySchoolTokenMerge(dto.schoolToken(), model);
   }
 
-  private void applyAddressMerge(Long dependentId, AddressRequestDTO address) {
+  private void applyAddressMerge(Long dependentId, DependentAddressRequestDTO address) {
     if (address == null) {
       addressService.clearForDependent(dependentId);
       return;

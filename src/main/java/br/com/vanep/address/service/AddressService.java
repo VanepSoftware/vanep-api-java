@@ -2,6 +2,7 @@ package br.com.vanep.address.service;
 
 import br.com.vanep.address.dto.AddressRequestDTO;
 import br.com.vanep.address.dto.AddressResponseDTO;
+import br.com.vanep.address.dto.DependentAddressRequestDTO;
 import br.com.vanep.address.mapper.AddressMapper;
 import br.com.vanep.address.model.AddressModel;
 import br.com.vanep.address.repository.AddressRepository;
@@ -11,6 +12,7 @@ import br.com.vanep.school.model.SchoolModel;
 import br.com.vanep.school.repository.SchoolRepository;
 import java.util.Collection;
 import java.util.Map;
+import java.util.function.Consumer;
 import java.util.function.LongConsumer;
 import java.util.stream.Collectors;
 import org.springframework.context.MessageSource;
@@ -24,6 +26,7 @@ import org.springframework.web.server.ResponseStatusException;
 public class AddressService {
   private final AddressRepository addressRepository;
   private final AddressPlaceResolverService placeResolver;
+  private final AddressCatalogResolverService catalogResolver;
   private final AddressMapper mapper;
   private final MessageSource messages;
   private final DependentRepository dependents;
@@ -32,12 +35,14 @@ public class AddressService {
   public AddressService(
       AddressRepository addressRepository,
       AddressPlaceResolverService placeResolver,
+      AddressCatalogResolverService catalogResolver,
       AddressMapper mapper,
       MessageSource messages,
       DependentRepository dependents,
       SchoolRepository schools) {
     this.addressRepository = addressRepository;
     this.placeResolver = placeResolver;
+    this.catalogResolver = catalogResolver;
     this.mapper = mapper;
     this.messages = messages;
     this.dependents = dependents;
@@ -64,11 +69,23 @@ public class AddressService {
   }
 
   @Transactional
-  public AddressResponseDTO upsertForDependent(Long dependentId, AddressRequestDTO request) {
+  public AddressResponseDTO upsertForDependent(
+      Long dependentId, DependentAddressRequestDTO request) {
     DependentModel dependent = requireDependent(dependentId);
+    Consumer<AddressModel> writeCatalogAddress =
+        address ->
+            catalogResolver.applyCity(
+                address,
+                request.cityToken(),
+                request.street(),
+                request.zipCode(),
+                request.number(),
+                request.complement(),
+                request.neighborhood());
     return upsertOwnedAddress(
         dependent.getAddressId(),
-        request,
+        writeCatalogAddress,
+        writeCatalogAddress,
         () ->
             rejectIfOwnedByAnotherActiveOwner(
                 dependents.countByAddressIdAndIdNot(dependent.getAddressId(), dependent.getId()),
@@ -84,7 +101,8 @@ public class AddressService {
     SchoolModel school = requireSchool(schoolId);
     return upsertOwnedAddress(
         school.getAddressId(),
-        request,
+        address -> applyToNewAddress(address, request),
+        address -> applyToExistingAddress(address, request),
         () ->
             rejectIfOwnedByAnotherActiveOwner(
                 dependents.countByAddressId(school.getAddressId()),
@@ -117,7 +135,8 @@ public class AddressService {
 
   private AddressResponseDTO upsertOwnedAddress(
       Long currentAddressId,
-      AddressRequestDTO request,
+      Consumer<AddressModel> writeToNewAddress,
+      Consumer<AddressModel> writeToExistingAddress,
       Runnable rejectIfOwnedByAnother,
       LongConsumer linkToOwner) {
     if (currentAddressId != null) {
@@ -129,12 +148,12 @@ public class AddressService {
                   () ->
                       new ResponseStatusException(
                           HttpStatus.NOT_FOUND, message("address.not_found")));
-      applyToExistingAddress(address, request);
+      writeToExistingAddress.accept(address);
       return mapper.toResponse(addressRepository.save(address));
     }
 
     AddressModel address = new AddressModel();
-    applyToNewAddress(address, request);
+    writeToNewAddress.accept(address);
     AddressModel saved = addressRepository.save(address);
     linkToOwner.accept(saved.getId());
     return mapper.toResponse(saved);
