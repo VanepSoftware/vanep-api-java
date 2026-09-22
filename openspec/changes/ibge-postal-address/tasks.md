@@ -54,12 +54,12 @@
 > Branch: `feat/ibge-postal-address-cep` a partir de `feat/ibge-postal-address-seeder`
 > Depende de: 2 | Paralelo com: 6
 
-- [ ] 5.1 Commitar fixtures JSON gravadas do ViaCEP em `src/test/resources`; cravar `vanep.viacep.base-url` em `http://localhost:1/...` no `application-test.properties` (regra 50)
-- [ ] 5.2 Testes unitários falhando do `ViaCepClient`: mapeia `ibge` `5300108`; `{ "erro": true }` → não encontrado; falha de conexão → exceção de lookup
-- [ ] 5.3 Slice falhando: `401`; CEP de oito dígitos de Brasília `200` + `cityToken`; formato inválido `400`; ViaCEP desconhecido `404`; transporte `503`; `ibge_code` ausente no catálogo `404`; `ibge` nulo ou vazio na resposta do ViaCEP também `404` `cep.ibge.not_found`; rate limit `429` sem chamar ViaCEP
-- [ ] 5.4 Config env + `.env.example`: `vanep.viacep.base-url`, timeout, knobs de rate-limit (regras 1/3)
-- [ ] 5.5 Implementar client (`RestClient`), service, `CepLookupController`, bean de rate limiter (chave `cep-lookup:` + uid do JWT, nunca IP nem `X-Forwarded-For`), chaves MessageSource; `CepLookupService` sem `@Transactional` (a chamada HTTP não segura conexão do pool)
-- [ ] 5.6 `make lint` + testes desta fase; abrir PR
+- [x] 5.1 Commitar fixtures JSON gravadas do ViaCEP em `src/test/resources`; cravar `vanep.viacep.base-url` em `http://localhost:1/...` no `application-test.properties` (regra 50)
+- [x] 5.2 Testes unitários falhando do `ViaCepClient`: mapeia `ibge` `5300108`; `{ "erro": true }` → não encontrado; falha de conexão → exceção de lookup
+- [x] 5.3 Slice falhando: `401`; CEP de oito dígitos de Brasília `200` + `cityToken`; formato inválido `400`; ViaCEP desconhecido `404`; transporte `503`; `ibge_code` ausente no catálogo `404`; `ibge` nulo ou vazio na resposta do ViaCEP também `404` `cep.ibge.not_found`; rate limit `429` sem chamar ViaCEP
+- [x] 5.4 Config env + `.env.example`: `vanep.viacep.base-url`, timeout, knobs de rate-limit (regras 1/3)
+- [x] 5.5 Implementar client (`RestClient`), service, `CepLookupController`, bean de rate limiter (chave `cep-lookup:` + uid do JWT, nunca IP nem `X-Forwarded-For`), chaves MessageSource; `CepLookupService` sem `@Transactional` (a chamada HTTP não segura conexão do pool)
+- [x] 5.6 `make lint` + testes desta fase; abrir PR
 
 ## 6. Fase 6 — Endereço pessoal (PR 6)
 
