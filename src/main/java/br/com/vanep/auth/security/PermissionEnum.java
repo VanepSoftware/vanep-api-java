@@ -41,6 +41,7 @@ public enum PermissionEnum {
   UPDATE_DRIVER("update_driver"),
   DELETE_DRIVER("delete_driver"),
   RESTORE_DRIVER("restore_driver"),
+  APPROVE_DRIVER("approve_driver"),
   LIST_SCHOOLS("list_schools"),
   SHOW_SCHOOL("show_school"),
   CREATE_SCHOOL("create_school"),
