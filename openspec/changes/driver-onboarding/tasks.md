@@ -72,8 +72,8 @@
 - [x] 2.8 Open PR 2: `feat(driver): phase 2 — onboarding foundation e schema de analise`.
 
 ### Phase 3 — OAuth Driver Initialization
-- [x] 3.1 Update `RegistrationService.java` to safeguard `DriverModel` creation with null-safe driver fields and default `basePrice = 0.00` when driver fields or price are omitted in OAuth signup.
-- [x] 3.2 Add unit tests in `RegistrationServiceTest.java` verifying driver creation with null fields and default `basePrice = 0.00`.
+- [x] 3.1 Update `RegistrationService.java` to safeguard `DriverModel` creation with null-safe driver fields, setting `basePrice` directly from validated DTO.
+- [x] 3.2 Add unit tests in `RegistrationServiceTest.java` verifying driver creation with null fields protection and direct field assignment.
 - [x] 3.3 Validate using `./mvnw test` and `./mvnw spotless:check`.
 - [ ] 3.4 Open PR 3: `feat(auth): phase 3 — inicializacao de perfil de motorista no fluxo oauth`.
 

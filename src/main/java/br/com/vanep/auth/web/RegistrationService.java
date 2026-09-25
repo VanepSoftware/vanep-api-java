@@ -21,7 +21,6 @@ import br.com.vanep.role.repository.RoleRepository;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
-import java.math.BigDecimal;
 import java.time.Instant;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -92,10 +91,7 @@ public class RegistrationService {
         if (driverFields != null) {
           driver.setCnpj(driverFields.getCnpj());
           driver.setExperienceYears(driverFields.getExperienceYears());
-          driver.setBasePrice(
-              driverFields.getBasePrice() != null ? driverFields.getBasePrice() : BigDecimal.ZERO);
-        } else {
-          driver.setBasePrice(BigDecimal.ZERO);
+          driver.setBasePrice(driverFields.getBasePrice());
         }
         driver.setApprovalStatus(DriverApprovalStatus.PENDING);
         drivers.save(driver);
