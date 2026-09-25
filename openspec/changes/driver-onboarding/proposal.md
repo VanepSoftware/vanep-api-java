@@ -41,10 +41,10 @@ Esta proposta introduz a funcionalidade completa de Onboarding do Motorista no b
     - Status geral (`approvalStatus`, `submittedAt`, `rejectionReason`, `canSubmit`).
     - Etapa Perfil: campos preenchidos e campos obrigatórios faltantes.
     - Etapa Veículo: presença de ao menos um veículo ativo e resumo do veículo principal.
-    - Etapa CNH: presença de CNH ativa e validação de validade da carteira.
-    - Etapa Documentos: checklist dos documentos obrigatórios (`CRLV`, `VEHICLE_INSPECTION`, `MUNICIPAL_AUTHORIZATION`) e seus status individuais (`UPLOADED`, `MISSING`, `APPROVED`, `REJECTED`).
+    - Etapa CNH: presença de CNH ativa, validação de validade da carteira e presença de foto anexada (`photo != null`).
+    - Etapa Documentos: checklist dos documentos obrigatórios (`CRLV`, `VEHICLE_INSPECTION`, `MUNICIPAL_AUTHORIZATION`), exigindo que cada registro possua arquivo associado (`file != null`) e status diferente de `REJECTED`. Documentos criados sem upload de arquivo no endpoint `/file` permanecem com status pendente de envio.
 - **Endpoint de Submissão do Onboarding (`POST /api/drivers/me/submit-onboarding`):**
-  - Valida se todos os pré-requisitos estão atendidos (perfil com cidade e preço base, ao menos 1 veículo ativo, CNH válida cadastrada, e todos os documentos obrigatórios enviados).
+  - Valida se todos os pré-requisitos estão atendidos (perfil com cidade e preço base, ao menos 1 veículo ativo, CNH válida cadastrada com foto, e todos os documentos obrigatórios com arquivos anexados).
   - Em caso de inconsistência ou pendência, rejeita com HTTP 422 Unprocessable Entity e payload estruturado detalhando quais etapas/documentos estão faltando.
   - Em caso de sucesso, transiciona o motorista para `UNDER_REVIEW`, marca `submitted_at = Instant.now()`, limpa eventual `rejection_reason` anterior e retorna o status atualizado.
 - **Endpoints Administrativos de Revisão:**
@@ -62,7 +62,7 @@ Esta proposta introduz a funcionalidade completa de Onboarding do Motorista no b
   - Testes de slice HTTP/segurança para `DriverOnboardingControllerTest` com `MockMvc`.
 
 **Fora de Escopo:**
-- Upload direto de binários multipart no backend (o app móvel faz upload para serviço de storage e envia as URLs públicas/assinadas para os endpoints REST existentes de vehicle, driver_cnh e driver_document).
+- Criação de nova infraestrutura de storage de arquivos (o fluxo de onboarding consome o motor de mídia multipart já implementado na PR #207 através de `media_file`, `POST /api/driver-documents/{token}/file` e `POST /api/driver-cnhs/{token}/photo`).
 - Reanálise automatizada via OCR/IA de documentos (revisão humana por administradores).
 
 ---

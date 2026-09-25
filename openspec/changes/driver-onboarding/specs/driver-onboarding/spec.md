@@ -6,13 +6,13 @@ The system SHALL expand `DocumentTypeEnum` to include `VEHICLE_INSPECTION` (vist
 
 #### Scenario: Registering a vehicle inspection document
 
-- **WHEN** an authenticated driver sends `POST /api/driver-documents` with `documentType` equal to `VEHICLE_INSPECTION` and a valid `fileUrl`
-- **THEN** the system returns `201 Created` with the registered document response containing `documentType: "VEHICLE_INSPECTION"`
+- **WHEN** an authenticated driver sends `POST /api/driver-documents` with `documentType` equal to `VEHICLE_INSPECTION`
+- **THEN** the system returns `201 Created` with the registered document response containing `documentType: "VEHICLE_INSPECTION"` and `status: "PENDING"`
 
 #### Scenario: Registering a municipal authorization document
 
-- **WHEN** an authenticated driver sends `POST /api/driver-documents` with `documentType` equal to `MUNICIPAL_AUTHORIZATION` and a valid `fileUrl`
-- **THEN** the system returns `201 Created` with the registered document response containing `documentType: "MUNICIPAL_AUTHORIZATION"`
+- **WHEN** an authenticated driver sends `POST /api/driver-documents` with `documentType` equal to `MUNICIPAL_AUTHORIZATION`
+- **THEN** the system returns `201 Created` with the registered document response containing `documentType: "MUNICIPAL_AUTHORIZATION"` and `status: "PENDING"`
 
 ---
 
@@ -56,13 +56,21 @@ The system SHALL expose `GET /api/drivers/me/onboarding` for authenticated drive
 
 #### Scenario: Checking status when all steps are completed
 
-- **WHEN** an authenticated driver has completed profile with city and basePrice > 0, has an active vehicle, has a valid non-expired CNH, and has uploaded all 3 mandatory document types
+- **WHEN** an authenticated driver has completed profile with city and basePrice > 0, has an active vehicle, has a valid non-expired CNH with photo uploaded, and has uploaded files for all 3 mandatory document types
 - **THEN** the system returns `200 OK`
 - **AND** `canSubmit` is `true`
 - **AND** `profileStep.completed` is `true`
 - **AND** `vehicleStep.completed` is `true`
 - **AND** `cnhStep.completed` is `true`
 - **AND** `documentsStep.completed` is `true` with empty `missingTypes`
+
+#### Scenario: Checking status when documents exist but files have not been uploaded
+
+- **WHEN** an authenticated driver created document records for all 3 mandatory types, but has not uploaded the file for `CRLV` via `POST /api/driver-documents/{token}/file`
+- **THEN** the system returns `200 OK`
+- **AND** `documentsStep.completed` is `false`
+- **AND** `documentsStep.missingTypes` contains `["CRLV"]`
+- **AND** `canSubmit` is `false`
 
 #### Scenario: Checking status while under review (Screen S06)
 
@@ -109,9 +117,21 @@ The system SHALL expose `POST /api/drivers/me/submit-onboarding` for authenticat
 
 #### Scenario: Submitting with missing mandatory documents
 
-- **WHEN** an authenticated driver who has not uploaded the `MUNICIPAL_AUTHORIZATION` sends `POST /api/drivers/me/submit-onboarding`
+- **WHEN** an authenticated driver who has not created the `MUNICIPAL_AUTHORIZATION` sends `POST /api/drivers/me/submit-onboarding`
 - **THEN** the system returns `422 Unprocessable Entity`
 - **AND** the error details list `MUNICIPAL_AUTHORIZATION` as a missing mandatory document
+
+#### Scenario: Submitting when mandatory document has no file uploaded
+
+- **WHEN** an authenticated driver has registered records for all mandatory types, but the `CRLV` document has no associated file (`file_media_id` is null)
+- **THEN** the system returns `422 Unprocessable Entity`
+- **AND** the error details indicate that `CRLV` is missing its uploaded file
+
+#### Scenario: Submitting with CNH missing photo
+
+- **WHEN** an authenticated driver whose registered CNH does not have a photo uploaded (`photo_media_id` is null) sends `POST /api/drivers/me/submit-onboarding`
+- **THEN** the system returns `422 Unprocessable Entity`
+- **AND** the error details indicate that the CNH photo is required
 
 #### Scenario: Cannot submit when already under review or approved
 

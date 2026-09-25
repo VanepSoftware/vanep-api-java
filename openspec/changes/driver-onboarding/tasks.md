@@ -72,12 +72,12 @@
 - [ ] 3.1 Create response DTOs: `DriverOnboardingStatusResponseDTO`, `DriverOnboardingStepDTO`, `DriverOnboardingDocumentsStepDTO`, `DriverDocumentSummaryDTO` in `br.com.vanep.driver.dto`.
 - [ ] 3.2 Add MessageSource keys for onboarding validation errors in `src/main/resources/messages.properties` and `messages_pt_BR.properties`.
 - [ ] 3.3 Create `DriverOnboardingService.java` in `br.com.vanep.driver.service` with:
-  - `getOnboardingStatus(String callerUid)` calculating checklist across `DriverModel`, `VehicleModel`, `DriverCnhModel`, and `DriverDocumentModel`.
-  - `submitOnboarding(String callerUid)` validating all 4 dimensions and transitioning to `UNDER_REVIEW`.
+  - `getOnboardingStatus(String callerUid)` calculating checklist across `DriverModel`, `VehicleModel`, `DriverCnhModel` (requiring valid date and `photo != null`), and `DriverDocumentModel` (requiring `file != null` and `status != REJECTED`).
+  - `submitOnboarding(String callerUid)` validating all 4 dimensions (including CNH photo and attached document files) and transitioning to `UNDER_REVIEW`.
 - [ ] 3.4 Create `DriverOnboardingController.java` in `br.com.vanep.driver.controller` exposing:
   - `GET /api/drivers/me/onboarding`
   - `POST /api/drivers/me/submit-onboarding`
-- [ ] 3.5 Write unit tests `DriverOnboardingServiceTest.java` covering all validation branches (missing vehicle, missing CNH, expired CNH, missing documents, incomplete profile, successful submission).
+- [ ] 3.5 Write unit tests `DriverOnboardingServiceTest.java` covering all validation branches (missing vehicle, missing CNH, expired CNH, CNH without photo, missing documents, document record without attached file, incomplete profile, successful submission).
 - [ ] 3.6 Write slice tests `DriverOnboardingControllerTest.java` (MockMvc) verifying security rules, HTTP 200, HTTP 422 on validation failures.
 - [ ] 3.7 Validate formatting and test coverage using `./mvnw spotless:check` and `./mvnw verify`.
 - [ ] 3.8 Open PR 3: `feat(driver): phase 3 — onboarding status and submission endpoints`.

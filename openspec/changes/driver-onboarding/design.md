@@ -26,7 +26,7 @@ Este documento detalha o design técnico e arquitetural da solução.
 7. Cumprir integralmente todas as regras de qualidade, Clean Architecture e entrega em fases da `constitution.md`.
 
 **Non-Goals:**
-- Implementar processamento de upload de arquivos binários diretamente na API (o upload é realizado diretamente para o storage pelo cliente mobile, persistindo as URLs nos DTOs existentes).
+- Implementar nova infraestrutura ou motor de armazenamento de arquivos (reutiliza o subsistema de mídia e uploads multipart já implementados em #207).
 - Automação de aprovação por OCR ou integração externa (validação humana administrativa).
 - Permitir que motoristas com status diferente de `APPROVED` recebam propostas de clientes ou fiquem visíveis para contratação na busca pública.
 
@@ -106,17 +106,18 @@ O endpoint calcula o status das quatro dimensões do onboarding:
 2. **Veículo (`vehicle`):**
    - Válido se existir pelo menos um `VehicleModel` ativo (`deleted_at IS NULL`) vinculado ao `driver.id`.
 3. **CNH (`cnh`):**
-   - Válido se existir um `DriverCnhModel` ativo vinculado ao `driver.id` e `validUntil >= LocalDate.now()`.
+   - Válido se existir um `DriverCnhModel` ativo vinculado ao `driver.id`, com `validUntil >= LocalDate.now()` e com foto anexada (`photo != null`).
 4. **Documentos Obrigatórios (`mandatoryDocuments`):**
    - Os tipos obrigatórios para transporte escolar são: `CRLV`, `VEHICLE_INSPECTION` e `MUNICIPAL_AUTHORIZATION`.
-   - Válido se houver ao menos um `DriverDocumentModel` ativo para cada um dos 3 tipos obrigatórios (com status diferente de `REJECTED`).
+   - Válido se houver ao menos um `DriverDocumentModel` ativo para cada um dos 3 tipos obrigatórios, com status diferente de `REJECTED` E com arquivo anexado (`document.getFile() != null`).
+   - Se um documento foi criado via `POST /api/driver-documents`, mas o arquivo não foi enviado via `POST /api/driver-documents/{token}/file` (`file_media_id` é `null`), o tipo continua sendo contabilizado em `missingTypes` e a etapa permanece incompleta.
 5. **`canSubmit`:**
    - Retorna `true` apenas se as 4 dimensões forem válidas E o status atual do motorista for `PENDING` ou `REJECTED`.
 
 ### D5 — Submissão para Análise (`POST /api/drivers/me/submit-onboarding`)
 
 Quando o motorista clica em "Submeter para análise":
-1. O serviço avalia a completude das 4 etapas.
+1. O serviço avalia a completude das 4 etapas (incluindo presença de foto na CNH e arquivos anexados nos documentos obrigatórios).
 2. Se houver pendências:
    - Dispara `ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, message("driver.onboarding.incomplete"))` acompanhado da lista de pendências.
 3. Se estiver completo:
