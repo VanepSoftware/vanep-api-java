@@ -11,15 +11,47 @@ concurrency:
 
 permissions:
   contents: read
+  pull-requests: read
 
 jobs:
-  ci:
+  changes:
+    name: Detecta mudanças de código
     runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Filtra caminhos
+        id: filter
+        uses: dorny/paths-filter@v4
+        with:
+          # 'some-with-excludes': o arquivo entra se casar com algum padrao positivo
+          # e com nenhum negado. Sem isso os '!' viram apenas mais uma clausula OR
+          # e o filtro casaria com praticamente tudo.
+          predicate-quantifier: "some-with-excludes"
+          filters: |
+            code:
+              - '**'
+              - '!**/*.md'
+              - '!docs/**'
+              - '!openspec/**'
+
+  ci:
+    needs: changes
+    runs-on: ubuntu-latest
+    steps:
+      - name: Docs-only PR — skip
+        if: needs.changes.outputs.code != 'true'
+        run: echo "No code changes — skipping CI"
+
+      - name: Checkout
+        if: needs.changes.outputs.code == 'true'
+        uses: actions/checkout@v4
+
       - name: Set up JDK 25
+        if: needs.changes.outputs.code == 'true'
         uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -27,11 +59,12 @@ jobs:
           cache: maven
 
       - name: Lint + testes + JaCoCo (Spotless + cobertura ≥ 75% linhas)
+        if: needs.changes.outputs.code == 'true'
         run: chmod +x mvnw && ./mvnw verify -B
 
       - name: Upload relatório JaCoCo (HTML)
         uses: actions/upload-artifact@v4
-        if: always()
+        if: always() && needs.changes.outputs.code == 'true'
         with:
           name: jacoco-html
           path: target/site/jacoco/
