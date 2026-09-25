@@ -11,7 +11,6 @@ concurrency:
 
 permissions:
   contents: read
-  pull-requests: read
 
 jobs:
   changes:
@@ -22,21 +21,50 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
+      # Feito em bash de proposito: este repo restringe Actions a uma allowlist
+      # (github_owned + docker/* + appleboy/ssh-action), entao dorny/paths-filter
+      # daria startup_failure. Frontend e mobile usam a action.
       - name: Filtra caminhos
         id: filter
-        uses: dorny/paths-filter@v4
-        with:
-          # 'some-with-excludes': o arquivo entra se casar com algum padrao positivo
-          # e com nenhum negado. Sem isso os '!' viram apenas mais uma clausula OR
-          # e o filtro casaria com praticamente tudo.
-          predicate-quantifier: "some-with-excludes"
-          filters: |
-            code:
-              - '**'
-              - '!**/*.md'
-              - '!docs/**'
-              - '!openspec/**'
+        run: |
+          set -euo pipefail
+
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            range="${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }}"
+          elif git rev-parse --quiet --verify "${{ github.event.before }}^{commit}" >/dev/null 2>&1; then
+            range="${{ github.event.before }}..${{ github.sha }}"
+          else
+            # Branch nova ou force-push: sem base confiavel, roda a CI inteira.
+            echo "Sem base para comparar — tratando como mudanca de codigo."
+            echo "code=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          files="$(git diff --name-only "$range")"
+          echo "Arquivos alterados:"
+          echo "${files:-(nenhum)}"
+
+          if [ -z "$files" ]; then
+            echo "code=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # docs-only = todo arquivo alterado e' .md ou esta em docs/ ou openspec/.
+          # Testa a saida do grep, nao o exit code de -v: nem toda implementacao
+          # de grep concorda sobre o status de saida com -v.
+          code_files="$(printf '%s\n' "$files" | grep -vE '(\.md$|^docs/|^openspec/)' || true)"
+
+          if [ -n "$code_files" ]; then
+            echo "Mudou codigo:"
+            echo "$code_files"
+            echo "code=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Somente documentacao."
+            echo "code=false" >> "$GITHUB_OUTPUT"
+          fi
 
   ci:
     needs: changes
