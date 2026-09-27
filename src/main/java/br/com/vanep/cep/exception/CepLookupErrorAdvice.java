@@ -26,7 +26,10 @@ public class CepLookupErrorAdvice {
   }
 
   private ProblemDetail problem(HttpStatus status, String key) {
-    return ProblemDetail.forStatusAndDetail(
-        status, messages.getMessage(key, null, LocaleContextHolder.getLocale()));
+    ProblemDetail problem =
+        ProblemDetail.forStatusAndDetail(
+            status, messages.getMessage(key, null, LocaleContextHolder.getLocale()));
+    problem.setProperty("code", key);
+    return problem;
   }
 }
