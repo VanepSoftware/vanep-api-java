@@ -18,6 +18,7 @@ import br.com.vanep.location.exception.UnsupportedStateException;
 import br.com.vanep.places.dto.PlaceDetailsResponseDTO;
 import br.com.vanep.state.model.StateModel;
 import br.com.vanep.state.repository.StateRepository;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -34,16 +35,19 @@ public class LocationResolverService {
   private final StateRepository states;
   private final CityRepository cities;
   private final DistrictRepository districts;
+  private final MeterRegistry meterRegistry;
 
   public LocationResolverService(
       CountryRepository countries,
       StateRepository states,
       CityRepository cities,
-      DistrictRepository districts) {
+      DistrictRepository districts,
+      MeterRegistry meterRegistry) {
     this.countries = countries;
     this.states = states;
     this.cities = cities;
     this.districts = districts;
+    this.meterRegistry = meterRegistry;
   }
 
   @Transactional
@@ -160,6 +164,7 @@ public class LocationResolverService {
         uf,
         googleCityName,
         placeId);
+    meterRegistry.counter("location.city.unmatched", "uf", uf).increment();
     return new UnmatchedCityException(uf, googleCityName, placeId);
   }
 
