@@ -88,3 +88,4 @@
 - [x] 7.7 MessageSource EN + pt-BR: `dependent_address.city_token.required`, `.street.required`, `.street.too_long`, `.zip_code.required`, `.zip_code.invalid`, `.number.too_long`, `.complement.too_long`, `.neighborhood.too_long`
 - [x] 7.8 Migrar `DependentServiceTest` e `DependentControllerTest` para o contrato novo, sem stub de `PlacesClient`
 - [x] 7.9 `make lint` + `./mvnw verify`; abrir PR
+- [x] 7.10 (pós-review) `code` estável (`city.not_found` / `dependent.not_found`) no `ProblemDetail` dos dois 404 do `PATCH /api/dependent` — mobile parava de depender do texto do `detail` (ver D9)

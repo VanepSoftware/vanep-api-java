@@ -176,8 +176,12 @@ public class AddressService {
     return dependents
         .findById(dependentId)
         .orElseThrow(
-            () ->
-                new ResponseStatusException(HttpStatus.NOT_FOUND, message("dependent.not_found")));
+            () -> {
+              ResponseStatusException exception =
+                  new ResponseStatusException(HttpStatus.NOT_FOUND, message("dependent.not_found"));
+              exception.getBody().setProperty("code", "dependent.not_found");
+              return exception;
+            });
   }
 
   private SchoolModel requireSchool(Long schoolId) {

@@ -395,7 +395,8 @@ class DependentControllerTest {
                     "{\"name\":\"Lucas Souza\",\"address\":"
                         + catalogAddressJson("doesnotexist", "Rua do Embarque", "13015904", "1")
                         + "}"))
-        .andExpect(status().isNotFound());
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.code").value("city.not_found"));
 
     assertThat(dependents.findByClientId(ownerClientId)).isEmpty();
     assertThat(addresses.count()).isZero();
@@ -529,7 +530,8 @@ class DependentControllerTest {
   void getByTokenReturns404WhenMissing() throws Exception {
     mockMvc
         .perform(get("/api/dependent/doesnotexist").with(ownerJwt()))
-        .andExpect(status().isNotFound());
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.code").value("dependent.not_found"));
   }
 
   @Test
@@ -649,6 +651,38 @@ class DependentControllerTest {
         .andExpect(jsonPath("$.address.token").value(pickup.getToken()))
         .andExpect(jsonPath("$.address.cityToken").value(santos.getToken()))
         .andExpect(jsonPath("$.address.cityName").value("Santos"));
+  }
+
+  @Test
+  void patchAddressWithUnknownCityTokenReturns404WithCityCode() throws Exception {
+    DependentModel own = createDependent(ownerClientId, "Own Kid", true);
+    AddressModel pickup = persistPickupAddress(own, "10");
+
+    mockMvc
+        .perform(
+            patch("/api/dependent/" + own.getToken())
+                .with(ownerJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"address\":"
+                        + catalogAddressJson("doesnotexist", "Rua do Embarque", "13015904", "1")
+                        + "}"))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.code").value("city.not_found"));
+
+    assertThat(addresses.findById(pickup.getId()).orElseThrow().getNumber()).isEqualTo("10");
+  }
+
+  @Test
+  void patchUnknownDependentTokenReturns404WithDependentCode() throws Exception {
+    mockMvc
+        .perform(
+            patch("/api/dependent/doesnotexist")
+                .with(ownerJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"Lucas Souza\"}"))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.code").value("dependent.not_found"));
   }
 
   @Test

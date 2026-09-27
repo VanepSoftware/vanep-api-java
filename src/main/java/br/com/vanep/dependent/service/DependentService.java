@@ -442,6 +442,9 @@ public class DependentService {
   }
 
   private ResponseStatusException notFound() {
-    return new ResponseStatusException(HttpStatus.NOT_FOUND, message("dependent.not_found"));
+    ResponseStatusException exception =
+        new ResponseStatusException(HttpStatus.NOT_FOUND, message("dependent.not_found"));
+    exception.getBody().setProperty("code", "dependent.not_found");
+    return exception;
   }
 }

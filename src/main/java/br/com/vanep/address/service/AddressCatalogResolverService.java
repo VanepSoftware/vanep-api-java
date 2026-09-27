@@ -40,10 +40,14 @@ public class AddressCatalogResolverService {
   }
 
   private CityModel requireCityByToken(String cityToken) {
-    return cities
-        .findByToken(cityToken)
-        .orElseThrow(
-            () -> new ResponseStatusException(HttpStatus.NOT_FOUND, message("city.not_found")));
+    return cities.findByToken(cityToken).orElseThrow(() -> notFound("city.not_found"));
+  }
+
+  private ResponseStatusException notFound(String key) {
+    ResponseStatusException exception =
+        new ResponseStatusException(HttpStatus.NOT_FOUND, message(key));
+    exception.getBody().setProperty("code", key);
+    return exception;
   }
 
   private String message(String key) {
