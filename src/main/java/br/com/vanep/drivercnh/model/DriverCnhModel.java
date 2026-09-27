@@ -1,6 +1,7 @@
 package br.com.vanep.drivercnh.model;
 
 import br.com.vanep.driver.model.DriverModel;
+import br.com.vanep.media.model.MediaFileModel;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -60,8 +61,9 @@ public class DriverCnhModel {
   @Column(name = "issuing_state", length = 2)
   private String issuingState;
 
-  @Column(name = "photo_url")
-  private String photoUrl;
+  @ManyToOne(fetch = FetchType.EAGER)
+  @JoinColumn(name = "photo_media_id")
+  private MediaFileModel photo;
 
   @Column(name = "is_active", nullable = false)
   private boolean active = true;

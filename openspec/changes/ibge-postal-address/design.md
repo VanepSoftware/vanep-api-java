@@ -1,6 +1,6 @@
 ## Contexto
 
-O `PUT /api/user/me/address` hoje aceita só `placeId` (+ `sessionToken`, `number`, `complement` opcionais). O `PersonalAddressService` delega a `AddressPlaceResolverService.applyPlace` (extraído pela PR #173), que chama Place Details, exige um componente de rua e faz `findOrCreate` na árvore. `city` nasce lazy do Google; o `StateSeeder` já cura as UFs. ViaCEP é não-objetivo documentado de `owned-address-model`. Testes cravam URLs de saída em `http://localhost:1` (regra 50). A `main` já está em `V35` (auth nativo, N-177 usou `V34` e `V35`); a próxima Flyway desta change é `V36`. Motivação em `proposal.md`.
+O `PUT /api/user/me/address` hoje aceita só `placeId` (+ `sessionToken`, `number`, `complement` opcionais). O `PersonalAddressService` delega a `AddressPlaceResolverService.applyPlace` (extraído pela PR #173), que chama Place Details, exige um componente de rua e faz `findOrCreate` na árvore. `city` nasce lazy do Google; o `StateSeeder` já cura as UFs. ViaCEP é não-objetivo documentado de `owned-address-model`. Testes cravam URLs de saída em `http://localhost:1` (regra 50). A `main` já está em `V45` (auth nativo N-177 usou `V34`/`V35`; o refactor de rating por `client_driver` tomou `V36`–`V39`; mídia tomou `V41`–`V45`); a próxima Flyway desta change é `V46`. Motivação em `proposal.md`.
 
 `GET /api/cities` e `GET /api/states` hoje são admin (`list_cities` / `list_states`). Esta change **reusa esses paths** como picker autenticado: município IBGE é dado de referência, não catálogo operacional. Motivação em `proposal.md`.
 
@@ -37,6 +37,8 @@ O `LocationResolverService` mantém `findOrCreateDistrict`. Lookup de cidade vir
 ### D2 — Dump no repo, seeder no boot, não 5570 inserts na Flyway
 
 Capturar IBGE `localidades/municipios` **uma vez** em `src/main/resources/seed/ibge-municipalities.json`. `CitySeeder` (depois do `StateSeeder`) faz upsert por `ibge_code`. Testes nunca baixam IBGE: unitários usam fixture de duas cidades; slice insere as cidades que precisa.
+
+`CountrySeeder` → `StateSeeder` → `CitySeeder` rodam num `ApplicationRunner` próprio (`GeographicDataSeeder`), ligado por padrão (`vanep.geographic-data.seed-enabled`) e separado do `DataSeeder` de demonstração (`vanep.seed.enabled`, default `false`). O catálogo geográfico é dado de referência que a busca de motorista, o picker e o CEP exigem em qualquer ambiente; gate-lo atrás do mesmo flag do admin/dados fictícios obrigaria produção a escolher entre ficar sem cidades ou subir um admin de senha padrão.
 
 Cada item do JSON é **um** município. `microrregiao` e `regiao-imediata` são recortes estatísticos do mesmo município, não duas cidades. O seeder lê só:
 
@@ -102,14 +104,14 @@ A V23 adicionou `google_place_id` em `state` e `city` “para rastrear origem”
 
 Uma change futura de Geocoding/alias é **N nomes ou place ids Google → um `ibge_code`**. Coluna unique 1:1 em `city` é o schema errado para isso. Estado já tem UF. `district.google_place_id` fica: esse nível não tem código oficial e é o único nó da árvore que o Geocoding pode canonicalizar depois. `address` e `school` mantêm a coluna (identidade do place escolhido).
 
-Dropar na `V36` junto com `ibge_code` (momento mais barato; não editar V23). Não é breaking HTTP.
+Dropar na `V46` junto com `ibge_code` (momento mais barato; não editar V23). Não é breaking HTTP.
 
 **Alternativas:** deixar as colunas null “pro Geocoding” (convite a preencher o 1:1 errado depois); dropar numa migration seguinte (mesmo trabalho, mais tarde).
 
 ### D8 — PRs faseados
 
 ```
-V36 + models (drop city/state google_place_id)
+V46 + models (drop city/state google_place_id)
     │
     ▼
 CitySeeder + dump
@@ -132,7 +134,7 @@ Fases 3 e 4 podem seguir em paralelo depois do seeder. Fase 5 depende da 2 (`ibg
 
 | Fase | Conteúdo | Depende de | Paralelo com |
 |------|----------|------------|--------------|
-| 1 | `V36` + `CityModel.ibgeCode` + `AddressModel.neighborhood`; drop `google_place_id` em `city` e `state` | — | — |
+| 1 | `V46` + `CityModel.ibgeCode` + `AddressModel.neighborhood`; drop `google_place_id` em `city` e `state` | — | — |
 | 2 | Dump IBGE + `CitySeeder` + testes do seeder (fixture pequena) | 1 | — |
 | 3 | Abrir `GET /api/states` e `GET /api/cities?uf=&search=` (`isAuthenticated()`) | 2 | 4 |
 | 4 | Resolver só match de cidade; 400 no miss (persistência + busca) | 2 | 3 |
@@ -169,22 +171,22 @@ A PR #173 (`dependent-address-by-place`) trocou `AddressRequestDTO` (compartilha
 - **[Risco] Dump IBGE desatualizado** (município novo) → ViaCEP 404 de código; recapturar dump. Sem IBGE em runtime.
 - **[Risco] Grafia Google ≠ IBGE no interior** → 400 alto até a change de alias. Lançamento DF/SP capital: fixtures atuais casam.
 - **[Risco] BREAKING no PUT de endereço** → app ainda em `placeId` quebra; coordenar release. Sem contrato duplo (place **ou** form) nesta change — dois caminhos reabrem duas verdades.
-- **[Risco] Seeder 5570 linhas no boot** → uma vez, idempotente; aceitável. Testes não carregam o dump completo.
+- **[Risco] Seeder 5570 linhas no boot** → uma vez, idempotente, em todo boot de qualquer ambiente (`GeographicDataSeeder` ligado por padrão); aceitável. Testes não carregam o dump completo e desligam `vanep.geographic-data.seed-enabled`.
 - **[Risco] ViaCEP fora do ar** → 503 no GET; PUT e picker seguem. Não acoplar save ao Correios.
 - **[Risco] `GET /api/cities` sem `uf`** → breaking para quem listava o catálogo admin inteiro; nenhum cliente de produção assumido. Sem `uf` é `400` de propósito (5.570 municípios).
 - **[Risco] Reintroduzir `google_place_id` em `city` no Geocoding** → unique 1:1 é o modelo errado; alias N→1. D7 dropa de propósito.
 - **[Risco] BREAKING no `POST/PATCH /api/dependent`** (fase 7) → o branch `feat/8-dependent-address` do `vanep-mobile`, escrito contra o contrato `placeId` da PR #173, precisa migrar para `cityToken` antes do release; coordenar como no D9/personal-address (sem contrato duplo). Além da troca de campos, o app perde o amend "só número": passa a reenviar o formulário completo montado a partir da leitura.
-- **[Risco] Colisão de versão Flyway** → branches de fase escritas antes do N-177 entrar na `main` (ex. `feat/ibge-postal-address-schema`) têm um arquivo `V34__...` que agora **duplica** a versão `V34` da `main`. O `git merge` não acusa (nomes de arquivo diferentes); o Flyway recusa subir com duas migrations na mesma versão. Renomear para `V36__...` antes de mergear a fase 1; a `V34` local nunca foi aplicada fora do banco do dev (que precisa ser recriado ou reparado). Regra 2 não impede: o arquivo não foi aplicado em ambiente compartilhado.
+- **[Risco] Colisão de versão Flyway** → branches de fase escritas antes de um trecho da `main` entrar duplicam a versão de um arquivo já ocupado lá (primeiro `V34` do auth N-177, depois `V36` do refactor de rating por `client_driver`). O `git merge` não acusa (nomes de arquivo diferentes); o Flyway recusa subir com duas migrations na mesma versão. Renomear o arquivo da fase 1 para a próxima versão livre em `main` antes de mergear cada vez que isso acontecer (`V34__...` → `V36__...` → `V46__...`); a versão local antiga nunca foi aplicada fora do banco do dev (que precisa ser recriado ou reparado). Regra 2 não impede: o arquivo não foi aplicado em ambiente compartilhado.
 - **[Risco] Fase 4 antes das 6/7** → reescreve testes que as 6/7 apagam (ver D8); mitigado pela ordem de merge com a 4 por último.
 
 ## Plano de migração
 
-1. `V36`: `city.ibge_code varchar(7)` unique where `deleted_at is null`; `address.neighborhood varchar(128)`; drop `city.google_place_id` e `state.google_place_id` mais `city_google_place_id_active_key` / `state_google_place_id_active_key`. Não editar V23 (regra 2).
+1. `V46`: `city.ibge_code varchar(7)` unique where `deleted_at is null`; `address.neighborhood varchar(128)`; drop `city.google_place_id` e `state.google_place_id` mais `city_google_place_id_active_key` / `state_google_place_id_active_key`. Não editar V23 (regra 2).
 2. Deploy do seeder (dev/prod). Cidades lazy Google existentes sem `ibge_code`: **sem dado de produção** assumido; se um banco local tiver resto Google, recriar ou casar por nome e setar `ibge_code` na mão. Sem backfill heróico nesta change.
 3. Deploy do resolver (Google para de criar cidade) **depois** do seeder ter rodado, senão o primeiro Place Details dá 400 em Brasília.
 4. Deploy CEP + PUT postal; o app troca no mesmo trem de release.
 
-Rollback: nova migration para reverter a V36 se já aplicada (dropar `ibge_code` / `neighborhood`, repor `google_place_id` só se um rollback do D7 for mesmo necessário — sempre foi null); não editar V36 (regra 2). Rollback do resolver restauraria `findOrCreateCity` — não enviar o resolver antes do catálogo estar populado.
+Rollback: nova migration para reverter a V46 se já aplicada (dropar `ibge_code` / `neighborhood`, repor `google_place_id` só se um rollback do D7 for mesmo necessário — sempre foi null); não editar V46 (regra 2). Rollback do resolver restauraria `findOrCreateCity` — não enviar o resolver antes do catálogo estar populado.
 
 ## Questões em aberto
 

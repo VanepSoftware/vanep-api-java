@@ -71,10 +71,4 @@ public class DriverRatingController {
   public void delete(@PathVariable String token) {
     service.delete(token);
   }
-
-  @PostMapping("/{token}/restore")
-  @PreAuthorize("hasAuthority('restore_driver_rating')")
-  public DriverRatingResponseDTO restore(@PathVariable String token) {
-    return service.restore(token);
-  }
 }
