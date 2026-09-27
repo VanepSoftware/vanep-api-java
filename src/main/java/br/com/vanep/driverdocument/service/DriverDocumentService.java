@@ -83,7 +83,6 @@ public class DriverDocumentService {
     DriverDocumentModel document = new DriverDocumentModel();
     document.setDriver(driver);
     document.setDocumentType(request.documentType());
-    document.setFileUrl(request.fileUrl());
     document.setExpiresAt(request.expiresAt());
     document.setStatus(DocumentStatusEnum.PENDING);
 
@@ -157,7 +156,6 @@ public class DriverDocumentService {
   public DriverDocumentResponseDTO update(String token, DriverDocumentRequestDTO request) {
     DriverDocumentModel document = requireByToken(token);
     document.setDocumentType(request.documentType());
-    document.setFileUrl(request.fileUrl());
     document.setExpiresAt(request.expiresAt());
     document.setStatus(DocumentStatusEnum.PENDING);
 

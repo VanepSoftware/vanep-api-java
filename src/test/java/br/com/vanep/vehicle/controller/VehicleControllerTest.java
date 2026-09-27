@@ -199,7 +199,7 @@ class VehicleControllerTest {
   }
 
   @Test
-  void createReturns201ForDriver() throws Exception {
+  void createIgnoresPhotoUrlStringsInTheBody() throws Exception {
     String body =
         """
         {
@@ -225,9 +225,9 @@ class VehicleControllerTest {
         .andExpect(jsonPath("$.token").exists())
         .andExpect(jsonPath("$.plate").value("XYZ-9876"))
         .andExpect(jsonPath("$.driverToken").value(driverToken))
-        .andExpect(jsonPath("$.photoFrontUrl").value("http://img.com/front.jpg"))
-        .andExpect(jsonPath("$.photoSideUrl").value("http://img.com/side.jpg"))
-        .andExpect(jsonPath("$.photoDocumentUrl").value("http://img.com/doc.jpg"));
+        .andExpect(jsonPath("$.photoFrontUrl").doesNotExist())
+        .andExpect(jsonPath("$.photoSideUrl").doesNotExist())
+        .andExpect(jsonPath("$.photoDocumentUrl").doesNotExist());
   }
 
   @Test
@@ -361,7 +361,7 @@ class VehicleControllerTest {
         .andExpect(jsonPath("$.model").value("Transit Updated"))
         .andExpect(jsonPath("$.color").value("Blue"))
         .andExpect(jsonPath("$.capacity").value(16))
-        .andExpect(jsonPath("$.photoFrontUrl").value("http://img.com/front-up.jpg"));
+        .andExpect(jsonPath("$.photoFrontUrl").doesNotExist());
   }
 
   @Test
