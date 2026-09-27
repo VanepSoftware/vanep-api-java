@@ -63,10 +63,7 @@ class StateControllerTest {
                 t.claim("uid", "admin-uid")
                     .claim("roles", List.of("ROLE_ADMIN"))
                     .subject("admin@vanep.com"))
-        .authorities(
-            new SimpleGrantedAuthority("ROLE_ADMIN"),
-            new SimpleGrantedAuthority("list_states"),
-            new SimpleGrantedAuthority("show_state"));
+        .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"));
   }
 
   private JwtRequestPostProcessor authenticatedClientJwt() {

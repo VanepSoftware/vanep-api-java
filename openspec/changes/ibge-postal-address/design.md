@@ -66,7 +66,7 @@ Município IBGE não é dado de painel. Os GETs atuais são CRUD operacional ant
 
 `uf` é o código de duas letras e **obrigatório** em `GET /api/cities`. Sem `uf` → `400` (MessageSource). UF desconhecida → `404`. `search` opcional, casado em `normalized_name` (contains ou prefix — escolher na implementação e testar). Sem `search`, lista paginada daquela UF. Paginação como o `Pageable` existente.
 
-Não criar `/api/geo` nem `CityCatalogController`. Reusar `CityController` / `StateController` e métodos em `CityService` / `StateService`. DTOs de lista: token opaco, nome, UF; sem exigir `list_cities` / `list_states`. Essas authorities deixam de guardar os GETs (podem permanecer no enum/seed nesta change).
+Não criar `/api/geo` nem `CityCatalogController`. Reusar `CityController` / `StateController` e métodos em `CityService` / `StateService`. DTOs de lista: token opaco, nome, UF; sem exigir `list_cities` / `list_states`. `CityService` não tem create/update/delete — CRUD de escrita de `city` já não existe desde antes desta change (saiu no `location-system`) e o catálogo IBGE agora é a fonte de verdade da tabela, então admin não deve controlar essas linhas. `LIST_CITIES`, `SHOW_CITY`, `CREATE_CITY`, `UPDATE_CITY` e `DELETE_CITY` foram removidas do `PermissionEnum` (nada mais as referenciava); `list_states`/`show_state` seguem no enum (não fazem parte deste comentário), só as authorities mortas nos testes admin de state foram limpas.
 
 `/api/countries` **permanece** admin: país ainda é “onde a Vanep opera”.
 
