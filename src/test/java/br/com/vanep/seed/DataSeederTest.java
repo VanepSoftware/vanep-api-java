@@ -12,6 +12,7 @@ import static org.mockito.Mockito.when;
 import br.com.vanep.auth.security.PermissionEnum;
 import br.com.vanep.auth.security.PermissionRegistry;
 import br.com.vanep.client.repository.ClientRepository;
+import br.com.vanep.clientdriver.seed.ClientDriverSeeder;
 import br.com.vanep.clientrating.seed.ClientRatingSeeder;
 import br.com.vanep.country.seed.CountrySeeder;
 import br.com.vanep.dependent.seed.DependentSeeder;
@@ -59,6 +60,7 @@ class DataSeederTest {
   @Mock private DriverRatingSeeder driverRatingSeeder;
   @Mock private ClientRatingSeeder clientRatingSeeder;
   @Mock private TripSeeder tripSeeder;
+  @Mock private ClientDriverSeeder clientDriverSeeder;
   @Mock private PasswordEncoder passwordEncoder;
 
   private DataSeeder seeder;
@@ -80,6 +82,7 @@ class DataSeederTest {
             driverRatingSeeder,
             clientRatingSeeder,
             tripSeeder,
+            clientDriverSeeder,
             passwordEncoder);
 
     seeder.adminEmail = "admin@vanep.com.br";
