@@ -60,6 +60,7 @@
 - [x] 5.4 Config env + `.env.example`: `vanep.viacep.base-url`, timeout, knobs de rate-limit (regras 1/3); cache Caffeine `ViaCepClient` (CEP → `ViaCepResponseDTO`), igual ao `PlacesClient` — o rate limiter é por usuário e não soma o total; toda saída é o mesmo IP da VPS, e CEP quase nunca muda, então o cache corta a maioria das chamadas na fonte. TTL bem mais longo que o do Places (`vanep.viacep.cache-ttl-minutes`/`cache-max-size`, default 7 dias)
 - [x] 5.5 Implementar client (`RestClient`), service, `CepLookupController`, bean de rate limiter (chave `cep-lookup:` + uid do JWT, nunca IP nem `X-Forwarded-For`), chaves MessageSource; `CepLookupService` sem `@Transactional` (a chamada HTTP não segura conexão do pool); `CepLookupErrorAdvice.problem(...)` seta `code` no `ProblemDetail`, mesmo tratamento da fase 4 em `LocationErrorAdvice` — pedido explícito do review daquela fase. `cep.invalid`/`cep.rate_limited`/`cep.ibge.not_found` continuam via `ResponseStatusException` direto em `CepLookupService`, sem `code` (mesma lacuna dos outros ~36 usos de `ResponseStatusException` no projeto; fora do escopo pedido)
 - [x] 5.6 `make lint` + testes desta fase; abrir PR
+- [x] 5.7 (pós-review) `code` estável (`cep.ibge.not_found`) no `ProblemDetail` de `CepLookupService.catalogMiss` — mesma lacuna documentada em 5.5, achada ao revisar o mobile pro fix análogo da fase 7 (D9); `cep.invalid`/`cep.rate_limited` continuam sem `code`, fora do escopo (nenhuma ambiguidade de texto reportada para eles)
 
 ## 6. Fase 6 — Endereço pessoal (PR 6)
 

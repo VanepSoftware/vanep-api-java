@@ -86,6 +86,8 @@ O PUT `/api/user/me/address` resolve `cityToken` só no banco.
 
 **Alternativa:** o app chama viacep.com.br — funciona, mas a API não consegue devolver `cityToken` sem um segundo round-trip e perdemos o match por código no servidor.
 
+**`code` estável em `cep.ibge.not_found` (pós-review, mesma lacuna de D9).** `cep.not_found` (CEP inexistente no ViaCEP) já tinha `code` por passar pelo `CepLookupErrorAdvice`; `cep.ibge.not_found` (cidade do CEP fora do catálogo) nascia como `ResponseStatusException` avulso em `catalogMiss`, sem `code`, e o mobile diferenciava os dois procurando `"catálogo"`/`"catalog"` no `detail` (`isCityNotInCatalogDetail`) — achado ao revisar o app para o fix análogo da fase 7. Mesmo tratamento: `catalogMiss` seta `code=cep.ibge.not_found` no próprio `ProblemDetail`. `cep.invalid`/`cep.rate_limited` (mencionados em 5.5) continuam sem `code` — nenhuma ambiguidade de texto foi reportada para eles.
+
 ### D5 — Contrato postal do PUT
 
 `PersonalAddressRequestDTO`: `cityToken` `@NotBlank`, `street` `@NotBlank @Size(max=255)`, `zipCode` `@NotBlank` + `@Pattern` (8 dígitos). `number` / `complement` / `neighborhood` opcionais com os size caps atuais. Jackson ignora `placeId` desconhecido. PUT não chama ViaCEP: obrigatório é só validação do body.

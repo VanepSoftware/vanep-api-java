@@ -192,7 +192,8 @@ class CepLookupControllerTest {
     mockMvc
         .perform(get("/api/cep/" + BRASILIA_CEP).with(authenticatedClientJwt()))
         .andExpect(status().isNotFound())
-        .andExpect(jsonPath("$.detail").value(message("cep.ibge.not_found")));
+        .andExpect(jsonPath("$.detail").value(message("cep.ibge.not_found")))
+        .andExpect(jsonPath("$.code").value("cep.ibge.not_found"));
 
     assertThat(addresses.count()).isZero();
   }
