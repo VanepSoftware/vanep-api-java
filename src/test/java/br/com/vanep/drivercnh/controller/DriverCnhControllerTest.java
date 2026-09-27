@@ -198,8 +198,7 @@ class DriverCnhControllerTest {
           "category": "B",
           "issueDate": "2021-06-10",
           "validUntil": "2031-06-10",
-          "issuingState": "SP",
-          "photoUrl": "http://img.com/cnh.jpg"
+          "issuingState": "SP"
         }
         """;
 
@@ -214,7 +213,7 @@ class DriverCnhControllerTest {
         .andExpect(jsonPath("$.registrationNumber").value("22222222222"))
         .andExpect(jsonPath("$.category").value("B"))
         .andExpect(jsonPath("$.driverToken").value(otherDriverToken))
-        .andExpect(jsonPath("$.photoUrl").value("http://img.com/cnh.jpg"));
+        .andExpect(jsonPath("$.photoUrl").doesNotExist());
   }
 
   @Test

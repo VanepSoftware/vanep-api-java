@@ -1,5 +1,6 @@
 package br.com.vanep.clientrating.controller;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -10,6 +11,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import br.com.vanep.client.model.ClientModel;
 import br.com.vanep.client.repository.ClientRepository;
+import br.com.vanep.clientdriver.enums.RelationshipStatus;
+import br.com.vanep.clientdriver.model.ClientDriverModel;
+import br.com.vanep.clientdriver.repository.ClientDriverRepository;
 import br.com.vanep.clientrating.model.ClientRatingModel;
 import br.com.vanep.clientrating.repository.ClientRatingRepository;
 import br.com.vanep.driver.DriverApprovalStatus;
@@ -44,6 +48,7 @@ class ClientRatingControllerTest {
   @Autowired private ClientRepository clients;
   @Autowired private DriverRepository drivers;
   @Autowired private ClientRatingRepository clientRatings;
+  @Autowired private ClientDriverRepository links;
 
   private MockMvc mockMvc;
 
@@ -51,6 +56,7 @@ class ClientRatingControllerTest {
   private String driverUserEmail;
   private String driverUserUid;
   private String ratingToken;
+  private String driverToken;
 
   @BeforeEach
   void setUp() {
@@ -74,6 +80,7 @@ class ClientRatingControllerTest {
     driver.setBasePrice(BigDecimal.valueOf(50));
     driver.setApprovalStatus(DriverApprovalStatus.APPROVED);
     driver = drivers.save(driver);
+    driverToken = driver.getToken();
 
     // Client
     UserModel clientUser = new UserModel();
@@ -90,10 +97,15 @@ class ClientRatingControllerTest {
     client = clients.save(client);
     clientToken = client.getToken();
 
+    ClientDriverModel link = new ClientDriverModel();
+    link.setClient(client);
+    link.setDriver(driver);
+    link.setStatus(RelationshipStatus.ACTIVE);
+    link = links.save(link);
+
     // Initial Rating
     ClientRatingModel rating = new ClientRatingModel();
-    rating.setDriver(driver);
-    rating.setClient(client);
+    rating.setLink(link);
     rating.setRating(BigDecimal.valueOf(5.00));
     rating.setComment("Great passenger!");
     rating = clientRatings.save(rating);
@@ -211,5 +223,55 @@ class ClientRatingControllerTest {
     mockMvc
         .perform(delete("/api/client-ratings/" + ratingToken).with(adminJwt()))
         .andExpect(status().isNoContent());
+  }
+
+  @Test
+  void theResponseStillCarriesBothParties() throws Exception {
+    mockMvc
+        .perform(get("/api/client-ratings/" + ratingToken).with(driverJwt()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.driverToken").value(driverToken))
+        .andExpect(jsonPath("$.driverName").value("Driver Name"))
+        .andExpect(jsonPath("$.clientToken").value(clientToken))
+        .andExpect(jsonPath("$.clientName").value("Client Name"))
+        .andExpect(jsonPath("$.id").doesNotExist())
+        .andExpect(jsonPath("$.clientDriverId").doesNotExist());
+  }
+
+  @Test
+  void deletingRemovesTheRowPhysically() throws Exception {
+    mockMvc
+        .perform(delete("/api/client-ratings/" + ratingToken).with(driverJwt()))
+        .andExpect(status().isNoContent());
+
+    assertThat(clientRatings.count()).isZero();
+  }
+
+  @Test
+  void aPairCanBeRatedAgainAfterItsRatingIsDeleted() throws Exception {
+    mockMvc
+        .perform(delete("/api/client-ratings/" + ratingToken).with(driverJwt()))
+        .andExpect(status().isNoContent());
+
+    String requestBody =
+        """
+        {
+          "clientToken": "%s",
+          "rating": 3.00,
+          "comment": "Mudei de ideia"
+        }
+        """
+            .formatted(clientToken);
+
+    mockMvc
+        .perform(
+            post("/api/client-ratings")
+                .with(driverJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(requestBody))
+        .andExpect(status().isCreated())
+        .andExpect(jsonPath("$.rating").value(3.0));
+
+    assertThat(clientRatings.count()).isEqualTo(1);
   }
 }

@@ -8,6 +8,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.HashSet;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -35,6 +37,7 @@ public class CitySeeder {
 
   public void seed() {
     JsonNode dump = readDump();
+    Set<String> existingIbgeCodes = new HashSet<>(cities.findAllIbgeCodes());
     int created = 0;
     for (JsonNode municipality : dump) {
       String ibgeCode = municipality.path("id").asText();
@@ -47,7 +50,7 @@ public class CitySeeder {
             name);
         continue;
       }
-      if (cities.findByIbgeCode(ibgeCode).isPresent()) {
+      if (existingIbgeCodes.contains(ibgeCode)) {
         continue;
       }
       StateModel state =
@@ -63,6 +66,7 @@ public class CitySeeder {
       city.setName(name);
       city.setState(state);
       cities.save(city);
+      existingIbgeCodes.add(ibgeCode);
       created++;
     }
     if (created > 0) {

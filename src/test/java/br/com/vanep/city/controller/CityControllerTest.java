@@ -96,13 +96,7 @@ class CityControllerTest {
                 t.claim("uid", "admin-uid")
                     .claim("roles", List.of("ROLE_ADMIN"))
                     .subject("admin@vanep.com"))
-        .authorities(
-            new SimpleGrantedAuthority("ROLE_ADMIN"),
-            new SimpleGrantedAuthority("list_cities"),
-            new SimpleGrantedAuthority("show_city"),
-            new SimpleGrantedAuthority("create_city"),
-            new SimpleGrantedAuthority("update_city"),
-            new SimpleGrantedAuthority("delete_city"));
+        .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"));
   }
 
   private JwtRequestPostProcessor authenticatedClientJwt() {

@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.atLeastOnce;
-import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -12,10 +11,9 @@ import static org.mockito.Mockito.when;
 
 import br.com.vanep.auth.security.PermissionEnum;
 import br.com.vanep.auth.security.PermissionRegistry;
-import br.com.vanep.city.seed.CitySeeder;
 import br.com.vanep.client.repository.ClientRepository;
+import br.com.vanep.clientdriver.seed.ClientDriverSeeder;
 import br.com.vanep.clientrating.seed.ClientRatingSeeder;
-import br.com.vanep.country.seed.CountrySeeder;
 import br.com.vanep.dependent.seed.DependentSeeder;
 import br.com.vanep.driver.DriverApprovalStatus;
 import br.com.vanep.driver.DriverRepository;
@@ -28,7 +26,6 @@ import br.com.vanep.role.model.RoleModel;
 import br.com.vanep.role.repository.RoleRepository;
 import br.com.vanep.rolepermission.model.RolePermissionModel;
 import br.com.vanep.rolepermission.repository.RolePermissionRepository;
-import br.com.vanep.state.seed.StateSeeder;
 import br.com.vanep.trip.seed.TripSeeder;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
@@ -56,12 +53,10 @@ class DataSeederTest {
   @Mock private DependentSeeder dependentSeeder;
   @Mock private DriverCnhSeeder driverCnhSeeder;
   @Mock private DriverDocumentSeeder driverDocumentSeeder;
-  @Mock private CountrySeeder countrySeeder;
-  @Mock private StateSeeder stateSeeder;
-  @Mock private CitySeeder citySeeder;
   @Mock private DriverRatingSeeder driverRatingSeeder;
   @Mock private ClientRatingSeeder clientRatingSeeder;
   @Mock private TripSeeder tripSeeder;
+  @Mock private ClientDriverSeeder clientDriverSeeder;
   @Mock private PasswordEncoder passwordEncoder;
 
   private DataSeeder seeder;
@@ -78,12 +73,10 @@ class DataSeederTest {
             dependentSeeder,
             driverCnhSeeder,
             driverDocumentSeeder,
-            countrySeeder,
-            stateSeeder,
-            citySeeder,
             driverRatingSeeder,
             clientRatingSeeder,
             tripSeeder,
+            clientDriverSeeder,
             passwordEncoder);
 
     seeder.adminEmail = "admin@vanep.com.br";
@@ -114,7 +107,6 @@ class DataSeederTest {
     seeder.run(new DefaultApplicationArguments());
 
     verify(users, never()).save(any());
-    verify(citySeeder, never()).seed();
   }
 
   @Test
@@ -241,31 +233,6 @@ class DataSeederTest {
 
     verify(rolePermissions, never()).save(any());
     verify(roles, never()).save(any());
-  }
-
-  @Test
-  void seedsCitiesAfterStatesWhenEnabled() {
-    seeder.enabled = true;
-    RoleModel adminRole = roleTaggedAs(RoleName.ADMIN);
-    adminRole.setRolePermission(completeAdminBundle());
-    RoleModel clientRole = roleTaggedAs(RoleName.CLIENT);
-    clientRole.setRolePermission(new RolePermissionModel());
-    RoleModel driverRole = roleTaggedAs(RoleName.DRIVER);
-    driverRole.setRolePermission(new RolePermissionModel());
-    RoleModel assistantRole = roleTaggedAs(RoleName.ASSISTANT);
-    assistantRole.setRolePermission(new RolePermissionModel());
-    when(roles.findByRoleName(RoleName.ADMIN)).thenReturn(Optional.of(adminRole));
-    when(roles.findByRoleName(RoleName.CLIENT)).thenReturn(Optional.of(clientRole));
-    when(roles.findByRoleName(RoleName.DRIVER)).thenReturn(Optional.of(driverRole));
-    when(roles.findByRoleName(RoleName.ASSISTANT)).thenReturn(Optional.of(assistantRole));
-    when(users.existsByEmail(anyString())).thenReturn(true);
-    when(users.findByTypeAndRoleIdIsNull(UserType.ADMIN)).thenReturn(List.of());
-
-    seeder.run(new DefaultApplicationArguments());
-
-    var order = inOrder(stateSeeder, citySeeder);
-    order.verify(stateSeeder).seed();
-    order.verify(citySeeder).seed();
   }
 
   @Test
