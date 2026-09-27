@@ -164,6 +164,9 @@ public class LocationResolverService {
         uf,
         googleCityName,
         placeId);
+    // TODO: this counter is only readable on demand via /actuator/metrics; nothing pages anyone
+    // when a whole city goes dark. Wire the project up to a real observability stack
+    // (Prometheus/Datadog/Grafana) and add an alert on this metric.
     meterRegistry.counter("location.city.unmatched", "uf", uf).increment();
     return new UnmatchedCityException(uf, googleCityName, placeId);
   }
