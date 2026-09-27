@@ -5,6 +5,7 @@ import br.com.vanep.auth.security.PermissionRegistry;
 import br.com.vanep.city.seed.CitySeeder;
 import br.com.vanep.client.model.ClientModel;
 import br.com.vanep.client.repository.ClientRepository;
+import br.com.vanep.clientdriver.seed.ClientDriverSeeder;
 import br.com.vanep.clientrating.seed.ClientRatingSeeder;
 import br.com.vanep.country.seed.CountrySeeder;
 import br.com.vanep.dependent.seed.DependentSeeder;
@@ -58,6 +59,7 @@ public class DataSeeder implements ApplicationRunner {
   private final DriverRatingSeeder driverRatingSeeder;
   private final ClientRatingSeeder clientRatingSeeder;
   private final TripSeeder tripSeeder;
+  private final ClientDriverSeeder clientDriverSeeder;
   private final PasswordEncoder passwordEncoder;
 
   @Value("${vanep.seed.enabled:false}")
@@ -90,6 +92,7 @@ public class DataSeeder implements ApplicationRunner {
       DriverRatingSeeder driverRatingSeeder,
       ClientRatingSeeder clientRatingSeeder,
       TripSeeder tripSeeder,
+      ClientDriverSeeder clientDriverSeeder,
       PasswordEncoder passwordEncoder) {
     this.users = users;
     this.clients = clients;
@@ -105,6 +108,7 @@ public class DataSeeder implements ApplicationRunner {
     this.driverRatingSeeder = driverRatingSeeder;
     this.clientRatingSeeder = clientRatingSeeder;
     this.tripSeeder = tripSeeder;
+    this.clientDriverSeeder = clientDriverSeeder;
     this.passwordEncoder = passwordEncoder;
   }
 
@@ -128,6 +132,7 @@ public class DataSeeder implements ApplicationRunner {
 
     stateSeeder.seed();
     citySeeder.seed();
+    clientDriverSeeder.seed();
     driverRatingSeeder.seed();
     clientRatingSeeder.seed();
     tripSeeder.seed();
