@@ -19,6 +19,7 @@ import br.com.vanep.places.dto.PlaceDetailsResponseDTO;
 import br.com.vanep.state.repository.StateRepository;
 import br.com.vanep.state.seed.StateSeeder;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -42,6 +43,7 @@ class LocationResolverServiceTest {
   @Autowired private CityRepository cities;
   @Autowired private DistrictRepository districts;
   @Autowired private StateSeeder stateSeeder;
+  @Autowired private MeterRegistry meterRegistry;
 
   @BeforeEach
   void seedCuratedGeography() {
@@ -120,6 +122,7 @@ class LocationResolverServiceTest {
     assertThat(cities.count()).isEqualTo(citiesBefore);
     assertThat(districts.count()).isEqualTo(districtsBefore);
     assertThat(cities.findFirstByNameIgnoreCase("Embu")).isEmpty();
+    assertThat(meterRegistry.counter("location.city.unmatched", "uf", "SP").count()).isEqualTo(1.0);
   }
 
   @Test

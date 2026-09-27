@@ -32,7 +32,7 @@ class ViaCepClientTest {
   void setUp() {
     RestClient.Builder builder = RestClient.builder().baseUrl(BASE_URL);
     server = MockRestServiceServer.bindTo(builder).build();
-    client = new ViaCepClient(builder.build());
+    client = new ViaCepClient(builder.build(), 60, 100);
   }
 
   private String fixture(String name) throws IOException {
@@ -88,6 +88,35 @@ class ViaCepClientTest {
         .expect(ExpectedCount.once(), requestTo(lookupUrl(BRASILIA_CEP)))
         .andRespond(withException(new SocketTimeoutException("Read timed out")));
 
+    assertThatThrownBy(() -> client.findByCep(BRASILIA_CEP))
+        .isInstanceOf(ViaCepLookupException.class);
+    server.verify();
+  }
+
+  @Test
+  void servesFromCacheOnSecondLookup() throws IOException {
+    server
+        .expect(ExpectedCount.once(), requestTo(lookupUrl(BRASILIA_CEP)))
+        .andRespond(withSuccess(fixture("df-brasilia-asa-norte"), MediaType.APPLICATION_JSON));
+
+    ViaCepResponseDTO first = client.findByCep(BRASILIA_CEP);
+    ViaCepResponseDTO second = client.findByCep(BRASILIA_CEP);
+
+    assertThat(second).isSameAs(first);
+    server.verify();
+  }
+
+  @Test
+  void doesNotCacheAFailedLookup() {
+    server
+        .expect(ExpectedCount.once(), requestTo(lookupUrl(BRASILIA_CEP)))
+        .andRespond(withException(new SocketTimeoutException("Read timed out")));
+    server
+        .expect(ExpectedCount.once(), requestTo(lookupUrl(BRASILIA_CEP)))
+        .andRespond(withException(new SocketTimeoutException("Read timed out")));
+
+    assertThatThrownBy(() -> client.findByCep(BRASILIA_CEP))
+        .isInstanceOf(ViaCepLookupException.class);
     assertThatThrownBy(() -> client.findByCep(BRASILIA_CEP))
         .isInstanceOf(ViaCepLookupException.class);
     server.verify();

@@ -162,7 +162,8 @@ class CepLookupControllerTest {
     mockMvc
         .perform(get("/api/cep/" + UNKNOWN_CEP).with(authenticatedClientJwt()))
         .andExpect(status().isNotFound())
-        .andExpect(jsonPath("$.detail").value(message("cep.not_found")));
+        .andExpect(jsonPath("$.detail").value(message("cep.not_found")))
+        .andExpect(jsonPath("$.code").value("cep.not_found"));
 
     assertThat(addresses.count()).isZero();
   }
@@ -175,7 +176,8 @@ class CepLookupControllerTest {
     mockMvc
         .perform(get("/api/cep/" + BRASILIA_CEP).with(authenticatedClientJwt()))
         .andExpect(status().isServiceUnavailable())
-        .andExpect(jsonPath("$.detail").value(message("cep.lookup_failed")));
+        .andExpect(jsonPath("$.detail").value(message("cep.lookup_failed")))
+        .andExpect(jsonPath("$.code").value("cep.lookup_failed"));
 
     assertThat(addresses.count()).isZero();
   }
