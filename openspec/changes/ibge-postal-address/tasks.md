@@ -5,8 +5,8 @@
 > Depende de: — | Paralelo com: —
 
 - [x] 1.1 Testes de repositório falhando: `ibge_code` único entre cidades ativas; `neighborhood` persiste em `address`; persistir/carregar `city` e `state` sem mapeamento de `googlePlaceId`
-- [x] 1.2 Migration `V36` (conferir a maior versão em `main` antes de criar — hoje `V35`, do auth N-177; se a branch já tem um `V34__...` escrito antes disso, **renomear para `V36`**, senão o Flyway recusa duas migrations na versão 34; recriar o banco local que aplicou a `V34` antiga) (não editar arquivos já aplicados em ambiente compartilhado, regra 2): `city.ibge_code varchar(7)` + índice unique parcial `WHERE deleted_at IS NULL`; `address.neighborhood varchar(128)` nullable; `DROP INDEX` `city_google_place_id_active_key` e `state_google_place_id_active_key`; `DROP COLUMN` `city.google_place_id` e `state.google_place_id`. Deixar `district.google_place_id`, `address.google_place_id` e `school.google_place_id`
-- [x] 1.3 Atualizar `CityModel` e `StateModel` (remover `googlePlaceId`); dropar `CityRepository.findByGooglePlaceId`; adicionar `ibgeCode` em `CityModel` e `neighborhood` em `AddressModel`; aplicar `V36` no Postgres local
+- [x] 1.2 Migration `V46` (conferir a maior versão em `main` antes de criar — hoje `V45`; a branch tinha `V36__...`, que passou a duplicar a `V36` do refactor de rating por `client_driver` que entrou na `main` depois, e foi renomeada para `V46`; senão o Flyway recusa duas migrations na mesma versão; recriar o banco local que aplicou a `V36` antiga) (não editar arquivos já aplicados em ambiente compartilhado, regra 2): `city.ibge_code varchar(7)` + índice unique parcial `WHERE deleted_at IS NULL`; `address.neighborhood varchar(128)` nullable; `DROP INDEX` `city_google_place_id_active_key` e `state_google_place_id_active_key`; `DROP COLUMN` `city.google_place_id` e `state.google_place_id`. Deixar `district.google_place_id`, `address.google_place_id` e `school.google_place_id`
+- [x] 1.3 Atualizar `CityModel` e `StateModel` (remover `googlePlaceId`); dropar `CityRepository.findByGooglePlaceId`; adicionar `ibgeCode` em `CityModel` e `neighborhood` em `AddressModel`; aplicar `V46` no Postgres local
 - [x] 1.4 `make lint` + testes desta fase; abrir PR
 
 ## 2. Fase 2 — Seeder do catálogo IBGE (PR 2)
@@ -17,8 +17,8 @@
 
 - [x] 2.1 **Uma vez, na mão:** baixar o JSON IBGE `localidades/municipios` e commitar em `src/main/resources/seed/ibge-municipalities.json` (regra 50 — não pela suíte de testes)
 - [x] 2.2 Testes unitários falhando do `CitySeeder` com fixture **pequena** commitada (Brasília + outro município): cria linhas com `ibge_code`; segunda execução é idempotente; mapeia UF para o `state` existente
-- [x] 2.3 Implementar `CitySeeder` depois do `StateSeeder` no `DataSeeder`; upsert por `ibge_code`; nunca HTTP para IBGE em runtime
-- [x] 2.4 Ligar `vanep.seed.enabled` para local/prod carregar o dump completo; testes seguem com fixture pequena / inserts explícitos
+- [x] 2.3 Implementar `CitySeeder` depois do `StateSeeder`; upsert por `ibge_code`; nunca HTTP para IBGE em runtime
+- [x] 2.4 Extrair `GeographicDataSeeder` (`ApplicationRunner` próprio: `CountrySeeder` → `StateSeeder` → `CitySeeder`), ligado por padrão (`vanep.geographic-data.seed-enabled=${VANEP_GEOGRAPHIC_DATA_SEED_ENABLED:true}`) e independente de `vanep.seed.enabled`/`DataSeeder` — catálogo geográfico é dado de referência exigido em produção pelas fases 3–7, não dado de demonstração; `vanep.seed.enabled` continua só para admin/clientes/motoristas fictícios. Testes desligam `vanep.geographic-data.seed-enabled` (cada repository/slice já semeia seu próprio país/estado/cidade)
 - [x] 2.5 `make lint` + `./mvnw verify`; abrir PR
 
 ## 3. Fase 3 — Picker autenticado em `/api/states` e `/api/cities` (PR 3)
@@ -43,8 +43,8 @@
 
 - [x] 4.1 Testes unitários falhando: persistir sob Brasília existente cria só Taguatinga; persistir com nome de cidade `Embu` sob SP (sem esse `normalized_name`) lança e não insere nada; `resolveAnchor` lança em cidade sem match em vez de optional vazio
 - [x] 4.2 Slice falhando: `PUT` área de atuação / `POST` school resolve / `GET` busca de motorista com componente de cidade sem match → `400` MessageSource; busca com cidade casada e sem motoristas continua `200` página vazia; `POST` de escola com place em cidade sem match → `400` e nenhuma linha de `city`, `district`, `address` nem `school` (rollback)
-- [x] 4.3 Chave MessageSource para cidade Google sem correspondência no IBGE (EN + pt-BR); logar UF, nome Google da cidade, place id
-- [x] 4.4 Mudar o caminho de cidade do `LocationResolverService` para só find; manter `findOrCreateDistrict`; a exceção vira `400` no `LocationErrorAdvice` global (mesma chave `location.city.unmatched` na persistência e na busca), sem `try/catch` nos services
+- [x] 4.3 Chave MessageSource para cidade Google sem correspondência no IBGE (EN + pt-BR); logar UF, nome Google da cidade, place id; adicionar `spring-boot-starter-actuator` e incrementar o contador Micrometer `location.city.unmatched` (tag `uf`) no mesmo ponto do log — único sinal hoje de que uma cidade inteira está bloqueada; alerta de verdade (Prometheus/Datadog) fica pendente, decisão de infra fora do escopo
+- [x] 4.4 Mudar o caminho de cidade do `LocationResolverService` para só find; manter `findOrCreateDistrict`; a exceção vira `400` no `LocationErrorAdvice` global (mesma chave `location.city.unmatched` na persistência e na busca), sem `try/catch` nos services; `LocationErrorAdvice.problem(...)` seta `code` (a própria chave MessageSource) como propriedade do `ProblemDetail` — o app mobile lê `body['code']` e caía no fallback frágil de casar texto traduzido (`vanep-mobile#65`); mesmo tratamento fica pendente para `CepLookupErrorAdvice` (fase 5) e o 404 de cidade (fase 7)
 - [x] 4.5 Atualizar testes existentes que assumiam que o Google criava `city` — MUST inserir a cidade IBGE antes (Brasília / São Paulo): `LocationResolverServiceTest`, `DriverSearchControllerTest`, `DriverServiceAreaControllerTest`, `SchoolResolveControllerTest`, `PersonalAddressControllerTest` e `OnboardingStepsTest` (estes dois a fase 6 reescreve por completo). `AddressServiceTest`, `DependentControllerTest` e `SchoolControllerTest` já inserem a cidade antes e não mudam
 - [x] 4.6 `make lint` + `./mvnw verify`; abrir PR
 

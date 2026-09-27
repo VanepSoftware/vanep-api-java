@@ -3,6 +3,7 @@ package br.com.vanep.assistant.model;
 import br.com.vanep.assistant.enums.AssistantStatus;
 import br.com.vanep.assistant.enums.VerificationStatus;
 import br.com.vanep.driver.model.DriverModel;
+import br.com.vanep.media.model.MediaFileModel;
 import br.com.vanep.user.model.UserModel;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -56,7 +57,9 @@ public class AssistantModel {
   @Column(name = "verification_status", nullable = false, length = 16)
   private VerificationStatus verificationStatus = VerificationStatus.PENDING;
 
-  @Column private String photo;
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "photo_media_id")
+  private MediaFileModel photo;
 
   @Column(name = "activated_at")
   private Instant activatedAt;

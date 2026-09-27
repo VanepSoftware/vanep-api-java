@@ -3,7 +3,6 @@ package br.com.vanep.city.seed;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -14,8 +13,10 @@ import br.com.vanep.city.repository.CityRepository;
 import br.com.vanep.state.model.StateModel;
 import br.com.vanep.state.repository.StateRepository;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -92,8 +93,7 @@ class CitySeederTest {
   @Test
   void secondRunDoesNotDuplicateCities() {
     Map<String, CityModel> stored = new HashMap<>();
-    when(cities.findByIbgeCode(anyString()))
-        .thenAnswer(invocation -> Optional.ofNullable(stored.get(invocation.getArgument(0))));
+    when(cities.findAllIbgeCodes()).thenAnswer(invocation -> new HashSet<>(stored.keySet()));
     when(states.findByUf("DF")).thenReturn(Optional.of(distritoFederal));
     when(states.findByUf("GO")).thenReturn(Optional.of(goias));
     when(states.findByUf("MT")).thenReturn(Optional.of(matoGrosso));
@@ -146,7 +146,7 @@ class CitySeederTest {
 
   @Test
   void rejectsMunicipalityWhenUfIsNotCurated() {
-    when(cities.findByIbgeCode(anyString())).thenReturn(Optional.empty());
+    when(cities.findAllIbgeCodes()).thenReturn(Set.of());
     when(states.findByUf("GO")).thenReturn(Optional.empty());
 
     assertThatThrownBy(() -> seeder.seed())
@@ -165,7 +165,7 @@ class CitySeederTest {
   }
 
   private void stubEmptyCatalogAndCuratedStates() {
-    when(cities.findByIbgeCode(anyString())).thenReturn(Optional.empty());
+    when(cities.findAllIbgeCodes()).thenReturn(Set.of());
     when(states.findByUf("DF")).thenReturn(Optional.of(distritoFederal));
     when(states.findByUf("GO")).thenReturn(Optional.of(goias));
     when(states.findByUf("MT")).thenReturn(Optional.of(matoGrosso));

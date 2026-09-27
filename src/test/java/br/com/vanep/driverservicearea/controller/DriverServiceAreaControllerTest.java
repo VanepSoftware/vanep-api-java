@@ -165,7 +165,8 @@ class DriverServiceAreaControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body("embu")))
         .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.detail").value(message("location.city.unmatched")));
+        .andExpect(jsonPath("$.detail").value(message("location.city.unmatched")))
+        .andExpect(jsonPath("$.code").value("location.city.unmatched"));
 
     assertThat(areas.count()).isZero();
   }

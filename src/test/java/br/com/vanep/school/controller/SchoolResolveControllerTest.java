@@ -212,7 +212,8 @@ class SchoolResolveControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"placeId\":\"embu-escola\"}"))
         .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.detail").value(message("location.city.unmatched")));
+        .andExpect(jsonPath("$.detail").value(message("location.city.unmatched")))
+        .andExpect(jsonPath("$.code").value("location.city.unmatched"));
 
     assertThat(schools.count()).isZero();
   }

@@ -506,7 +506,8 @@ class DriverSearchControllerTest {
     mockMvc
         .perform(get("/api/drivers/search").with(as(clientUid)).param("placeId", "embu"))
         .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.detail").value(message("location.city.unmatched")));
+        .andExpect(jsonPath("$.detail").value(message("location.city.unmatched")))
+        .andExpect(jsonPath("$.code").value("location.city.unmatched"));
   }
 
   @Test

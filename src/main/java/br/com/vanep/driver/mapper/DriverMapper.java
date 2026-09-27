@@ -3,6 +3,7 @@ package br.com.vanep.driver.mapper;
 import br.com.vanep.driver.dto.DriverMeSummaryResponseDTO;
 import br.com.vanep.driver.dto.DriverResponseDTO;
 import br.com.vanep.driver.model.DriverModel;
+import br.com.vanep.media.web.MediaUrl;
 import br.com.vanep.user.dto.UserMeResponseDTO;
 import org.springframework.stereotype.Component;
 
@@ -15,7 +16,7 @@ public class DriverMapper {
         driver.getUser().getEmail(),
         driver.getUser().getPhone(),
         driver.getUser().getDocument(),
-        driver.getPhoto(),
+        photoUrl(driver),
         driver.getRating(),
         driver.getBio(),
         driver.getCnpj(),
@@ -35,11 +36,15 @@ public class DriverMapper {
   public DriverMeSummaryResponseDTO toMeSummary(DriverModel driver, UserMeResponseDTO user) {
     return new DriverMeSummaryResponseDTO(
         driver.getToken(),
-        driver.getPhoto(),
+        photoUrl(driver),
         driver.getRating(),
         driver.getApprovalStatus(),
         driver.isAvailable(),
         driver.isActive(),
         user);
+  }
+
+  private String photoUrl(DriverModel driver) {
+    return MediaUrl.of("/api/drivers", driver.getToken(), "photo", driver.getPhoto());
   }
 }
