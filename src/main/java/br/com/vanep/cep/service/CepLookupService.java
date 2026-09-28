@@ -65,7 +65,10 @@ public class CepLookupService {
 
   private ResponseStatusException catalogMiss(String ibgeCode) {
     log.warn("ViaCEP ibge_code {} has no city catalog row", ibgeCode);
-    return new ResponseStatusException(HttpStatus.NOT_FOUND, message("cep.ibge.not_found"));
+    ResponseStatusException exception =
+        new ResponseStatusException(HttpStatus.NOT_FOUND, message("cep.ibge.not_found"));
+    exception.getBody().setProperty("code", "cep.ibge.not_found");
+    return exception;
   }
 
   static String blankToNull(String value) {

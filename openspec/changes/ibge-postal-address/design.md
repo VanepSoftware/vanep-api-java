@@ -86,6 +86,8 @@ O PUT `/api/user/me/address` resolve `cityToken` só no banco.
 
 **Alternativa:** o app chama viacep.com.br — funciona, mas a API não consegue devolver `cityToken` sem um segundo round-trip e perdemos o match por código no servidor.
 
+**`code` estável em `cep.ibge.not_found` (pós-review, mesma lacuna de D9).** `cep.not_found` (CEP inexistente no ViaCEP) já tinha `code` por passar pelo `CepLookupErrorAdvice`; `cep.ibge.not_found` (cidade do CEP fora do catálogo) nascia como `ResponseStatusException` avulso em `catalogMiss`, sem `code`, e o mobile diferenciava os dois procurando `"catálogo"`/`"catalog"` no `detail` (`isCityNotInCatalogDetail`) — achado ao revisar o app para o fix análogo da fase 7. Mesmo tratamento: `catalogMiss` seta `code=cep.ibge.not_found` no próprio `ProblemDetail`. `cep.invalid`/`cep.rate_limited` (mencionados em 5.5) continuam sem `code` — nenhuma ambiguidade de texto foi reportada para eles.
+
 ### D5 — Contrato postal do PUT
 
 `PersonalAddressRequestDTO`: `cityToken` `@NotBlank`, `street` `@NotBlank @Size(max=255)`, `zipCode` `@NotBlank` + `@Pattern` (8 dígitos). `number` / `complement` / `neighborhood` opcionais com os size caps atuais. Jackson ignora `placeId` desconhecido. PUT não chama ViaCEP: obrigatório é só validação do body.
@@ -169,6 +171,8 @@ A PR #173 (`dependent-address-by-place`) trocou `AddressRequestDTO` (compartilha
 **Resposta ganha `neighborhood`.** `AddressResponseDTO`/`AddressMapper` (usado por dependente e escola) não expõe `neighborhood` hoje, embora a coluna exista desde a fase 1. Sem isso, o app conseguiria gravar o bairro do dependente mas nunca leria de volta (e não montaria o formulário de edição). Adicionar o campo é aditivo e não quebra escola (fica `null` lá, como hoje).
 
 **Alternativas:** migrar dependente e escola juntos (mais DRY na checagem de posse, mas amplia o escopo pedido sem necessidade); manter `AddressRequestDTO` único e sobrecarregar `cityToken` *e* `placeId` nele (contrato ambíguo — reabre exatamente o problema que a fase 6 do endereço pessoal evitou ao não aceitar os dois); manter o amend parcial da PR #173 com `cityToken`/`street`/`zipCode` opcionais (contradiz a regra 16 e o `@NotBlank`; sem motivo, já que a leitura devolve o formulário todo).
+
+**`code` estável nos dois 404 do PATCH.** No `PATCH /api/dependent`, `city.not_found` (token de cidade desconhecido, lançado em `AddressCatalogResolverService.requireCityByToken`) e `dependent.not_found` (token de dependente desconhecido, lançado em `DependentService.notFound` e no `requireDependent` de `AddressService`) chegavam como o mesmo `404` sem nenhum campo além do `detail` textual — o mobile (vanep-mobile#67) diferenciava os dois procurando `"cidade"`/`"city"` na mensagem, um acoplamento frágil a texto de erro (que ainda por cima é i18n). Cada um passa a setar `problem.getBody().setProperty("code", <chave>)` no próprio `ResponseStatusException`, mesmo padrão de `code` estável já usado em `LocationErrorAdvice`/`CepLookupErrorAdvice`, sem introduzir uma exceção customizada nem um `@RestControllerAdvice` novo — os dois já eram `ResponseStatusException` avulsos, então bastou mutar o `ProblemDetail` da própria exceção antes de lançá-la. Escopo é só os dois 404 do fluxo de dependente citados no comentário; `school.not_found` e `address.not_found` (mesmo arquivo) ficam de fora por não fazerem parte da ambiguidade relatada.
 
 ## Riscos / trade-offs
 
