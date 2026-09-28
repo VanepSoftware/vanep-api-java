@@ -74,6 +74,15 @@ class CityRepositoryTest {
   }
 
   @Test
+  void findAllIbgeCodesExcludesSoftDeletedCities() {
+    CityModel brasilia = cities.saveAndFlush(newCity("Brasília", "5300108"));
+    cities.saveAndFlush(newCity("Cristalina", "5206206"));
+    cities.delete(brasilia);
+
+    assertThat(cities.findAllIbgeCodes()).containsExactly("5206206");
+  }
+
+  @Test
   void cityModelHasNoGooglePlaceIdMapping() {
     assertThatThrownBy(() -> CityModel.class.getDeclaredField("googlePlaceId"))
         .isInstanceOf(NoSuchFieldException.class);

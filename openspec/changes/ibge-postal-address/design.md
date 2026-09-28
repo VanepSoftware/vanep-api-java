@@ -38,6 +38,8 @@ O `LocationResolverService` mantém `findOrCreateDistrict`. Lookup de cidade vir
 
 Capturar IBGE `localidades/municipios` **uma vez** em `src/main/resources/seed/ibge-municipalities.json`. `CitySeeder` (depois do `StateSeeder`) faz upsert por `ibge_code`. Testes nunca baixam IBGE: unitários usam fixture de duas cidades; slice insere as cidades que precisa.
 
+`CountrySeeder` → `StateSeeder` → `CitySeeder` rodam num `ApplicationRunner` próprio (`GeographicDataSeeder`), ligado por padrão (`vanep.geographic-data.seed-enabled`) e separado do `DataSeeder` de demonstração (`vanep.seed.enabled`, default `false`). O catálogo geográfico é dado de referência que a busca de motorista, o picker e o CEP exigem em qualquer ambiente; gate-lo atrás do mesmo flag do admin/dados fictícios obrigaria produção a escolher entre ficar sem cidades ou subir um admin de senha padrão.
+
 Cada item do JSON é **um** município. `microrregiao` e `regiao-imediata` são recortes estatísticos do mesmo município, não duas cidades. O seeder lê só:
 
 | JSON | `city` |
@@ -169,7 +171,7 @@ A PR #173 (`dependent-address-by-place`) trocou `AddressRequestDTO` (compartilha
 - **[Risco] Dump IBGE desatualizado** (município novo) → ViaCEP 404 de código; recapturar dump. Sem IBGE em runtime.
 - **[Risco] Grafia Google ≠ IBGE no interior** → 400 alto até a change de alias. Lançamento DF/SP capital: fixtures atuais casam.
 - **[Risco] BREAKING no PUT de endereço** → app ainda em `placeId` quebra; coordenar release. Sem contrato duplo (place **ou** form) nesta change — dois caminhos reabrem duas verdades.
-- **[Risco] Seeder 5570 linhas no boot** → uma vez, idempotente; aceitável. Testes não carregam o dump completo.
+- **[Risco] Seeder 5570 linhas no boot** → uma vez, idempotente, em todo boot de qualquer ambiente (`GeographicDataSeeder` ligado por padrão); aceitável. Testes não carregam o dump completo e desligam `vanep.geographic-data.seed-enabled`.
 - **[Risco] ViaCEP fora do ar** → 503 no GET; PUT e picker seguem. Não acoplar save ao Correios.
 - **[Risco] `GET /api/cities` sem `uf`** → breaking para quem listava o catálogo admin inteiro; nenhum cliente de produção assumido. Sem `uf` é `400` de propósito (5.570 municípios).
 - **[Risco] Reintroduzir `google_place_id` em `city` no Geocoding** → unique 1:1 é o modelo errado; alias N→1. D7 dropa de propósito.

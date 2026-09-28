@@ -14,7 +14,6 @@ import br.com.vanep.auth.security.PermissionRegistry;
 import br.com.vanep.client.repository.ClientRepository;
 import br.com.vanep.clientdriver.seed.ClientDriverSeeder;
 import br.com.vanep.clientrating.seed.ClientRatingSeeder;
-import br.com.vanep.country.seed.CountrySeeder;
 import br.com.vanep.dependent.seed.DependentSeeder;
 import br.com.vanep.driver.DriverApprovalStatus;
 import br.com.vanep.driver.DriverRepository;
@@ -27,7 +26,6 @@ import br.com.vanep.role.model.RoleModel;
 import br.com.vanep.role.repository.RoleRepository;
 import br.com.vanep.rolepermission.model.RolePermissionModel;
 import br.com.vanep.rolepermission.repository.RolePermissionRepository;
-import br.com.vanep.state.seed.StateSeeder;
 import br.com.vanep.trip.seed.TripSeeder;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
@@ -55,8 +53,6 @@ class DataSeederTest {
   @Mock private DependentSeeder dependentSeeder;
   @Mock private DriverCnhSeeder driverCnhSeeder;
   @Mock private DriverDocumentSeeder driverDocumentSeeder;
-  @Mock private CountrySeeder countrySeeder;
-  @Mock private StateSeeder stateSeeder;
   @Mock private DriverRatingSeeder driverRatingSeeder;
   @Mock private ClientRatingSeeder clientRatingSeeder;
   @Mock private TripSeeder tripSeeder;
@@ -77,8 +73,6 @@ class DataSeederTest {
             dependentSeeder,
             driverCnhSeeder,
             driverDocumentSeeder,
-            countrySeeder,
-            stateSeeder,
             driverRatingSeeder,
             clientRatingSeeder,
             tripSeeder,
