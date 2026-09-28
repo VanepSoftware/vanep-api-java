@@ -339,7 +339,7 @@ class DriverSearchControllerTest {
         .perform(get("/api/drivers/search").with(as(clientUid)).param("placeId", "taguatinga"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.content[0].serviceAreas.length()").value(2))
-        .andExpect(jsonPath("$.content[0].serviceAreas", hasItems("Taguatinga", "Águas Claras")));
+        .andExpect(jsonPath("$.content[0].serviceAreas", hasItems("QNL 5", "Águas Claras")));
   }
 
   @Test
@@ -423,6 +423,19 @@ class DriverSearchControllerTest {
         .andExpect(jsonPath("$.content.length()").value(2))
         .andExpect(jsonPath("$.content[0].name").value("Motorista taguatinga@vanep.com"))
         .andExpect(jsonPath("$.content[1].name").value("Motorista qnl5@vanep.com"));
+  }
+
+  @Test
+  void aDriverWhoRegisteredABlockIsFoundBySearchingItsRegion() throws Exception {
+    stubPlaces();
+    createDriverWithAreas("qnl5@vanep.com", "taguatinga");
+
+    mockMvc
+        .perform(get("/api/drivers/search").with(as(clientUid)).param("placeId", "taguatinga-ra"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content.length()").value(1))
+        .andExpect(jsonPath("$.content[0].name").value("Motorista qnl5@vanep.com"))
+        .andExpect(jsonPath("$.content[0].serviceAreas[0]").value("QNL 5"));
   }
 
   @Test

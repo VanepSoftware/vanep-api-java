@@ -196,10 +196,7 @@ public class DataSeeder implements ApplicationRunner {
   }
 
   static List<String> clientPermissions() {
-    List<String> permissions = new java.util.ArrayList<>(PermissionEnum.crudFor("dependents"));
-    permissions.add(PermissionEnum.LIST_DRIVERS.value());
-    permissions.add(PermissionEnum.SHOW_DRIVER.value());
-    return List.copyOf(permissions);
+    return List.copyOf(PermissionEnum.crudFor("dependents"));
   }
 
   private void seedAssistantPermissions() {

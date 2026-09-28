@@ -106,6 +106,12 @@ class DataSeederTest {
   }
 
   @Test
+  void clientBundleDoesNotGrantTheAdministrativeDriverReads() {
+    assertThat(DataSeeder.clientPermissions())
+        .doesNotContain(PermissionEnum.LIST_DRIVERS.value(), PermissionEnum.SHOW_DRIVER.value());
+  }
+
+  @Test
   void doesNothingWhenDisabled() {
     seeder.enabled = false;
     seeder.seedOnly = false;

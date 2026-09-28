@@ -23,10 +23,6 @@ public record ResolvedLocationChainDTO(
         : Optional.of(districts.get(districts.size() - 1));
   }
 
-  public Optional<DistrictModel> shallowestDistrict() {
-    return districts.isEmpty() ? Optional.empty() : Optional.of(districts.get(0));
-  }
-
   public boolean anchoredAboveTheDistrictComponents() {
     return hasDistrictComponent && districts.isEmpty();
   }

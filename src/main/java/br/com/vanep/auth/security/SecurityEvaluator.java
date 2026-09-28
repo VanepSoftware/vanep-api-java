@@ -60,6 +60,16 @@ public class SecurityEvaluator {
         .orElse(false);
   }
 
+  // Any signed-in user may see what the driver search shows; @PreAuthorize already
+  // requires the caller to be authenticated before reaching these.
+  public boolean isSearchableDriver(String token) {
+    return driverRepository.existsSearchableByToken(token);
+  }
+
+  public boolean isVehicleOfSearchableDriver(String token) {
+    return vehicleRepository.existsOfSearchableDriverByToken(token);
+  }
+
   public boolean isClientOwner(String token, Authentication authentication) {
     return SecurityHelper.getCallerUid(authentication)
         .flatMap(
