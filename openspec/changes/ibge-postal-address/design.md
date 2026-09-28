@@ -169,7 +169,7 @@ A PR #173 (`dependent-address-by-place`) trocou `AddressRequestDTO` (compartilha
 ## Riscos / trade-offs
 
 - **[Risco] Dump IBGE desatualizado** (município novo) → ViaCEP 404 de código; recapturar dump. Sem IBGE em runtime.
-- **[Risco] Grafia Google ≠ IBGE no interior** → 400 alto até a change de alias. Lançamento DF/SP capital: fixtures atuais casam.
+- **[Risco] Grafia Google ≠ IBGE no interior** → 400 alto até a change de alias. Lançamento DF/SP capital: fixtures atuais casam. O `log.warn` do miss em `LocationResolverService` era o único sinal disso; agora incrementa também `location.city.unmatched` (contador Micrometer, tag `uf`) via `spring-boot-starter-actuator`, consultável em `GET /actuator/metrics/location.city.unmatched` — restrito a `ROLE_ADMIN` no `defaultSecurityFilterChain` (`@Order(4)`), diferente de `/actuator/health`/`/info`/`/mappings` que continuam públicos. Isso não é um alerta — ninguém é avisado proativamente, e o contador zera a cada restart. Ligar isso a um alerta de verdade (Prometheus/Datadog/Grafana com scrape + regra) é decisão de infra do time, fora do escopo desta change; o `MeterRegistry` já publica em qualquer backend que for adicionado depois, sem mudar este código.
 - **[Risco] BREAKING no PUT de endereço** → app ainda em `placeId` quebra; coordenar release. Sem contrato duplo (place **ou** form) nesta change — dois caminhos reabrem duas verdades.
 - **[Risco] Seeder 5570 linhas no boot** → uma vez, idempotente, em todo boot de qualquer ambiente (`GeographicDataSeeder` ligado por padrão); aceitável. Testes não carregam o dump completo e desligam `vanep.geographic-data.seed-enabled`.
 - **[Risco] ViaCEP fora do ar** → 503 no GET; PUT e picker seguem. Não acoplar save ao Correios.

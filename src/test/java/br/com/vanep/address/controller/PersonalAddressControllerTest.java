@@ -10,6 +10,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import br.com.vanep.address.repository.AddressRepository;
+import br.com.vanep.city.model.CityModel;
+import br.com.vanep.city.repository.CityRepository;
 import br.com.vanep.country.model.CountryModel;
 import br.com.vanep.country.repository.CountryRepository;
 import br.com.vanep.district.repository.DistrictRepository;
@@ -17,6 +19,7 @@ import br.com.vanep.places.client.PlacesClient;
 import br.com.vanep.places.dto.AddressComponentDTO;
 import br.com.vanep.places.dto.PlaceDetailsResponseDTO;
 import br.com.vanep.places.exception.PlaceNotFoundException;
+import br.com.vanep.state.repository.StateRepository;
 import br.com.vanep.state.seed.StateSeeder;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
@@ -51,6 +54,8 @@ class PersonalAddressControllerTest {
   @Autowired private UserRepository users;
   @Autowired private AddressRepository addresses;
   @Autowired private CountryRepository countries;
+  @Autowired private StateRepository states;
+  @Autowired private CityRepository cities;
   @Autowired private StateSeeder stateSeeder;
   @Autowired private DistrictRepository districts;
 
@@ -71,6 +76,7 @@ class PersonalAddressControllerTest {
     countries.save(brasil);
 
     stateSeeder.seed();
+    seedIbgeCity("DF", "Brasília", "5300108");
 
     UserModel user = new UserModel();
     user.setType(UserType.DRIVER);
@@ -106,6 +112,14 @@ class PersonalAddressControllerTest {
 
   private JwtRequestPostProcessor caller() {
     return jwt().jwt(builder -> builder.claim("uid", callerUid).subject(callerUid));
+  }
+
+  private CityModel seedIbgeCity(String uf, String name, String ibgeCode) {
+    CityModel city = new CityModel();
+    city.setState(states.findByUf(uf).orElseThrow());
+    city.setName(name);
+    city.setIbgeCode(ibgeCode);
+    return cities.save(city);
   }
 
   @Test

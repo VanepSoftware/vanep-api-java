@@ -8,6 +8,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import br.com.vanep.city.model.CityModel;
+import br.com.vanep.city.repository.CityRepository;
 import br.com.vanep.country.model.CountryModel;
 import br.com.vanep.country.repository.CountryRepository;
 import br.com.vanep.driver.DriverApprovalStatus;
@@ -15,6 +17,7 @@ import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.places.client.PlacesClient;
 import br.com.vanep.places.dto.PlaceDetailsResponseDTO;
+import br.com.vanep.state.repository.StateRepository;
 import br.com.vanep.state.seed.StateSeeder;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
@@ -49,6 +52,8 @@ class OnboardingStepsTest {
   @Autowired private UserRepository users;
   @Autowired private DriverRepository drivers;
   @Autowired private CountryRepository countries;
+  @Autowired private StateRepository states;
+  @Autowired private CityRepository cities;
   @Autowired private StateSeeder stateSeeder;
 
   @MockitoBean private PlacesClient places;
@@ -67,6 +72,7 @@ class OnboardingStepsTest {
     countries.save(brasil);
 
     stateSeeder.seed();
+    seedIbgeCity("DF", "Brasília", "5300108");
 
     BDDMockito.given(places.findPlaceDetails("taguatinga", null))
         .willReturn(fixture("df-taguatinga-qnl5"));
@@ -81,6 +87,14 @@ class OnboardingStepsTest {
 
   private JwtRequestPostProcessor as(String uid) {
     return jwt().jwt(builder -> builder.claim("uid", uid).subject(uid));
+  }
+
+  private CityModel seedIbgeCity(String uf, String name, String ibgeCode) {
+    CityModel city = new CityModel();
+    city.setState(states.findByUf(uf).orElseThrow());
+    city.setName(name);
+    city.setIbgeCode(ibgeCode);
+    return cities.save(city);
   }
 
   private UserModel saveUser(UserType type, String email, String document) {

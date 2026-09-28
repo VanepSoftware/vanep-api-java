@@ -26,6 +26,7 @@ import br.com.vanep.school.repository.SchoolRepository;
 import br.com.vanep.state.model.StateModel;
 import br.com.vanep.state.repository.StateRepository;
 import java.util.List;
+import java.util.Locale;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.BDDMockito;
@@ -129,20 +130,24 @@ class SchoolControllerTest {
   @MockitoBean private PlacesClient places;
 
   private void givenResolvedPlace(String street) {
+    givenResolvedPlace(street, "Campinas");
+  }
+
+  private void givenResolvedPlace(String street, String googleCityName) {
     BDDMockito.given(
             places.findPlaceDetails(
                 org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
         .willReturn(
             new PlaceDetailsResponseDTO(
                 "place-1",
-                street + ", Campinas - SP",
+                street + ", " + googleCityName + " - SP",
                 List.of(
                     new AddressComponentDTO("Brazil", "BR", List.of("country", "political")),
                     new AddressComponentDTO(
                         "Sao Paulo", "SP", List.of("administrative_area_level_1", "political")),
                     new AddressComponentDTO(
-                        "Campinas",
-                        "Campinas",
+                        googleCityName,
+                        googleCityName,
                         List.of("administrative_area_level_2", "political")),
                     new AddressComponentDTO("13015904", "13015904", List.of("postal_code")),
                     new AddressComponentDTO(street, street, List.of("route")))));
@@ -265,6 +270,33 @@ class SchoolControllerTest {
         .andExpect(jsonPath("$.address.cityToken").value(cityToken))
         .andExpect(jsonPath("$.address.token").isNotEmpty())
         .andExpect(jsonPath("$.addressId").doesNotExist());
+  }
+
+  @Test
+  void createReturns400AndPersistsNothingWhenPlaceCityHasNoIbgeMatch() throws Exception {
+    givenResolvedPlace("Rua da Escola", "Embu");
+    long citiesBefore = cities.count();
+    long addressesBefore = addresses.count();
+    long schoolsBefore = schools.count();
+
+    mockMvc
+        .perform(
+            post("/api/schools")
+                .with(adminJwt())
+                .locale(Locale.forLanguageTag("pt-BR"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"name\":\"Escola Sem Match\",\"address\":" + placeAddressJson("100") + "}"))
+        .andExpect(status().isBadRequest())
+        .andExpect(
+            jsonPath("$.detail")
+                .value(
+                    "Este nome de cidade não corresponde a um município brasileiro. Escolha outra"
+                        + " sugestão."));
+
+    assertThat(cities.count()).isEqualTo(citiesBefore);
+    assertThat(addresses.count()).isEqualTo(addressesBefore);
+    assertThat(schools.count()).isEqualTo(schoolsBefore);
   }
 
   @Test
