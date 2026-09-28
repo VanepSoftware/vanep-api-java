@@ -67,11 +67,11 @@
 > Branch: `feat/ibge-postal-address-personal-address` a partir de `feat/ibge-postal-address-schema`
 > Depende de: 1 | Paralelo com: 5
 
-- [ ] 6.1 Slice falhando: `200` com `cityToken` + street + CEP de 8 dígitos; CEP omitido `400`; CEP inválido `400`; street em branco `400`; token desconhecido `404` `city.not_found`; `cityName` extra ignorado; `placeId` não é aceito como contrato; `neighborhood` persiste e volta; `district_id` e `google_place_id` null; `401`; DELETE + PUT ainda cria linha nova; resposta da busca continua sem neighborhood/street de motoristas
-- [ ] 6.2 Trocar `PersonalAddressRequestDTO`; `PersonalAddressService` deixa de depender de `AddressPlaceResolverService` (extraído pela PR #173; segue existindo, agora só para escola) e nunca mais chama `PlacesClient` / `LocationResolverService`
-- [ ] 6.3 DTO de resposta: `neighborhood`; não exigir `googlePlaceId`
-- [ ] 6.4 MessageSource conforme precisar; manter onboarding `PERSONAL_ADDRESS` atrelado a `users.address_id`; reescrever para `cityToken` os testes que montam endereço pessoal por `placeId` (`PersonalAddressControllerTest`, `OnboardingStepsTest`), sem stub de `PlacesClient`; manter `location.address.street_required` nos bundles (a escola ainda a usa via `AddressPlaceResolverService`); o `PUT` com `cityToken` de cidade inativa segue aceito (só o picker filtra por ativas)
-- [ ] 6.5 `make lint` + `./mvnw verify`; abrir PR
+- [x] 6.1 Slice falhando: `200` com `cityToken` + street + CEP de 8 dígitos; CEP omitido `400`; CEP inválido `400`; street em branco `400`; token desconhecido `404` `city.not_found`; `cityName` extra ignorado; `placeId` não é aceito como contrato; `neighborhood` persiste e volta; `district_id` e `google_place_id` null; `401`; DELETE + PUT ainda cria linha nova; resposta da busca continua sem neighborhood/street de motoristas
+- [x] 6.2 Trocar `PersonalAddressRequestDTO`; `PersonalAddressService` deixa de depender de `AddressPlaceResolverService` (extraído pela PR #173; segue existindo, agora só para escola) e nunca mais chama `PlacesClient` / `LocationResolverService`
+- [x] 6.3 DTO de resposta: `neighborhood`; não exigir `googlePlaceId`
+- [x] 6.4 MessageSource conforme precisar; manter onboarding `PERSONAL_ADDRESS` atrelado a `users.address_id`; reescrever para `cityToken` os testes que montam endereço pessoal por `placeId` (`PersonalAddressControllerTest`, `OnboardingStepsTest`), sem stub de `PlacesClient`; manter `location.address.street_required` nos bundles (a escola ainda a usa via `AddressPlaceResolverService`); o `PUT` com `cityToken` de cidade inativa segue aceito (só o picker filtra por ativas)
+- [x] 6.5 `make lint` + `./mvnw verify`; abrir PR
 
 ## 7. Fase 7 — Endereço de embarque do dependente por `cityToken` (PR 7)
 

@@ -388,7 +388,19 @@ class DriverSearchControllerTest {
   @Test
   void neverExposesResidentialAddressOfTheDriver() throws Exception {
     stubPlaces();
-    createDriverWithAreas("exato@vanep.com", "taguatinga");
+    String driverUid = createDriverWithAreas("exato@vanep.com", "taguatinga");
+    String cityToken = cities.findAll().getFirst().getToken();
+
+    mockMvc
+        .perform(
+            put("/api/user/me/address")
+                .with(as(driverUid))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"cityToken\":\""
+                        + cityToken
+                        + "\",\"street\":\"QNL 5 Conjunto I\",\"zipCode\":\"72115105\",\"neighborhood\":\"Taguatinga Norte\"}"))
+        .andExpect(status().isOk());
 
     mockMvc
         .perform(get("/api/drivers/search").with(as(clientUid)).param("placeId", "taguatinga"))
@@ -397,6 +409,7 @@ class DriverSearchControllerTest {
         .andExpect(jsonPath("$.content[0].zipCode").doesNotExist())
         .andExpect(jsonPath("$.content[0].number").doesNotExist())
         .andExpect(jsonPath("$.content[0].complement").doesNotExist())
+        .andExpect(jsonPath("$.content[0].neighborhood").doesNotExist())
         .andExpect(jsonPath("$.content[0].address").doesNotExist());
   }
 

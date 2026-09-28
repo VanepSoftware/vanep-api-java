@@ -119,12 +119,16 @@ class OnboardingStepsTest {
   }
 
   private void setAddress(String uid) throws Exception {
+    String cityToken = cities.findAll().getFirst().getToken();
     mockMvc
         .perform(
             put("/api/user/me/address")
                 .with(as(uid))
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"placeId\":\"taguatinga\"}"))
+                .content(
+                    "{\"cityToken\":\""
+                        + cityToken
+                        + "\",\"street\":\"QNL 5 Conjunto I\",\"zipCode\":\"72115105\"}"))
         .andExpect(status().isOk());
   }
 
