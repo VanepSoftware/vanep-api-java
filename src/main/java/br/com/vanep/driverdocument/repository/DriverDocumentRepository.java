@@ -3,6 +3,7 @@ package br.com.vanep.driverdocument.repository;
 import br.com.vanep.driverdocument.enums.DocumentStatusEnum;
 import br.com.vanep.driverdocument.enums.DocumentTypeEnum;
 import br.com.vanep.driverdocument.model.DriverDocumentModel;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -17,6 +18,8 @@ public interface DriverDocumentRepository
         JpaSpecificationExecutor<DriverDocumentModel> {
 
   Optional<DriverDocumentModel> findByToken(String token);
+
+  List<DriverDocumentModel> findByDriverId(Long driverId);
 
   Page<DriverDocumentModel> findByDriverId(Long driverId, Pageable pageable);
 

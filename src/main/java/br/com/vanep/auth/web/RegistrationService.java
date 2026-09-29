@@ -88,9 +88,11 @@ public class RegistrationService {
       case DRIVER -> {
         DriverModel driver = new DriverModel();
         driver.setUser(user);
-        driver.setCnpj(driverFields.getCnpj());
-        driver.setExperienceYears(driverFields.getExperienceYears());
-        driver.setBasePrice(driverFields.getBasePrice());
+        if (driverFields != null) {
+          driver.setCnpj(driverFields.getCnpj());
+          driver.setExperienceYears(driverFields.getExperienceYears());
+          driver.setBasePrice(driverFields.getBasePrice());
+        }
         driver.setApprovalStatus(DriverApprovalStatus.PENDING);
         drivers.save(driver);
       }
