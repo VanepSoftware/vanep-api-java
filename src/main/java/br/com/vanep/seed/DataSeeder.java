@@ -26,6 +26,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -180,12 +181,15 @@ public class DataSeeder implements ApplicationRunner {
       bundle = rolePermissions.save(bundle);
       clientRole.setRolePermission(bundle);
       roles.save(clientRole);
-      log.info("Seed: CLIENT bundle created with dependents and driver read permissions.");
+      log.info("Seed: CLIENT bundle created with dependents and driver rating permissions.");
     }
   }
 
   static List<String> clientPermissions() {
-    return List.copyOf(PermissionEnum.crudFor("dependents"));
+    return Stream.concat(
+            PermissionEnum.crudFor("dependents").stream(),
+            Stream.of(PermissionEnum.CREATE_DRIVER_RATING.value()))
+        .toList();
   }
 
   private void seedAssistantPermissions() {
