@@ -126,7 +126,7 @@ public class MediaFileService {
   }
 
   private ResponseStatusException payloadTooLarge(String key) {
-    return new ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE, message(key));
+    return new ResponseStatusException(HttpStatus.CONTENT_TOO_LARGE, message(key));
   }
 
   private String message(String key) {
