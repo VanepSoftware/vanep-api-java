@@ -5,6 +5,7 @@ import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
+import br.com.vanep.user.service.UserService;
 import br.com.vanep.vehicle.dto.VehicleRequestDTO;
 import br.com.vanep.vehicle.dto.VehicleResponseDTO;
 import br.com.vanep.vehicle.mapper.VehicleMapper;
@@ -24,6 +25,7 @@ public class VehicleService {
   private final VehicleRepository vehicleRepository;
   private final DriverRepository driverRepository;
   private final UserRepository userRepository;
+  private final UserService userService;
   private final VehicleMapper mapper;
   private final MessageSource messages;
 
@@ -31,11 +33,13 @@ public class VehicleService {
       VehicleRepository vehicleRepository,
       DriverRepository driverRepository,
       UserRepository userRepository,
+      UserService userService,
       VehicleMapper mapper,
       MessageSource messages) {
     this.vehicleRepository = vehicleRepository;
     this.driverRepository = driverRepository;
     this.userRepository = userRepository;
+    this.userService = userService;
     this.mapper = mapper;
     this.messages = messages;
   }
@@ -75,6 +79,22 @@ public class VehicleService {
                           HttpStatus.NOT_FOUND, message("user.driver_profile.not_found")));
     }
 
+    return createFor(driver, request);
+  }
+
+  @Transactional
+  public VehicleResponseDTO createMine(String callerUid, VehicleRequestDTO request) {
+    return createFor(requireCallerDriver(callerUid), request);
+  }
+
+  @Transactional(readOnly = true)
+  public List<VehicleResponseDTO> findMine(String callerUid) {
+    return vehicleRepository.findByDriverId(requireCallerDriver(callerUid).getId()).stream()
+        .map(mapper::toResponse)
+        .toList();
+  }
+
+  VehicleResponseDTO createFor(DriverModel driver, VehicleRequestDTO request) {
     if (vehicleRepository.existsByPlate(request.plate())) {
       throw new ResponseStatusException(HttpStatus.CONFLICT, message("vehicle.plate.duplicate"));
     }
@@ -89,6 +109,16 @@ public class VehicleService {
     vehicle.setCapacity(request.capacity());
 
     return mapper.toResponse(vehicleRepository.save(vehicle));
+  }
+
+  DriverModel requireCallerDriver(String callerUid) {
+    UserModel user = userService.requireByTokenAndType(callerUid, UserType.DRIVER);
+    return driverRepository
+        .findByUserId(user.getId())
+        .orElseThrow(
+            () ->
+                new ResponseStatusException(
+                    HttpStatus.NOT_FOUND, message("user.driver_profile.not_found")));
   }
 
   public List<VehicleResponseDTO> findAll(String callerEmail) {

@@ -1,6 +1,7 @@
 package br.com.vanep.driverservicearea.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.hasItems;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -190,7 +191,7 @@ class DriverServiceAreaControllerTest {
   }
 
   @Test
-  void registersTheAdministrativeRegionAsServiceAreaNotTheBlockInsideIt() throws Exception {
+  void registersThePlaceTheDriverPickedNotTheRegionAroundIt() throws Exception {
     BDDMockito.given(places.findPlaceDetails("taguatinga", null))
         .willReturn(fixture("df-taguatinga-qnl5"));
 
@@ -201,14 +202,14 @@ class DriverServiceAreaControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body("taguatinga")))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$[0].name").value("Taguatinga"))
+        .andExpect(jsonPath("$[0].name").value("QNL 5"))
         .andExpect(jsonPath("$[0].cityName").value("Brasília"))
         .andExpect(jsonPath("$[0].coversWholeCity").value(false))
         .andExpect(jsonPath("$[0].token").isNotEmpty());
   }
 
   @Test
-  void collapsesTwoAddressesOfTheSameRegionIntoOneArea() throws Exception {
+  void keepsTwoPlacesOfTheSameRegionAsSeparateAreas() throws Exception {
     BDDMockito.given(places.findPlaceDetails("qnl5", null))
         .willReturn(fixture("df-taguatinga-qnl5"));
     BDDMockito.given(places.findPlaceDetails("objetivo", null))
@@ -221,8 +222,8 @@ class DriverServiceAreaControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"areas\":[{\"placeId\":\"qnl5\"},{\"placeId\":\"objetivo\"}]}"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.length()").value(1))
-        .andExpect(jsonPath("$[0].name").value("Taguatinga"));
+        .andExpect(jsonPath("$.length()").value(2))
+        .andExpect(jsonPath("$[*].name", hasItems("QNL 5", "QI 21")));
   }
 
   @Test

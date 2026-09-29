@@ -1,6 +1,7 @@
 package br.com.vanep.client.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.startsWith;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -99,7 +100,8 @@ class ClientPhotoControllerTest {
     mockMvc
         .perform(get("/api/clients/" + clientToken).with(adminJwt()))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.photo").value("/api/clients/" + clientToken + "/photo"));
+        .andExpect(
+            jsonPath("$.photo").value(startsWith("/api/clients/" + clientToken + "/photo?v=")));
   }
 
   @Test

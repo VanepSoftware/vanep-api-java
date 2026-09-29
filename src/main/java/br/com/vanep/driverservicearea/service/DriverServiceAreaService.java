@@ -92,7 +92,7 @@ public class DriverServiceAreaService {
 
       area.setCity(chain.city());
 
-      area.setDistrict(chain.shallowestDistrict().orElse(null));
+      area.setDistrict(chain.deepestDistrict().orElse(null));
 
       resolved.putIfAbsent(dedupeKey(area), area);
     }

@@ -23,6 +23,7 @@ import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -76,6 +77,18 @@ public class DriverSearchService {
       return Page.empty(pageable);
     }
     return pageInRankOrder(ranked, pageable);
+  }
+
+  // The sort is fixed on purpose: a caller-chosen sort could order drivers by a private column.
+  @Transactional(readOnly = true)
+  public Page<DriverSearchResponseDTO> findRecommended(Pageable pageable) {
+    Page<DriverModel> page =
+        drivers.findSearchableNewestFirst(
+            PageRequest.of(pageable.getPageNumber(), pageable.getPageSize()));
+    List<Long> driverIds = page.getContent().stream().map(DriverModel::getId).toList();
+    Map<Long, List<String>> areaNamesByDriver =
+        driverIds.isEmpty() ? Map.of() : findAreaNames(driverIds);
+    return page.map(driver -> toResponse(driver, areaNamesByDriver));
   }
 
   List<Long> rankDriverIds(ResolvedLocationChainDTO anchor) {

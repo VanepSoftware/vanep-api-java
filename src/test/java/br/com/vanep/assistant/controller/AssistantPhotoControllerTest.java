@@ -1,6 +1,7 @@
 package br.com.vanep.assistant.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.startsWith;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -124,7 +125,9 @@ class AssistantPhotoControllerTest {
     mockMvc
         .perform(get("/api/assistants").with(driverWithListJwt()))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$[0].photo").value("/api/assistants/" + assistantToken + "/photo"));
+        .andExpect(
+            jsonPath("$[0].photo")
+                .value(startsWith("/api/assistants/" + assistantToken + "/photo?v=")));
   }
 
   @Test

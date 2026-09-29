@@ -2,10 +2,12 @@ package br.com.vanep.driver.controller;
 
 import br.com.vanep.auth.security.SecurityHelper;
 import br.com.vanep.driver.dto.DriverMeSummaryResponseDTO;
+import br.com.vanep.driver.dto.DriverProfileResponseDTO;
 import br.com.vanep.driver.dto.DriverResponseDTO;
 import br.com.vanep.driver.dto.DriverSearchResponseDTO;
 import br.com.vanep.driver.dto.DriverUpdateRequestDTO;
 import br.com.vanep.driver.service.DriverPhotoService;
+import br.com.vanep.driver.service.DriverProfileService;
 import br.com.vanep.driver.service.DriverSearchService;
 import br.com.vanep.driver.service.DriverService;
 import br.com.vanep.media.web.MediaResponder;
@@ -38,13 +40,16 @@ public class DriverController {
   private final DriverService service;
   private final DriverSearchService searchService;
   private final DriverPhotoService photoService;
+  private final DriverProfileService profileService;
   private final MediaResponder mediaResponder;
 
   public DriverController(
       DriverService service,
       DriverSearchService searchService,
       DriverPhotoService photoService,
+      DriverProfileService profileService,
       MediaResponder mediaResponder) {
+    this.profileService = profileService;
     this.photoService = photoService;
     this.mediaResponder = mediaResponder;
     this.service = service;
@@ -60,6 +65,18 @@ public class DriverController {
       @PageableDefault(size = 20) Pageable pageable) {
     return searchService.search(
         SecurityHelper.requireCallerUid(authentication), placeId, sessionToken, pageable);
+  }
+
+  @GetMapping("/recommended")
+  @PreAuthorize("isAuthenticated()")
+  public Page<DriverSearchResponseDTO> recommended(@PageableDefault(size = 20) Pageable pageable) {
+    return searchService.findRecommended(pageable);
+  }
+
+  @GetMapping("/{token}/profile")
+  @PreAuthorize("isAuthenticated()")
+  public DriverProfileResponseDTO profile(@PathVariable String token) {
+    return profileService.findProfile(token);
   }
 
   @GetMapping("/me")
@@ -108,7 +125,9 @@ public class DriverController {
   }
 
   @GetMapping("/{token}/photo")
-  @PreAuthorize("hasAuthority('show_driver') or @sec.isDriverOwner(#token, authentication)")
+  @PreAuthorize(
+      "hasAuthority('show_driver') or @sec.isDriverOwner(#token, authentication)"
+          + " or @sec.isSearchableDriver(#token)")
   public ResponseEntity<InputStreamResource> downloadPhoto(@PathVariable String token) {
     return mediaResponder.respond(photoService.require(token, true));
   }
