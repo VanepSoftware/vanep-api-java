@@ -8,7 +8,6 @@ import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.driverrating.dto.DriverRatingCreateRequestDTO;
 import br.com.vanep.driverrating.dto.DriverRatingResponseDTO;
-import br.com.vanep.driverrating.dto.DriverRatingUpdateRequestDTO;
 import br.com.vanep.driverrating.mapper.DriverRatingMapper;
 import br.com.vanep.driverrating.model.DriverRatingModel;
 import br.com.vanep.driverrating.repository.DriverRatingRepository;
@@ -123,19 +122,6 @@ public class DriverRatingService {
   @Transactional(readOnly = true)
   public DriverRatingResponseDTO findByToken(String token) {
     return mapper.toResponse(requireByToken(token));
-  }
-
-  @Transactional
-  public DriverRatingResponseDTO update(String token, DriverRatingUpdateRequestDTO request) {
-    DriverRatingModel ratingModel = requireByToken(token);
-
-    ratingModel.setRating(request.rating());
-    ratingModel.setComment(request.comment());
-
-    DriverRatingModel saved = driverRatingRepository.save(ratingModel);
-    recalculateDriverAverage(saved.getLink().getDriver());
-
-    return mapper.toResponse(saved);
   }
 
   @Transactional
