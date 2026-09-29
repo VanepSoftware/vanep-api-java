@@ -18,6 +18,7 @@ import br.com.vanep.clientdriver.enums.RelationshipStatus;
 import br.com.vanep.clientdriver.mapper.ClientDriverMapper;
 import br.com.vanep.clientdriver.model.ClientDriverModel;
 import br.com.vanep.clientdriver.repository.ClientDriverRepository;
+import br.com.vanep.driver.DriverApprovalStatus;
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.user.enums.UserType;
@@ -37,6 +38,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.openapitools.jackson.nullable.JsonNullable;
 import org.springframework.context.MessageSource;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
 @ExtendWith(MockitoExtension.class)
@@ -68,6 +70,7 @@ class ClientDriverServiceTest {
     carlos = new DriverModel();
     carlos.setId(2L);
     carlos.setUser(user(20L, "carlos-uid", UserType.DRIVER));
+    carlos.setApprovalStatus(DriverApprovalStatus.APPROVED);
 
     when(clients.findByToken("cli")).thenReturn(Optional.of(maria));
     when(drivers.findByToken("drv")).thenReturn(Optional.of(carlos));
@@ -124,6 +127,72 @@ class ClientDriverServiceTest {
         .isInstanceOf(ResponseStatusException.class)
         .hasMessageContaining("404")
         .hasMessageContaining("client_driver.driver.not_found");
+  }
+
+  @Test
+  void refusesCreateWhenDriverIsNotApproved() {
+    for (DriverApprovalStatus unapprovedStatus :
+        List.of(
+            DriverApprovalStatus.PENDING,
+            DriverApprovalStatus.UNDER_REVIEW,
+            DriverApprovalStatus.REJECTED)) {
+      carlos.setApprovalStatus(unapprovedStatus);
+
+      assertThatThrownBy(() -> service.create(new ClientDriverCreateRequestDTO("cli", "drv", null)))
+          .isInstanceOf(ResponseStatusException.class)
+          .satisfies(
+              e -> {
+                ResponseStatusException ex = (ResponseStatusException) e;
+                assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+                assertThat(ex.getReason()).isEqualTo("client_driver.driver.not_approved");
+              });
+    }
+
+    carlos.setApprovalStatus(null);
+    assertThatThrownBy(() -> service.create(new ClientDriverCreateRequestDTO("cli", "drv", null)))
+        .isInstanceOf(ResponseStatusException.class)
+        .satisfies(
+            e -> {
+              ResponseStatusException ex = (ResponseStatusException) e;
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+              assertThat(ex.getReason()).isEqualTo("client_driver.driver.not_approved");
+            });
+
+    verify(links, never()).save(any());
+  }
+
+  @Test
+  void refusesUpdateToActiveWhenDriverIsNotApproved() {
+    ClientDriverModel stored = link(RelationshipStatus.PENDING);
+    carlos.setApprovalStatus(DriverApprovalStatus.UNDER_REVIEW);
+    when(links.findByToken("lnk")).thenReturn(Optional.of(stored));
+
+    assertThatThrownBy(
+            () ->
+                service.update(
+                    "lnk",
+                    new ClientDriverUpdateRequestDTO(JsonNullable.of(RelationshipStatus.ACTIVE))))
+        .isInstanceOf(ResponseStatusException.class)
+        .satisfies(
+            e -> {
+              ResponseStatusException ex = (ResponseStatusException) e;
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+              assertThat(ex.getReason()).isEqualTo("client_driver.driver.not_approved");
+            });
+
+    assertThat(stored.getStatus()).isEqualTo(RelationshipStatus.PENDING);
+  }
+
+  @Test
+  void allowsUpdateToNonActiveStatusesEvenIfDriverIsNotApproved() {
+    ClientDriverModel stored = link(RelationshipStatus.PENDING);
+    carlos.setApprovalStatus(DriverApprovalStatus.UNDER_REVIEW);
+    when(links.findByToken("lnk")).thenReturn(Optional.of(stored));
+
+    service.update(
+        "lnk", new ClientDriverUpdateRequestDTO(JsonNullable.of(RelationshipStatus.BLOCKED)));
+
+    assertThat(stored.getStatus()).isEqualTo(RelationshipStatus.BLOCKED);
   }
 
   @Test

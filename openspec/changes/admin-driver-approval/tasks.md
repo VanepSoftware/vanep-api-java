@@ -50,12 +50,12 @@
 - [ ] 1.2 Open PR 1: `docs(openspec): proposta de aprovacao de documentos do motorista pelo admin (UC02, RN02)`.
 
 ### Phase 2 — RN02 Proposal Blocking Enforcement
-- [ ] 2.1 Add internationalized error messages in `src/main/resources/messages.properties` and `src/main/resources/messages_pt_BR.properties` for `client_driver.driver.not_approved`.
-- [ ] 2.2 Add unit test in `ClientDriverServiceTest.java` verifying that attempting to create a link with an unapproved driver (`PENDING`, `UNDER_REVIEW`, `REJECTED`) throws `422 Unprocessable Entity`.
-- [ ] 2.3 Add unit test in `ClientDriverServiceTest.java` verifying that updating link status to `ACTIVE` fails if driver is not approved.
-- [ ] 2.4 Update `ClientDriverService.java` to enforce driver `approvalStatus == APPROVED` on `create` and `update` (transitions to `ACTIVE`).
-- [ ] 2.5 Add MockMvc slice test in `ClientDriverControllerTest.java` asserting `HTTP 422` when creating link for an unapproved driver.
-- [ ] 2.6 Validate with `./mvnw spotless:check` and `./mvnw test`.
+- [x] 2.1 Add internationalized error messages in `src/main/resources/messages.properties` and `src/main/resources/messages_pt_BR.properties` for `client_driver.driver.not_approved`.
+- [x] 2.2 Add unit test in `ClientDriverServiceTest.java` verifying that attempting to create a link with an unapproved driver (`PENDING`, `UNDER_REVIEW`, `REJECTED`) throws `422 Unprocessable Entity`.
+- [x] 2.3 Add unit test in `ClientDriverServiceTest.java` verifying that updating link status to `ACTIVE` fails if driver is not approved.
+- [x] 2.4 Update `ClientDriverService.java` to enforce driver `approvalStatus == APPROVED` on `create` and `update` (transitions to `ACTIVE`).
+- [x] 2.5 Add MockMvc slice test in `ClientDriverControllerTest.java` asserting `HTTP 422` when creating link for an unapproved driver.
+- [x] 2.6 Validate with `./mvnw spotless:check` and `./mvnw test`.
 - [ ] 2.7 Open PR 2: `feat(client-driver): phase 2 — bloqueio de propostas para motoristas nao homologados (RN02)`.
 
 ### Phase 3 — Driver Notification Engine
