@@ -17,17 +17,23 @@ import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.driverrating.dto.DriverRatingCreateRequestDTO;
 import br.com.vanep.driverrating.dto.DriverRatingResponseDTO;
+import br.com.vanep.driverrating.dto.DriverRatingStatusResponseDTO;
 import br.com.vanep.driverrating.mapper.DriverRatingMapper;
 import br.com.vanep.driverrating.model.DriverRatingModel;
 import br.com.vanep.driverrating.repository.DriverRatingRepository;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
 import java.math.BigDecimal;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.EnumSource.Mode;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.Mock;
@@ -62,7 +68,8 @@ class DriverRatingServiceTest {
             linkRepository,
             userRepository,
             mapper,
-            messages);
+            messages,
+            new DriverRatingEligibilityPolicy());
   }
 
   private DriverModel mockDriver(Long id, Long userId) {
@@ -98,7 +105,14 @@ class DriverRatingServiceTest {
     link.setClient(client);
     link.setDriver(driver);
     link.setStatus(RelationshipStatus.ACTIVE);
+    link.setCreatedAt(Instant.now().minus(Duration.ofDays(1)));
     return link;
+  }
+
+  private void givenTheCallerIs(ClientModel client) {
+    UserModel caller = client.getUser();
+    when(userRepository.findByEmail(caller.getEmail())).thenReturn(Optional.of(caller));
+    when(clientRepository.findByUserId(caller.getId())).thenReturn(Optional.of(client));
   }
 
   private DriverRatingResponseDTO anyResponse() {
@@ -288,6 +302,146 @@ class DriverRatingServiceTest {
     when(mapper.toResponse(rating)).thenReturn(response);
 
     assertThat(service.findByToken("tok")).isEqualTo(response);
+  }
+
+  @ParameterizedTest
+  @EnumSource(value = RelationshipStatus.class, mode = Mode.EXCLUDE, names = "ACTIVE")
+  void createThrowsUnprocessableWhenTheLinkIsNotActive(RelationshipStatus status) {
+    ClientModel client = mockClient(1L, 10L);
+    DriverModel driver = mockDriver(2L, 20L);
+    ClientDriverModel link = mockLink(7L, client, driver);
+    link.setStatus(status);
+
+    givenTheCallerIs(client);
+    when(driverRepository.findByToken("driver-token")).thenReturn(Optional.of(driver));
+    when(linkRepository.findByPair(1L, 2L)).thenReturn(Optional.of(link));
+    when(messages.getMessage(anyString(), any(), any())).thenAnswer(c -> c.getArgument(0));
+
+    assertThatThrownBy(
+            () ->
+                service.create(
+                    new DriverRatingCreateRequestDTO(
+                        "driver-token", BigDecimal.valueOf(5.00), "Nice"),
+                    "client@vanep.com"))
+        .isInstanceOf(ResponseStatusException.class)
+        .hasMessageContaining("422")
+        .hasMessageContaining("driver_rating.link.not_active");
+
+    verify(driverRatingRepository, never()).save(any());
+  }
+
+  @Test
+  void deletingTheLastRatingLeavesTheDriverWithoutARating() {
+    DriverModel driver = mockDriver(2L, 20L);
+    driver.setRating(BigDecimal.valueOf(3.00));
+    DriverRatingModel ratingModel = new DriverRatingModel();
+    ratingModel.setLink(mockLink(7L, mockClient(1L, 10L), driver));
+
+    when(driverRatingRepository.findByToken("tok")).thenReturn(Optional.of(ratingModel));
+    when(driverRatingRepository.calculateAverageRatingForDriver(2L)).thenReturn(Optional.empty());
+
+    service.delete("tok");
+
+    assertThat(driver.getRating()).isNull();
+    verify(driverRepository).save(driver);
+  }
+
+  @Test
+  void anActiveUnratedLinkCanRate() {
+    ClientModel client = mockClient(1L, 10L);
+    DriverModel driver = mockDriver(2L, 20L);
+
+    givenTheCallerIs(client);
+    when(driverRepository.findByToken("driver-token")).thenReturn(Optional.of(driver));
+    when(linkRepository.findByPair(1L, 2L)).thenReturn(Optional.of(mockLink(7L, client, driver)));
+    when(driverRatingRepository.existsByLinkId(7L)).thenReturn(false);
+
+    assertThat(service.findRatingStatus("driver-token", "client@vanep.com"))
+        .isEqualTo(new DriverRatingStatusResponseDTO(false, true));
+  }
+
+  @Test
+  void aRatedLinkCannotRateAgain() {
+    ClientModel client = mockClient(1L, 10L);
+    DriverModel driver = mockDriver(2L, 20L);
+
+    givenTheCallerIs(client);
+    when(driverRepository.findByToken("driver-token")).thenReturn(Optional.of(driver));
+    when(linkRepository.findByPair(1L, 2L)).thenReturn(Optional.of(mockLink(7L, client, driver)));
+    when(driverRatingRepository.existsByLinkId(7L)).thenReturn(true);
+
+    assertThat(service.findRatingStatus("driver-token", "client@vanep.com"))
+        .isEqualTo(new DriverRatingStatusResponseDTO(true, false));
+  }
+
+  @Test
+  void aLinkThatIsNotActiveCannotRate() {
+    ClientModel client = mockClient(1L, 10L);
+    DriverModel driver = mockDriver(2L, 20L);
+    ClientDriverModel link = mockLink(7L, client, driver);
+    link.setStatus(RelationshipStatus.INACTIVE);
+
+    givenTheCallerIs(client);
+    when(driverRepository.findByToken("driver-token")).thenReturn(Optional.of(driver));
+    when(linkRepository.findByPair(1L, 2L)).thenReturn(Optional.of(link));
+    when(driverRatingRepository.existsByLinkId(7L)).thenReturn(false);
+
+    assertThat(service.findRatingStatus("driver-token", "client@vanep.com"))
+        .isEqualTo(new DriverRatingStatusResponseDTO(false, false));
+  }
+
+  @Test
+  void aLinkYoungerThanFiveMinutesCannotRateYet() {
+    ClientModel client = mockClient(1L, 10L);
+    DriverModel driver = mockDriver(2L, 20L);
+    ClientDriverModel link = mockLink(7L, client, driver);
+    link.setCreatedAt(Instant.now().minus(Duration.ofMinutes(1)));
+
+    givenTheCallerIs(client);
+    when(driverRepository.findByToken("driver-token")).thenReturn(Optional.of(driver));
+    when(linkRepository.findByPair(1L, 2L)).thenReturn(Optional.of(link));
+    when(driverRatingRepository.existsByLinkId(7L)).thenReturn(false);
+
+    assertThat(service.findRatingStatus("driver-token", "client@vanep.com"))
+        .isEqualTo(new DriverRatingStatusResponseDTO(false, false));
+  }
+
+  @Test
+  void createThrowsUnprocessableWhenTheLinkIsTooRecent() {
+    ClientModel client = mockClient(1L, 10L);
+    DriverModel driver = mockDriver(2L, 20L);
+    ClientDriverModel link = mockLink(7L, client, driver);
+    link.setCreatedAt(Instant.now().minus(Duration.ofMinutes(1)));
+
+    givenTheCallerIs(client);
+    when(driverRepository.findByToken("driver-token")).thenReturn(Optional.of(driver));
+    when(linkRepository.findByPair(1L, 2L)).thenReturn(Optional.of(link));
+    when(messages.getMessage(anyString(), any(), any())).thenAnswer(c -> c.getArgument(0));
+
+    assertThatThrownBy(
+            () ->
+                service.create(
+                    new DriverRatingCreateRequestDTO(
+                        "driver-token", BigDecimal.valueOf(5.00), "Nice"),
+                    "client@vanep.com"))
+        .isInstanceOf(ResponseStatusException.class)
+        .hasMessageContaining("422")
+        .hasMessageContaining("driver_rating.link.too_recent");
+
+    verify(driverRatingRepository, never()).save(any());
+  }
+
+  @Test
+  void withoutALinkTheClientCannotRate() {
+    ClientModel client = mockClient(1L, 10L);
+    DriverModel driver = mockDriver(2L, 20L);
+
+    givenTheCallerIs(client);
+    when(driverRepository.findByToken("driver-token")).thenReturn(Optional.of(driver));
+    when(linkRepository.findByPair(1L, 2L)).thenReturn(Optional.empty());
+
+    assertThat(service.findRatingStatus("driver-token", "client@vanep.com"))
+        .isEqualTo(new DriverRatingStatusResponseDTO(false, false));
   }
 
   @Test
