@@ -38,14 +38,14 @@ public class DriverOnboardingController {
   }
 
   @PostMapping("/{token}/approve")
-  @PreAuthorize("hasAuthority('approve_driver')")
+  @PreAuthorize("hasRole('ADMIN') or hasAuthority('approve_driver')")
   public DriverResponseDTO approveDriver(
       @PathVariable String token, Authentication authentication) {
     return onboardingService.approve(token, SecurityHelper.requireCallerUid(authentication));
   }
 
   @PostMapping("/{token}/reject")
-  @PreAuthorize("hasAuthority('approve_driver')")
+  @PreAuthorize("hasRole('ADMIN') or hasAuthority('approve_driver')")
   public DriverResponseDTO rejectDriver(
       @PathVariable String token,
       @Valid @RequestBody DriverRejectionRequestDTO request,

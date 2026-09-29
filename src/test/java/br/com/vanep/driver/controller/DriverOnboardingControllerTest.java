@@ -122,6 +122,12 @@ class DriverOnboardingControllerTest {
             new SimpleGrantedAuthority("ROLE_ADMIN"), new SimpleGrantedAuthority("approve_driver"));
   }
 
+  private JwtRequestPostProcessor adminRoleOnlyJwt(String uid) {
+    return jwt()
+        .jwt(t -> t.claim("uid", uid).claim("roles", List.of("ROLE_ADMIN")))
+        .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"));
+  }
+
   private JwtRequestPostProcessor driverJwt(String uid) {
     return jwt()
         .jwt(t -> t.claim("uid", uid).claim("roles", List.of("ROLE_DRIVER")))
@@ -324,6 +330,21 @@ class DriverOnboardingControllerTest {
   }
 
   @Test
+  void approveDriverSuccessForAdminWithRoleAdminOnly() throws Exception {
+    driver.setApprovalStatus(DriverApprovalStatus.UNDER_REVIEW);
+    driver.setActive(false);
+    driver = drivers.save(driver);
+
+    mockMvc
+        .perform(
+            post("/api/drivers/" + driver.getToken() + "/approve")
+                .with(adminRoleOnlyJwt(adminUserUid)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.approvalStatus").value("APPROVED"))
+        .andExpect(jsonPath("$.active").value(true));
+  }
+
+  @Test
   void approveDriverWhenNotUnderReviewReturns400() throws Exception {
     driver.setApprovalStatus(DriverApprovalStatus.PENDING);
     driver = drivers.save(driver);
@@ -368,6 +389,21 @@ class DriverOnboardingControllerTest {
         .perform(
             post("/api/drivers/" + driver.getToken() + "/reject")
                 .with(adminJwt(adminUserUid))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"reason\": \"Foto da CNH ilegível\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.approvalStatus").value("REJECTED"));
+  }
+
+  @Test
+  void rejectDriverSuccessForAdminWithRoleAdminOnly() throws Exception {
+    driver.setApprovalStatus(DriverApprovalStatus.UNDER_REVIEW);
+    driver = drivers.save(driver);
+
+    mockMvc
+        .perform(
+            post("/api/drivers/" + driver.getToken() + "/reject")
+                .with(adminRoleOnlyJwt(adminUserUid))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"reason\": \"Foto da CNH ilegível\"}"))
         .andExpect(status().isOk())
