@@ -228,7 +228,8 @@ public class DriverOnboardingService {
                   doc ->
                       doc.isActive()
                           && doc.getDocumentType() == requiredType
-                          && doc.getStatus() != DocumentStatusEnum.REJECTED);
+                          && doc.getStatus() != DocumentStatusEnum.REJECTED
+                          && doc.getFile() != null);
       if (!present) {
         missingTypes.add(requiredType);
       }

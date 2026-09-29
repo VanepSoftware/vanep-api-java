@@ -21,6 +21,7 @@ import br.com.vanep.driverdocument.model.DriverDocumentModel;
 import br.com.vanep.driverdocument.repository.DriverDocumentRepository;
 import br.com.vanep.driverservicearea.model.DriverServiceAreaModel;
 import br.com.vanep.driverservicearea.repository.DriverServiceAreaRepository;
+import br.com.vanep.media.model.MediaFileModel;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.service.UserService;
@@ -85,6 +86,20 @@ class DriverOnboardingServiceTest {
     driver.setBasePrice(BigDecimal.valueOf(150.00));
   }
 
+  private DriverDocumentModel mockDocument(DocumentTypeEnum type, boolean withFile) {
+    DriverDocumentModel doc = new DriverDocumentModel();
+    doc.setToken("doc-token-" + type.name().toLowerCase());
+    doc.setActive(true);
+    doc.setDocumentType(type);
+    doc.setStatus(DocumentStatusEnum.PENDING);
+    if (withFile) {
+      MediaFileModel file = new MediaFileModel();
+      file.setToken("media-token-" + type.name().toLowerCase());
+      doc.setFile(file);
+    }
+    return doc;
+  }
+
   @Test
   void getOnboardingStatusReturnsIncompleteWhenNothingConfigured() {
     driver.setBasePrice(BigDecimal.ZERO);
@@ -131,20 +146,9 @@ class DriverOnboardingServiceTest {
     cnh.setValidUntil(LocalDate.now().plusYears(2));
     when(driverCnhRepository.findByDriverId(20L)).thenReturn(List.of(cnh));
 
-    DriverDocumentModel crlv = new DriverDocumentModel();
-    crlv.setActive(true);
-    crlv.setDocumentType(DocumentTypeEnum.CRLV);
-    crlv.setStatus(DocumentStatusEnum.PENDING);
-
-    DriverDocumentModel inspection = new DriverDocumentModel();
-    inspection.setActive(true);
-    inspection.setDocumentType(DocumentTypeEnum.VEHICLE_INSPECTION);
-    inspection.setStatus(DocumentStatusEnum.PENDING);
-
-    DriverDocumentModel municipal = new DriverDocumentModel();
-    municipal.setActive(true);
-    municipal.setDocumentType(DocumentTypeEnum.MUNICIPAL_AUTHORIZATION);
-    municipal.setStatus(DocumentStatusEnum.PENDING);
+    DriverDocumentModel crlv = mockDocument(DocumentTypeEnum.CRLV, true);
+    DriverDocumentModel inspection = mockDocument(DocumentTypeEnum.VEHICLE_INSPECTION, true);
+    DriverDocumentModel municipal = mockDocument(DocumentTypeEnum.MUNICIPAL_AUTHORIZATION, true);
 
     when(driverDocumentRepository.findByDriverId(20L))
         .thenReturn(List.of(crlv, inspection, municipal));
@@ -211,15 +215,9 @@ class DriverOnboardingServiceTest {
     cnh.setValidUntil(LocalDate.now().plusYears(1));
     when(driverCnhRepository.findByDriverId(20L)).thenReturn(List.of(cnh));
 
-    DriverDocumentModel crlv = new DriverDocumentModel();
-    crlv.setActive(true);
-    crlv.setDocumentType(DocumentTypeEnum.CRLV);
-    DriverDocumentModel inspection = new DriverDocumentModel();
-    inspection.setActive(true);
-    inspection.setDocumentType(DocumentTypeEnum.VEHICLE_INSPECTION);
-    DriverDocumentModel municipal = new DriverDocumentModel();
-    municipal.setActive(true);
-    municipal.setDocumentType(DocumentTypeEnum.MUNICIPAL_AUTHORIZATION);
+    DriverDocumentModel crlv = mockDocument(DocumentTypeEnum.CRLV, true);
+    DriverDocumentModel inspection = mockDocument(DocumentTypeEnum.VEHICLE_INSPECTION, true);
+    DriverDocumentModel municipal = mockDocument(DocumentTypeEnum.MUNICIPAL_AUTHORIZATION, true);
     when(driverDocumentRepository.findByDriverId(20L))
         .thenReturn(List.of(crlv, inspection, municipal));
 
@@ -250,15 +248,9 @@ class DriverOnboardingServiceTest {
     cnh.setValidUntil(LocalDate.now().minusDays(1)); // Expired!
     when(driverCnhRepository.findByDriverId(20L)).thenReturn(List.of(cnh));
 
-    DriverDocumentModel crlv = new DriverDocumentModel();
-    crlv.setActive(true);
-    crlv.setDocumentType(DocumentTypeEnum.CRLV);
-    DriverDocumentModel inspection = new DriverDocumentModel();
-    inspection.setActive(true);
-    inspection.setDocumentType(DocumentTypeEnum.VEHICLE_INSPECTION);
-    DriverDocumentModel municipal = new DriverDocumentModel();
-    municipal.setActive(true);
-    municipal.setDocumentType(DocumentTypeEnum.MUNICIPAL_AUTHORIZATION);
+    DriverDocumentModel crlv = mockDocument(DocumentTypeEnum.CRLV, true);
+    DriverDocumentModel inspection = mockDocument(DocumentTypeEnum.VEHICLE_INSPECTION, true);
+    DriverDocumentModel municipal = mockDocument(DocumentTypeEnum.MUNICIPAL_AUTHORIZATION, true);
     when(driverDocumentRepository.findByDriverId(20L))
         .thenReturn(List.of(crlv, inspection, municipal));
 
@@ -287,13 +279,9 @@ class DriverOnboardingServiceTest {
     cnh.setValidUntil(LocalDate.now().plusYears(1));
     when(driverCnhRepository.findByDriverId(20L)).thenReturn(List.of(cnh));
 
-    // CRLV and inspection uploaded, but MUNICIPAL_AUTHORIZATION is missing!
-    DriverDocumentModel crlv = new DriverDocumentModel();
-    crlv.setActive(true);
-    crlv.setDocumentType(DocumentTypeEnum.CRLV);
-    DriverDocumentModel inspection = new DriverDocumentModel();
-    inspection.setActive(true);
-    inspection.setDocumentType(DocumentTypeEnum.VEHICLE_INSPECTION);
+    // CRLV and inspection uploaded with files, but MUNICIPAL_AUTHORIZATION is missing!
+    DriverDocumentModel crlv = mockDocument(DocumentTypeEnum.CRLV, true);
+    DriverDocumentModel inspection = mockDocument(DocumentTypeEnum.VEHICLE_INSPECTION, true);
     when(driverDocumentRepository.findByDriverId(20L)).thenReturn(List.of(crlv, inspection));
 
     assertThatThrownBy(() -> service.submitOnboarding("user-token-10"))
@@ -324,15 +312,9 @@ class DriverOnboardingServiceTest {
     cnh.setValidUntil(LocalDate.now().plusYears(1));
     when(driverCnhRepository.findByDriverId(20L)).thenReturn(List.of(cnh));
 
-    DriverDocumentModel crlv = new DriverDocumentModel();
-    crlv.setActive(true);
-    crlv.setDocumentType(DocumentTypeEnum.CRLV);
-    DriverDocumentModel inspection = new DriverDocumentModel();
-    inspection.setActive(true);
-    inspection.setDocumentType(DocumentTypeEnum.VEHICLE_INSPECTION);
-    DriverDocumentModel municipal = new DriverDocumentModel();
-    municipal.setActive(true);
-    municipal.setDocumentType(DocumentTypeEnum.MUNICIPAL_AUTHORIZATION);
+    DriverDocumentModel crlv = mockDocument(DocumentTypeEnum.CRLV, true);
+    DriverDocumentModel inspection = mockDocument(DocumentTypeEnum.VEHICLE_INSPECTION, true);
+    DriverDocumentModel municipal = mockDocument(DocumentTypeEnum.MUNICIPAL_AUTHORIZATION, true);
     when(driverDocumentRepository.findByDriverId(20L))
         .thenReturn(List.of(crlv, inspection, municipal));
 
@@ -347,5 +329,70 @@ class DriverOnboardingServiceTest {
     assertThat(driver.getApprovalStatus()).isEqualTo(DriverApprovalStatus.UNDER_REVIEW);
     assertThat(driver.getSubmittedAt()).isNotNull();
     assertThat(driver.getRejectionReason()).isNull();
+  }
+
+  @Test
+  void getOnboardingStatusReturnsIncompleteWhenDocumentHasNoFileUploaded() {
+    when(userService.requireByTokenAndType("user-token-10", UserType.DRIVER)).thenReturn(user);
+    when(driverRepository.findByUserId(10L)).thenReturn(Optional.of(driver));
+
+    DriverServiceAreaModel area = new DriverServiceAreaModel();
+    area.setCity(new CityModel());
+    when(driverServiceAreaRepository.findByDriverId(20L)).thenReturn(List.of(area));
+
+    VehicleModel vehicle = new VehicleModel();
+    vehicle.setActive(true);
+    when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of(vehicle));
+
+    DriverCnhModel cnh = new DriverCnhModel();
+    cnh.setActive(true);
+    cnh.setValidUntil(LocalDate.now().plusYears(2));
+    when(driverCnhRepository.findByDriverId(20L)).thenReturn(List.of(cnh));
+
+    // CRLV exists but with no uploaded file (file == null)
+    DriverDocumentModel crlv = mockDocument(DocumentTypeEnum.CRLV, false);
+    DriverDocumentModel inspection = mockDocument(DocumentTypeEnum.VEHICLE_INSPECTION, true);
+    DriverDocumentModel municipal = mockDocument(DocumentTypeEnum.MUNICIPAL_AUTHORIZATION, true);
+
+    when(driverDocumentRepository.findByDriverId(20L))
+        .thenReturn(List.of(crlv, inspection, municipal));
+
+    DriverOnboardingStatusResponseDTO status = service.getOnboardingStatus("user-token-10");
+
+    assertThat(status.canSubmit()).isFalse();
+    assertThat(status.documentsStep().completed()).isFalse();
+    assertThat(status.documentsStep().missingTypes()).containsExactly(DocumentTypeEnum.CRLV);
+  }
+
+  @Test
+  void submitOnboardingThrowsUnprocessableEntityWhenDocumentHasNoFileUploaded() {
+    when(userService.requireByTokenAndType("user-token-10", UserType.DRIVER)).thenReturn(user);
+    when(driverRepository.findByUserId(10L)).thenReturn(Optional.of(driver));
+
+    user.setAddressId(55L);
+    VehicleModel vehicle = new VehicleModel();
+    vehicle.setActive(true);
+    when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of(vehicle));
+
+    DriverCnhModel cnh = new DriverCnhModel();
+    cnh.setActive(true);
+    cnh.setValidUntil(LocalDate.now().plusYears(1));
+    when(driverCnhRepository.findByDriverId(20L)).thenReturn(List.of(cnh));
+
+    // CRLV exists but file is null
+    DriverDocumentModel crlv = mockDocument(DocumentTypeEnum.CRLV, false);
+    DriverDocumentModel inspection = mockDocument(DocumentTypeEnum.VEHICLE_INSPECTION, true);
+    DriverDocumentModel municipal = mockDocument(DocumentTypeEnum.MUNICIPAL_AUTHORIZATION, true);
+    when(driverDocumentRepository.findByDriverId(20L))
+        .thenReturn(List.of(crlv, inspection, municipal));
+
+    assertThatThrownBy(() -> service.submitOnboarding("user-token-10"))
+        .isInstanceOf(ResponseStatusException.class)
+        .satisfies(
+            e -> {
+              ResponseStatusException ex = (ResponseStatusException) e;
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+              assertThat(ex.getReason()).contains("driver.onboarding.documents_missing");
+            });
   }
 }

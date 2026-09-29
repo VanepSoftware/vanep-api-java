@@ -22,6 +22,8 @@ import br.com.vanep.driverdocument.enums.DocumentStatusEnum;
 import br.com.vanep.driverdocument.enums.DocumentTypeEnum;
 import br.com.vanep.driverdocument.model.DriverDocumentModel;
 import br.com.vanep.driverdocument.repository.DriverDocumentRepository;
+import br.com.vanep.media.model.MediaFileModel;
+import br.com.vanep.media.repository.MediaFileRepository;
 import br.com.vanep.state.model.StateModel;
 import br.com.vanep.state.repository.StateRepository;
 import br.com.vanep.user.enums.UserType;
@@ -57,6 +59,7 @@ class DriverOnboardingControllerTest {
   @Autowired private VehicleRepository vehicles;
   @Autowired private DriverCnhRepository driverCnhs;
   @Autowired private DriverDocumentRepository driverDocuments;
+  @Autowired private MediaFileRepository mediaFiles;
   @Autowired private AddressRepository addresses;
   @Autowired private CityRepository cities;
   @Autowired private StateRepository states;
@@ -165,11 +168,20 @@ class DriverOnboardingControllerTest {
             DocumentTypeEnum.CRLV,
             DocumentTypeEnum.VEHICLE_INSPECTION,
             DocumentTypeEnum.MUNICIPAL_AUTHORIZATION)) {
+      MediaFileModel file = new MediaFileModel();
+      file.setObjectKey(
+          "driver-documents/" + type.name().toLowerCase() + "-" + System.nanoTime() + ".pdf");
+      file.setMimeType("application/pdf");
+      file.setSizeBytes(2048L);
+      file.setOriginalName("doc.pdf");
+      mediaFiles.save(file);
+
       DriverDocumentModel doc = new DriverDocumentModel();
       doc.setDriver(driver);
       doc.setDocumentType(type);
       doc.setStatus(DocumentStatusEnum.PENDING);
       doc.setActive(true);
+      doc.setFile(file);
       driverDocuments.save(doc);
     }
   }
