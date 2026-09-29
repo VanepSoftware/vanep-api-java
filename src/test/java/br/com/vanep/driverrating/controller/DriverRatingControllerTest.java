@@ -121,7 +121,6 @@ class DriverRatingControllerTest {
             new SimpleGrantedAuthority("list_driver_ratings"),
             new SimpleGrantedAuthority("show_driver_rating"),
             new SimpleGrantedAuthority("create_driver_rating"),
-            new SimpleGrantedAuthority("update_driver_rating"),
             new SimpleGrantedAuthority("delete_driver_rating"));
   }
 
@@ -207,87 +206,57 @@ class DriverRatingControllerTest {
   }
 
   @Test
-  void updateReturns200ForOwner() throws Exception {
-    String requestBody =
-        """
-        {
-          "rating": 4.00,
-          "comment": "Updated feedback"
-        }
-        """;
-
-    mockMvc
-        .perform(
-            put("/api/driver-ratings/" + ratingToken)
-                .with(clientJwt())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(requestBody))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.rating").value(4.0))
-        .andExpect(jsonPath("$.comment").value("Updated feedback"));
-  }
-
-  @Test
-  void updateForbidsOtherClient() throws Exception {
+  void aRatingCannotBeEdited() throws Exception {
     String requestBody =
         """
         {
           "rating": 1.00,
-          "comment": "Malicious edit"
+          "comment": "Changed my mind"
         }
         """;
 
     mockMvc
         .perform(
             put("/api/driver-ratings/" + ratingToken)
-                .with(otherClientJwt())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(requestBody))
-        .andExpect(status().isForbidden());
-  }
-
-  @Test
-  void deleteReturns204ForOwner() throws Exception {
-    mockMvc
-        .perform(delete("/api/driver-ratings/" + ratingToken).with(clientJwt()))
-        .andExpect(status().isNoContent());
-  }
-
-  @Test
-  void deletingRemovesTheRowPhysically() throws Exception {
-    mockMvc
-        .perform(delete("/api/driver-ratings/" + ratingToken).with(clientJwt()))
-        .andExpect(status().isNoContent());
-
-    assertThat(driverRatings.count()).isZero();
-  }
-
-  @Test
-  void aPairCanBeRatedAgainAfterItsRatingIsDeleted() throws Exception {
-    mockMvc
-        .perform(delete("/api/driver-ratings/" + ratingToken).with(clientJwt()))
-        .andExpect(status().isNoContent());
-
-    String requestBody =
-        """
-        {
-          "driverToken": "%s",
-          "rating": 3.00,
-          "comment": "Mudei de ideia"
-        }
-        """
-            .formatted(driverToken);
-
-    mockMvc
-        .perform(
-            post("/api/driver-ratings")
                 .with(clientJwt())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(requestBody))
-        .andExpect(status().isCreated())
-        .andExpect(jsonPath("$.rating").value(3.0));
+        .andExpect(status().isMethodNotAllowed());
+
+    assertThat(driverRatings.findByToken(ratingToken))
+        .get()
+        .satisfies(
+            rating -> {
+              assertThat(rating.getRating()).isEqualByComparingTo("5.00");
+              assertThat(rating.getComment()).isEqualTo("Great trip!");
+            });
+  }
+
+  @Test
+  void theAuthorCannotDeleteTheirRating() throws Exception {
+    mockMvc
+        .perform(delete("/api/driver-ratings/" + ratingToken).with(clientJwt()))
+        .andExpect(status().isForbidden());
 
     assertThat(driverRatings.count()).isEqualTo(1);
+  }
+
+  @Test
+  void anotherClientCannotDeleteTheRating() throws Exception {
+    mockMvc
+        .perform(delete("/api/driver-ratings/" + ratingToken).with(otherClientJwt()))
+        .andExpect(status().isForbidden());
+
+    assertThat(driverRatings.count()).isEqualTo(1);
+  }
+
+  @Test
+  void theAdminRemovesTheRowPhysically() throws Exception {
+    mockMvc
+        .perform(delete("/api/driver-ratings/" + ratingToken).with(adminJwt()))
+        .andExpect(status().isNoContent());
+
+    assertThat(driverRatings.count()).isZero();
   }
 
   @Test
