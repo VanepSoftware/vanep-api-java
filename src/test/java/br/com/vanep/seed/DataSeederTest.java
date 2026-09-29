@@ -106,6 +106,16 @@ class DataSeederTest {
   }
 
   @Test
+  void clientBundleRatesTheDriverWithoutListingOtherRatings() {
+    assertThat(DataSeeder.clientPermissions())
+        .contains(PermissionEnum.CREATE_DRIVER_RATING.value())
+        .doesNotContain(
+            PermissionEnum.LIST_DRIVER_RATINGS.value(),
+            PermissionEnum.UPDATE_DRIVER_RATING.value(),
+            PermissionEnum.DELETE_DRIVER_RATING.value());
+  }
+
+  @Test
   void doesNothingWhenDisabled() {
     seeder.enabled = false;
     seeder.seedOnly = false;
