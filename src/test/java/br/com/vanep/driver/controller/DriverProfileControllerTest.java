@@ -1,6 +1,7 @@
 package br.com.vanep.driver.controller;
 
 import static org.hamcrest.Matchers.hasItems;
+import static org.hamcrest.Matchers.nullValue;
 import static org.hamcrest.Matchers.startsWith;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -101,6 +102,18 @@ class DriverProfileControllerTest {
         .andExpect(jsonPath("$.bio").value("Levo criança há 8 anos."))
         .andExpect(jsonPath("$.experienceYears").value(8))
         .andExpect(jsonPath("$.rating").value(4.8));
+  }
+
+  @Test
+  void aDriverNeverRatedShowsNoRating() throws Exception {
+    DriverModel driver = saveDriver("carlos@vanep.com", DriverApprovalStatus.APPROVED);
+    driver.setRating(null);
+    drivers.save(driver);
+
+    mockMvc
+        .perform(get("/api/drivers/" + driver.getToken() + "/profile").with(clientJwt()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.rating").value(nullValue()));
   }
 
   @Test
