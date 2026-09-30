@@ -38,7 +38,7 @@ public class RateLimiter {
     Bucket bucket =
         buckets.compute(
             key,
-            (k, current) ->
+            (_, current) ->
                 current == null || current.isExpired(now, window) ? new Bucket(now) : current);
     return bucket.count().incrementAndGet() <= capacity;
   }

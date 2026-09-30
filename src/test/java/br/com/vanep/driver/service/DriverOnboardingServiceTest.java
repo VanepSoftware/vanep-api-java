@@ -231,7 +231,7 @@ class DriverOnboardingServiceTest {
         .satisfies(
             e -> {
               ResponseStatusException ex = (ResponseStatusException) e;
-              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
               assertThat(ex.getReason()).contains("driver.onboarding.vehicle_required");
             });
 
@@ -264,7 +264,7 @@ class DriverOnboardingServiceTest {
         .satisfies(
             e -> {
               ResponseStatusException ex = (ResponseStatusException) e;
-              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
               assertThat(ex.getReason()).contains("driver.onboarding.cnh_expired");
             });
   }
@@ -294,7 +294,7 @@ class DriverOnboardingServiceTest {
         .satisfies(
             e -> {
               ResponseStatusException ex = (ResponseStatusException) e;
-              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
             });
   }
 
@@ -396,7 +396,7 @@ class DriverOnboardingServiceTest {
         .satisfies(
             e -> {
               ResponseStatusException ex = (ResponseStatusException) e;
-              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
               assertThat(ex.getReason()).contains("driver.onboarding.documents_missing");
             });
   }

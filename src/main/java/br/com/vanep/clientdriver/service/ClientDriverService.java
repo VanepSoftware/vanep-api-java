@@ -63,7 +63,7 @@ public class ClientDriverService {
     links
         .findByPair(client.getId(), driver.getId())
         .ifPresent(
-            existing -> {
+            _ -> {
               throw conflict("client_driver.duplicate_pair");
             });
 

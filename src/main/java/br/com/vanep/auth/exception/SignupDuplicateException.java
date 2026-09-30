@@ -1,10 +1,13 @@
 package br.com.vanep.auth.exception;
 
 import br.com.vanep.auth.enums.AuthErrorCode;
+import java.io.Serial;
 import lombok.Getter;
 
 @Getter
 public class SignupDuplicateException extends RuntimeException {
+
+  @Serial private static final long serialVersionUID = 1L;
 
   private final String field;
   private final String messageKey;

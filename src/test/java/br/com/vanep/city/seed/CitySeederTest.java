@@ -93,7 +93,7 @@ class CitySeederTest {
   @Test
   void secondRunDoesNotDuplicateCities() {
     Map<String, CityModel> stored = new HashMap<>();
-    when(cities.findAllIbgeCodes()).thenAnswer(invocation -> new HashSet<>(stored.keySet()));
+    when(cities.findAllIbgeCodes()).thenAnswer(_ -> new HashSet<>(stored.keySet()));
     when(states.findByUf("DF")).thenReturn(Optional.of(distritoFederal));
     when(states.findByUf("GO")).thenReturn(Optional.of(goias));
     when(states.findByUf("MT")).thenReturn(Optional.of(matoGrosso));

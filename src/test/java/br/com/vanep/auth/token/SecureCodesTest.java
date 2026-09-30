@@ -14,7 +14,7 @@ class SecureCodesTest {
   void generatesSixDigitCodesKeepingLeadingZeros() {
     IntStream.range(0, 500)
         .forEach(
-            attempt -> {
+            _ -> {
               String code = codes.generate();
               assertThat(code).hasSize(6).containsOnlyDigits();
             });
