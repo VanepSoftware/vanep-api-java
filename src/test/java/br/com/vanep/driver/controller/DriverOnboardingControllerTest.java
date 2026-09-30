@@ -269,7 +269,7 @@ class DriverOnboardingControllerTest {
             post("/api/drivers/me/submit-onboarding")
                 .with(driverJwt(driverUserUid))
                 .contentType(MediaType.APPLICATION_JSON))
-        .andExpect(status().isUnprocessableEntity());
+        .andExpect(status().isUnprocessableContent());
   }
 
   @Test

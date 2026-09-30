@@ -48,7 +48,7 @@ public class ViaCepClient {
               .retrieve()
               .onStatus(
                   status -> status.isError(),
-                  (request, clientResponse) -> {
+                  (_, clientResponse) -> {
                     throw new ViaCepLookupException(
                         "ViaCEP responded " + clientResponse.getStatusCode() + ".");
                   })

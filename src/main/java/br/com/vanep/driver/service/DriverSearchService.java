@@ -149,7 +149,7 @@ public class DriverSearchService {
     Map<Long, List<DistrictModel>> childrenByParent = new HashMap<>();
     for (DistrictModel district : districts.findByCityId(anchor.city().getId())) {
       Long parentId = district.getParent() == null ? null : district.getParent().getId();
-      childrenByParent.computeIfAbsent(parentId, id -> new ArrayList<>()).add(district);
+      childrenByParent.computeIfAbsent(parentId, _ -> new ArrayList<>()).add(district);
     }
     collectDescendants(deepest.get().getId(), 1, childrenByParent, distances);
     return distances;
@@ -197,7 +197,7 @@ public class DriverSearchService {
     for (DriverServiceAreaModel area : areas.findByDriverIds(driverIds)) {
       String name =
           area.getDistrict() == null ? area.getCity().getName() : area.getDistrict().getName();
-      namesByDriver.computeIfAbsent(area.getDriver().getId(), id -> new ArrayList<>()).add(name);
+      namesByDriver.computeIfAbsent(area.getDriver().getId(), _ -> new ArrayList<>()).add(name);
     }
     return namesByDriver;
   }

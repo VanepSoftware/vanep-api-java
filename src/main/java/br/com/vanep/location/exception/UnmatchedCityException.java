@@ -1,6 +1,11 @@
 package br.com.vanep.location.exception;
 
+import java.io.Serial;
+
 public class UnmatchedCityException extends RuntimeException {
+
+  @Serial private static final long serialVersionUID = 1L;
+
   private final String uf;
   private final String googleCityName;
   private final String placeId;

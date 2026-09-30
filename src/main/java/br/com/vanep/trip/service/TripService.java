@@ -120,7 +120,7 @@ public class TripService {
     trips
         .findByDriverAndServiceDateAndShift(driver.getId(), request.serviceDate(), request.shift())
         .ifPresent(
-            existing -> {
+            _ -> {
               throw conflict("trip.duplicate_slot");
             });
 

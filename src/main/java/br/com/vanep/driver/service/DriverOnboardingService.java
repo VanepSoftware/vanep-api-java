@@ -153,7 +153,8 @@ public class DriverOnboardingService {
     }
 
     if (!errors.isEmpty()) {
-      throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, String.join("; ", errors));
+      throw new ResponseStatusException(
+          HttpStatus.UNPROCESSABLE_CONTENT, String.join("; ", errors));
     }
 
     driver.setApprovalStatus(DriverApprovalStatus.UNDER_REVIEW);
