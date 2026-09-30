@@ -59,11 +59,11 @@
 - [ ] 2.7 Open PR 2: `feat(client-driver): phase 2 — bloqueio de propostas para motoristas nao homologados (RN02)`.
 
 ### Phase 3 — Driver Notification Engine
-- [ ] 3.1 Create email template `src/main/resources/templates/email/driver-approved.html` with congratulations and notification of active status.
-- [ ] 3.2 Create email template `src/main/resources/templates/email/driver-rejected.html` with feedback and display of `rejectionReason`.
-- [ ] 3.3 Create `DriverNotificationService.java` in `br.com.vanep.driver.service` with `notifyApproval(DriverModel driver)` and `notifyRejection(DriverModel driver, String reason)`.
-- [ ] 3.4 Write unit tests in `DriverNotificationServiceTest.java` verifying parameters and calls to `MailService`.
-- [ ] 3.5 Validate with `./mvnw spotless:check` and `./mvnw test`.
+- [x] 3.1 Create email template `src/main/resources/templates/email/driver-approved.html` with congratulations and notification of active status.
+- [x] 3.2 Create email template `src/main/resources/templates/email/driver-rejected.html` with feedback and display of `rejectionReason`.
+- [x] 3.3 Create `DriverNotificationService.java` in `br.com.vanep.driver.service` with `notifyApproval(DriverModel driver)` and `notifyRejection(DriverModel driver, String reason)`.
+- [x] 3.4 Write unit tests in `DriverNotificationServiceTest.java` verifying parameters and calls to `MailService`.
+- [x] 3.5 Validate with `./mvnw spotless:check` and `./mvnw test`.
 - [ ] 3.6 Open PR 3: `feat(driver): phase 3 — servico de notificacao de aprovacao e rejeicao de motorista`.
 
 ### Phase 4 — Admin Review & Pending Listing Orchestration
