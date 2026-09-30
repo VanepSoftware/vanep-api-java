@@ -41,6 +41,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.MessageSource;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -53,6 +57,7 @@ class DriverOnboardingServiceTest {
   @Mock private DriverDocumentRepository driverDocumentRepository;
   @Mock private DriverServiceAreaRepository driverServiceAreaRepository;
   @Mock private UserService userService;
+  @Mock private DriverNotificationService driverNotificationService;
   @Mock private DriverMapper mapper;
   @Mock private MessageSource messages;
 
@@ -71,6 +76,7 @@ class DriverOnboardingServiceTest {
             driverDocumentRepository,
             driverServiceAreaRepository,
             userService,
+            driverNotificationService,
             mapper,
             messages);
 
@@ -446,6 +452,7 @@ class DriverOnboardingServiceTest {
     assertThat(driver.getReviewedAt()).isNotNull();
     assertThat(driver.getReviewedBy()).isEqualTo(adminUser);
     verify(driverRepository).save(driver);
+    verify(driverNotificationService).notifyApproval(driver);
   }
 
   @Test
@@ -516,6 +523,51 @@ class DriverOnboardingServiceTest {
     assertThat(driver.getReviewedAt()).isNotNull();
     assertThat(driver.getReviewedBy()).isEqualTo(adminUser);
     verify(driverRepository).save(driver);
+    verify(driverNotificationService).notifyRejection(driver, "Foto da CNH ilegível");
+  }
+
+  @Test
+  void findPendingDriversReturnsMappedPage() {
+    Pageable pageable = PageRequest.of(0, 10);
+    DriverModel pendingDriver = new DriverModel();
+    pendingDriver.setId(50L);
+    pendingDriver.setApprovalStatus(DriverApprovalStatus.UNDER_REVIEW);
+
+    DriverResponseDTO responseDto =
+        new DriverResponseDTO(
+            "pending-token",
+            "Pending Driver",
+            "p@v.com",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            BigDecimal.valueOf(100),
+            null,
+            null,
+            null,
+            null,
+            DriverApprovalStatus.UNDER_REVIEW,
+            true,
+            false,
+            null,
+            null);
+
+    Page<DriverModel> page = new PageImpl<>(List.of(pendingDriver), pageable, 1);
+    when(driverRepository.findByApprovalStatusWithUser(DriverApprovalStatus.UNDER_REVIEW, pageable))
+        .thenReturn(page);
+    when(mapper.toResponse(pendingDriver)).thenReturn(responseDto);
+
+    Page<DriverResponseDTO> result = service.findPendingDrivers(pageable);
+
+    assertThat(result).isNotNull();
+    assertThat(result.getTotalElements()).isEqualTo(1);
+    assertThat(result.getContent()).containsExactly(responseDto);
+    verify(driverRepository)
+        .findByApprovalStatusWithUser(DriverApprovalStatus.UNDER_REVIEW, pageable);
   }
 
   @Test

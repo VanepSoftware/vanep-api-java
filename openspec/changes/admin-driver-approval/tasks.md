@@ -64,14 +64,14 @@
 - [x] 3.3 Create `DriverNotificationService.java` in `br.com.vanep.driver.service` with `notifyApproval(DriverModel driver)` and `notifyRejection(DriverModel driver, String reason)`.
 - [x] 3.4 Write unit tests in `DriverNotificationServiceTest.java` verifying parameters and calls to `MailService`.
 - [x] 3.5 Validate with `./mvnw spotless:check` and `./mvnw test`.
-- [ ] 3.6 Open PR 3: `feat(driver): phase 3 — servico de notificacao de aprovacao e rejeicao de motorista`.
+- [x] 3.6 Open PR 3: `feat(driver): phase 3 — servico de notificacao de aprovacao e rejeicao de motorista`.
 
 ### Phase 4 — Admin Review & Pending Listing Orchestration
-- [ ] 4.1 Add `findByApprovalStatusWithUser(DriverApprovalStatus status, Pageable pageable)` to `DriverRepository.java`.
-- [ ] 4.2 Add `findPendingDrivers(Pageable pageable)` to `DriverOnboardingService.java`.
-- [ ] 4.3 Inject `DriverNotificationService` into `DriverOnboardingService.java` and dispatch notifications in `approve` and `reject`.
-- [ ] 4.4 Add `GET /api/drivers/pending` in `DriverOnboardingController.java` with `@PreAuthorize("hasRole('ADMIN') or hasAuthority('approve_driver')")`.
-- [ ] 4.5 Add unit tests in `DriverOnboardingServiceTest.java` covering `findPendingDrivers` and notification invocation in `approve` and `reject`.
-- [ ] 4.6 Add slice tests in `DriverOnboardingControllerTest.java` verifying `GET /api/drivers/pending` (200 for admin with content, 403 for client/driver, 401 for unauthenticated).
-- [ ] 4.7 Execute complete verification with `./mvnw spotless:check` and `./mvnw verify` ensuring JaCoCo coverage ≥ 75%.
+- [x] 4.1 Add `findByApprovalStatusWithUser(DriverApprovalStatus status, Pageable pageable)` to `DriverRepository.java`.
+- [x] 4.2 Add `findPendingDrivers(Pageable pageable)` to `DriverOnboardingService.java`.
+- [x] 4.3 Inject `DriverNotificationService` into `DriverOnboardingService.java` and dispatch notifications in `approve` and `reject`.
+- [x] 4.4 Add `GET /api/drivers/pending` in `DriverOnboardingController.java` with `@PreAuthorize("hasRole('ADMIN') or hasAuthority('approve_driver')")`.
+- [x] 4.5 Add unit tests in `DriverOnboardingServiceTest.java` covering `findPendingDrivers` and notification invocation in `approve` and `reject`.
+- [x] 4.6 Add slice tests in `DriverOnboardingControllerTest.java` verifying `GET /api/drivers/pending` (200 for admin with content, 403 for client/driver, 401 for unauthenticated).
+- [x] 4.7 Execute complete verification with `./mvnw spotless:check` and `./mvnw verify` ensuring JaCoCo coverage ≥ 75%.
 - [ ] 4.8 Open PR 4: `feat(driver): phase 4 — listagem de pendentes e orquestracao de revisao administrativa`.

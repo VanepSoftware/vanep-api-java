@@ -31,6 +31,8 @@ import java.util.List;
 import java.util.stream.Collectors;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -51,6 +53,7 @@ public class DriverOnboardingService {
   private final DriverDocumentRepository driverDocumentRepository;
   private final DriverServiceAreaRepository driverServiceAreaRepository;
   private final UserService userService;
+  private final DriverNotificationService driverNotificationService;
   private final DriverMapper mapper;
   private final MessageSource messages;
 
@@ -61,6 +64,7 @@ public class DriverOnboardingService {
       DriverDocumentRepository driverDocumentRepository,
       DriverServiceAreaRepository driverServiceAreaRepository,
       UserService userService,
+      DriverNotificationService driverNotificationService,
       DriverMapper mapper,
       MessageSource messages) {
     this.driverRepository = driverRepository;
@@ -69,8 +73,16 @@ public class DriverOnboardingService {
     this.driverDocumentRepository = driverDocumentRepository;
     this.driverServiceAreaRepository = driverServiceAreaRepository;
     this.userService = userService;
+    this.driverNotificationService = driverNotificationService;
     this.mapper = mapper;
     this.messages = messages;
+  }
+
+  @Transactional(readOnly = true)
+  public Page<DriverResponseDTO> findPendingDrivers(Pageable pageable) {
+    return driverRepository
+        .findByApprovalStatusWithUser(DriverApprovalStatus.UNDER_REVIEW, pageable)
+        .map(mapper::toResponse);
   }
 
   private String message(String key) {
@@ -270,6 +282,8 @@ public class DriverOnboardingService {
     driver.setReviewedBy(adminUser);
     DriverModel saved = driverRepository.save(driver);
 
+    driverNotificationService.notifyApproval(saved);
+
     return mapper.toResponse(saved);
   }
 
@@ -289,6 +303,8 @@ public class DriverOnboardingService {
     driver.setReviewedAt(Instant.now());
     driver.setReviewedBy(adminUser);
     DriverModel saved = driverRepository.save(driver);
+
+    driverNotificationService.notifyRejection(saved, request.reason());
 
     return mapper.toResponse(saved);
   }
