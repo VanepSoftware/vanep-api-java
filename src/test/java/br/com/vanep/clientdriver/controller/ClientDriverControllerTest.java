@@ -15,6 +15,7 @@ import br.com.vanep.client.repository.ClientRepository;
 import br.com.vanep.clientdriver.enums.RelationshipStatus;
 import br.com.vanep.clientdriver.model.ClientDriverModel;
 import br.com.vanep.clientdriver.repository.ClientDriverRepository;
+import br.com.vanep.driver.DriverApprovalStatus;
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.user.enums.UserType;
@@ -84,6 +85,42 @@ class ClientDriverControllerTest {
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.status").value("PENDING"))
         .andExpect(jsonPath("$.token").isNotEmpty());
+  }
+
+  @Test
+  void rejectsCreateWhenDriverIsNotApproved() throws Exception {
+    DriverModel pendingDriver = createDriver("pendente@vanep.com", "98765432100");
+    pendingDriver.setApprovalStatus(DriverApprovalStatus.UNDER_REVIEW);
+    drivers.save(pendingDriver);
+
+    mockMvc
+        .perform(
+            post("/api/client-drivers")
+                .with(adminJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(createBody(maria.getToken(), pendingDriver.getToken())))
+        .andExpect(status().isUnprocessableEntity());
+  }
+
+  @Test
+  void rejectsPatchStatusToActiveWhenDriverIsNotApproved() throws Exception {
+    DriverModel pendingDriver = createDriver("pendente2@vanep.com", "98765432101");
+    pendingDriver.setApprovalStatus(DriverApprovalStatus.UNDER_REVIEW);
+    drivers.save(pendingDriver);
+
+    ClientDriverModel link = new ClientDriverModel();
+    link.setClient(maria);
+    link.setDriver(pendingDriver);
+    link.setStatus(RelationshipStatus.PENDING);
+    link = links.save(link);
+
+    mockMvc
+        .perform(
+            patch("/api/client-drivers/" + link.getToken())
+                .with(adminJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"status\":\"ACTIVE\"}"))
+        .andExpect(status().isUnprocessableEntity());
   }
 
   @Test
@@ -297,6 +334,7 @@ class ClientDriverControllerTest {
     DriverModel driver = new DriverModel();
     driver.setUser(createUser(UserType.DRIVER, "Motorista", email, document));
     driver.setBasePrice(new BigDecimal("100.00"));
+    driver.setApprovalStatus(DriverApprovalStatus.APPROVED);
     return drivers.save(driver);
   }
 

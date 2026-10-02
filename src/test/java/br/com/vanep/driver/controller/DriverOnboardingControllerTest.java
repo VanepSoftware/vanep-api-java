@@ -423,4 +423,65 @@ class DriverOnboardingControllerTest {
                 .content("{\"reason\": \"Foto ilegível\"}"))
         .andExpect(status().isBadRequest());
   }
+
+  @Test
+  void listPendingDriversReturnsOnlyUnderReviewForAdmin() throws Exception {
+    driver.setApprovalStatus(DriverApprovalStatus.UNDER_REVIEW);
+    driver.setSubmittedAt(Instant.now());
+    driver = drivers.save(driver);
+
+    UserModel otherUser = new UserModel();
+    otherUser.setType(UserType.DRIVER);
+    otherUser.setName("Outro Motorista");
+    otherUser.setEmail("outro@vanep.com");
+    otherUser.setDocument("99911122233");
+    otherUser.setVerified(true);
+    otherUser.setTermsAcceptedAt(Instant.now());
+    otherUser = users.save(otherUser);
+
+    DriverModel approvedDriver = new DriverModel();
+    approvedDriver.setUser(otherUser);
+    approvedDriver.setBasePrice(new BigDecimal("100.00"));
+    approvedDriver.setApprovalStatus(DriverApprovalStatus.APPROVED);
+    drivers.save(approvedDriver);
+
+    mockMvc
+        .perform(get("/api/drivers/pending").with(adminJwt(adminUserUid)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.totalElements").value(1))
+        .andExpect(jsonPath("$.content[0].token").value(driver.getToken()))
+        .andExpect(jsonPath("$.content[0].approvalStatus").value("UNDER_REVIEW"))
+        .andExpect(jsonPath("$.content[0].name").value("Carlos Motorista"));
+  }
+
+  @Test
+  void listPendingDriversAllowedForAdminRoleOnly() throws Exception {
+    driver.setApprovalStatus(DriverApprovalStatus.UNDER_REVIEW);
+    driver = drivers.save(driver);
+
+    mockMvc
+        .perform(get("/api/drivers/pending").with(adminRoleOnlyJwt(adminUserUid)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.totalElements").value(1))
+        .andExpect(jsonPath("$.content[0].token").value(driver.getToken()));
+  }
+
+  @Test
+  void listPendingDriversForbiddenForDriver() throws Exception {
+    mockMvc
+        .perform(get("/api/drivers/pending").with(driverJwt(driverUserUid)))
+        .andExpect(status().isForbidden());
+  }
+
+  @Test
+  void listPendingDriversForbiddenForClient() throws Exception {
+    mockMvc
+        .perform(get("/api/drivers/pending").with(clientJwt(clientUserUid)))
+        .andExpect(status().isForbidden());
+  }
+
+  @Test
+  void listPendingDriversUnauthorizedForAnonymous() throws Exception {
+    mockMvc.perform(get("/api/drivers/pending")).andExpect(status().isUnauthorized());
+  }
 }

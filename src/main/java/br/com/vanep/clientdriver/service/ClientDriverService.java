@@ -9,6 +9,7 @@ import br.com.vanep.clientdriver.enums.RelationshipStatus;
 import br.com.vanep.clientdriver.mapper.ClientDriverMapper;
 import br.com.vanep.clientdriver.model.ClientDriverModel;
 import br.com.vanep.clientdriver.repository.ClientDriverRepository;
+import br.com.vanep.driver.DriverApprovalStatus;
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.user.enums.UserType;
@@ -60,6 +61,10 @@ public class ClientDriverService {
             .findByToken(request.driverToken())
             .orElseThrow(() -> notFound("client_driver.driver.not_found"));
 
+    if (driver.getApprovalStatus() != DriverApprovalStatus.APPROVED) {
+      throw unprocessableEntity("client_driver.driver.not_approved");
+    }
+
     links
         .findByPair(client.getId(), driver.getId())
         .ifPresent(
@@ -103,6 +108,10 @@ public class ClientDriverService {
       if (status == null) {
         throw badRequest("client_driver.status.required");
       }
+      if (status == RelationshipStatus.ACTIVE
+          && link.getDriver().getApprovalStatus() != DriverApprovalStatus.APPROVED) {
+        throw unprocessableEntity("client_driver.driver.not_approved");
+      }
       link.setStatus(status);
     }
 
@@ -137,6 +146,10 @@ public class ClientDriverService {
 
   ResponseStatusException badRequest(String key) {
     return new ResponseStatusException(HttpStatus.BAD_REQUEST, message(key));
+  }
+
+  ResponseStatusException unprocessableEntity(String key) {
+    return new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, message(key));
   }
 
   String message(String key) {

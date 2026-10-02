@@ -18,6 +18,22 @@ public interface DriverRepository extends JpaRepository<DriverModel, Long> {
   @Query(
       value =
           """
+          select driver from DriverModel driver
+          join fetch driver.user
+          where driver.approvalStatus = :status
+          order by driver.submittedAt asc nulls last, driver.id asc
+          """,
+      countQuery =
+          """
+          select count(driver) from DriverModel driver
+          where driver.approvalStatus = :status
+          """)
+  Page<DriverModel> findByApprovalStatusWithUser(
+      @Param("status") DriverApprovalStatus status, Pageable pageable);
+
+  @Query(
+      value =
+          """
           select distinct driver from DriverModel driver
           join fetch driver.user
           where driver.id in :ids
