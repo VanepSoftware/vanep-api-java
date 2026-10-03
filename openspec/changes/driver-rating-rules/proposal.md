@@ -23,6 +23,7 @@ A última linha é a mais séria: a feature existe, mas o ator dela não tem ace
 - Nova migration **`V50`**: `update_driver_rating` sai de todo bundle que ainda a tenha
 - **`DELETE /api/driver-ratings/{token}` passa a ser só do admin** (moderação). O autor perde o ramo `@sec.isDriverRatingOwner`
 - Avaliar exige vínculo `ACTIVE`: sem vínculo segue 404; vínculo em outro status responde **422** `driver_rating.link.not_active`
+- Avaliar exige **5 minutos de vínculo**, contados do `client_driver.created_at`: antes disso, **422** `driver_rating.link.too_recent`
 - A média volta a `null` quando não sobra avaliação, em vez de `5.00`
 - Nova rota para o app saber se o cliente já avaliou o motorista (RN-03)
 - Testes nomeados provando que o motorista não alcança nenhuma avaliação individual
@@ -47,7 +48,7 @@ A última linha é a mais séria: a feature existe, mas o ator dela não tem ace
 - **Mudança de API:**
   - `PUT /api/driver-ratings/{token}` some
   - `DELETE /api/driver-ratings/{token}` responde 403 ao autor
-  - avaliar com vínculo não `ACTIVE` passa de 201 a 422
+  - avaliar com vínculo não `ACTIVE`, ou com menos de 5 minutos, passa de 201 a 422
   - nova rota "já avaliou?"
 - **Permissões:** `update_driver_rating` sai do `PermissionEnum` e, pela `V50`, dos bundles. O seeder vem desligado fora do ambiente local (`VANEP_SEED_ENABLED:false`), então não dá para contar com ele para limpar o ADMIN. `create_driver_rating` entra no CLIENT. **Tokens emitidos antes exigem novo login.**
 - **Mobile e front:** `rating: null` passa a ser o estado "sem avaliações" em todas as rotas que expõem a nota.

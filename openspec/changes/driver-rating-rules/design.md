@@ -38,7 +38,9 @@ A `rating-through-link` deixou em aberto se `INACTIVE` avalia (Q1 dela). A #158 
 - **Sem vínculo** segue **404** `driver_rating.link.not_found`. É o comportamento que a `rating-through-link` fixou, e o cliente não tem o que corrigir.
 - **Vínculo em outro status** responde **422** `driver_rating.link.not_active`. O pedido é bem formado e o recurso existe; o estado dele é que não permite. É o mesmo status que a #241 usa para "motorista não aprovado" no `client_driver`.
 
-A checagem entra no repositório como `findActiveByPair`, e não como um `if` depois do `findByPair`. Assim o 404 e o 422 são distinguíveis sem carregar o vínculo duas vezes.
+A checagem é um `if` sobre o vínculo que o `findByPair` já carregou, e não uma query nova. Uma `findActiveByPair` devolveria vazio nos dois casos, e o 404 e o 422 deixariam de ser distinguíveis sem uma segunda consulta.
+
+O 422 usa `HttpStatus.UNPROCESSABLE_CONTENT`, e não `UNPROCESSABLE_ENTITY`: são o mesmo 422, mas o segundo está deprecated no Spring 7.
 
 ### D2 — Irreversível para o cliente; o admin modera
 
@@ -82,7 +84,7 @@ Hoje o anonimato vale por omissão: nenhum bundle além do ADMIN tem `list_drive
 ```
 
 - `rated`: existe avaliação no vínculo do cliente com esse motorista
-- `canRate`: o vínculo é `ACTIVE` e ainda não foi avaliado. É o que o app usa para mostrar ou esconder o botão, sem replicar a regra do D1
+- `canRate`: o vínculo é `ACTIVE`, tem pelo menos 5 minutos (D8) e ainda não foi avaliado. É o que o app usa para mostrar ou esconder o botão, sem replicar as regras do D1 e do D8
 
 Autorização por `create_driver_rating`: quem pode perguntar é quem pode avaliar. O cliente vem do `jwt.getSubject()`, como no `POST`. Por construção, a resposta só fala do vínculo do próprio chamador.
 
@@ -99,9 +101,14 @@ set rating = (select round(avg(avaliacao.rating), 2) … where vinculo.deleted_a
 - `avg` de zero linhas é `null`, então o motorista sem avaliação cai no D3 sem `coalesce`
 - sem `where` no `update`: reescrever todos é idempotente, e mais simples de verificar do que achar os divergentes
 
-### D8 — Sem tempo mínimo de vínculo, por enquanto
+### D8 — Cinco minutos de vínculo antes de avaliar
 
-A #158 pede para decidir se a avaliação exige um tempo mínimo de vínculo. A decisão é **não exigir** nesta change, até o PO decidir (Q1). Se vier, é uma checagem a mais no `create` e no `canRate` do D6, sem mudança de schema: o `client_driver` já tem `created_at`.
+A #158 pede para decidir se a avaliação exige um tempo mínimo de vínculo, para reduzir avaliação impulsiva. A decisão é **5 minutos, contados do `client_driver.created_at`**. Antes disso, o `POST` responde **422** `driver_rating.link.too_recent` e o status do D6 devolve `canRate: false`.
+
+- **Por que `created_at` e não o momento em que o vínculo virou `ACTIVE`.** O `client_driver` não guarda quando mudou de status. Contar da ativação exigiria uma coluna nova (`activated_at`) preenchida no `ClientDriverService`, o arquivo que a #241 está mexendo. Com `created_at`, o tempo em que o vínculo ficou `PENDING` também conta. Como o vínculo ainda precisa estar `ACTIVE` (D1), a regra nunca libera avaliação antes da ativação; só pode liberar logo depois dela.
+- **Onde a regra mora.** `DriverRatingEligibilityPolicy`, um `@Component` puro no molde do `WorkWindowPolicy` da trip: recebe status, `created_at` e o "agora" como parâmetros e decide sem banco (regra 8). O `create` e o `findRatingStatus` consultam a mesma policy, então o botão do app e o `POST` nunca discordam.
+- **Exatamente 5 minutos já vale.** A fronteira é inclusiva.
+- **É constante, não configuração.** `MINIMUM_LINK_AGE` é regra de negócio, não varia por ambiente (regra 3).
 
 ## Risks / Trade-offs
 
@@ -114,6 +121,6 @@ A #158 pede para decidir se a avaliação exige um tempo mínimo de vínculo. A 
 
 ## Open Questions
 
-- **Q1 — Tempo mínimo de vínculo para avaliar?** Decisão do PO (D8).
+- ~~**Q1 — Tempo mínimo de vínculo para avaliar?**~~ **Decidido: 5 minutos desde a criação do vínculo** (D8).
 - **Q2 — As mesmas regras valem para o `client_rating`?** A #158 pergunta. Hoje o `client_rating` já não tem `update`, mas o autor ainda apaga. E o bundle DRIVER tem `list_client_ratings`, cuja resposta traz `driverName`: um motorista vê quais outros motoristas avaliaram um cliente, e com que nota. Se o anonimato valer no sentido inverso, vira issue própria.
 - **Q3 — Detalhe da van.** O cliente não alcança `GET /api/vehicles/{token}`. A van que ele vê vem em `DriverProfileResponseDTO.vehicles`, e a nota já está na raiz do perfil. Confirmar com o mobile se a tela de detalhe da van lê `rating` do perfil. Se sim, a RN-17 já está coberta nesse ponto de contato.
