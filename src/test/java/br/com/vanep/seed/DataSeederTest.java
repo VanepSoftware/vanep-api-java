@@ -111,7 +111,6 @@ class DataSeederTest {
         .contains(PermissionEnum.CREATE_DRIVER_RATING.value())
         .doesNotContain(
             PermissionEnum.LIST_DRIVER_RATINGS.value(),
-            PermissionEnum.UPDATE_DRIVER_RATING.value(),
             PermissionEnum.DELETE_DRIVER_RATING.value());
   }
 

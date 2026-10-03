@@ -48,6 +48,8 @@ A #158 pede "sem endpoint de editar ou apagar". O `DELETE` só do admin é um de
 
 Apagar pelo admin continua físico e recalcula a média (regra 19).
 
+`update_driver_rating` sai do `PermissionEnum` e, pela `V50`, de todo bundle em banco. O `DataSeeder` ressincroniza o ADMIN com o `PermissionRegistry`, mas só roda com `vanep.seed.enabled`, desligado por padrão fora do ambiente local.
+
 ### D3 — "Sem avaliações" é `rating: null`, sem contagem
 
 `null` é o estado. Não há coluna nova nem campo `ratingsCount`, e o contrato das rotas que expõem a nota não muda de forma.
@@ -103,7 +105,7 @@ A #158 pede para decidir se a avaliação exige um tempo mínimo de vínculo. A 
 
 ## Risks / Trade-offs
 
-- **R1 — A `V49` não roda na suíte.** `spring.flyway.enabled=false`. Aplicar à mão num PostgreSQL com dado dentro: um motorista sem avaliação que estava com `5.00` → `null`; um com duas avaliações → média delas; o bundle CLIENT com `create_driver_rating` uma vez só, mesmo rodando o `update` duas vezes.
+- **R1 — A `V49` e a `V50` não rodam na suíte.** `spring.flyway.enabled=false`. Aplicar à mão num PostgreSQL com dado dentro: um motorista sem avaliação que estava com `5.00` → `null`; um com duas avaliações → média delas; o bundle CLIENT com `create_driver_rating` uma vez só, mesmo rodando o `update` duas vezes; nenhum bundle com `update_driver_rating` depois da `V50`.
 - **R2 — Dedução pela variação da média.** Um motorista com um único cliente novo vê a nota mudar e sabe quem avaliou. A #158 cita esse caso. Mitigar exige atrasar ou agrupar a publicação da média, o que muda a regra RN-17 ("média pública do total acumulado"). **Aceito e registrado**; vira issue se o PO quiser.
 - **R3 — Avaliação de vínculo removido na média.** O AVG do serviço navega por `ClientDriverModel`, que tem `@SoftDelete`; a `V49` filtra `deleted_at is null` para casar com isso. A fase 3 prova com teste de repositório que a avaliação de um vínculo soft-deletado não entra no AVG. Se não for assim, a `V49` e o serviço divergem, e é a `V49` que se ajusta.
 - **R4 — Tokens antigos.** Quem já está logado como CLIENT só ganha `create_driver_rating` num novo login.
