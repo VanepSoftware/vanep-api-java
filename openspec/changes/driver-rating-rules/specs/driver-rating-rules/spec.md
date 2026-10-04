@@ -2,7 +2,7 @@
 
 ### Requirement: Only a client with an active link rates the driver
 
-A client MUST be able to rate a driver only through a `client_driver` link in status `ACTIVE`. The `CLIENT` role bundle MUST hold `create_driver_rating`, and MUST NOT hold `list_driver_ratings`.
+A client MUST be able to rate a driver only through a `client_driver` link in status `ACTIVE`, created at least five minutes before the rating. The `CLIENT` role bundle MUST hold `create_driver_rating`, and MUST NOT hold `list_driver_ratings`.
 
 A rating request with no link MUST keep returning HTTP 404 `driver_rating.link.not_found`. A rating request whose link exists in any other status MUST return HTTP 422 `driver_rating.link.not_active`.
 
@@ -16,6 +16,17 @@ A rating request with no link MUST keep returning HTTP 404 `driver_rating.link.n
 - **WHEN** a client whose link to the driver is `PENDING`, `INACTIVE` or `BLOCKED` rates that driver
 - **THEN** the system returns HTTP 422
 - **AND** no rating is stored
+
+#### Scenario: A link younger than five minutes cannot rate yet
+
+- **WHEN** a client whose `ACTIVE` link to the driver was created less than five minutes ago rates that driver
+- **THEN** the system returns HTTP 422 `driver_rating.link.too_recent`
+- **AND** no rating is stored
+
+#### Scenario: A link exactly five minutes old can rate
+
+- **WHEN** a client whose `ACTIVE` link was created five minutes ago or more rates that driver
+- **THEN** the system returns HTTP 201
 
 #### Scenario: A client without a link cannot rate
 
@@ -75,7 +86,7 @@ The system MUST expose, to the client only, whether they have rated a given driv
 
 #### Scenario: A client whose link is not active cannot rate
 
-- **WHEN** a client whose link is not `ACTIVE`, or who has no link, asks for the rating status
+- **WHEN** a client whose link is not `ACTIVE`, is younger than five minutes, or who has no link, asks for the rating status
 - **THEN** the response has `canRate` false
 
 ### Requirement: The driver's average is the average of existing ratings, or null
