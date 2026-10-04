@@ -2,6 +2,7 @@ package br.com.vanep.driverrating.controller;
 
 import br.com.vanep.driverrating.dto.DriverRatingCreateRequestDTO;
 import br.com.vanep.driverrating.dto.DriverRatingResponseDTO;
+import br.com.vanep.driverrating.dto.DriverRatingStatusResponseDTO;
 import br.com.vanep.driverrating.service.DriverRatingService;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
@@ -45,6 +46,13 @@ public class DriverRatingController {
       @RequestParam(required = false) String driverToken,
       @PageableDefault(size = 20) Pageable pageable) {
     return service.findAll(driverToken, pageable);
+  }
+
+  @GetMapping("/status")
+  @PreAuthorize("hasAuthority('create_driver_rating')")
+  public DriverRatingStatusResponseDTO status(
+      @RequestParam String driverToken, @AuthenticationPrincipal Jwt jwt) {
+    return service.findRatingStatus(driverToken, jwt.getSubject());
   }
 
   @GetMapping("/{token}")
