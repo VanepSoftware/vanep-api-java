@@ -37,7 +37,7 @@
 
 - [x] 1.1 Criar branch `feat/158-driver-rating-schema` a partir de `main`
 - [x] 1.2 Teste nomeado: o bundle CLIENT tem `create_driver_rating` e **não** tem `list_driver_ratings`, `update_driver_rating` nem `delete_driver_rating` (D5)
-- [x] 1.3 Migration `V49__client_rates_driver_and_rating_recount.sql`: (a) `create_driver_rating` no bundle CLIENT, idempotente; (b) recalcular `driver.rating` de todos os motoristas, `null` sem avaliação (D7)
+- [x] 1.3 Migration `V51__client_rates_driver_and_rating_recount.sql`: (a) `create_driver_rating` no bundle CLIENT, idempotente; (b) recalcular `driver.rating` de todos os motoristas, `null` sem avaliação (D7)
 - [x] 1.4 `DataSeeder.clientPermissions()`: incluir `create_driver_rating`
 - [ ] 1.5 **Aplicar a `V49` manualmente contra o PostgreSQL, com dado dentro** (R1): motorista com `5.00` de fallback → `null`; motorista com duas avaliações → média; rodar o `update` do bundle duas vezes e conferir a permissão uma vez só
 - [ ] 1.6 `make lint` + `./mvnw verify`; abrir PR em pt-BR, `--base main`, `Refs #158`
