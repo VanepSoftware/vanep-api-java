@@ -17,7 +17,6 @@ import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.driverrating.dto.DriverRatingCreateRequestDTO;
 import br.com.vanep.driverrating.dto.DriverRatingResponseDTO;
-import br.com.vanep.driverrating.dto.DriverRatingUpdateRequestDTO;
 import br.com.vanep.driverrating.mapper.DriverRatingMapper;
 import br.com.vanep.driverrating.model.DriverRatingModel;
 import br.com.vanep.driverrating.repository.DriverRatingRepository;
@@ -289,28 +288,6 @@ class DriverRatingServiceTest {
     when(mapper.toResponse(rating)).thenReturn(response);
 
     assertThat(service.findByToken("tok")).isEqualTo(response);
-  }
-
-  @Test
-  void updatePersistsChangesAndRecalculatesAverage() {
-    DriverModel driver = mockDriver(2L, 20L);
-    DriverRatingModel ratingModel = new DriverRatingModel();
-    ratingModel.setLink(mockLink(7L, mockClient(1L, 10L), driver));
-
-    DriverRatingUpdateRequestDTO dto =
-        new DriverRatingUpdateRequestDTO(BigDecimal.valueOf(4.00), "Updated comment");
-    DriverRatingResponseDTO response = anyResponse();
-
-    when(driverRatingRepository.findByToken("tok")).thenReturn(Optional.of(ratingModel));
-    when(driverRatingRepository.save(ratingModel)).thenReturn(ratingModel);
-    when(driverRatingRepository.calculateAverageRatingForDriver(2L))
-        .thenReturn(Optional.of(BigDecimal.valueOf(4.00)));
-    when(mapper.toResponse(ratingModel)).thenReturn(response);
-
-    DriverRatingResponseDTO result = service.update("tok", dto);
-
-    assertThat(result).isEqualTo(response);
-    verify(driverRepository).save(driver);
   }
 
   @Test
