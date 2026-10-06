@@ -147,12 +147,12 @@
 > Depends on: Phase 4 | Parallel with: —
 > Order: test → security/authorization → request DTO → service → controller → seeder
 
-- [ ] 5.1 Criar branch `feat/stop-change-request-admin-crud` a partir de `feat/stop-change-request-client-driver-http`.
-- [ ] 5.2 Testes MockMvc do CRUD administrativo:
+- [x] 5.1 Criar branch `feat/stop-change-request-admin-crud` a partir de `feat/stop-change-request-client-driver-http`.
+- [x] 5.2 Testes MockMvc do CRUD administrativo:
   - `GET /api/stop-change-requests` paginado com permissão `list_stop_change_requests`.
   - `GET /api/stop-change-requests/{token}` com permissão de admin ou posse do recurso.
   - `DELETE /api/stop-change-requests/{token}` com soft delete.
   - `POST /api/stop-change-requests/{token}/restore` restaura solicitação soft-deletada.
-- [ ] 5.3 Criar `controller/StopChangeRequestController` administrativo.
-- [ ] 5.4 Criar `seed/StopChangeRequestSeeder` com dados de teste representativos (seeder por feature, regra 5).
-- [ ] 5.5 `make lint` + `./mvnw verify`. Abrir PR da fase 5 apontando para `feat/stop-change-request-client-driver-http`.
+- [x] 5.3 Criar `controller/StopChangeRequestController` administrativo.
+- [x] 5.4 Criar `seed/StopChangeRequestSeeder` com dados de teste representativos (seeder por feature, regra 5).
+- [x] 5.5 `make lint` + `./mvnw verify`. Fase 5 concluída.

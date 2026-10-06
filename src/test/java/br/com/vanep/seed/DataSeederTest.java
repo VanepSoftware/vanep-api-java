@@ -59,6 +59,7 @@ class DataSeederTest {
   @Mock private DriverRatingSeeder driverRatingSeeder;
   @Mock private ClientRatingSeeder clientRatingSeeder;
   @Mock private TripSeeder tripSeeder;
+  @Mock private br.com.vanep.stopchange.seed.StopChangeRequestSeeder stopChangeRequestSeeder;
   @Mock private PasswordEncoder passwordEncoder;
 
   private DataSeeder seeder;
@@ -80,6 +81,7 @@ class DataSeederTest {
             driverRatingSeeder,
             clientRatingSeeder,
             tripSeeder,
+            stopChangeRequestSeeder,
             passwordEncoder);
 
     seeder.adminEmail = "admin@vanep.com.br";
