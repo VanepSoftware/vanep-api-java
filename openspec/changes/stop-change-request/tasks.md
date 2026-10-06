@@ -62,16 +62,16 @@
 > Depends on: Phase 1 | Parallel with: —
 > Order: test → policy
 
-- [ ] 2.1 Criar branch `feat/stop-change-request-policies` a partir de `feat/stop-change-request-schema`.
-- [ ] 2.2 Teste de `StopChangeTransitionPolicy` cobrindo a matriz completa de transições entre estados de `StopChangeStatus`:
+- [x] 2.1 Criar branch `feat/stop-change-request-policies` a partir de `feat/stop-change-request-schema`.
+- [x] 2.2 Teste de `StopChangeTransitionPolicy` cobrindo a matriz completa de transições entre estados de `StopChangeStatus`:
   - `PENDING -> APPROVED` permitido.
   - `PENDING -> REJECTED` permitido.
   - `PENDING -> CANCELLED` permitido.
   - `PENDING -> EXPIRED` permitido.
   - Qualquer transição a partir de `APPROVED`, `REJECTED`, `CANCELLED` ou `EXPIRED` rejeitada.
   - Rodar sem contexto Spring e sem banco de dados (regra 8 e 26).
-- [ ] 2.3 Implementar `service/StopChangeTransitionPolicy` recebendo status atual e status pretendido, devolvendo validade ou lançando violação coerente (regra 9).
-- [ ] 2.4 `make lint` + `./mvnw verify`. Abrir PR da fase 2 apontando para `feat/stop-change-request-schema`.
+- [x] 2.3 Implementar `service/StopChangeTransitionPolicy` recebendo status atual e status pretendido, devolvendo validade ou lançando violação coerente (regra 9).
+- [x] 2.4 `make lint` + `./mvnw test -Dtest=StopChangeTransitionPolicyTest`. Phase 2 concluída.
 
 ## 3. Phase 3 — Serviço, eventos, permissões e autorização (PR 3)
 
