@@ -119,8 +119,8 @@
 > Depends on: Phase 3 | Parallel with: —
 > Order: test → request DTO → controller → response DTO → mapper
 
-- [ ] 4.1 Criar branch `feat/stop-change-request-client-driver-http` a partir de `feat/stop-change-request-service`.
-- [ ] 4.2 Testes MockMvc com segurança:
+- [x] 4.1 Criar branch `feat/stop-change-request-client-driver-http` a partir de `feat/stop-change-request-service`.
+- [x] 4.2 Testes MockMvc com segurança:
   - `POST /api/clients/me/stop-change-requests` com cliente autenticado cria com 201.
   - `GET /api/clients/me/stop-change-requests/today` lista solicitações de hoje do cliente.
   - `POST /api/clients/me/stop-change-requests/{token}/cancel` cancela solicitação com 200.
@@ -129,17 +129,17 @@
   - `POST /api/drivers/me/stop-change-requests/{token}/reject` recusa solicitação com 200.
   - Sem autenticação -> 401; tipos de usuário trocados -> 403.
   - Respostas não vazam IDs numéricos internos (regra 13).
-- [ ] 4.3 Criar DTOs de request:
+- [x] 4.3 Criar DTOs de request:
   - `StopChangeCreateRequestDTO` (validação com `@NotNull`, `@NotBlank`, etc. via Bean Validation — regra 10).
   - DTO de cancelamento / recusa se aplicável.
-- [ ] 4.4 Criar DTOs de response:
+- [x] 4.4 Criar DTOs de response:
   - `StopChangeResponseDTO` com tokens opacos, endereço de desembarque formatado, timestamps e status (regra 12).
-- [ ] 4.5 Criar `mapper/StopChangeRequestMapper`.
-- [ ] 4.6 Criar controllers:
+- [x] 4.5 Criar `mapper/StopChangeRequestMapper`.
+- [x] 4.6 Criar controllers:
   - `controller/ClientStopChangeRequestController` em `/api/clients/me/stop-change-requests`.
   - `controller/DriverStopChangeRequestController` em `/api/drivers/me/stop-change-requests`.
-- [ ] 4.7 Verificar segurança em `SecurityConfig` (regras 20 e 21).
-- [ ] 4.8 `make lint` + `./mvnw verify`. Abrir PR da fase 4 apontando para `feat/stop-change-request-service`.
+- [x] 4.7 Verificar segurança em `SecurityConfig` (regras 20 e 21).
+- [x] 4.8 `make lint` + `./mvnw verify`. Fase 4 concluída.
 
 ## 5. Phase 5 — CRUD Administrativo por Token e Seeder (PR 5)
 
