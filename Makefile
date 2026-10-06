@@ -11,7 +11,7 @@ ENV_FILE = .env
 ENV_EXAMPLE = .env.example
 
 .PHONY: up down nuke restart rebuild logs shell test test-coverage check boot-run build clean \
-	docker-build lint lint-fix db-up db-down db-logs db-psql db-migrate db-seed up-build dev setup-env \
+	docker-build lint lint-fix check-migrations db-up db-down db-logs db-psql db-migrate db-seed up-build dev setup-env \
 	mail-up mail-down mail-logs install clean-install env pr
 
 # Gera um `.env` pronto para dev a partir do `.env.example`, com os segredos
@@ -112,7 +112,13 @@ test:
 test-coverage:
 	$(MVNW) verify
 
-check: test-coverage
+check: check-migrations test-coverage
+
+# Versão de migration repetida ou atrás da main derruba o boot do Flyway em produção.
+# A CI roda o mesmo script; aqui ele compara com a origin/main recém-buscada.
+check-migrations:
+	@git fetch --quiet origin main || true
+	@bash scripts/check-migrations.sh
 
 boot-run: setup-env
 	@bash -euo pipefail -c 'set -a && . ./$(ENV_FILE) && set +a && $(MVNW) spring-boot:run'

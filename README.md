@@ -445,6 +445,7 @@ VANEP_MAIL_ENABLED=false
   - **`local`** — datasource em **`application-local.properties`** (Maven na máquina, Postgres normalmente em `127.0.0.1`).
   - **`docker`** — datasource em **`application-docker.properties`** (porta **5432** na rede entre containers; não use `POSTGRES_PORT` do host no JDBC). Variáveis `POSTGRES_*` vêm do ambiente (`.env` no Compose / CI).
   - **`test`** — H2 em memória; Flyway desligado e schema gerado pelas entidades JPA (`ddl-auto=create-drop`), já que o SQL das migrações é específico de PostgreSQL.
+- **Numeração das migrações:** a CI roda `scripts/check-migrations.sh` (localmente: `make check-migrations`) e falha se duas migrações tiverem a mesma versão ou se uma migração nova ficar com versão menor ou igual à última da `main`. Se falhar depois de atualizar a branch, renomeie a sua migração para o próximo número livre.
 
 Evite usar **`localhost`** no JDBC no host se o Postgres do Docker só estiver escutando em **IPv4** no mapeamento da porta — **`127.0.0.1`** costuma ser mais previsível que **`localhost`** (IPv6).
 
