@@ -50,7 +50,7 @@
 - [x] 3.3 Testes de `AbsenceScopePolicy`: `BOTH` só com `dependent.shift = FULLTIME`; `RETURN` recusado em `MORNING`; `OUTBOUND` recusado em `AFTERNOON`
 - [x] 3.4 Testes de `AbsenceUndoPolicy`: sem trip ou `SCHEDULED` → permite; `IN_PROGRESS` / `COMPLETED` / `CANCELLED` → recusa; matriz tudo-ou-nada para `BOTH`
 - [x] 3.5 Implementar as três policies no pacote `service`, sem `@Service` de repositório e sem tipo de framework na assinatura (regra 9)
-- [ ] 3.6 `make lint` + `./mvnw verify`; PR `--base feat/absence-schema`
+- [x] 3.6 `./mvnw verify`: **1353 testes, JaCoCo ok, BUILD SUCCESS**. PR `--base feat/absence-schema`
 
 ## 4. Phase 4 — Serviço, permissões, messages (PR 4)
 
