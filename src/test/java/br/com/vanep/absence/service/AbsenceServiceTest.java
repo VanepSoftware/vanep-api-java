@@ -170,19 +170,12 @@ class AbsenceServiceTest {
   @Test
   void bothWithExistingOutboundOnlyInsertsReturn() {
     AbsenceModel existing = stored(AbsenceLeg.OUTBOUND);
-    when(absences.saveAndFlush(any(AbsenceModel.class)))
-        .thenAnswer(
-            invocation -> {
-              AbsenceModel row = invocation.getArgument(0);
-              if (row.getLeg() == AbsenceLeg.OUTBOUND) {
-                throw new DataIntegrityViolationException("dup");
-              }
-              row.setToken("abs-RETURN");
-              return row;
-            });
     when(absences.findByDependentAndDateAndLeg(
             eq(40L), any(LocalDate.class), eq(AbsenceLeg.OUTBOUND)))
         .thenReturn(Optional.of(existing));
+    when(absences.findByDependentAndDateAndLeg(
+            eq(40L), any(LocalDate.class), eq(AbsenceLeg.RETURN)))
+        .thenReturn(Optional.empty());
 
     AbsenceMutationResult result =
         service.reportForClient(CLIENT_UID, LINK, DEPENDENT, AbsenceScope.BOTH);
@@ -326,7 +319,7 @@ class AbsenceServiceTest {
         .thenThrow(new DataIntegrityViolationException("dup"));
     when(absences.findByDependentAndDateAndLeg(
             eq(40L), any(LocalDate.class), eq(AbsenceLeg.OUTBOUND)))
-        .thenReturn(Optional.of(winner));
+        .thenReturn(Optional.empty(), Optional.of(winner));
 
     AbsenceMutationResult result =
         service.reportForClient(CLIENT_UID, LINK, DEPENDENT, AbsenceScope.OUTBOUND);

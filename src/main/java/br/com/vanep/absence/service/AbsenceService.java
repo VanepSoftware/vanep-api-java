@@ -175,6 +175,11 @@ public class AbsenceService {
       AbsenceSource source,
       String reason,
       TripModel trip) {
+    Optional<AbsenceModel> existing =
+        absences.findByDependentAndDateAndLeg(dependent.getId(), date, leg);
+    if (existing.isPresent()) {
+      return new InsertedAbsence(existing.get(), false);
+    }
     AbsenceModel row = new AbsenceModel();
     row.setClientDriver(link);
     row.setDependent(dependent);
