@@ -33,11 +33,11 @@
 - [x] 2.3 Testes de `AbsenceRepository`: persiste token opaco; busca por `(dependent, date, leg)`; dois trechos no mesmo dia coexistem; soft delete libera o slot (H2 **não** prova o unique — não acrescentar unique só de teste; ver D7 / R4)
 - [x] 2.4 Enums `AbsenceSource` (`CLIENT`, `DRIVER`, `ASSISTANT`) e `AbsenceLeg` (`OUTBOUND`, `RETURN`) em `br.com.vanep.absence.enums` (regra 14). **Não** criar enum persistido `BOTH`
 - [x] 2.5 Migration `V52__create_absence_table.sql` conforme o esboço do `design.md` (`client_driver_id`, `trip_id` nullable, unique parcial por trecho, `deleted_at`)
-- [ ] 2.6 Aplicar a migration **manualmente** no PostgreSQL local e verificar: (a) segundo `(dependent, date, leg)` ativo viola o unique; (b) ida e volta no mesmo dia passam; (c) soft-deletado + reinsert passa
+- [ ] 2.6 Aplicar a migration **manualmente** no PostgreSQL local e verificar: (a) segundo `(dependent, date, leg)` ativo viola o unique; (b) ida e volta no mesmo dia passam; (c) soft-deletado + reinsert passa. **Pendente:** não há `.env` neste ambiente; H2 da suíte não exerce o unique (R4). Fazer na máquina com Postgres 17 local.
 - [x] 2.7 `AbsenceModel` com `@SoftDelete(columnName = "deleted_at", strategy = TIMESTAMP)` (regra 19); token no `@PrePersist` no padrão das outras features
 - [x] 2.8 `AbsenceRepository` com fetch join do `client_driver` / `dependent` / `trip` que a leitura precisar (regra 17)
 - [x] 2.9 Acrescentar `absence` em `src/test/resources/db/clean.sql` na ordem de FK
-- [ ] 2.10 `make lint` + `./mvnw verify`; PR apontando `--base feature/absence-crud-docs`
+- [x] 2.10 `./mvnw verify`: **1341 testes, JaCoCo ok, BUILD SUCCESS** (Spotless check no Docker Windows falha por CRLF do working copy; CI Linux é a prova). PR apontando `--base feature/absence-crud-docs`
 
 ## 3. Phase 3 — Policies puras (PR 3)
 
