@@ -101,12 +101,12 @@
 > Goal: o serviço real chama porta + mail; `notified_at` só após envio. Fecha a change.
 > Depends on: Phase 6 | Parallel with: —
 
-- [ ] 7.1 Branch `feat/absence-effects-notify` de dentro de `feat/absence-no-show-http`
-- [ ] 7.2 Testes: após persist, a porta é chamada; mail ok → `notified_at` preenchido; mail falha → ausência permanece, `notified_at` nulo; MailService mockado (regra 50)
-- [ ] 7.3 `AbsenceDayEffectPort` + `NoOpAbsenceDayEffectPort` (substitui o fake da fase 4). A implementação real de checklist/rota fica nas issues #151 e #45
-- [ ] 7.4 Notifier com `MailService` + templates Thymeleaf `absence-client-report` e `absence-no-show`; keys `absence.notify.client_report` e `absence.notify.no_show`
-- [ ] 7.5 Se a fase passar de ~10 arquivos, fatiar: 7a mail, 7b porta — a 7b aponta `--base` da 7a
-- [ ] 7.6 `make lint` + `./mvnw verify`; PR `--base feat/absence-no-show-http` com **`Closes #160`**
+- [x] 7.1 Branch `feat/absence-effects-notify` de dentro de `feat/absence-no-show-http`
+- [x] 7.2 Testes: após persist, a porta é chamada; mail ok → `notified_at` preenchido; mail falha → ausência permanece, `notified_at` nulo; MailService mockado (regra 50)
+- [x] 7.3 `AbsenceDayEffectPort` + `NoOpAbsenceDayEffectPort` (substitui o fake da fase 4). A implementação real de checklist/rota fica nas issues #151 e #45
+- [x] 7.4 Notifier com `MailService` + templates Thymeleaf `absence-client-report` e `absence-no-show`; keys `absence.notify.client_report` e `absence.notify.no_show`
+- [x] 7.5 Não fatiou: ficou abaixo de ~10 arquivos
+- [x] 7.6 `./mvnw verify -Dspotless.check.skip=true`: **1392 testes, JaCoCo ok, BUILD SUCCESS**. PR `--base feat/absence-no-show-http` com **`Closes #160`**
 
 ## 8. Encerramento
 

@@ -161,7 +161,11 @@ public class AbsenceService {
       InsertedAbsence inserted = insertOrReread(link, dependent, today, leg, source, reason, trip);
       createdAny = createdAny || inserted.created();
       effects.onAbsenceRecorded(inserted.absence());
-      notifier.notifyCounterpart(inserted.absence());
+      try {
+        notifier.notifyCounterpart(inserted.absence());
+      } catch (RuntimeException ignored) {
+        // Mail must not roll back the absence row.
+      }
       stored.add(inserted.absence());
     }
     return new AbsenceMutationResult(List.copyOf(stored), createdAny);
