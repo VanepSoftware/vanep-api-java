@@ -58,15 +58,15 @@
 > Depends on: Phase 3 | Parallel with: —
 > Order: test → security/authorization → messages → service
 
-- [ ] 4.1 Branch `feat/absence-service` de dentro de `feat/absence-policies`
-- [ ] 4.2 Testes Mockito de `AbsenceService`: `BOTH` cria duas linhas; segundo `OUTBOUND` relê; `BOTH` com ida existente só insere volta; dono errado; vínculo não `ACTIVE`; RN-19 não toca `dependent`; no-show preenche `reason` e `trip_id`; undo soft-delete; undo com trip `IN_PROGRESS` não apaga nada
-- [ ] 4.3 Teste de corrida com repositório mockado lançando `DataIntegrityViolationException` — o serviço relê, não propaga 500
-- [ ] 4.4 `REPORT_ABSENCE` no bundle `CLIENT`; `REPORT_NO_SHOW` nos bundles `DRIVER` e `ASSISTANT` (`PermissionEnum` + seeder)
-- [ ] 4.5 **Não** acrescentar `isTripOperator` nesta fase — nasce na fase 6 com a rota que o usa. Permissão sem rota da fase 6 fica no seeder já, porque o serviço já ramifica origem; se isso vazar string morta no JWT, aceitável: o endpoint ainda não existe
-- [ ] 4.6 Keys MessageSource EN + `messages_pt_BR.properties`: `absence.scope.not_in_shift`, `absence.link.not_active`, `absence.undo.trip_started`, `absence.trip.not_today`, `absence.trip.not_open` (regra 46)
-- [ ] 4.7 Implementar `AbsenceService` com insert-then-catch (D7), data do servidor (D8), `trip_id` opcional no fluxo cliente (D3)
-- [ ] 4.8 Porta de efeito e mail: o serviço recebe a porta e um notifier por construtor; nos testes unitários, fakes. Implementações reais na fase 7
-- [ ] 4.9 `make lint` + `./mvnw verify`; PR `--base feat/absence-policies`
+- [x] 4.1 Branch `feat/absence-service` de dentro de `feat/absence-policies`
+- [x] 4.2 Testes Mockito de `AbsenceService`: `BOTH` cria duas linhas; segundo `OUTBOUND` relê; `BOTH` com ida existente só insere volta; dono errado; vínculo não `ACTIVE`; RN-19 não toca `dependent`; no-show preenche `reason` e `trip_id`; undo soft-delete; undo com trip `IN_PROGRESS` não apaga nada
+- [x] 4.3 Teste de corrida com repositório mockado lançando `DataIntegrityViolationException` — o serviço relê, não propaga 500
+- [x] 4.4 `REPORT_ABSENCE` no bundle `CLIENT`; `REPORT_NO_SHOW` nos bundles `DRIVER` e `ASSISTANT` (`PermissionEnum` + seeder)
+- [x] 4.5 **Não** acrescentar `isTripOperator` nesta fase — nasce na fase 6 com a rota que o usa. Permissão sem rota da fase 6 fica no seeder já, porque o serviço já ramifica origem; se isso vazar string morta no JWT, aceitável: o endpoint ainda não existe
+- [x] 4.6 Keys MessageSource EN + `messages_pt_BR.properties`: `absence.scope.not_in_shift`, `absence.link.not_active`, `absence.undo.trip_started`, `absence.trip.not_today`, `absence.trip.not_open` (regra 46)
+- [x] 4.7 Implementar `AbsenceService` com insert-then-catch (D7), data do servidor (D8), `trip_id` opcional no fluxo cliente (D3)
+- [x] 4.8 Porta de efeito e mail: o serviço recebe a porta e um notifier por construtor; nos testes unitários, fakes. Implementações reais na fase 7
+- [x] 4.9 `./mvnw verify -Dspotless.check.skip=true`: **1369 testes, JaCoCo ok, BUILD SUCCESS**. PR `--base feat/absence-policies`
 
 ## 5. Phase 5 — HTTP do cliente (PR 5)
 
