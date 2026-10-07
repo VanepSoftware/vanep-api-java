@@ -1,11 +1,11 @@
 ## ADDED Requirements
 
 ### Requirement: Consolidated document compliance
-The system SHALL calculate one document-compliance result for each driver from the active CNH and active driver documents. The result MUST distinguish pending review, rejection, expiration, and missing required documents, and MUST expose document-derived blocking reasons separately from plan-derived blocking reasons.
+The system SHALL calculate and persist one document-compliance result for each driver from the active CNH and the mandatory driver documents. The result MUST distinguish pending review, rejection, expiration, and missing documents, and MUST expose document-derived blocking reasons separately from plan-derived blocking reasons.
 
-#### Scenario: Pending CNH suspends the driver
-- **WHEN** a driver's active CNH has status `PENDING`
-- **THEN** the compliance result marks the driver as document-irregular with a pending-review reason
+#### Scenario: Replaced CNH suspends an approved driver
+- **WHEN** an approved driver's CNH data or photo is replaced
+- **THEN** the compliance result becomes `PENDING_REVIEW` and the driver is moved to `UNDER_REVIEW`
 
 #### Scenario: Expired approved document remains irregular
 - **WHEN** an approved active driver document has an expiration date before the current `America/Sao_Paulo` date
@@ -16,7 +16,7 @@ The system SHALL calculate one document-compliance result for each driver from t
 - **THEN** the consolidated response includes each reason in its respective category
 
 ### Requirement: Daily expiration notifications
-The system SHALL run a daily expiration scan over `driver_cnh.valid_until` and `driver_document.expires_at`. For each active document with a validity date, it MUST create and dispatch at most one notification for D-60, D-30, and D0, and record the notification timestamp and event marker.
+The system SHALL run a daily expiration scan over `driver_cnh.valid_until` and `driver_document.expires_at`. For each active resource with a validity date, it MUST create and dispatch at most one notification for D-60, D-30, and D0, and record the notification timestamp in a unique alert event.
 
 #### Scenario: Sixty-day alert is emitted once
 - **WHEN** the daily scan runs for an approved active document whose validity date is 60 days away
@@ -32,15 +32,15 @@ The system SHALL run a daily expiration scan over `driver_cnh.valid_until` and `
 - **THEN** it dispatches the pending milestone once without duplicating any recorded milestone
 
 ### Requirement: Expiration blocks future opportunities only
-The system SHALL exclude a document-irregular driver from driver-search results and SHALL reject creation of a new proposal for that driver. It MUST NOT cancel, modify, or hide already active contracts because of document irregularity.
+The system SHALL exclude a document-irregular driver from location search, recommended-driver search, and public driver profile results. It SHALL reject creation of a new `client_driver` relationship and activation of a pending relationship for that driver. It MUST NOT cancel, modify, or hide an existing active relationship because of document irregularity.
 
 #### Scenario: Expired driver is absent from search
 - **WHEN** a driver has an active document that expired before today
 - **THEN** driver search does not return that driver
 
-#### Scenario: Existing contract is preserved
-- **WHEN** a driver's document becomes expired while the driver has an active contract
-- **THEN** the contract remains unchanged
+#### Scenario: Existing active relationship is preserved
+- **WHEN** a driver's document becomes expired while an existing `client_driver` relationship is `ACTIVE`
+- **THEN** the relationship remains unchanged
 
 #### Scenario: Approval after renewal restores eligibility
 - **WHEN** a driver replaces an expired document and an Admin approves it
@@ -48,11 +48,11 @@ The system SHALL exclude a document-irregular driver from driver-search results 
 - **THEN** the driver becomes eligible for search and new proposals automatically
 
 ### Requirement: Directly linked document replacement requires review
-The system SHALL set a CNH to `PENDING` whenever its content, file, or validity is replaced. It SHALL clear its prior review decision, keep the driver document-irregular until an Admin approves it, and require a non-blank rejection reason when an Admin rejects a CNH or driver document.
+The system SHALL set a driver document to `PENDING` whenever its content, file, or validity is replaced. Replacing CNH content, CNH photo, or a mandatory driver document SHALL set an approved driver to `UNDER_REVIEW` and keep the driver document-irregular until the Admin approval flow succeeds. A rejected driver document MUST have a non-blank rejection reason.
 
 #### Scenario: CNH update requires fresh approval
 - **WHEN** an approved driver's CNH is updated
-- **THEN** the CNH status becomes `PENDING` and the driver is excluded from new opportunities until approval
+- **THEN** the driver status becomes `UNDER_REVIEW` and the driver is excluded from new opportunities until approval
 
 #### Scenario: Rejection without reason is rejected
 - **WHEN** an Admin submits `REJECTED` status without a rejection reason
@@ -63,7 +63,7 @@ The system SHALL set a CNH to `PENDING` whenever its content, file, or validity 
 - **THEN** the response includes its rejection reason
 
 ### Requirement: Compliance endpoint
-The system SHALL expose an authenticated endpoint for a driver to retrieve their consolidated document-compliance result. An Admin MAY retrieve the same result for a selected driver through an explicitly authorized endpoint.
+The system SHALL expose an authenticated endpoint for a driver to retrieve their persisted document-compliance result and reasons. An Admin MAY retrieve the same result for a selected driver through an explicitly authorized endpoint. Plan-derived reasons MUST be returned in a separate category when the plan module provides them.
 
 #### Scenario: Driver reads own compliance
 - **WHEN** an authenticated driver requests their compliance state

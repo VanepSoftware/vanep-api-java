@@ -1,34 +1,32 @@
 ## Why
 
-O cadastro atual de CNH e documentos do motorista não reage à passagem do tempo: uma CNH ou documento de vistoria vencido pode deixar o motorista elegível para busca e novas propostas. Isso cria exposição jurídica direta e não oferece ao motorista aviso ou um caminho consistente de regularização.
+As entregas de upload de mídia e aprovação administrativa agora existem, mas não há um estado que represente a validade contínua da documentação. Um motorista aprovado pode ter a CNH, vistoria ou outro documento obrigatório vencido e continuar aparecendo na busca, criando novos vínculos `client_driver` e operando como elegível.
 
-Também falta um contrato único de regularidade documental para o app e o painel administrativo. Sem ele, cada consumidor pode interpretar pendências, reprovações e vencimentos de forma diferente.
+Sem uma fonte única de regularidade, o app, o painel Admin, a busca e o fluxo de propostas podem discordar sobre a mesma documentação. A consequência é risco de conformidade e uma revalidação manual que não suspende o motorista de modo confiável.
 
 ## What Changes
 
-- Criar o motor de regularidade documental que consolida a situação da CNH e dos documentos obrigatórios, incluindo pendência de revisão, reprovação e vencimento.
-- Executar diariamente a avaliação de validade e emitir uma única notificação por documento em cada marco: 60 dias, 30 dias e vencimento.
-- Bloquear motoristas documentalmente irregulares de aparecerem em buscas e receberem novas propostas, sem alterar contratos já ativos; restaurar a elegibilidade após renovação e aprovação manual.
-- Exigir nova revisão manual quando a CNH for substituída ou atualizada e tornar obrigatório o motivo de rejeição, visível ao motorista.
-- Expor endpoint autenticado de regularidade documental, com os motivos de bloqueio separados do bloqueio por plano (RN-16).
-- Substituir referências públicas a arquivos de documentos por armazenamento privado S3-compatível, com upload e leitura por URLs assinadas e temporárias.
-- Estender o esquema de CNH com os metadados de revisão e notificação necessários, por nova migration Flyway; as migrations já aplicadas não serão alteradas.
+- Criar a capability de regularidade documental como estado consolidado e atualizado transacionalmente para cada motorista: `REGULAR`, `PENDING_REVIEW`, `EXPIRED`, `REJECTED` ou `MISSING`.
+- Reutilizar as rotas privadas de arquivo e a abstração `media-storage` já entregues; upload S3/MinIO e URLs pré-assinadas não fazem parte deste change, pois contradizem a decisão atual de storage local por provedor.
+- Recalcular a regularidade quando CNH/documentos são criados, atualizados, recebem arquivo, são revisados ou expiram; troca de CNH ou documento obrigatório suspende somente a elegibilidade documental e encaminha o motorista para nova revisão Admin.
+- Executar job diário para atualizar vencimentos e criar um único alerta auditável em D-60, D-30 e D0 para CNH e documentos ativos com validade.
+- Usar a regularidade na busca por localização, recomendação, perfil público e criação/ativação de `client_driver`, preservando vínculos ativos já existentes.
+- Expor a regularidade para o próprio motorista e para o Admin, com motivos documentais distintos de qualquer bloqueio de plano.
+- Tornar a rejeição de `driver_document` justificada, mantendo o motivo visível ao proprietário; a rejeição/reaprovação da conta continua usando os endpoints de onboarding entregues em #47.
 
 ## Capabilities
 
 ### New Capabilities
 
-- `driver-document-compliance`: Avalia a regularidade documental do motorista, agenda alertas de validade, governa a elegibilidade para busca/propostas e expõe o estado consolidado.
-- `private-driver-document-storage`: Recebe e entrega arquivos de CNH e documentos por storage S3-compatível privado, usando URLs assinadas com expiração.
+- `driver-document-compliance`: Consolida validade, presença, revisão e rejeição documental; emite alertas e aplica a elegibilidade documental em todos os fluxos que exibem ou criam oportunidades para motoristas.
 
 ### Modified Capabilities
 
-<!-- Nenhuma capability principal existente cobre o ciclo de vida documental. A busca de motoristas será integrada pela nova capability de regularidade. -->
+<!-- Não há capability principal arquivada para media-storage ou admin-driver-approval. Esta change integra as implementações já entregues sem publicar delta spec para um contrato principal inexistente. -->
 
 ## Impact
 
-- **Database:** nova migration para metadados de revisão/notificação da CNH e para registrar cada marco de alerta sem ambiguidade; índices para a varredura diária.
-- **Backend:** novos serviços/políticas de regularidade e de arquivos privados, job agendado, repositórios/consultas, DTOs, endpoint e mensagens i18n.
-- **Existing flows:** atualização de CNH/documento, aprovação/rejeição do Admin, busca de motoristas e o ponto de criação de novas propostas quando essa feature estiver presente no backend.
-- **Infrastructure:** configuração por ambiente para endpoint, bucket, região/credenciais e TTL das URLs assinadas; MinIO no staging e S3-compatível em produção.
-- **Dependencies:** entrega do fluxo de aprovação manual do Admin (#47) e provedor de push (FCM) para a entrega efetiva das notificações.
+- **Database:** nova migration aditiva para o estado de regularidade no motorista, último alerta da CNH e uma tabela de eventos únicos de alerta; nenhuma migration V41–V48 será alterada.
+- **Backend:** política de regularidade, serviço de atualização, job diário, endpoint de consulta, regras de transição e integração nos serviços de busca, perfil, onboarding e `client_driver`.
+- **Existing files:** CNH e documentos continuam usando `media_file`, `StorageService`, `POST /.../photo|file` e `GET /.../photo|file`; eles não voltarão a gravar URL pública.
+- **Notifications:** a persistência/idempotência dos alertas é deste change. O canal de push FCM depende da entrega de notificações push; enquanto ela não existir, o adaptador precisa usar o canal transacional aprovado (e-mail) ou permanecer explicitamente bloqueado.

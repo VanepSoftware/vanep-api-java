@@ -1,77 +1,74 @@
 ## Context
 
-Os CRUDs existentes tratam CNH e documentos como recursos independentes. `driver_document` já tem status de revisão e `notified_at`, mas uma única data não consegue representar os três marcos de alerta. `driver_cnh` contém apenas validade e URL da foto, sem dados de revisão. A busca já centraliza o filtro final em `DriverRepository.findSearchableByIds`, mas não existe ainda no backend o fluxo de criação de propostas mencionado pela regra de negócio.
+A premissa principal da proposta anterior mudou. A entrega `media-file-upload` já substituiu `photo_url` e `file_url` por FKs privadas para `media_file`, implementou `StorageService`/`LocalStorageService` e rotas por dono para upload/download autenticado. Portanto, não há motivo nem espaço seguro para criar outra tabela de arquivo, URL pública ou fluxo de URL pré-assinada neste change.
 
-O Admin fará a revisão manual pela entrega #47; este change fornece o contrato e as transições que essa interface consome. Arquivos de documento são dados pessoais sensíveis e não podem continuar acessíveis por URL pública.
+A entrega `admin-driver-approval` também já existe. Ela usa `DriverApprovalStatus`, o onboarding, `DriverNotificationService` e `ClientDriverService` para bloquear propostas de contas não aprovadas. Ainda faltam a validade contínua, a revisão desencadeada por alteração documental e uma fonte comum para busca/propostas. `driver_document` tem `PENDING`, `APPROVED` e `REJECTED`; CNH é validada pela decisão de onboarding, sem status próprio.
 
 ## Goals / Non-Goals
 
 **Goals:**
 
-- Determinar uma única regularidade documental por motorista, reutilizável pela busca, propostas, app e painel administrativo.
-- Alertar cada documento válido uma vez nos marcos D-60, D-30 e D0, sem renotificação em reexecuções do job.
-- Suspender apenas a elegibilidade para novas oportunidades por irregularidade documental, sem cancelar ou alterar contratos em curso.
-- Requerer aprovação manual após a substituição de CNH e expor reprovação com motivo ao motorista.
-- Armazenar binários em bucket privado e nunca devolver URL permanente ou pública.
+- Criar uma fonte de verdade de regularidade documental, com estado e motivos disponíveis ao motorista, Admin e regras de elegibilidade.
+- Recalcular esse estado após cada alteração documental e diariamente para que o tempo também altere a elegibilidade.
+- Manter a CNH no fluxo já entregue de aprovação de conta e usar o status existente do `driver_document` para revisão individual.
+- Alertar cada marco de validade exatamente uma vez e nunca alterar vínculos `client_driver` já ativos.
 
 **Non-Goals:**
 
-- Construir a tela administrativa de revisão, a integração FCM concreta ou o fluxo de contratos/propostas ainda inexistente neste backend.
-- Alterar regras de bloqueio por plano (RN-16), cancelar contratos ativos ou decidir documentos obrigatórios além dos tipos já definidos pelo produto.
-- Fazer verificação automática de autenticidade, OCR ou antivírus do arquivo.
+- Criar bucket MinIO/S3, URLs pré-assinadas, novos endpoints genéricos de mídia ou migrar os arquivos da VPS; isso contraria o contrato ativo de `media-storage` e requer change próprio de provider.
+- Construir a tela Admin, tokens/dispositivos FCM, OCR, antivírus ou cancelar vínculos/contratos ativos.
+- Duplicar a regra de bloqueio por plano; a resposta expõe categorias separadas para que o consumidor apresente a causa correta.
 
 ## Decisions
 
-### D1 — Política central de regularidade, sem novo estado persistido no motorista
+### D1 — Estado materializado, calculado por uma única política
 
-Criar uma política pura de regularidade documental e um serviço que carrega, em lote, a CNH e os documentos ativos de um motorista. O resultado contém `regular`, os impedimentos documentais e uma mensagem/código por motivo. Busca e criação de propostas consultam esse serviço/predicado; o endpoint apenas serializa o mesmo resultado.
+Adicionar `document_compliance_status`, `document_compliance_reason` e `document_compliance_updated_at` ao motorista. `DriverDocumentCompliancePolicy` é pura e recebe CNH, documentos obrigatórios e data de negócio; `DriverDocumentComplianceService` é o único gravador do estado materializado e do DTO de consulta.
 
-Isso evita duplicar regras em controller, consulta de busca e painel. Não será adicionado um booleano `document_compliant` ao `driver`: ele ficaria desatualizado entre o job e alterações manuais. O filtro de busca será aplicado na consulta final de motoristas, preservando a ordenação atual e impedindo que motoristas bloqueados apareçam em qualquer página.
+O estado materializado permite que todas as consultas paginadas existentes (`findSearchableByIds`, `findSearchableNewestFirst` e perfil público) filtrem no banco sem recalcular regras ou estragar a contagem/paginação. Alterações de CNH, documento, arquivo e revisão chamam a atualização na mesma transação; o job diário cobre a transição causada pelo tempo. Isso é preferível a repetir subqueries de regularidade em cada busca.
 
-O bloqueio documental será distinto do bloqueio por plano. O agregado expõe motivos em categorias separadas; o consumidor de propostas escolhe a mensagem específica quando ambos se aplicam.
+### D2 — Revalidação aproveita o fluxo de onboarding entregue
 
-### D2 — Transições de revisão explícitas para CNH e documentos
+CNH não receberá um segundo status de revisão. Ao substituir seus dados ou foto, ou alterar um documento obrigatório, o sistema marca o documento como `PENDING` quando aplicável, recalcula a regularidade e move uma conta previamente `APPROVED` para `UNDER_REVIEW`. Esse é o estado que #47 já lista e que os endpoints Admin já aprovam/rejeitam; não há reenvio de onboarding nem novo endpoint de aprovação.
 
-Estender `driver_cnh` em uma nova migration com `status`, `reviewed_by`, `reviewed_at`, `rejection_reason` e os dados de alerta necessários, alinhando-o ao ciclo de `driver_document`. Criar/atualizar CNH e atualizar o arquivo ou a validade de um documento coloca o recurso em `PENDING`, limpa a decisão anterior e suspende a elegibilidade até uma aprovação manual. A aprovação só restaura o acesso se nenhum outro requisito documental estiver pendente, rejeitado ou vencido.
+Na aprovação, `DriverOnboardingService` deve recusar a decisão se a política reportar CNH/documento obrigatório ausente, vencido, pendente ou rejeitado. A aprovação de um onboarding legado é a evidência histórica para backfill: documentos obrigatórios anexados e válidos de motoristas já `APPROVED` serão migrados para `APPROVED`, sem suspender a base inteira no deploy. Nova rejeição de documento exige justificativa não vazia; a justificativa permanece no DTO proprietário. A rejeição da conta continua usando `DriverRejectionRequestDTO` e a notificação já entregue.
 
-Rejeição exige `rejection_reason` não vazio no DTO e no serviço; aprovação limpa eventual motivo anterior. A atualização de status continuará autorizada somente para Admin pela integração #47. O status `APPROVED` não torna um item vencido válido: validade é uma dimensão separada.
+### D3 — Escopo documental e data de negócio
 
-### D3 — Marcos de alerta persistidos por documento e evento
+A política usa a mesma lista de documentos obrigatórios do onboarding (`CRLV`, `VEHICLE_INSPECTION`, `MUNICIPAL_AUTHORIZATION`) e exige CNH ativa, anexada e válida. Para cada tipo obrigatório, exige arquivo privado anexado, status `APPROVED` e validade não anterior à data `America/Sao_Paulo`; documentos opcionais podem receber alertas, mas não suspendem a conta sem uma regra de produto adicional.
 
-Criar uma tabela de auditoria de alertas com chave única por tipo de recurso, identificador do recurso e marco (`DAYS_60`, `DAYS_30`, `EXPIRATION`). O job diário usa `Clock` injetável, localiza itens ativos com validade e persiste o marco antes/de forma transacional com o disparo enfileirado de notificação. A restrição única torna o job idempotente inclusive em execuções concorrentes; `notified_at` passa a registrar a última emissão no recurso para compatibilidade/auditoria, sem ser a fonte da deduplicação.
+No dia D0 o documento ainda é válido e recebe o alerta de vencimento; torna-se irregular em D+1. Essa fronteira é controlada por `Clock` injetável para não depender do fuso do host.
 
-Os marcos são avaliados pela data local `America/Sao_Paulo`: D-60 e D-30 são 60 e 30 dias antes de `valid_until`/`expires_at`; D0 é a própria data de validade. A data de validade continua válida durante D0 e torna-se bloqueante em D+1. Caso o job fique indisponível em uma data, ele envia o marco pendente na próxima execução, uma única vez, em vez de o perder silenciosamente.
+### D4 — Eventos de alerta, não um único timestamp
 
-### D4 — Storage privado por chaves de objeto, URLs assinadas de curta duração
+`driver_document.notified_at` não representa três marcos nem cobre CNH. A migration cria `driver_document_expiry_alert` com recurso, marco (`DAYS_60`, `DAYS_30`, `EXPIRATION`) e `notified_at`, com unicidade por `(resource_type, resource_id, milestone)`. A CNH ganha apenas `notified_at` como último aviso compatível; para documentos, o campo existente recebe o último envio.
 
-Substituir URLs persistentes por `object_key`/identificador privado. O backend emite URL assinada de upload para um prefixo não adivinhável limitado ao motorista e ao tipo de documento; após o upload, o CRUD recebe a chave emitida e a valida contra o escopo do solicitante. A leitura é feita por endpoint autorizado que retorna uma URL assinada de curta duração; Admin e proprietário usam as mesmas regras de acesso já existentes para o recurso.
+O job seleciona CNH e documentos ativos com data de validade, cria o evento de forma transacional e trata violação de unicidade como execução já concluída. Se uma execução diária falhar, marcos anteriores ainda não registrados são enviados uma vez na próxima execução. A entrega usa uma porta: o adaptador pode reutilizar e-mail transacional agora, enquanto FCM permanece uma dependência explícita e não é simulado por chamada de rede nos testes.
 
-Será usado um cliente S3-compatível configurado exclusivamente por ambiente (endpoint, bucket, região, credenciais e TTL). MinIO é apenas a implementação de staging. A alternativa de bucket público com URL salva na tabela foi descartada por expor dados LGPD; proxy de streaming foi adiado para evitar custo e complexidade inicial, mantendo a autorização no emissor da URL.
+### D5 — Integrações de elegibilidade sem tocar em vínculos ativos
 
-### D5 — Job observável e entrega desacoplada
+As consultas de busca e perfil público passam a exigir `document_compliance_status = REGULAR`, além de `active` e `approval_status = APPROVED`. `ClientDriverService.create` e a transição para `ACTIVE` consultam a mesma regularidade e retornam motivo documental quando ela é a causa. Nenhuma rotina altera `client_driver` existente: o bloqueio vale somente para criação e ativação futuras.
 
-O scheduler só identifica eventos e os registra de modo transacional. A entrega de push é uma porta/adaptador, permitindo FCM em produção e fake nos testes. Falhas de entrega não criam uma segunda notificação sem política explícita; elas ficam observáveis por log/métrica e deverão ter estratégia de retry definida com o provedor. O job pode ser acionado por scheduler diário e por teste de integração com `Clock` fixo.
+O endpoint de regularidade retorna o estado, motivo e data de cálculo. Ele recebe, quando aplicável, os bloqueios de plano em uma categoria distinta fornecida pelo módulo de plano; enquanto esse módulo não estiver no backend, a categoria de plano é explicitamente vazia, e não inferida.
 
 ## Risks / Trade-offs
 
-- [Mudança de schema da CNH] → criar nova migration e migrar dados existentes para `PENDING`, exigindo revisão administrativa antes de nova elegibilidade; validar o rollout com o time de operações.
-- [Execução perdida do scheduler] → processar marcos já vencidos ainda não registrados e manter unicidade no banco.
-- [Consulta de busca mais cara] → filtrar a elegibilidade em lote/consulta, usar índices por driver, status e validade, e cobrir paginação em teste.
-- [URLs assinadas vazarem] → TTL curto, bucket privado, prefixo restrito e nenhuma URL persistida ou retornada como URL pública.
-- [Falha entre registrar e entregar push] → introduzir porta de notificação e definir outbox/retry antes de depender de entrega com garantia forte.
-- [Regras de documentos obrigatórios incompletas] → parametrizar a lista após confirmação de produto; até lá, a política avalia CNH e os documentos ativos que possuem validade/revisão.
+- [Backfill marca documentos indevidamente] → limitar a migração a motoristas já aprovados, com arquivo e validade válidos, e auditar os totais antes/depois em staging.
+- [Job perdido ou concorrente] → ledger único no banco, reprocessamento de marcos pendentes e `Clock` fixo nos testes.
+- [Busca vaza motorista irregular] → aplicar o estado materializado a todas as quatro consultas de elegibilidade, com testes de recomendação, geobusca e perfil público.
+- [FCM ainda indisponível] → manter o evento persistido e usar somente adaptador aprovado; não declarar push entregue antes de existir configuração/credencial de push.
+- [Estado materializado fica obsoleto] → toda escrita documental chama refresh na própria transação e o job recalcula diariamente.
 
 ## Migration Plan
 
-1. Publicar migration Flyway nova para os campos de revisão/notificação da CNH, tabela de marcos de alerta, chaves privadas de arquivo e índices de varredura; não modificar V17 ou V21.
-2. Implantar as leituras tolerantes aos dados migrados e disponibilizar o endpoint de regularidade para Admin/app.
-3. Configurar bucket privado e variáveis de ambiente em cada ambiente antes de habilitar emissão de URLs assinadas; migrar referências legadas de arquivo de forma controlada.
-4. Habilitar o job diário e monitorar alertas, bloqueios e falhas de entrega.
-5. Integrar o predicado de regularidade à busca e ao ponto de novas propostas. Rollback de código desabilita o job/filtro; migrations permanecem aditivas e não exigem rollback destrutivo.
+1. Criar migration posterior à V51 para estado materializado, último aviso da CNH, ledger de alertas e índices; nunca editar V17, V21 ou V41–V48.
+2. Executar e auditar o backfill de documentos de motoristas aprovados antes de ativar o filtro de elegibilidade.
+3. Publicar refresh, endpoints e filtros de busca/proposta; habilitar o job diário após a migration.
+4. Configurar o adaptador de notificação aprovado e observar alertas, supressões e erros de entrega. A migração de storage para S3/MinIO continua change separado.
+5. Rollback desabilita job/filtros por configuração/código; schema e ledger permanecem aditivos e não requerem rollback destrutivo.
 
 ## Open Questions
 
-- Quais `DocumentTypeEnum` são obrigatórios para cada perfil de motorista e se algum deles não expira?
-- Qual TTL de upload/leitura, limites de tamanho e MIME types serão aceitos para CNH e demais documentos?
-- A entrega FCM exige outbox e retentativa garantida já neste change ou a primeira versão apenas registra/observa falhas?
-- Onde o fluxo de novas propostas será introduzido, já que não há módulo correspondente no checkout atual?
+- O canal inicial será e-mail transacional, evento persistido sem envio, ou FCM já disponível? O requisito de push não pode ser concluído sem essa resposta.
+- Documentos opcionais vencidos devem bloquear ou apenas alertar? Esta proposta bloqueia somente CNH e os tipos obrigatórios já usados pelo onboarding.
+- O módulo de plano já expõe seus motivos de bloqueio? Sem ele, a categoria de plano do endpoint permanece vazia.
