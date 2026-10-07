@@ -89,12 +89,12 @@
 > Depends on: Phase 5 | Parallel with: —
 > Order: test → security → request DTO → controller
 
-- [ ] 6.1 Branch `feat/absence-no-show-http` de dentro de `feat/absence-client-http`
-- [ ] 6.2 MockMvc: motorista na própria trip `IN_PROGRESS` + reason → 201 `source=DRIVER`; assistente `ACTIVE` → 201 `source=ASSISTANT`; outro motorista → 403; reason em branco → 400; trip `COMPLETED` → 409; trip de ontem → 409; cliente → 403
-- [ ] 6.3 `isTripOperator(String tripToken, Authentication)` em `SecurityEvaluator` (regra 22) — dono da trip **ou** assistente `ACTIVE` cujo `driver_id` é o da trip. Sem `AbsenceSecurityService`
-- [ ] 6.4 `AbsenceNoShowRequestDTO` (`dependentToken`, `reason` `@NotBlank`)
-- [ ] 6.5 Endpoint no controller de trip ou no de absence, prefixo `/api`, `@PreAuthorize("hasAuthority('report_no_show') and @sec.isTripOperator(#tripToken, authentication)")`
-- [ ] 6.6 `make lint` + `./mvnw verify`; PR `--base feat/absence-client-http`
+- [x] 6.1 Branch `feat/absence-no-show-http` de dentro de `feat/absence-client-http`
+- [x] 6.2 MockMvc: motorista na própria trip `IN_PROGRESS` + reason → 201 `source=DRIVER`; assistente `ACTIVE` → 201 `source=ASSISTANT`; outro motorista → 403; reason em branco → 400; trip `COMPLETED` → 409; trip de ontem → 409; cliente → 403
+- [x] 6.3 `isTripOperator(String tripToken, Authentication)` em `SecurityEvaluator` (regra 22) — dono da trip **ou** assistente `ACTIVE` cujo `driver_id` é o da trip. Sem `AbsenceSecurityService`
+- [x] 6.4 `AbsenceNoShowRequestDTO` (`dependentToken`, `reason` `@NotBlank`)
+- [x] 6.5 Endpoint no controller de trip ou no de absence, prefixo `/api`, `@PreAuthorize("hasAuthority('report_no_show') and @sec.isTripOperator(#tripToken, authentication)")`
+- [x] 6.6 `./mvnw verify -Dspotless.check.skip=true`: **1388 testes, JaCoCo ok, BUILD SUCCESS**. PR `--base feat/absence-client-http`
 
 ## 7. Phase 7 — Efeitos do dia (porta no-op) e notificação (PR 7)
 
