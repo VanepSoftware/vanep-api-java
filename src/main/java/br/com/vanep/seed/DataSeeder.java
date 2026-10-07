@@ -188,7 +188,8 @@ public class DataSeeder implements ApplicationRunner {
   static List<String> clientPermissions() {
     return Stream.concat(
             PermissionEnum.crudFor("dependents").stream(),
-            Stream.of(PermissionEnum.CREATE_DRIVER_RATING.value()))
+            Stream.of(
+                PermissionEnum.CREATE_DRIVER_RATING.value(), PermissionEnum.REPORT_ABSENCE.value()))
         .toList();
   }
 
@@ -204,7 +205,8 @@ public class DataSeeder implements ApplicationRunner {
           List.of(
               PermissionEnum.SHOW_ASSISTANT.value(),
               PermissionEnum.UPDATE_ASSISTANT.value(),
-              PermissionEnum.REVOKE_ASSISTANT.value()));
+              PermissionEnum.REVOKE_ASSISTANT.value(),
+              PermissionEnum.REPORT_NO_SHOW.value()));
       bundle = rolePermissions.save(bundle);
       assistantRole.setRolePermission(bundle);
       roles.save(assistantRole);
@@ -236,7 +238,8 @@ public class DataSeeder implements ApplicationRunner {
               PermissionEnum.FINISH_TRIP.value(),
               PermissionEnum.CREATE_CLIENT_RATING.value(),
               PermissionEnum.LIST_CLIENT_RATINGS.value(),
-              PermissionEnum.SHOW_CLIENT_RATING.value()));
+              PermissionEnum.SHOW_CLIENT_RATING.value(),
+              PermissionEnum.REPORT_NO_SHOW.value()));
       bundle = rolePermissions.save(bundle);
       driverRole.setRolePermission(bundle);
       roles.save(driverRole);

@@ -115,6 +115,11 @@ class DataSeederTest {
   }
 
   @Test
+  void clientBundleCanReportAbsence() {
+    assertThat(DataSeeder.clientPermissions()).contains(PermissionEnum.REPORT_ABSENCE.value());
+  }
+
+  @Test
   void doesNothingWhenDisabled() {
     seeder.enabled = false;
     seeder.seedOnly = false;
@@ -324,7 +329,8 @@ class DataSeederTest {
         .containsExactlyInAnyOrder(
             PermissionEnum.SHOW_ASSISTANT.value(),
             PermissionEnum.UPDATE_ASSISTANT.value(),
-            PermissionEnum.REVOKE_ASSISTANT.value());
+            PermissionEnum.REVOKE_ASSISTANT.value(),
+            PermissionEnum.REPORT_NO_SHOW.value());
     assertThat(assistantRole.getRolePermission()).isEqualTo(captor.getValue());
   }
 
@@ -368,7 +374,8 @@ class DataSeederTest {
             PermissionEnum.FINISH_TRIP.value(),
             PermissionEnum.CREATE_CLIENT_RATING.value(),
             PermissionEnum.LIST_CLIENT_RATINGS.value(),
-            PermissionEnum.SHOW_CLIENT_RATING.value());
+            PermissionEnum.SHOW_CLIENT_RATING.value(),
+            PermissionEnum.REPORT_NO_SHOW.value());
     assertThat(driverRole.getRolePermission()).isEqualTo(captor.getValue());
   }
 }
