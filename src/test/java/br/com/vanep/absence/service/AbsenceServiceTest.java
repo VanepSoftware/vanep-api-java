@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -149,6 +150,17 @@ class AbsenceServiceTest {
         .containsExactly(AbsenceLeg.OUTBOUND, AbsenceLeg.RETURN);
     verify(effects, times(2)).onAbsenceRecorded(any());
     verify(notifier, times(2)).notifyCounterpart(any());
+  }
+
+  @Test
+  void mailFailureDoesNotRollBackTheAbsence() {
+    doThrow(new RuntimeException("smtp down")).when(notifier).notifyCounterpart(any());
+
+    AbsenceMutationResult result =
+        service.reportForClient(CLIENT_UID, LINK, DEPENDENT, AbsenceScope.OUTBOUND);
+
+    assertThat(result.createdAny()).isTrue();
+    verify(absences).saveAndFlush(any());
   }
 
   @Test
