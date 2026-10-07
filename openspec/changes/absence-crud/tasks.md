@@ -33,7 +33,7 @@
 - [x] 2.3 Testes de `AbsenceRepository`: persiste token opaco; busca por `(dependent, date, leg)`; dois trechos no mesmo dia coexistem; soft delete libera o slot (H2 **não** prova o unique — não acrescentar unique só de teste; ver D7 / R4)
 - [x] 2.4 Enums `AbsenceSource` (`CLIENT`, `DRIVER`, `ASSISTANT`) e `AbsenceLeg` (`OUTBOUND`, `RETURN`) em `br.com.vanep.absence.enums` (regra 14). **Não** criar enum persistido `BOTH`
 - [x] 2.5 Migration `V52__create_absence_table.sql` conforme o esboço do `design.md` (`client_driver_id`, `trip_id` nullable, unique parcial por trecho, `deleted_at`)
-- [ ] 2.6 Aplicar a migration **manualmente** no PostgreSQL local e verificar: (a) segundo `(dependent, date, leg)` ativo viola o unique; (b) ida e volta no mesmo dia passam; (c) soft-deletado + reinsert passa. **Pendente:** não há `.env` neste ambiente; H2 da suíte não exerce o unique (R4). Fazer na máquina com Postgres 17 local.
+- [x] 2.6 Aplicar a migration **manualmente** no PostgreSQL local e verificar: (a) segundo `(dependent, date, leg)` ativo viola o unique; (b) ida e volta no mesmo dia passam; (c) soft-deletado + reinsert passa. ✅ Flyway até V52 no Postgres 17; duplicata OUTBOUND viola o unique; RETURN no mesmo dia ok; soft-delete + reinsert ok.
 - [x] 2.7 `AbsenceModel` com `@SoftDelete(columnName = "deleted_at", strategy = TIMESTAMP)` (regra 19); token no `@PrePersist` no padrão das outras features
 - [x] 2.8 `AbsenceRepository` com fetch join do `client_driver` / `dependent` / `trip` que a leitura precisar (regra 17)
 - [x] 2.9 Acrescentar `absence` em `src/test/resources/db/clean.sql` na ordem de FK
@@ -45,11 +45,11 @@
 > Depends on: Phase 2 | Parallel with: —
 > Order: test → policy
 
-- [ ] 3.1 Branch `feat/absence-policies` de dentro de `feat/absence-schema`
-- [ ] 3.2 Testes de `AbsenceLegShiftPolicy`: `MORNING`/`NIGHT` → `OUTBOUND`; `AFTERNOON` → `RETURN`; `FULLTIME` na trip aceita os dois trechos apontando para a mesma trip
-- [ ] 3.3 Testes de `AbsenceScopePolicy`: `BOTH` só com `dependent.shift = FULLTIME`; `RETURN` recusado em `MORNING`; `OUTBOUND` recusado em `AFTERNOON`
-- [ ] 3.4 Testes de `AbsenceUndoPolicy`: sem trip ou `SCHEDULED` → permite; `IN_PROGRESS` / `COMPLETED` / `CANCELLED` → recusa; matriz tudo-ou-nada para `BOTH`
-- [ ] 3.5 Implementar as três policies no pacote `service`, sem `@Service` de repositório e sem tipo de framework na assinatura (regra 9)
+- [x] 3.1 Branch `feat/absence-policies` de dentro de `feat/absence-schema`
+- [x] 3.2 Testes de `AbsenceLegShiftPolicy`: `MORNING`/`NIGHT` → `OUTBOUND`; `AFTERNOON` → `RETURN`; `FULLTIME` na trip aceita os dois trechos apontando para a mesma trip
+- [x] 3.3 Testes de `AbsenceScopePolicy`: `BOTH` só com `dependent.shift = FULLTIME`; `RETURN` recusado em `MORNING`; `OUTBOUND` recusado em `AFTERNOON`
+- [x] 3.4 Testes de `AbsenceUndoPolicy`: sem trip ou `SCHEDULED` → permite; `IN_PROGRESS` / `COMPLETED` / `CANCELLED` → recusa; matriz tudo-ou-nada para `BOTH`
+- [x] 3.5 Implementar as três policies no pacote `service`, sem `@Service` de repositório e sem tipo de framework na assinatura (regra 9)
 - [ ] 3.6 `make lint` + `./mvnw verify`; PR `--base feat/absence-schema`
 
 ## 4. Phase 4 — Serviço, permissões, messages (PR 4)
