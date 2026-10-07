@@ -4,8 +4,8 @@ import br.com.vanep.auth.security.PermissionEnum;
 import br.com.vanep.auth.security.PermissionRegistry;
 import br.com.vanep.client.model.ClientModel;
 import br.com.vanep.client.repository.ClientRepository;
+import br.com.vanep.clientdriver.seed.ClientDriverSeeder;
 import br.com.vanep.clientrating.seed.ClientRatingSeeder;
-import br.com.vanep.country.seed.CountrySeeder;
 import br.com.vanep.dependent.seed.DependentSeeder;
 import br.com.vanep.driver.DriverApprovalStatus;
 import br.com.vanep.driver.DriverRepository;
@@ -18,7 +18,6 @@ import br.com.vanep.role.model.RoleModel;
 import br.com.vanep.role.repository.RoleRepository;
 import br.com.vanep.rolepermission.model.RolePermissionModel;
 import br.com.vanep.rolepermission.repository.RolePermissionRepository;
-import br.com.vanep.state.seed.StateSeeder;
 import br.com.vanep.trip.seed.TripSeeder;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
@@ -27,6 +26,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -51,11 +51,10 @@ public class DataSeeder implements ApplicationRunner {
   private final DependentSeeder dependentSeeder;
   private final DriverCnhSeeder driverCnhSeeder;
   private final DriverDocumentSeeder driverDocumentSeeder;
-  private final CountrySeeder countrySeeder;
-  private final StateSeeder stateSeeder;
   private final DriverRatingSeeder driverRatingSeeder;
   private final ClientRatingSeeder clientRatingSeeder;
   private final TripSeeder tripSeeder;
+  private final ClientDriverSeeder clientDriverSeeder;
   private final PasswordEncoder passwordEncoder;
 
   @Value("${vanep.seed.enabled:false}")
@@ -82,11 +81,10 @@ public class DataSeeder implements ApplicationRunner {
       DependentSeeder dependentSeeder,
       DriverCnhSeeder driverCnhSeeder,
       DriverDocumentSeeder driverDocumentSeeder,
-      CountrySeeder countrySeeder,
-      StateSeeder stateSeeder,
       DriverRatingSeeder driverRatingSeeder,
       ClientRatingSeeder clientRatingSeeder,
       TripSeeder tripSeeder,
+      ClientDriverSeeder clientDriverSeeder,
       PasswordEncoder passwordEncoder) {
     this.users = users;
     this.clients = clients;
@@ -96,11 +94,10 @@ public class DataSeeder implements ApplicationRunner {
     this.dependentSeeder = dependentSeeder;
     this.driverCnhSeeder = driverCnhSeeder;
     this.driverDocumentSeeder = driverDocumentSeeder;
-    this.countrySeeder = countrySeeder;
-    this.stateSeeder = stateSeeder;
     this.driverRatingSeeder = driverRatingSeeder;
     this.clientRatingSeeder = clientRatingSeeder;
     this.tripSeeder = tripSeeder;
+    this.clientDriverSeeder = clientDriverSeeder;
     this.passwordEncoder = passwordEncoder;
   }
 
@@ -120,9 +117,7 @@ public class DataSeeder implements ApplicationRunner {
     dependentSeeder.seed();
     driverCnhSeeder.seed();
     driverDocumentSeeder.seed();
-    countrySeeder.seed();
-
-    stateSeeder.seed();
+    clientDriverSeeder.seed();
     driverRatingSeeder.seed();
     clientRatingSeeder.seed();
     tripSeeder.seed();
@@ -186,15 +181,15 @@ public class DataSeeder implements ApplicationRunner {
       bundle = rolePermissions.save(bundle);
       clientRole.setRolePermission(bundle);
       roles.save(clientRole);
-      log.info("Seed: CLIENT bundle created with dependents and driver read permissions.");
+      log.info("Seed: CLIENT bundle created with dependents and driver rating permissions.");
     }
   }
 
   static List<String> clientPermissions() {
-    List<String> permissions = new java.util.ArrayList<>(PermissionEnum.crudFor("dependents"));
-    permissions.add(PermissionEnum.LIST_DRIVERS.value());
-    permissions.add(PermissionEnum.SHOW_DRIVER.value());
-    return List.copyOf(permissions);
+    return Stream.concat(
+            PermissionEnum.crudFor("dependents").stream(),
+            Stream.of(PermissionEnum.CREATE_DRIVER_RATING.value()))
+        .toList();
   }
 
   private void seedAssistantPermissions() {

@@ -45,6 +45,7 @@ class MobileTokenFlowTest {
 
   private static final String MOBILE_CLIENT_ID = "vanep-mobile";
   private static final String WEB_CLIENT_ID = "vanep-frontend";
+  private static final String WEB_CLIENT_SECRET = "test-web-client-secret";
   private static final String MOBILE_REDIRECT_URI = "com.vanep.vanepmobile://oauth2redirect";
   private static final String WEB_REDIRECT_URI = "http://localhost:3000/api/auth/callback/vanep";
   private static final String CODE_VERIFIER = "vanep-mobile-code-verifier-with-enough-entropy";
@@ -78,11 +79,59 @@ class MobileTokenFlowTest {
   }
 
   @Test
-  void webClientKeepsGettingNoRefreshToken() throws Exception {
+  void webClientGetsARefreshToken() throws Exception {
     JsonNode tokens = exchangeAuthorizationCode(WEB_CLIENT_ID, WEB_REDIRECT_URI);
 
     assertThat(tokens.hasNonNull("access_token")).isTrue();
-    assertThat(tokens.has("refresh_token")).isFalse();
+    assertThat(tokens.hasNonNull("refresh_token")).isTrue();
+  }
+
+  @Test
+  void webClientRefreshesWithItsSecret() throws Exception {
+    String refreshToken =
+        exchangeAuthorizationCode(WEB_CLIENT_ID, WEB_REDIRECT_URI).get("refresh_token").asText();
+
+    JsonNode refreshed = refreshAsWebClient(refreshToken, status().isOk());
+
+    assertThat(refreshed.hasNonNull("access_token")).isTrue();
+    assertThat(jwtDecoder.decode(refreshed.get("access_token").asText())).isNotNull();
+  }
+
+  /**
+   * The web client authenticates with a secret, so {@link MobileClientAuthenticationConverter} must
+   * not claim its refresh request and hand it to the mobile-only provider.
+   */
+  @Test
+  void webClientRefreshWithoutItsSecretIsRejected() throws Exception {
+    String refreshToken =
+        exchangeAuthorizationCode(WEB_CLIENT_ID, WEB_REDIRECT_URI).get("refresh_token").asText();
+
+    mockMvc
+        .perform(
+            post("/oauth2/token")
+                .params(
+                    form(
+                        "grant_type",
+                        "refresh_token",
+                        "refresh_token",
+                        refreshToken,
+                        "client_id",
+                        WEB_CLIENT_ID)))
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.error").value("invalid_client"));
+  }
+
+  /** Rotation stays off for the stateless Next.js BFF: it cannot persist a rotated token safely. */
+  @Test
+  void webClientKeepsTheSameRefreshTokenAcrossRefreshes() throws Exception {
+    String refreshToken =
+        exchangeAuthorizationCode(WEB_CLIENT_ID, WEB_REDIRECT_URI).get("refresh_token").asText();
+
+    JsonNode refreshed = refreshAsWebClient(refreshToken, status().isOk());
+
+    assertThat(refreshed.get("refresh_token").asText()).isEqualTo(refreshToken);
+    assertThat(refreshAsWebClient(refreshToken, status().isOk()).hasNonNull("access_token"))
+        .isTrue();
   }
 
   @Test
@@ -168,6 +217,28 @@ class MobileTokenFlowTest {
         .andExpect(jsonPath("$.error").value("invalid_client"));
   }
 
+  private JsonNode refreshAsWebClient(
+      String refreshToken, org.springframework.test.web.servlet.ResultMatcher expectedStatus)
+      throws Exception {
+    MvcResult result =
+        mockMvc
+            .perform(
+                post("/oauth2/token")
+                    .params(
+                        form(
+                            "grant_type",
+                            "refresh_token",
+                            "refresh_token",
+                            refreshToken,
+                            "client_id",
+                            WEB_CLIENT_ID,
+                            "client_secret",
+                            WEB_CLIENT_SECRET)))
+            .andExpect(expectedStatus)
+            .andReturn();
+    return objectMapper.readTree(result.getResponse().getContentAsString());
+  }
+
   private JsonNode refresh(
       String clientId,
       String refreshToken,
@@ -192,22 +263,24 @@ class MobileTokenFlowTest {
 
   private JsonNode exchangeAuthorizationCode(String clientId, String redirectUri) throws Exception {
     String code = authorizationCodeFor(clientId, redirectUri);
+    MultiValueMap<String, String> parameters =
+        form(
+            "grant_type",
+            "authorization_code",
+            "code",
+            code,
+            "redirect_uri",
+            redirectUri,
+            "client_id",
+            clientId,
+            "code_verifier",
+            CODE_VERIFIER);
+    if (WEB_CLIENT_ID.equals(clientId)) {
+      parameters.add("client_secret", WEB_CLIENT_SECRET);
+    }
     MvcResult result =
         mockMvc
-            .perform(
-                post("/oauth2/token")
-                    .params(
-                        form(
-                            "grant_type",
-                            "authorization_code",
-                            "code",
-                            code,
-                            "redirect_uri",
-                            redirectUri,
-                            "client_id",
-                            clientId,
-                            "code_verifier",
-                            CODE_VERIFIER)))
+            .perform(post("/oauth2/token").params(parameters))
             .andExpect(status().isOk())
             .andReturn();
     return objectMapper.readTree(result.getResponse().getContentAsString());

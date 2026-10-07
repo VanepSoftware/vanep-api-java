@@ -16,6 +16,28 @@ public interface VehicleRepository extends JpaRepository<VehicleModel, Long> {
 
   boolean existsByPlate(String plate);
 
+  @Query(
+      """
+      select vehicle from VehicleModel vehicle
+      left join fetch vehicle.photoFront
+      left join fetch vehicle.photoSide
+      left join fetch vehicle.photoDocument
+      where vehicle.driver.id = :driverId
+        and vehicle.active = true
+      order by vehicle.createdAt, vehicle.id
+      """)
+  List<VehicleModel> findActiveWithPhotosByDriverId(@Param("driverId") Long driverId);
+
+  @Query(
+      """
+      select count(vehicle) > 0 from VehicleModel vehicle
+      where vehicle.token = :token
+        and vehicle.active = true
+        and vehicle.driver.active = true
+        and vehicle.driver.approvalStatus = br.com.vanep.driver.DriverApprovalStatus.APPROVED
+      """)
+  boolean existsOfSearchableDriverByToken(@Param("token") String token);
+
   @Modifying
   @Query(value = "UPDATE vehicle SET deleted_at = NULL WHERE token = :token", nativeQuery = true)
   int restoreByToken(@Param("token") String token);

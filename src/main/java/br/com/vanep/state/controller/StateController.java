@@ -23,7 +23,7 @@ public class StateController {
   }
 
   @GetMapping
-  @PreAuthorize("hasAuthority('list_states')")
+  @PreAuthorize("isAuthenticated()")
   public Page<StateResponseDTO> list(
       @PageableDefault(size = 30, sort = "name", direction = Sort.Direction.ASC)
           Pageable pageable) {
@@ -31,7 +31,7 @@ public class StateController {
   }
 
   @GetMapping("/{token}")
-  @PreAuthorize("hasAuthority('show_state')")
+  @PreAuthorize("isAuthenticated()")
   public StateResponseDTO get(@PathVariable String token) {
     return service.findByToken(token);
   }

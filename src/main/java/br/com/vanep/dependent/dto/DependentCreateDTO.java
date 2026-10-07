@@ -1,6 +1,6 @@
 package br.com.vanep.dependent.dto;
 
-import br.com.vanep.address.dto.AddressRequestDTO;
+import br.com.vanep.address.dto.DependentAddressRequestDTO;
 import br.com.vanep.shared.enums.Shift;
 import br.com.vanep.user.enums.Gender;
 import jakarta.validation.Valid;
@@ -41,7 +41,7 @@ public class DependentCreateDTO {
 
   private String schoolToken;
 
-  @Valid private AddressRequestDTO address;
+  @Valid private DependentAddressRequestDTO address;
 
   private String clientToken;
 }

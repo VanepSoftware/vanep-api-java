@@ -1,6 +1,7 @@
 package br.com.vanep.driverservicearea.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.hasItems;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -8,6 +9,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import br.com.vanep.city.model.CityModel;
+import br.com.vanep.city.repository.CityRepository;
 import br.com.vanep.country.model.CountryModel;
 import br.com.vanep.country.repository.CountryRepository;
 import br.com.vanep.driver.DriverApprovalStatus;
@@ -16,7 +19,9 @@ import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.driverservicearea.dto.DriverServiceAreaRequestDTO;
 import br.com.vanep.driverservicearea.repository.DriverServiceAreaRepository;
 import br.com.vanep.places.client.PlacesClient;
+import br.com.vanep.places.dto.AddressComponentDTO;
 import br.com.vanep.places.dto.PlaceDetailsResponseDTO;
+import br.com.vanep.state.repository.StateRepository;
 import br.com.vanep.state.seed.StateSeeder;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
@@ -26,11 +31,14 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.BDDMockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.MessageSource;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor;
@@ -51,8 +59,11 @@ class DriverServiceAreaControllerTest {
   @Autowired private UserRepository users;
   @Autowired private DriverRepository drivers;
   @Autowired private CountryRepository countries;
+  @Autowired private StateRepository states;
+  @Autowired private CityRepository cities;
   @Autowired private StateSeeder stateSeeder;
   @Autowired private DriverServiceAreaRepository areas;
+  @Autowired private MessageSource messages;
 
   @MockitoBean private PlacesClient places;
 
@@ -72,6 +83,8 @@ class DriverServiceAreaControllerTest {
     countries.save(brasil);
 
     stateSeeder.seed();
+    seedIbgeCity("DF", "Brasília", "5300108");
+    seedIbgeCity("GO", "Formosa", "5208004");
 
     UserModel driverUser = new UserModel();
     driverUser.setType(UserType.DRIVER);
@@ -110,12 +123,53 @@ class DriverServiceAreaControllerTest {
     return jwt().jwt(builder -> builder.claim("uid", uid).subject(uid));
   }
 
+  private CityModel seedIbgeCity(String uf, String name, String ibgeCode) {
+    CityModel city = new CityModel();
+    city.setState(states.findByUf(uf).orElseThrow());
+    city.setName(name);
+    city.setIbgeCode(ibgeCode);
+    return cities.save(city);
+  }
+
+  private PlaceDetailsResponseDTO unmatchedEmbu() {
+    return new PlaceDetailsResponseDTO(
+        "place-embu",
+        "Embu, SP",
+        List.of(
+            new AddressComponentDTO("Brazil", "BR", List.of("country", "political")),
+            new AddressComponentDTO(
+                "São Paulo", "SP", List.of("administrative_area_level_1", "political")),
+            new AddressComponentDTO(
+                "Embu", "Embu", List.of("administrative_area_level_2", "political"))));
+  }
+
+  private String message(String key) {
+    return messages.getMessage(key, null, LocaleContextHolder.getLocale());
+  }
+
   private String body(String... placeIds) {
     StringBuilder json = new StringBuilder("{\"areas\":[");
     for (int i = 0; i < placeIds.length; i++) {
       json.append(i > 0 ? "," : "").append("{\"placeId\":\"").append(placeIds[i]).append("\"}");
     }
     return json.append("]}").toString();
+  }
+
+  @Test
+  void rejectsAnUnmatchedGoogleCityWithCatalogMessage() throws Exception {
+    BDDMockito.given(places.findPlaceDetails("embu", null)).willReturn(unmatchedEmbu());
+
+    mockMvc
+        .perform(
+            put("/api/drivers/me/service-areas")
+                .with(as(driverUid))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body("embu")))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.detail").value(message("location.city.unmatched")))
+        .andExpect(jsonPath("$.code").value("location.city.unmatched"));
+
+    assertThat(areas.count()).isZero();
   }
 
   @Test
@@ -137,7 +191,7 @@ class DriverServiceAreaControllerTest {
   }
 
   @Test
-  void registersTheAdministrativeRegionAsServiceAreaNotTheBlockInsideIt() throws Exception {
+  void registersThePlaceTheDriverPickedNotTheRegionAroundIt() throws Exception {
     BDDMockito.given(places.findPlaceDetails("taguatinga", null))
         .willReturn(fixture("df-taguatinga-qnl5"));
 
@@ -148,14 +202,14 @@ class DriverServiceAreaControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body("taguatinga")))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$[0].name").value("Taguatinga"))
+        .andExpect(jsonPath("$[0].name").value("QNL 5"))
         .andExpect(jsonPath("$[0].cityName").value("Brasília"))
         .andExpect(jsonPath("$[0].coversWholeCity").value(false))
         .andExpect(jsonPath("$[0].token").isNotEmpty());
   }
 
   @Test
-  void collapsesTwoAddressesOfTheSameRegionIntoOneArea() throws Exception {
+  void keepsTwoPlacesOfTheSameRegionAsSeparateAreas() throws Exception {
     BDDMockito.given(places.findPlaceDetails("qnl5", null))
         .willReturn(fixture("df-taguatinga-qnl5"));
     BDDMockito.given(places.findPlaceDetails("objetivo", null))
@@ -168,8 +222,8 @@ class DriverServiceAreaControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"areas\":[{\"placeId\":\"qnl5\"},{\"placeId\":\"objetivo\"}]}"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.length()").value(1))
-        .andExpect(jsonPath("$[0].name").value("Taguatinga"));
+        .andExpect(jsonPath("$.length()").value(2))
+        .andExpect(jsonPath("$[*].name", hasItems("QNL 5", "QI 21")));
   }
 
   @Test

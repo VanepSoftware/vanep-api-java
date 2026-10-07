@@ -10,6 +10,7 @@ import br.com.vanep.driverservicearea.model.DriverServiceAreaModel;
 import br.com.vanep.driverservicearea.repository.DriverServiceAreaRepository;
 import br.com.vanep.location.dto.ResolvedLocationChainDTO;
 import br.com.vanep.location.service.LocationResolverService;
+import br.com.vanep.media.web.MediaUrl;
 import br.com.vanep.places.client.PlacesClient;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -22,6 +23,7 @@ import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -75,6 +77,18 @@ public class DriverSearchService {
       return Page.empty(pageable);
     }
     return pageInRankOrder(ranked, pageable);
+  }
+
+  // The sort is fixed on purpose: a caller-chosen sort could order drivers by a private column.
+  @Transactional(readOnly = true)
+  public Page<DriverSearchResponseDTO> findRecommended(Pageable pageable) {
+    Page<DriverModel> page =
+        drivers.findSearchableNewestFirst(
+            PageRequest.of(pageable.getPageNumber(), pageable.getPageSize()));
+    List<Long> driverIds = page.getContent().stream().map(DriverModel::getId).toList();
+    Map<Long, List<String>> areaNamesByDriver =
+        driverIds.isEmpty() ? Map.of() : findAreaNames(driverIds);
+    return page.map(driver -> toResponse(driver, areaNamesByDriver));
   }
 
   List<Long> rankDriverIds(ResolvedLocationChainDTO anchor) {
@@ -135,7 +149,7 @@ public class DriverSearchService {
     Map<Long, List<DistrictModel>> childrenByParent = new HashMap<>();
     for (DistrictModel district : districts.findByCityId(anchor.city().getId())) {
       Long parentId = district.getParent() == null ? null : district.getParent().getId();
-      childrenByParent.computeIfAbsent(parentId, id -> new ArrayList<>()).add(district);
+      childrenByParent.computeIfAbsent(parentId, _ -> new ArrayList<>()).add(district);
     }
     collectDescendants(deepest.get().getId(), 1, childrenByParent, distances);
     return distances;
@@ -183,7 +197,7 @@ public class DriverSearchService {
     for (DriverServiceAreaModel area : areas.findByDriverIds(driverIds)) {
       String name =
           area.getDistrict() == null ? area.getCity().getName() : area.getDistrict().getName();
-      namesByDriver.computeIfAbsent(area.getDriver().getId(), id -> new ArrayList<>()).add(name);
+      namesByDriver.computeIfAbsent(area.getDriver().getId(), _ -> new ArrayList<>()).add(name);
     }
     return namesByDriver;
   }
@@ -193,7 +207,7 @@ public class DriverSearchService {
     return new DriverSearchResponseDTO(
         driver.getToken(),
         driver.getUser().getName(),
-        driver.getPhoto(),
+        MediaUrl.of("/api/drivers", driver.getToken(), "photo", driver.getPhoto()),
         driver.getRating(),
         driver.getBasePrice(),
         driver.getExperienceYears(),

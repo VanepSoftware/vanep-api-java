@@ -21,6 +21,7 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.core.env.Environment;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.config.annotation.web.configuration.OAuth2AuthorizationServerConfiguration;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
@@ -48,7 +49,9 @@ public class AuthorizationServerConfig {
 
   @Bean
   public RegisteredClientRepository registeredClientRepository(
+      PasswordEncoder passwordEncoder,
       @Value("${vanep.oauth.client.id}") String clientId,
+      @Value("${vanep.oauth.client.secret:}") String clientSecret,
       @Value("${vanep.oauth.client.redirect-uris}") List<String> redirectUris,
       @Value("${vanep.oauth.client.post-logout-redirect-uris:}")
           List<String> postLogoutRedirectUris,
@@ -57,17 +60,26 @@ public class AuthorizationServerConfig {
       @Value("${vanep.oauth.access-token-ttl-minutes:15}") long accessTokenTtlMinutes,
       @Value("${vanep.oauth.refresh-token-ttl-days:90}") long refreshTokenTtlDays) {
 
-    ClientSettings publicClientSettings =
-        ClientSettings.builder().requireProofKey(true).requireAuthorizationConsent(false).build();
-    TokenSettings tokenSettings =
-        TokenSettings.builder()
-            .accessTokenTimeToLive(Duration.ofMinutes(accessTokenTtlMinutes))
-            .refreshTokenTimeToLive(Duration.ofDays(refreshTokenTtlDays))
-            .reuseRefreshTokens(false)
-            .build();
+    if (clientSecret.isBlank()) {
+      throw new IllegalStateException(
+          "Configure vanep.oauth.client.secret (VANEP_OAUTH_CLIENT_SECRET). The web client must"
+              + " authenticate with a secret, otherwise the authorization server refuses it a"
+              + " refresh token and every browser session dies at the access token TTL.");
+    }
 
+    ClientSettings clientSettings =
+        ClientSettings.builder().requireProofKey(true).requireAuthorizationConsent(false).build();
+
+    // Rotation stays off for the web client: the Next.js BFF keeps the session in a stateless
+    // cookie shared by concurrent serverless invocations, so it cannot store a rotated token
+    // safely — every parallel request would burn the same one and all but the winner would get
+    // invalid_grant. The app owns a single mutable store, so it keeps rotation.
     RegisteredClient.Builder webBuilder =
-        buildPublicClient(clientId, publicClientSettings, tokenSettings);
+        buildConfidentialClient(
+            clientId,
+            passwordEncoder.encode(clientSecret),
+            clientSettings,
+            tokenSettings(accessTokenTtlMinutes, refreshTokenTtlDays, true));
     applyRedirectUris(webBuilder, redirectUris);
     applyPostLogoutRedirectUris(webBuilder, postLogoutRedirectUris);
     RegisteredClient webClient = webBuilder.build();
@@ -75,7 +87,10 @@ public class AuthorizationServerConfig {
     // Cliente público do app mobile: mesmo fluxo Authorization Code + PKCE, mas com
     // redirect custom-scheme (ex.: com.vanep.vanep_mobile://oauth2redirect) capturado no WebView.
     RegisteredClient.Builder mobileBuilder =
-        buildPublicClient(mobileClientId, publicClientSettings, tokenSettings);
+        buildPublicClient(
+            mobileClientId,
+            clientSettings,
+            tokenSettings(accessTokenTtlMinutes, refreshTokenTtlDays, false));
     applyRedirectUris(mobileBuilder, mobileRedirectUris);
     // Only the native app gets the extension grants. This is configuration hygiene, not a
     // security barrier: the defence is the uniform lockout plus the rate limit.
@@ -86,11 +101,19 @@ public class AuthorizationServerConfig {
     return new InMemoryRegisteredClientRepository(webClient, mobileClient);
   }
 
-  private static RegisteredClient.Builder buildPublicClient(
+  private static TokenSettings tokenSettings(
+      long accessTokenTtlMinutes, long refreshTokenTtlDays, boolean reuseRefreshTokens) {
+    return TokenSettings.builder()
+        .accessTokenTimeToLive(Duration.ofMinutes(accessTokenTtlMinutes))
+        .refreshTokenTimeToLive(Duration.ofDays(refreshTokenTtlDays))
+        .reuseRefreshTokens(reuseRefreshTokens)
+        .build();
+  }
+
+  private static RegisteredClient.Builder buildClient(
       String clientId, ClientSettings clientSettings, TokenSettings tokenSettings) {
     return RegisteredClient.withId(UUID.nameUUIDFromBytes(clientId.getBytes()).toString())
         .clientId(clientId)
-        .clientAuthenticationMethod(ClientAuthenticationMethod.NONE)
         .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
         .authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
         .scope("openid")
@@ -99,6 +122,31 @@ public class AuthorizationServerConfig {
         .scope("write")
         .clientSettings(clientSettings)
         .tokenSettings(tokenSettings);
+  }
+
+  private static RegisteredClient.Builder buildPublicClient(
+      String clientId, ClientSettings clientSettings, TokenSettings tokenSettings) {
+    return buildClient(clientId, clientSettings, tokenSettings)
+        .clientAuthenticationMethod(ClientAuthenticationMethod.NONE);
+  }
+
+  /**
+   * The Next.js BFF runs server-side, so it can hold a secret — and it has to. {@code
+   * OAuth2RefreshTokenGenerator} refuses a refresh token to any public client on {@code
+   * authorization_code}, which left every browser session expiring at the access token TTL with no
+   * way back. Authenticating with a secret also keeps {@link
+   * br.com.vanep.auth.oauth.grant.MobileClientAuthenticationConverter} from claiming the web
+   * client's token requests, since it only matches a bare {@code client_id}.
+   */
+  private static RegisteredClient.Builder buildConfidentialClient(
+      String clientId,
+      String encodedSecret,
+      ClientSettings clientSettings,
+      TokenSettings tokenSettings) {
+    return buildClient(clientId, clientSettings, tokenSettings)
+        .clientSecret(encodedSecret)
+        .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_POST)
+        .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC);
   }
 
   private static RegisteredClient.Builder applyRedirectUris(

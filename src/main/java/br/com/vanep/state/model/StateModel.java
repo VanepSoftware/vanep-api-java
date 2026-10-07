@@ -48,9 +48,6 @@ public class StateModel {
   @Column(name = "normalized_name", nullable = false, length = 64)
   private String normalizedName;
 
-  @Column(name = "google_place_id", length = 255)
-  private String googlePlaceId;
-
   @Column(name = "requires_district", nullable = false)
   private boolean requiresDistrict = false;
 

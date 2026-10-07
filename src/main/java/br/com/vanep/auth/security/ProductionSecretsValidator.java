@@ -15,14 +15,17 @@ public class ProductionSecretsValidator implements InitializingBean {
   private final String rememberMeKey;
   private final String pepper;
   private final String jwkPrivateKey;
+  private final String oauthClientSecret;
 
   public ProductionSecretsValidator(
       @Value("${vanep.remember-me.key:}") String rememberMeKey,
       @Value("${vanep.password.pepper:}") String pepper,
-      @Value("${vanep.oauth.jwk.private-key:}") String jwkPrivateKey) {
+      @Value("${vanep.oauth.jwk.private-key:}") String jwkPrivateKey,
+      @Value("${vanep.oauth.client.secret:}") String oauthClientSecret) {
     this.rememberMeKey = rememberMeKey;
     this.pepper = pepper;
     this.jwkPrivateKey = jwkPrivateKey;
+    this.oauthClientSecret = oauthClientSecret;
   }
 
   @Override
@@ -32,6 +35,10 @@ public class ProductionSecretsValidator implements InitializingBean {
     if (jwkPrivateKey == null || jwkPrivateKey.isBlank()) {
       throw new IllegalStateException(
           "Em produção configure vanep.oauth.jwk.private-key (chave de assinatura RSA estável).");
+    }
+    if (oauthClientSecret == null || oauthClientSecret.isBlank()) {
+      throw new IllegalStateException(
+          "Em produção configure vanep.oauth.client.secret (segredo do cliente web).");
     }
   }
 

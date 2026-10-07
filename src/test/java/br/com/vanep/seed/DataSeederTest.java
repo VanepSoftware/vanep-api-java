@@ -12,8 +12,8 @@ import static org.mockito.Mockito.when;
 import br.com.vanep.auth.security.PermissionEnum;
 import br.com.vanep.auth.security.PermissionRegistry;
 import br.com.vanep.client.repository.ClientRepository;
+import br.com.vanep.clientdriver.seed.ClientDriverSeeder;
 import br.com.vanep.clientrating.seed.ClientRatingSeeder;
-import br.com.vanep.country.seed.CountrySeeder;
 import br.com.vanep.dependent.seed.DependentSeeder;
 import br.com.vanep.driver.DriverApprovalStatus;
 import br.com.vanep.driver.DriverRepository;
@@ -26,7 +26,6 @@ import br.com.vanep.role.model.RoleModel;
 import br.com.vanep.role.repository.RoleRepository;
 import br.com.vanep.rolepermission.model.RolePermissionModel;
 import br.com.vanep.rolepermission.repository.RolePermissionRepository;
-import br.com.vanep.state.seed.StateSeeder;
 import br.com.vanep.trip.seed.TripSeeder;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
@@ -54,11 +53,10 @@ class DataSeederTest {
   @Mock private DependentSeeder dependentSeeder;
   @Mock private DriverCnhSeeder driverCnhSeeder;
   @Mock private DriverDocumentSeeder driverDocumentSeeder;
-  @Mock private CountrySeeder countrySeeder;
-  @Mock private StateSeeder stateSeeder;
   @Mock private DriverRatingSeeder driverRatingSeeder;
   @Mock private ClientRatingSeeder clientRatingSeeder;
   @Mock private TripSeeder tripSeeder;
+  @Mock private ClientDriverSeeder clientDriverSeeder;
   @Mock private PasswordEncoder passwordEncoder;
 
   private DataSeeder seeder;
@@ -75,11 +73,10 @@ class DataSeederTest {
             dependentSeeder,
             driverCnhSeeder,
             driverDocumentSeeder,
-            countrySeeder,
-            stateSeeder,
             driverRatingSeeder,
             clientRatingSeeder,
             tripSeeder,
+            clientDriverSeeder,
             passwordEncoder);
 
     seeder.adminEmail = "admin@vanep.com.br";
@@ -100,6 +97,21 @@ class DataSeederTest {
     bundle.setName("ADMIN");
     bundle.setPermissions(List.copyOf(PermissionRegistry.all()));
     return bundle;
+  }
+
+  @Test
+  void clientBundleDoesNotGrantTheAdministrativeDriverReads() {
+    assertThat(DataSeeder.clientPermissions())
+        .doesNotContain(PermissionEnum.LIST_DRIVERS.value(), PermissionEnum.SHOW_DRIVER.value());
+  }
+
+  @Test
+  void clientBundleRatesTheDriverWithoutListingOtherRatings() {
+    assertThat(DataSeeder.clientPermissions())
+        .contains(PermissionEnum.CREATE_DRIVER_RATING.value())
+        .doesNotContain(
+            PermissionEnum.LIST_DRIVER_RATINGS.value(),
+            PermissionEnum.DELETE_DRIVER_RATING.value());
   }
 
   @Test

@@ -1,6 +1,7 @@
 package br.com.vanep.driver.model;
 
 import br.com.vanep.driver.DriverApprovalStatus;
+import br.com.vanep.media.model.MediaFileModel;
 import br.com.vanep.user.model.UserModel;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -11,6 +12,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
@@ -45,7 +47,9 @@ public class DriverModel {
   @JoinColumn(name = "user_id", nullable = false, unique = true)
   private UserModel user;
 
-  @Column private String photo;
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "photo_media_id")
+  private MediaFileModel photo;
 
   @Column(precision = 3, scale = 2)
   private BigDecimal rating;
@@ -76,6 +80,19 @@ public class DriverModel {
   @Enumerated(EnumType.STRING)
   @Column(name = "approval_status", nullable = false, length = 16)
   private DriverApprovalStatus approvalStatus = DriverApprovalStatus.PENDING;
+
+  @Column(name = "submitted_at")
+  private Instant submittedAt;
+
+  @Column(name = "rejection_reason")
+  private String rejectionReason;
+
+  @Column(name = "reviewed_at")
+  private Instant reviewedAt;
+
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "reviewed_by")
+  private UserModel reviewedBy;
 
   @Column(name = "is_active", nullable = false)
   private boolean active = true;

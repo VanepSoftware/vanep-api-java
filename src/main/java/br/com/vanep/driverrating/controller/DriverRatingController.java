@@ -2,7 +2,7 @@ package br.com.vanep.driverrating.controller;
 
 import br.com.vanep.driverrating.dto.DriverRatingCreateRequestDTO;
 import br.com.vanep.driverrating.dto.DriverRatingResponseDTO;
-import br.com.vanep.driverrating.dto.DriverRatingUpdateRequestDTO;
+import br.com.vanep.driverrating.dto.DriverRatingStatusResponseDTO;
 import br.com.vanep.driverrating.service.DriverRatingService;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
@@ -16,7 +16,6 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -49,6 +48,13 @@ public class DriverRatingController {
     return service.findAll(driverToken, pageable);
   }
 
+  @GetMapping("/status")
+  @PreAuthorize("hasAuthority('create_driver_rating')")
+  public DriverRatingStatusResponseDTO status(
+      @RequestParam String driverToken, @AuthenticationPrincipal Jwt jwt) {
+    return service.findRatingStatus(driverToken, jwt.getSubject());
+  }
+
   @GetMapping("/{token}")
   @PreAuthorize(
       "hasAuthority('show_driver_rating') or @sec.isDriverRatingOwner(#token, authentication)")
@@ -56,25 +62,10 @@ public class DriverRatingController {
     return service.findByToken(token);
   }
 
-  @PutMapping("/{token}")
-  @PreAuthorize(
-      "hasAuthority('update_driver_rating') or @sec.isDriverRatingOwner(#token, authentication)")
-  public DriverRatingResponseDTO update(
-      @PathVariable String token, @Valid @RequestBody DriverRatingUpdateRequestDTO request) {
-    return service.update(token, request);
-  }
-
   @DeleteMapping("/{token}")
-  @PreAuthorize(
-      "hasAuthority('delete_driver_rating') or @sec.isDriverRatingOwner(#token, authentication)")
+  @PreAuthorize("hasAuthority('delete_driver_rating')")
   @ResponseStatus(HttpStatus.NO_CONTENT)
   public void delete(@PathVariable String token) {
     service.delete(token);
-  }
-
-  @PostMapping("/{token}/restore")
-  @PreAuthorize("hasAuthority('restore_driver_rating')")
-  public DriverRatingResponseDTO restore(@PathVariable String token) {
-    return service.restore(token);
   }
 }

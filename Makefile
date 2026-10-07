@@ -24,6 +24,7 @@ env:
 		cp $(ENV_EXAMPLE) $(ENV_FILE); \
 		sed -i "s|^VANEP_PASSWORD_PEPPER=.*|VANEP_PASSWORD_PEPPER=$$(openssl rand -hex 32)|" $(ENV_FILE); \
 		sed -i "s|^VANEP_REMEMBER_ME_KEY=.*|VANEP_REMEMBER_ME_KEY=$$(openssl rand -hex 32)|" $(ENV_FILE); \
+		sed -i "s|^VANEP_OAUTH_CLIENT_SECRET=.*|VANEP_OAUTH_CLIENT_SECRET=$$(openssl rand -hex 32)|" $(ENV_FILE); \
 		echo "=> $(ENV_FILE) criado com segredos gerados. Pronto para 'make dev'."; \
 	fi
 

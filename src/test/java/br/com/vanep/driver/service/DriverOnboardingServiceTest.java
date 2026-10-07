@@ -1,0 +1,597 @@
+package br.com.vanep.driver.service;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import br.com.vanep.city.model.CityModel;
+import br.com.vanep.driver.DriverApprovalStatus;
+import br.com.vanep.driver.DriverRepository;
+import br.com.vanep.driver.dto.DriverOnboardingStatusResponseDTO;
+import br.com.vanep.driver.dto.DriverRejectionRequestDTO;
+import br.com.vanep.driver.dto.DriverResponseDTO;
+import br.com.vanep.driver.mapper.DriverMapper;
+import br.com.vanep.driver.model.DriverModel;
+import br.com.vanep.drivercnh.model.DriverCnhModel;
+import br.com.vanep.drivercnh.repository.DriverCnhRepository;
+import br.com.vanep.driverdocument.enums.DocumentStatusEnum;
+import br.com.vanep.driverdocument.enums.DocumentTypeEnum;
+import br.com.vanep.driverdocument.model.DriverDocumentModel;
+import br.com.vanep.driverdocument.repository.DriverDocumentRepository;
+import br.com.vanep.driverservicearea.model.DriverServiceAreaModel;
+import br.com.vanep.driverservicearea.repository.DriverServiceAreaRepository;
+import br.com.vanep.media.model.MediaFileModel;
+import br.com.vanep.user.enums.UserType;
+import br.com.vanep.user.model.UserModel;
+import br.com.vanep.user.service.UserService;
+import br.com.vanep.vehicle.model.VehicleModel;
+import br.com.vanep.vehicle.repository.VehicleRepository;
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Optional;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.MessageSource;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
+
+@ExtendWith(MockitoExtension.class)
+class DriverOnboardingServiceTest {
+
+  @Mock private DriverRepository driverRepository;
+  @Mock private VehicleRepository vehicleRepository;
+  @Mock private DriverCnhRepository driverCnhRepository;
+  @Mock private DriverDocumentRepository driverDocumentRepository;
+  @Mock private DriverServiceAreaRepository driverServiceAreaRepository;
+  @Mock private UserService userService;
+  @Mock private DriverNotificationService driverNotificationService;
+  @Mock private DriverMapper mapper;
+  @Mock private MessageSource messages;
+
+  private DriverOnboardingService service;
+
+  private UserModel user;
+  private DriverModel driver;
+
+  @BeforeEach
+  void setUp() {
+    service =
+        new DriverOnboardingService(
+            driverRepository,
+            vehicleRepository,
+            driverCnhRepository,
+            driverDocumentRepository,
+            driverServiceAreaRepository,
+            userService,
+            driverNotificationService,
+            mapper,
+            messages);
+
+    lenient()
+        .when(messages.getMessage(anyString(), any(), any()))
+        .thenAnswer(inv -> inv.getArgument(0));
+
+    user = new UserModel();
+    user.setId(10L);
+    user.setToken("user-token-10");
+    user.setType(UserType.DRIVER);
+
+    driver = new DriverModel();
+    driver.setId(20L);
+    driver.setToken("driver-token-20");
+    driver.setUser(user);
+    driver.setApprovalStatus(DriverApprovalStatus.PENDING);
+    driver.setBasePrice(BigDecimal.valueOf(150.00));
+  }
+
+  private DriverDocumentModel mockDocument(DocumentTypeEnum type, boolean withFile) {
+    DriverDocumentModel doc = new DriverDocumentModel();
+    doc.setToken("doc-token-" + type.name().toLowerCase());
+    doc.setActive(true);
+    doc.setDocumentType(type);
+    doc.setStatus(DocumentStatusEnum.PENDING);
+    if (withFile) {
+      MediaFileModel file = new MediaFileModel();
+      file.setToken("media-token-" + type.name().toLowerCase());
+      doc.setFile(file);
+    }
+    return doc;
+  }
+
+  @Test
+  void getOnboardingStatusReturnsIncompleteWhenNothingConfigured() {
+    driver.setBasePrice(BigDecimal.ZERO);
+    when(userService.requireByTokenAndType("user-token-10", UserType.DRIVER)).thenReturn(user);
+    when(driverRepository.findByUserId(10L)).thenReturn(Optional.of(driver));
+    when(driverServiceAreaRepository.findByDriverId(20L)).thenReturn(List.of());
+    when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of());
+    when(driverCnhRepository.findByDriverId(20L)).thenReturn(List.of());
+    when(driverDocumentRepository.findByDriverId(20L)).thenReturn(List.of());
+
+    DriverOnboardingStatusResponseDTO status = service.getOnboardingStatus("user-token-10");
+
+    assertThat(status.approvalStatus()).isEqualTo(DriverApprovalStatus.PENDING);
+    assertThat(status.canSubmit()).isFalse();
+    assertThat(status.profileStep().completed()).isFalse();
+    assertThat(status.profileStep().pendingItems()).contains("basePrice", "city");
+    assertThat(status.vehicleStep().completed()).isFalse();
+    assertThat(status.vehicleStep().pendingItems()).contains("vehicle");
+    assertThat(status.cnhStep().completed()).isFalse();
+    assertThat(status.cnhStep().pendingItems()).contains("cnh");
+    assertThat(status.documentsStep().completed()).isFalse();
+    assertThat(status.documentsStep().missingTypes())
+        .containsExactlyInAnyOrder(
+            DocumentTypeEnum.CRLV,
+            DocumentTypeEnum.VEHICLE_INSPECTION,
+            DocumentTypeEnum.MUNICIPAL_AUTHORIZATION);
+  }
+
+  @Test
+  void getOnboardingStatusReturnsCompleteWhenAllRequirementsMet() {
+    when(userService.requireByTokenAndType("user-token-10", UserType.DRIVER)).thenReturn(user);
+    when(driverRepository.findByUserId(10L)).thenReturn(Optional.of(driver));
+
+    DriverServiceAreaModel area = new DriverServiceAreaModel();
+    area.setCity(new CityModel());
+    when(driverServiceAreaRepository.findByDriverId(20L)).thenReturn(List.of(area));
+
+    VehicleModel vehicle = new VehicleModel();
+    vehicle.setActive(true);
+    when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of(vehicle));
+
+    DriverCnhModel cnh = new DriverCnhModel();
+    cnh.setActive(true);
+    cnh.setValidUntil(LocalDate.now().plusYears(2));
+    when(driverCnhRepository.findByDriverId(20L)).thenReturn(List.of(cnh));
+
+    DriverDocumentModel crlv = mockDocument(DocumentTypeEnum.CRLV, true);
+    DriverDocumentModel inspection = mockDocument(DocumentTypeEnum.VEHICLE_INSPECTION, true);
+    DriverDocumentModel municipal = mockDocument(DocumentTypeEnum.MUNICIPAL_AUTHORIZATION, true);
+
+    when(driverDocumentRepository.findByDriverId(20L))
+        .thenReturn(List.of(crlv, inspection, municipal));
+
+    DriverOnboardingStatusResponseDTO status = service.getOnboardingStatus("user-token-10");
+
+    assertThat(status.approvalStatus()).isEqualTo(DriverApprovalStatus.PENDING);
+    assertThat(status.canSubmit()).isTrue();
+    assertThat(status.profileStep().completed()).isTrue();
+    assertThat(status.vehicleStep().completed()).isTrue();
+    assertThat(status.cnhStep().completed()).isTrue();
+    assertThat(status.documentsStep().completed()).isTrue();
+    assertThat(status.documentsStep().missingTypes()).isEmpty();
+  }
+
+  @Test
+  void getOnboardingStatusUnderReviewCannotSubmit() {
+    driver.setApprovalStatus(DriverApprovalStatus.UNDER_REVIEW);
+    Instant now = Instant.now();
+    driver.setSubmittedAt(now);
+
+    when(userService.requireByTokenAndType("user-token-10", UserType.DRIVER)).thenReturn(user);
+    when(driverRepository.findByUserId(10L)).thenReturn(Optional.of(driver));
+    when(driverServiceAreaRepository.findByDriverId(20L)).thenReturn(List.of());
+    when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of());
+    when(driverCnhRepository.findByDriverId(20L)).thenReturn(List.of());
+    when(driverDocumentRepository.findByDriverId(20L)).thenReturn(List.of());
+
+    DriverOnboardingStatusResponseDTO status = service.getOnboardingStatus("user-token-10");
+
+    assertThat(status.approvalStatus()).isEqualTo(DriverApprovalStatus.UNDER_REVIEW);
+    assertThat(status.canSubmit()).isFalse();
+    assertThat(status.submittedAt()).isEqualTo(now);
+  }
+
+  @Test
+  void submitOnboardingThrowsBadRequestWhenAlreadyUnderReviewOrApproved() {
+    driver.setApprovalStatus(DriverApprovalStatus.UNDER_REVIEW);
+    when(userService.requireByTokenAndType("user-token-10", UserType.DRIVER)).thenReturn(user);
+    when(driverRepository.findByUserId(10L)).thenReturn(Optional.of(driver));
+
+    assertThatThrownBy(() -> service.submitOnboarding("user-token-10"))
+        .isInstanceOf(ResponseStatusException.class)
+        .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+        .isEqualTo(HttpStatus.BAD_REQUEST);
+
+    driver.setApprovalStatus(DriverApprovalStatus.APPROVED);
+    assertThatThrownBy(() -> service.submitOnboarding("user-token-10"))
+        .isInstanceOf(ResponseStatusException.class)
+        .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+        .isEqualTo(HttpStatus.BAD_REQUEST);
+  }
+
+  @Test
+  void submitOnboardingThrowsUnprocessableEntityWhenVehicleMissing() {
+    when(userService.requireByTokenAndType("user-token-10", UserType.DRIVER)).thenReturn(user);
+    when(driverRepository.findByUserId(10L)).thenReturn(Optional.of(driver));
+
+    user.setAddressId(55L); // Has city via address
+    when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of());
+
+    DriverCnhModel cnh = new DriverCnhModel();
+    cnh.setActive(true);
+    cnh.setValidUntil(LocalDate.now().plusYears(1));
+    when(driverCnhRepository.findByDriverId(20L)).thenReturn(List.of(cnh));
+
+    DriverDocumentModel crlv = mockDocument(DocumentTypeEnum.CRLV, true);
+    DriverDocumentModel inspection = mockDocument(DocumentTypeEnum.VEHICLE_INSPECTION, true);
+    DriverDocumentModel municipal = mockDocument(DocumentTypeEnum.MUNICIPAL_AUTHORIZATION, true);
+    when(driverDocumentRepository.findByDriverId(20L))
+        .thenReturn(List.of(crlv, inspection, municipal));
+
+    assertThatThrownBy(() -> service.submitOnboarding("user-token-10"))
+        .isInstanceOf(ResponseStatusException.class)
+        .satisfies(
+            e -> {
+              ResponseStatusException ex = (ResponseStatusException) e;
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
+              assertThat(ex.getReason()).contains("driver.onboarding.vehicle_required");
+            });
+
+    assertThat(driver.getApprovalStatus()).isEqualTo(DriverApprovalStatus.PENDING);
+  }
+
+  @Test
+  void submitOnboardingThrowsUnprocessableEntityWhenCnhExpired() {
+    when(userService.requireByTokenAndType("user-token-10", UserType.DRIVER)).thenReturn(user);
+    when(driverRepository.findByUserId(10L)).thenReturn(Optional.of(driver));
+
+    user.setAddressId(55L);
+    VehicleModel vehicle = new VehicleModel();
+    vehicle.setActive(true);
+    when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of(vehicle));
+
+    DriverCnhModel cnh = new DriverCnhModel();
+    cnh.setActive(true);
+    cnh.setValidUntil(LocalDate.now().minusDays(1)); // Expired!
+    when(driverCnhRepository.findByDriverId(20L)).thenReturn(List.of(cnh));
+
+    DriverDocumentModel crlv = mockDocument(DocumentTypeEnum.CRLV, true);
+    DriverDocumentModel inspection = mockDocument(DocumentTypeEnum.VEHICLE_INSPECTION, true);
+    DriverDocumentModel municipal = mockDocument(DocumentTypeEnum.MUNICIPAL_AUTHORIZATION, true);
+    when(driverDocumentRepository.findByDriverId(20L))
+        .thenReturn(List.of(crlv, inspection, municipal));
+
+    assertThatThrownBy(() -> service.submitOnboarding("user-token-10"))
+        .isInstanceOf(ResponseStatusException.class)
+        .satisfies(
+            e -> {
+              ResponseStatusException ex = (ResponseStatusException) e;
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
+              assertThat(ex.getReason()).contains("driver.onboarding.cnh_expired");
+            });
+  }
+
+  @Test
+  void submitOnboardingThrowsUnprocessableEntityWhenDocumentMissing() {
+    when(userService.requireByTokenAndType("user-token-10", UserType.DRIVER)).thenReturn(user);
+    when(driverRepository.findByUserId(10L)).thenReturn(Optional.of(driver));
+
+    user.setAddressId(55L);
+    VehicleModel vehicle = new VehicleModel();
+    vehicle.setActive(true);
+    when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of(vehicle));
+
+    DriverCnhModel cnh = new DriverCnhModel();
+    cnh.setActive(true);
+    cnh.setValidUntil(LocalDate.now().plusYears(1));
+    when(driverCnhRepository.findByDriverId(20L)).thenReturn(List.of(cnh));
+
+    // CRLV and inspection uploaded with files, but MUNICIPAL_AUTHORIZATION is missing!
+    DriverDocumentModel crlv = mockDocument(DocumentTypeEnum.CRLV, true);
+    DriverDocumentModel inspection = mockDocument(DocumentTypeEnum.VEHICLE_INSPECTION, true);
+    when(driverDocumentRepository.findByDriverId(20L)).thenReturn(List.of(crlv, inspection));
+
+    assertThatThrownBy(() -> service.submitOnboarding("user-token-10"))
+        .isInstanceOf(ResponseStatusException.class)
+        .satisfies(
+            e -> {
+              ResponseStatusException ex = (ResponseStatusException) e;
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
+            });
+  }
+
+  @Test
+  void submitOnboardingSuccessTransitionsToUnderReview() {
+    driver.setApprovalStatus(DriverApprovalStatus.REJECTED);
+    driver.setRejectionReason("Correção necessária");
+
+    when(userService.requireByTokenAndType("user-token-10", UserType.DRIVER)).thenReturn(user);
+    when(driverRepository.findByUserId(10L)).thenReturn(Optional.of(driver));
+    when(driverRepository.save(any(DriverModel.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    user.setAddressId(55L);
+    VehicleModel vehicle = new VehicleModel();
+    vehicle.setActive(true);
+    when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of(vehicle));
+
+    DriverCnhModel cnh = new DriverCnhModel();
+    cnh.setActive(true);
+    cnh.setValidUntil(LocalDate.now().plusYears(1));
+    when(driverCnhRepository.findByDriverId(20L)).thenReturn(List.of(cnh));
+
+    DriverDocumentModel crlv = mockDocument(DocumentTypeEnum.CRLV, true);
+    DriverDocumentModel inspection = mockDocument(DocumentTypeEnum.VEHICLE_INSPECTION, true);
+    DriverDocumentModel municipal = mockDocument(DocumentTypeEnum.MUNICIPAL_AUTHORIZATION, true);
+    when(driverDocumentRepository.findByDriverId(20L))
+        .thenReturn(List.of(crlv, inspection, municipal));
+
+    DriverOnboardingStatusResponseDTO response = service.submitOnboarding("user-token-10");
+
+    assertThat(response.approvalStatus()).isEqualTo(DriverApprovalStatus.UNDER_REVIEW);
+    assertThat(response.canSubmit()).isFalse();
+    assertThat(response.submittedAt()).isNotNull();
+    assertThat(response.rejectionReason()).isNull();
+
+    verify(driverRepository).save(driver);
+    assertThat(driver.getApprovalStatus()).isEqualTo(DriverApprovalStatus.UNDER_REVIEW);
+    assertThat(driver.getSubmittedAt()).isNotNull();
+    assertThat(driver.getRejectionReason()).isNull();
+  }
+
+  @Test
+  void getOnboardingStatusReturnsIncompleteWhenDocumentHasNoFileUploaded() {
+    when(userService.requireByTokenAndType("user-token-10", UserType.DRIVER)).thenReturn(user);
+    when(driverRepository.findByUserId(10L)).thenReturn(Optional.of(driver));
+
+    DriverServiceAreaModel area = new DriverServiceAreaModel();
+    area.setCity(new CityModel());
+    when(driverServiceAreaRepository.findByDriverId(20L)).thenReturn(List.of(area));
+
+    VehicleModel vehicle = new VehicleModel();
+    vehicle.setActive(true);
+    when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of(vehicle));
+
+    DriverCnhModel cnh = new DriverCnhModel();
+    cnh.setActive(true);
+    cnh.setValidUntil(LocalDate.now().plusYears(2));
+    when(driverCnhRepository.findByDriverId(20L)).thenReturn(List.of(cnh));
+
+    // CRLV exists but with no uploaded file (file == null)
+    DriverDocumentModel crlv = mockDocument(DocumentTypeEnum.CRLV, false);
+    DriverDocumentModel inspection = mockDocument(DocumentTypeEnum.VEHICLE_INSPECTION, true);
+    DriverDocumentModel municipal = mockDocument(DocumentTypeEnum.MUNICIPAL_AUTHORIZATION, true);
+
+    when(driverDocumentRepository.findByDriverId(20L))
+        .thenReturn(List.of(crlv, inspection, municipal));
+
+    DriverOnboardingStatusResponseDTO status = service.getOnboardingStatus("user-token-10");
+
+    assertThat(status.canSubmit()).isFalse();
+    assertThat(status.documentsStep().completed()).isFalse();
+    assertThat(status.documentsStep().missingTypes()).containsExactly(DocumentTypeEnum.CRLV);
+  }
+
+  @Test
+  void submitOnboardingThrowsUnprocessableEntityWhenDocumentHasNoFileUploaded() {
+    when(userService.requireByTokenAndType("user-token-10", UserType.DRIVER)).thenReturn(user);
+    when(driverRepository.findByUserId(10L)).thenReturn(Optional.of(driver));
+
+    user.setAddressId(55L);
+    VehicleModel vehicle = new VehicleModel();
+    vehicle.setActive(true);
+    when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of(vehicle));
+
+    DriverCnhModel cnh = new DriverCnhModel();
+    cnh.setActive(true);
+    cnh.setValidUntil(LocalDate.now().plusYears(1));
+    when(driverCnhRepository.findByDriverId(20L)).thenReturn(List.of(cnh));
+
+    // CRLV exists but file is null
+    DriverDocumentModel crlv = mockDocument(DocumentTypeEnum.CRLV, false);
+    DriverDocumentModel inspection = mockDocument(DocumentTypeEnum.VEHICLE_INSPECTION, true);
+    DriverDocumentModel municipal = mockDocument(DocumentTypeEnum.MUNICIPAL_AUTHORIZATION, true);
+    when(driverDocumentRepository.findByDriverId(20L))
+        .thenReturn(List.of(crlv, inspection, municipal));
+
+    assertThatThrownBy(() -> service.submitOnboarding("user-token-10"))
+        .isInstanceOf(ResponseStatusException.class)
+        .satisfies(
+            e -> {
+              ResponseStatusException ex = (ResponseStatusException) e;
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
+              assertThat(ex.getReason()).contains("driver.onboarding.documents_missing");
+            });
+  }
+
+  @Test
+  void approveDriverSuccessTransitionsToApproved() {
+    driver.setApprovalStatus(DriverApprovalStatus.UNDER_REVIEW);
+    driver.setActive(false);
+
+    UserModel adminUser = new UserModel();
+    adminUser.setId(99L);
+    adminUser.setToken("admin-uid");
+
+    when(userService.requireByToken("admin-uid")).thenReturn(adminUser);
+    when(driverRepository.findByToken("driver-token-20")).thenReturn(Optional.of(driver));
+    when(driverRepository.save(any(DriverModel.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    DriverResponseDTO expectedResponse =
+        new DriverResponseDTO(
+            "driver-token-20",
+            "Driver",
+            "d@v.com",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            BigDecimal.valueOf(150),
+            null,
+            null,
+            null,
+            null,
+            DriverApprovalStatus.APPROVED,
+            true,
+            false,
+            null,
+            null);
+    when(mapper.toResponse(driver)).thenReturn(expectedResponse);
+
+    DriverResponseDTO response = service.approve("driver-token-20", "admin-uid");
+
+    assertThat(response).isEqualTo(expectedResponse);
+    assertThat(driver.getApprovalStatus()).isEqualTo(DriverApprovalStatus.APPROVED);
+    assertThat(driver.isActive()).isTrue();
+    assertThat(driver.getReviewedAt()).isNotNull();
+    assertThat(driver.getReviewedBy()).isEqualTo(adminUser);
+    verify(driverRepository).save(driver);
+    verify(driverNotificationService).notifyApproval(driver);
+  }
+
+  @Test
+  void approveDriverThrowsNotFoundWhenDriverMissing() {
+    when(userService.requireByToken("admin-uid")).thenReturn(new UserModel());
+    when(driverRepository.findByToken("unknown")).thenReturn(Optional.empty());
+
+    assertThatThrownBy(() -> service.approve("unknown", "admin-uid"))
+        .isInstanceOf(ResponseStatusException.class)
+        .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+        .isEqualTo(HttpStatus.NOT_FOUND);
+  }
+
+  @Test
+  void approveDriverThrowsBadRequestWhenNotUnderReview() {
+    driver.setApprovalStatus(DriverApprovalStatus.PENDING);
+    when(userService.requireByToken("admin-uid")).thenReturn(new UserModel());
+    when(driverRepository.findByToken("driver-token-20")).thenReturn(Optional.of(driver));
+
+    assertThatThrownBy(() -> service.approve("driver-token-20", "admin-uid"))
+        .isInstanceOf(ResponseStatusException.class)
+        .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+        .isEqualTo(HttpStatus.BAD_REQUEST);
+  }
+
+  @Test
+  void rejectDriverSuccessTransitionsToRejectedWithReason() {
+    driver.setApprovalStatus(DriverApprovalStatus.UNDER_REVIEW);
+
+    UserModel adminUser = new UserModel();
+    adminUser.setId(99L);
+    adminUser.setToken("admin-uid");
+
+    when(userService.requireByToken("admin-uid")).thenReturn(adminUser);
+    when(driverRepository.findByToken("driver-token-20")).thenReturn(Optional.of(driver));
+    when(driverRepository.save(any(DriverModel.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    DriverResponseDTO expectedResponse =
+        new DriverResponseDTO(
+            "driver-token-20",
+            "Driver",
+            "d@v.com",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            BigDecimal.valueOf(150),
+            null,
+            null,
+            null,
+            null,
+            DriverApprovalStatus.REJECTED,
+            true,
+            false,
+            null,
+            null);
+    when(mapper.toResponse(driver)).thenReturn(expectedResponse);
+
+    DriverRejectionRequestDTO request = new DriverRejectionRequestDTO("Foto da CNH ilegível");
+    DriverResponseDTO response = service.reject("driver-token-20", request, "admin-uid");
+
+    assertThat(response).isEqualTo(expectedResponse);
+    assertThat(driver.getApprovalStatus()).isEqualTo(DriverApprovalStatus.REJECTED);
+    assertThat(driver.getRejectionReason()).isEqualTo("Foto da CNH ilegível");
+    assertThat(driver.getReviewedAt()).isNotNull();
+    assertThat(driver.getReviewedBy()).isEqualTo(adminUser);
+    verify(driverRepository).save(driver);
+    verify(driverNotificationService).notifyRejection(driver, "Foto da CNH ilegível");
+  }
+
+  @Test
+  void findPendingDriversReturnsMappedPage() {
+    Pageable pageable = PageRequest.of(0, 10);
+    DriverModel pendingDriver = new DriverModel();
+    pendingDriver.setId(50L);
+    pendingDriver.setApprovalStatus(DriverApprovalStatus.UNDER_REVIEW);
+
+    DriverResponseDTO responseDto =
+        new DriverResponseDTO(
+            "pending-token",
+            "Pending Driver",
+            "p@v.com",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            BigDecimal.valueOf(100),
+            null,
+            null,
+            null,
+            null,
+            DriverApprovalStatus.UNDER_REVIEW,
+            true,
+            false,
+            null,
+            null);
+
+    Page<DriverModel> page = new PageImpl<>(List.of(pendingDriver), pageable, 1);
+    when(driverRepository.findByApprovalStatusWithUser(DriverApprovalStatus.UNDER_REVIEW, pageable))
+        .thenReturn(page);
+    when(mapper.toResponse(pendingDriver)).thenReturn(responseDto);
+
+    Page<DriverResponseDTO> result = service.findPendingDrivers(pageable);
+
+    assertThat(result).isNotNull();
+    assertThat(result.getTotalElements()).isEqualTo(1);
+    assertThat(result.getContent()).containsExactly(responseDto);
+    verify(driverRepository)
+        .findByApprovalStatusWithUser(DriverApprovalStatus.UNDER_REVIEW, pageable);
+  }
+
+  @Test
+  void rejectDriverThrowsNotFoundWhenDriverMissing() {
+    when(userService.requireByToken("admin-uid")).thenReturn(new UserModel());
+    when(driverRepository.findByToken("unknown")).thenReturn(Optional.empty());
+
+    DriverRejectionRequestDTO request = new DriverRejectionRequestDTO("Motivo qualquer");
+    assertThatThrownBy(() -> service.reject("unknown", request, "admin-uid"))
+        .isInstanceOf(ResponseStatusException.class)
+        .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+        .isEqualTo(HttpStatus.NOT_FOUND);
+  }
+
+  @Test
+  void rejectDriverThrowsBadRequestWhenNotUnderReview() {
+    driver.setApprovalStatus(DriverApprovalStatus.APPROVED);
+    when(userService.requireByToken("admin-uid")).thenReturn(new UserModel());
+    when(driverRepository.findByToken("driver-token-20")).thenReturn(Optional.of(driver));
+
+    DriverRejectionRequestDTO request = new DriverRejectionRequestDTO("Motivo qualquer");
+    assertThatThrownBy(() -> service.reject("driver-token-20", request, "admin-uid"))
+        .isInstanceOf(ResponseStatusException.class)
+        .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+        .isEqualTo(HttpStatus.BAD_REQUEST);
+  }
+}
