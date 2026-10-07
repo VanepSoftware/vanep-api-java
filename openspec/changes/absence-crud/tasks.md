@@ -74,14 +74,14 @@
 > Depends on: Phase 4 | Parallel with: —
 > Order: test → request DTO → controller → response DTO → mapper
 
-- [ ] 5.1 Branch `feat/absence-client-http` de dentro de `feat/absence-service`
-- [ ] 5.2 MockMvc: 401; JWT driver → 403; cliente no próprio vínculo `ACTIVE` + próprio dependente `OUTBOUND` → 201; repetir → 200 mesmo token; `BOTH` em `FULLTIME` → 2 itens; `BOTH` em `MORNING` → 400; vínculo `INACTIVE` → 409; dependente de outro cliente → 403/404; GET today; DELETE 204; DELETE com trip `IN_PROGRESS` → 409
-- [ ] 5.3 Teste nomeado: a resposta **não contém** `id` numérico (regra 13)
-- [ ] 5.4 `AbsenceClientRequestDTO` com `dependentToken` e `scope` (`AbsenceScope` **só no DTO**: `OUTBOUND`, `RETURN`, `BOTH`), Bean Validation, `@Valid` no controller (regras 10 e 11)
-- [ ] 5.5 `AbsenceController` fino em `/api/client-drivers/{linkToken}/absences` (regra 7)
-- [ ] 5.6 `AbsenceResponseDTO` + `AbsenceMapper`
-- [ ] 5.7 `SecurityConfig` não deixa a rota pública (regras 20–21)
-- [ ] 5.8 `make lint` + `./mvnw verify`; PR `--base feat/absence-service`
+- [x] 5.1 Branch `feat/absence-client-http` de dentro de `feat/absence-service`
+- [x] 5.2 MockMvc: 401; JWT driver → 403; cliente no próprio vínculo `ACTIVE` + próprio dependente `OUTBOUND` → 201; repetir → 200 mesmo token; `BOTH` em `FULLTIME` → 2 itens; `BOTH` em `MORNING` → 400; vínculo `INACTIVE` → 409; dependente de outro cliente → 403/404; GET today; DELETE 204; DELETE com trip `IN_PROGRESS` → 409
+- [x] 5.3 Teste nomeado: a resposta **não contém** `id` numérico (regra 13)
+- [x] 5.4 `AbsenceClientRequestDTO` com `dependentToken` e `scope` (`AbsenceScope` **só no DTO**: `OUTBOUND`, `RETURN`, `BOTH`), Bean Validation, `@Valid` no controller (regras 10 e 11)
+- [x] 5.5 `AbsenceController` fino em `/api/client-drivers/{linkToken}/absences` (regra 7)
+- [x] 5.6 `AbsenceResponseDTO` + `AbsenceMapper`
+- [x] 5.7 `SecurityConfig` não deixa a rota pública (regras 20–21) — `/api/**` autenticado + `@PreAuthorize("hasAuthority('report_absence')")`
+- [x] 5.8 `./mvnw verify -Dspotless.check.skip=true`: **1381 testes, JaCoCo ok, BUILD SUCCESS**. PR `--base feat/absence-service`
 
 ## 6. Phase 6 — HTTP de não comparecimento (PR 6)
 
