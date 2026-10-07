@@ -1,5 +1,6 @@
 package br.com.vanep.auth.security;
 
+import br.com.vanep.assistant.enums.AssistantStatus;
 import br.com.vanep.assistant.repository.AssistantRepository;
 import br.com.vanep.client.repository.ClientRepository;
 import br.com.vanep.clientdriver.repository.ClientDriverRepository;
@@ -137,6 +138,32 @@ public class SecurityEvaluator {
                 tripRepository
                     .findDriverUserTokenByTripToken(token)
                     .map(driverUserToken -> driverUserToken.equals(uid)))
+        .orElse(false);
+  }
+
+  public boolean isTripOperator(String tripToken, Authentication authentication) {
+    return SecurityHelper.getCallerUid(authentication)
+        .flatMap(
+            uid ->
+                tripRepository
+                    .findByToken(tripToken)
+                    .map(
+                        trip -> {
+                          if (uid.equals(trip.getDriver().getUser().getToken())) {
+                            return true;
+                          }
+                          return assistantRepository
+                              .findByUserToken(uid)
+                              .filter(assistant -> assistant.getStatus() == AssistantStatus.ACTIVE)
+                              .filter(assistant -> assistant.getDriver() != null)
+                              .map(
+                                  assistant ->
+                                      assistant
+                                          .getDriver()
+                                          .getId()
+                                          .equals(trip.getDriver().getId()))
+                              .orElse(false);
+                        }))
         .orElse(false);
   }
 
