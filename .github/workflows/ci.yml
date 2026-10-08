@@ -18,6 +18,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # 2 commits: HEAD^1 é a main antes deste PR/merge, a base da checagem das migrations.
+          fetch-depth: 2
+
+      - name: Numeração das migrations (sem versão repetida nem atrás da main)
+        run: bash scripts/check-migrations.sh HEAD^1
 
       - name: Set up JDK 25
         uses: actions/setup-java@v4
