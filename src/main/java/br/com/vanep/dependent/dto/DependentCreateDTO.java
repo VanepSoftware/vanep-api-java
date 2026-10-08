@@ -1,7 +1,7 @@
 package br.com.vanep.dependent.dto;
 
 import br.com.vanep.address.dto.DependentAddressRequestDTO;
-import br.com.vanep.shared.enums.Shift;
+import br.com.vanep.shared.enums.SchoolShift;
 import br.com.vanep.user.enums.Gender;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
@@ -37,7 +37,7 @@ public class DependentCreateDTO {
 
   private Boolean isDefault;
 
-  private Shift shift;
+  private SchoolShift shift;
 
   private String schoolToken;
 
