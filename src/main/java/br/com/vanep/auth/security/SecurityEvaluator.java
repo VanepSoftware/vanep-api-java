@@ -22,6 +22,8 @@ public class SecurityEvaluator {
   private final ClientRatingRepository clientRatingRepository;
   private final DriverDocumentRepository driverDocumentRepository;
   private final TripRepository tripRepository;
+  private final br.com.vanep.stopchange.repository.StopChangeRequestRepository
+      stopChangeRequestRepository;
 
   public SecurityEvaluator(
       DriverRepository driverRepository,
@@ -31,7 +33,8 @@ public class SecurityEvaluator {
       DriverRatingRepository driverRatingRepository,
       ClientRatingRepository clientRatingRepository,
       DriverDocumentRepository driverDocumentRepository,
-      TripRepository tripRepository) {
+      TripRepository tripRepository,
+      br.com.vanep.stopchange.repository.StopChangeRequestRepository stopChangeRequestRepository) {
     this.driverRepository = driverRepository;
     this.clientRepository = clientRepository;
     this.vehicleRepository = vehicleRepository;
@@ -40,6 +43,7 @@ public class SecurityEvaluator {
     this.clientRatingRepository = clientRatingRepository;
     this.driverDocumentRepository = driverDocumentRepository;
     this.tripRepository = tripRepository;
+    this.stopChangeRequestRepository = stopChangeRequestRepository;
   }
 
   public boolean isDriverOwner(String token, Authentication authentication) {
@@ -120,5 +124,30 @@ public class SecurityEvaluator {
                     .findDriverUserTokenByTripToken(token)
                     .map(driverUserToken -> driverUserToken.equals(uid)))
         .orElse(false);
+  }
+
+  public boolean isStopChangeRequestClient(String token, Authentication authentication) {
+    return SecurityHelper.getCallerUid(authentication)
+        .flatMap(
+            uid ->
+                stopChangeRequestRepository
+                    .findRequesterUserTokenByToken(token)
+                    .map(requesterUserToken -> requesterUserToken.equals(uid)))
+        .orElse(false);
+  }
+
+  public boolean isStopChangeRequestDriver(String token, Authentication authentication) {
+    return SecurityHelper.getCallerUid(authentication)
+        .flatMap(
+            uid ->
+                stopChangeRequestRepository
+                    .findDriverUserTokenByToken(token)
+                    .map(driverUserToken -> driverUserToken.equals(uid)))
+        .orElse(false);
+  }
+
+  public boolean isStopChangeRequestOwner(String token, Authentication authentication) {
+    return isStopChangeRequestClient(token, authentication)
+        || isStopChangeRequestDriver(token, authentication);
   }
 }

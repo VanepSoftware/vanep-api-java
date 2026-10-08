@@ -356,7 +356,9 @@ class DataSeederTest {
             PermissionEnum.FINISH_TRIP.value(),
             PermissionEnum.CREATE_CLIENT_RATING.value(),
             PermissionEnum.LIST_CLIENT_RATINGS.value(),
-            PermissionEnum.SHOW_CLIENT_RATING.value());
+            PermissionEnum.SHOW_CLIENT_RATING.value(),
+            PermissionEnum.APPROVE_STOP_CHANGE.value(),
+            PermissionEnum.REJECT_STOP_CHANGE.value());
     assertThat(driverRole.getRolePermission()).isEqualTo(captor.getValue());
   }
 }

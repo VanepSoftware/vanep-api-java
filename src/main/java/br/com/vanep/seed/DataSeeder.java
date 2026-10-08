@@ -194,6 +194,8 @@ public class DataSeeder implements ApplicationRunner {
     List<String> permissions = new java.util.ArrayList<>(PermissionEnum.crudFor("dependents"));
     permissions.add(PermissionEnum.LIST_DRIVERS.value());
     permissions.add(PermissionEnum.SHOW_DRIVER.value());
+    permissions.add(PermissionEnum.REQUEST_STOP_CHANGE.value());
+    permissions.add(PermissionEnum.CANCEL_STOP_CHANGE.value());
     return List.copyOf(permissions);
   }
 
@@ -241,11 +243,14 @@ public class DataSeeder implements ApplicationRunner {
               PermissionEnum.FINISH_TRIP.value(),
               PermissionEnum.CREATE_CLIENT_RATING.value(),
               PermissionEnum.LIST_CLIENT_RATINGS.value(),
-              PermissionEnum.SHOW_CLIENT_RATING.value()));
+              PermissionEnum.SHOW_CLIENT_RATING.value(),
+              PermissionEnum.APPROVE_STOP_CHANGE.value(),
+              PermissionEnum.REJECT_STOP_CHANGE.value()));
       bundle = rolePermissions.save(bundle);
       driverRole.setRolePermission(bundle);
       roles.save(driverRole);
-      log.info("Seed: DRIVER bundle created with assistant, CNH, Document and Trip permissions.");
+      log.info(
+          "Seed: DRIVER bundle created with assistant, CNH, Document, Trip and Stop Change permissions.");
     }
   }
 

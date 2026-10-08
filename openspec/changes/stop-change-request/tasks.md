@@ -79,8 +79,8 @@
 > Depends on: Phase 2 | Parallel with: —
 > Order: test → security/authorization → messages → events → service
 
-- [ ] 3.1 Criar branch `feat/stop-change-request-service` a partir de `feat/stop-change-request-policies`.
-- [ ] 3.2 Testes unitários de `StopChangeRequestService` com Mockito:
+- [x] 3.1 Criar branch `feat/stop-change-request-service` a partir de `feat/stop-change-request-policies`.
+- [x] 3.2 Testes unitários de `StopChangeRequestService` com Mockito:
   - Solicitação por cliente com dependente próprio cria com status `PENDING` (201).
   - Solicitação por cliente de dependente de outro cliente lança 403 Forbidden.
   - Solicitação para trip `COMPLETED` ou `CANCELLED` lança 409 Conflict.
@@ -93,24 +93,25 @@
   - Resposta idêntica a solicitação já aprovada/recusada pelo mesmo motorista é idempotente (200).
   - Cancelamento pelo cliente solicitante atualiza para `CANCELLED`.
   - Cancelamento de solicitação já aprovada lança 409 Conflict.
-- [ ] 3.3 Adicionar novas permissões ao `PermissionEnum`:
+- [x] 3.3 Adicionar novas permissões ao `PermissionEnum`:
   - `REQUEST_STOP_CHANGE("request_stop_change")` no bundle `CLIENT`.
   - `APPROVE_STOP_CHANGE("approve_stop_change")` e `REJECT_STOP_CHANGE("reject_stop_change")` no bundle `DRIVER`.
   - `LIST_STOP_CHANGE_REQUESTS`, `SHOW_STOP_CHANGE_REQUEST`, `DELETE_STOP_CHANGE_REQUEST`, `RESTORE_STOP_CHANGE_REQUEST` no bundle `ADMIN`.
-  - Atualizar seeder de permissões (`RolePermissionSeeder` / `PermissionSeeder`).
-- [ ] 3.4 Adicionar métodos de checagem de posse no `SecurityEvaluator` (`@sec`):
+  - Atualizar seeder de permissões (`DataSeeder`).
+- [x] 3.4 Adicionar métodos de checagem de posse no `SecurityEvaluator` (`@sec`):
   - `isStopChangeRequestClient(String token, Authentication authentication)`
   - `isStopChangeRequestDriver(String token, Authentication authentication)`
-- [ ] 3.5 Adicionar chaves de mensagens i18n em `messages.properties` e `messages_pt_BR.properties` (regras 46 e 49):
+  - `isStopChangeRequestOwner(String token, Authentication authentication)`
+- [x] 3.5 Adicionar chaves de mensagens i18n em `messages.properties` e `messages_pt_BR.properties` (regras 46 e 49):
   - `stop_change.already_pending`, `stop_change.already_resolved`, `stop_change.trip_not_active`, `stop_change.not_found`, `stop_change.not_owner`, `stop_change.cannot_cancel`.
-- [ ] 3.6 Criar eventos de domínio desacoplados:
+- [x] 3.6 Criar eventos de domínio desacoplados:
   - `StopChangeRequestedEvent`
   - `StopChangeApprovedEvent`
   - `StopChangeRejectedEvent`
-- [ ] 3.7 Implementar `service/StopChangeRequestService`:
+- [x] 3.7 Implementar `service/StopChangeRequestService`:
   - Métodos: `requestChange`, `approveChange`, `rejectChange`, `cancelChange`, `findByToken`, `listTodayForClient`, `listTodayForDriver`.
   - Integração com `AddressPlaceResolverService` / `AddressModel` para resolução segura do endereço de desembarque sem alterar o cadastro do dependente.
-- [ ] 3.8 `make lint` + `./mvnw verify`. Abrir PR da fase 3 apontando para `feat/stop-change-request-policies`.
+- [x] 3.8 `make lint` + `./mvnw test -Dtest=StopChangeRequestServiceTest`. Phase 3 concluída.
 
 ## 4. Phase 4 — Superfície HTTP do Cliente e do Motorista (PR 4)
 

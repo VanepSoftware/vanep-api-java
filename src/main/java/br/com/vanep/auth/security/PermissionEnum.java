@@ -91,7 +91,15 @@ public enum PermissionEnum {
   CREATE_TRIP("create_trip"),
   UPDATE_TRIP("update_trip"),
   DELETE_TRIP("delete_trip"),
-  RESTORE_TRIP("restore_trip");
+  RESTORE_TRIP("restore_trip"),
+  REQUEST_STOP_CHANGE("request_stop_change"),
+  CANCEL_STOP_CHANGE("cancel_stop_change"),
+  APPROVE_STOP_CHANGE("approve_stop_change"),
+  REJECT_STOP_CHANGE("reject_stop_change"),
+  LIST_STOP_CHANGE_REQUESTS("list_stop_change_requests"),
+  SHOW_STOP_CHANGE_REQUEST("show_stop_change_request"),
+  DELETE_STOP_CHANGE_REQUEST("delete_stop_change_request"),
+  RESTORE_STOP_CHANGE_REQUEST("restore_stop_change_request");
 
   private final String value;
 
