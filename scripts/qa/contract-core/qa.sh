@@ -269,5 +269,38 @@ check S24 "V56 left the other shifts alone" AFTERNOON "$(sql "select shift from 
 check S25 "trip.shift and dependent.shift are documented" "yes" \
   "$(sql "select case when col_description('trip'::regclass, (select attnum from pg_attribute where attrelid = 'trip'::regclass and attname = 'shift')) is not null and col_description('dependent'::regclass, (select attnum from pg_attribute where attrelid = 'dependent'::regclass and attname = 'shift')) is not null then 'yes' else 'no' end")"
 
+table "V57: schedule, schedule_slot and unlinked_passenger (database checks)"
+NEW_SCHEDULE="insert into schedule default values"
+SLOT="insert into schedule_slot (schedule_id, weekday, leg, shift, window_start, window_end) values"
+LAST_SCHEDULE="(select max(id) from schedule)"
+check_sql_rejected D1 "the same weekday and leg twice in one schedule" schedule_slot_weekday_leg_active_key \
+  "$NEW_SCHEDULE; $SLOT ($LAST_SCHEDULE, 'MONDAY', 'OUTBOUND', 'MORNING', '06:40', null); $SLOT ($LAST_SCHEDULE, 'MONDAY', 'OUTBOUND', 'MORNING', '07:00', null)"
+check_sql_accepted D2 "outbound and return on the same weekday" \
+  "$NEW_SCHEDULE; $SLOT ($LAST_SCHEDULE, 'MONDAY', 'OUTBOUND', 'MORNING', '06:40', null); $SLOT ($LAST_SCHEDULE, 'MONDAY', 'RETURN', 'AFTERNOON', '12:30', null)"
+check_sql_accepted D3 "a soft-deleted slot frees its weekday and leg" \
+  "$NEW_SCHEDULE; $SLOT ($LAST_SCHEDULE, 'MONDAY', 'OUTBOUND', 'MORNING', '06:40', null); update schedule_slot set deleted_at = now() where schedule_id = $LAST_SCHEDULE; $SLOT ($LAST_SCHEDULE, 'MONDAY', 'OUTBOUND', 'MORNING', '07:00', null)"
+check_sql_rejected D4 "window end before its start" schedule_slot_window_check \
+  "$NEW_SCHEDULE; $SLOT ($LAST_SCHEDULE, 'MONDAY', 'OUTBOUND', 'MORNING', '07:00', '06:50')"
+check_sql_rejected D5 "window end equal to its start" schedule_slot_window_check \
+  "$NEW_SCHEDULE; $SLOT ($LAST_SCHEDULE, 'MONDAY', 'OUTBOUND', 'MORNING', '07:00', '07:00')"
+check_sql_accepted D6 "window without an end" \
+  "$NEW_SCHEDULE; $SLOT ($LAST_SCHEDULE, 'MONDAY', 'RETURN', 'AFTERNOON', '12:30', null)"
+check_sql_rejected D7 "a slot that points to no schedule" schedule_slot_schedule_id_fkey \
+  "$SLOT (-1, 'MONDAY', 'OUTBOUND', 'MORNING', '06:40', null)"
+PASSENGER="insert into unlinked_passenger (token, driver_id, name, school_id, school_shift, address_id, schedule_id) select"
+DRIVER_ID="(select min(id) from driver)"
+SCHOOL_ID="(select min(id) from school)"
+NEW_ADDRESS="insert into address (token, city_id, street, zip_code) select substr(md5(random()::text), 1, 25), min(id), 'Rua QA', '01001000' from city"
+LAST_ADDRESS="(select max(id) from address)"
+check_sql_rejected D8 "two unlinked passengers sharing one schedule" unlinked_passenger_schedule_id_active_key \
+  "$NEW_SCHEDULE; $NEW_ADDRESS; $PASSENGER 'qap1', $DRIVER_ID, 'A', $SCHOOL_ID, 'MORNING', $LAST_ADDRESS, $LAST_SCHEDULE; $NEW_ADDRESS; $PASSENGER 'qap2', $DRIVER_ID, 'B', $SCHOOL_ID, 'MORNING', $LAST_ADDRESS, $LAST_SCHEDULE"
+check_sql_rejected D9 "two unlinked passengers sharing one address" unlinked_passenger_address_id_active_key \
+  "$NEW_ADDRESS; $NEW_SCHEDULE; $PASSENGER 'qap1', $DRIVER_ID, 'A', $SCHOOL_ID, 'MORNING', $LAST_ADDRESS, $LAST_SCHEDULE; $NEW_SCHEDULE; $PASSENGER 'qap2', $DRIVER_ID, 'B', $SCHOOL_ID, 'MORNING', $LAST_ADDRESS, $LAST_SCHEDULE"
+check_sql_accepted D10 "a soft-deleted passenger frees its schedule and address" \
+  "$NEW_ADDRESS; $NEW_SCHEDULE; $PASSENGER 'qap1', $DRIVER_ID, 'A', $SCHOOL_ID, 'MORNING', $LAST_ADDRESS, $LAST_SCHEDULE; update unlinked_passenger set deleted_at = now() where token = 'qap1'; $PASSENGER 'qap2', $DRIVER_ID, 'B', $SCHOOL_ID, 'MORNING', $LAST_ADDRESS, $LAST_SCHEDULE"
+check_sql_rejected D11 "two live passengers with the same token" unlinked_passenger_token_active_key \
+  "$NEW_ADDRESS; $NEW_SCHEDULE; $PASSENGER 'qap1', $DRIVER_ID, 'A', $SCHOOL_ID, 'MORNING', $LAST_ADDRESS, $LAST_SCHEDULE; $NEW_ADDRESS; $NEW_SCHEDULE; $PASSENGER 'qap1', $DRIVER_ID, 'B', $SCHOOL_ID, 'MORNING', $LAST_ADDRESS, $LAST_SCHEDULE"
+check D12 "the rolled-back checks left no passenger behind" 0 "$(count unlinked_passenger)"
+
 echo
 echo "ALL PASSED: $PASSED scenarios"
