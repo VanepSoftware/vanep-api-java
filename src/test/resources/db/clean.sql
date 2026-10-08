@@ -8,6 +8,7 @@ delete from password_reset_token;
 delete from email_verification_token;
 delete from assistant_invite;
 delete from assistant;
+delete from stop_change_request;
 delete from trip;
 delete from driver_service_area;
 delete from driver_rating;
