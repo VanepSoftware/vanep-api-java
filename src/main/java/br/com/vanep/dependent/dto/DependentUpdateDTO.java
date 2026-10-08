@@ -1,7 +1,7 @@
 package br.com.vanep.dependent.dto;
 
 import br.com.vanep.address.dto.DependentAddressRequestDTO;
-import br.com.vanep.shared.enums.Shift;
+import br.com.vanep.shared.enums.SchoolShift;
 import br.com.vanep.user.enums.Gender;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
@@ -21,7 +21,7 @@ public record DependentUpdateDTO(
         email,
     JsonNullable<Boolean> isSelf,
     JsonNullable<Boolean> isDefault,
-    JsonNullable<Shift> shift,
+    JsonNullable<SchoolShift> shift,
     JsonNullable<@Valid DependentAddressRequestDTO> address,
     JsonNullable<String> schoolToken) {
 
