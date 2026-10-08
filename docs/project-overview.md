@@ -118,8 +118,23 @@ Sem código formatado segundo o Spotless, o **CI falha**.
 |-----------|-----------|
 | [README](../README.md) | Como correr, Docker, perfis Spring, troubleshooting |
 | `docs/project-overview.md` (este ficheiro) | Filosofia do repo, convenções, expectativas de contribuição |
+| `openspec/changes/absence-crud/` | Operação do dia — **Avisar ausência** (ida, volta, ida e volta) e não comparecimento (issue #160) |
 
 Sugestão: para decisões maiores (stack, segurança, modelo de dados), considerar **ADRs** em `docs/adr/` no futuro, se o time quiser histórico explícito.
+
+---
+
+## Operação do dia — ausência (overview de produto)
+
+Na tela de detalhe da van o responsável não marca um booleano “não vou o dia inteiro”. Ele escolhe **Avisar ausência**, com três escopos que valem **só para o dia corrente** (RN-19):
+
+- **Ida e volta** — o aluno não usa a van em nenhum trecho; o backend grava dois fatos (ida e volta).
+- **Só ida** — casa → escola some da rota de hoje; a volta continua prevista.
+- **Só volta** — escola → casa some; a ida continua prevista.
+
+O motorista ou o assistente, na trip em andamento, registra **não comparecimento** daquele trecho (um só), com motivo, depois da tolerância de espera. Em ambos os casos o aluno sai da rota daquele trecho; contrato e cadastro do aluno não mudam.
+
+O desenho completo (schema, autorização, desfazer, notificações e pilha de PRs) está na change OpenSpec `absence-crud`.
 
 ---
 
