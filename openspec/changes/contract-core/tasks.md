@@ -146,13 +146,13 @@
 > Depends on: PR 5 | Parallel with: —
 > Order: test → controller
 
-- [ ] 6.1 Criar branch `feat/contract-core-contract-http` de dentro da branch do PR 5
-- [ ] 6.2 Testes MockMvc com segurança: sem JWT → 401; admin cria → 201; cliente cria → 403; parte lê → 200; outro cliente lê → 403; parte lista os contratos do vínculo → 200; motorista faz `PATCH` → 403; admin faz `PATCH` `ENDED` → 200; `DELETE` → 204 e some da listagem; `restore` → 200; corpo sem `endsOn` → 400; slot sem `shift` → 400; `dueDay = 31`, `installments = 13` e `totalAmount = 0` → 400 com a mensagem da chave (D5); `endsOn` igual a `startsOn` → 422
-- [ ] 6.3 **Teste nomeado do PATCH vazio** (regra 16): corpo `{}` devolve 200 e nenhum campo muda
-- [ ] 6.4 **Teste nomeado de não vazamento:** nenhuma resposta contém `id`, só `token` (regra 13)
-- [ ] 6.5 Criar `contract.controller.ContractController` em `/api/contracts` (`POST`, `GET` paginado, `GET /{token}`, `PATCH /{token}`, `DELETE /{token}`, `POST /{token}/restore`) e `contract.controller.ClientDriverContractController` em `GET /api/client-drivers/{token}/contracts`, com as autorizações do D12
-- [ ] 6.6 Confirmar no `SecurityConfig` que nenhuma rota nova fica pública por omissão (regras 20 e 21)
-- [ ] 6.7 `make lint` + `./mvnw verify -B`
+- [x] 6.1 Criar branch `feat/contract-core-contract-http` de dentro da branch do PR 5
+- [x] 6.2 Testes MockMvc com segurança: sem JWT → 401; admin cria → 201; cliente cria → 403; parte lê → 200; outro cliente lê → 403; parte lista os contratos do vínculo → 200; motorista faz `PATCH` → 403; admin faz `PATCH` `ENDED` → 200; `DELETE` → 204 e some da listagem; `restore` → 200; corpo sem `endsOn` → 400; slot sem `shift` → 400; `dueDay = 31`, `installments = 13` e `totalAmount = 0` → 400 com a mensagem da chave (D5); `endsOn` igual a `startsOn` → 422
+- [x] 6.3 **Teste nomeado do PATCH vazio** (regra 16): corpo `{}` devolve 200 e nenhum campo muda
+- [x] 6.4 **Teste nomeado de não vazamento:** nenhuma resposta contém `id`, só `token` (regra 13)
+- [x] 6.5 Criar `contract.controller.ContractController` em `/api/contracts` (`POST`, `GET` paginado, `GET /{token}`, `PATCH /{token}`, `DELETE /{token}`, `POST /{token}/restore`) e `contract.controller.ClientDriverContractController` em `GET /api/client-drivers/{token}/contracts`, com as autorizações do D12
+- [x] 6.6 Confirmar no `SecurityConfig` que nenhuma rota nova fica pública por omissão (regras 20 e 21)
+- [x] 6.7 `make lint` + `./mvnw verify -B`
 
 ## 7. PR 7 — Vínculo com status derivado e saneamento
 
