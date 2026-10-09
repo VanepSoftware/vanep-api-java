@@ -23,7 +23,7 @@
 
 - [x] Ler `constitution.md` inteiro antes de qualquer trabalho (`openspec/rules.md` regra 1)
 - [x] Revisar `proposal.md`, `design.md` e os seis specs (`operation-shift`, `contract-schedule`, `contract-core`, `client-driver-derived-status`, `unlinked-passengers`, `route-passengers`)
-- [x] **Confirmar os números de Flyway** em `main` e em **todas as branches remotas** (`git ls-tree`). Esta change usa `V56` a `V60`. **Reconfirmar antes do merge de cada PR com migration** (R7)
+- [x] **Confirmar os números de Flyway** em `main` e em **todas as branches remotas** (`git ls-tree`). Esta change usa `V59` a `V60`. **Reconfirmar antes do merge de cada PR com migration** (R7)
 - [x] Branch `spec/contract-core` a partir da `main`, só com `openspec/changes/contract-core/`. É a base da pilha; a branch `spike/contract-proposal` não vai para a `main`
 
 ## 1. PR 1 — Turno escolar e turno da operação
@@ -34,11 +34,11 @@
 
 - [x] 1.1 Criar branch `feat/contract-core-shift-split` a partir da `spec/contract-core` (o PR aponta para ela como `--base`)
 - [x] 1.2 Testes: `POST /api/drivers/me/trips/start` com `FULLTIME` → 400 e nenhuma trip; com `MORNING` → 200 (já coberto, continua); `POST /api/trips` e `PATCH /api/trips/{token}` do admin com `FULLTIME` → 400 (o `PATCH` mantém o turno gravado); dependent com `FULLTIME` continua 201, devolve e grava `FULLTIME`; repositório de trip grava e lê `OperationShift` (testes existentes, com o tipo trocado)
-- [x] 1.3 Migration `V56__trip_operation_shift.sql`: `update trip set shift = 'MORNING' where shift = 'FULLTIME'`; `comment on column trip.shift` (turno da operação, sem `FULLTIME`); `comment on column dependent.shift` (turno escolar; dias e horários vêm da agenda do contrato — A1)
+- [x] 1.3 Migration `V59__trip_operation_shift.sql`: `update trip set shift = 'MORNING' where shift = 'FULLTIME'`; `comment on column trip.shift` (turno da operação, sem `FULLTIME`); `comment on column dependent.shift` (turno escolar; dias e horários vêm da agenda do contrato — A1)
 - [x] 1.4 Renomear `shared.enums.Shift` para `SchoolShift` e ajustar `DependentModel`, `DependentMapper`, DTOs, `DependentService` e `DependentSeeder` (refactor mecânico, JSON igual)
 - [x] 1.5 Criar `shared.enums.OperationShift` (`MORNING`, `AFTERNOON`, `NIGHT`) e trocar o tipo em `TripModel`, `TripRepository`, DTOs de trip, `TripService` e `TripSeeder`
 - [x] 1.6 Conferir que a `absence` (#160) não está na `main`: ela entra depois desta change e troca os tipos de turno nas policies dela ao entrar (aviso no topo)
-- [x] 1.7 Aplicar a `V56` num PostgreSQL descartável com trips `FULLTIME` e `AFTERNOON` semeadas à mão: `FULLTIME` vira `MORNING`, `AFTERNOON` fica intacta, e os comments de `trip.shift` e `dependent.shift` são gravados (R1)
+- [x] 1.7 Aplicar a `V59` num PostgreSQL descartável com trips `FULLTIME` e `AFTERNOON` semeadas à mão: `FULLTIME` vira `MORNING`, `AFTERNOON` fica intacta, e os comments de `trip.shift` e `dependent.shift` são gravados (R1)
 - [x] 1.8 `make lint` + `./mvnw verify -B`
 - [x] 1.9 QA da regra 55 (`scripts/qa/contract-core/qa.sh`, resultado no `qa.md`): início de rota e trip do admin recusam `FULLTIME`, dependente aceita `FULLTIME` e a `V56` reaplicada converte uma trip `FULLTIME`
 
@@ -50,7 +50,7 @@
 
 - [x] 2.1 Criar branch `feat/contract-core-schedule-schema` de dentro da branch do PR 1
 - [x] 2.2 Testes de repositório: salvar agenda com slots e reler; aluno não vinculado por motorista, com escola, endereço e slots carregados fora da transação (prova o fetch join, `open-in-view` desligado); aluno de outro motorista não aparece; token só resolve dentro do motorista; token opaco gerado no persist; soft delete esconde a linha e mantém no banco, e o do aluno leva junto a agenda e os slots. A ordem dos slots não vem do banco: fica no `ScheduleMapper` (tarefa 5.10)
-- [x] 2.3 Migration `V57__create_schedule_and_unlinked_passenger.sql`:
+- [x] 2.3 Migration `V60__create_schedule_and_unlinked_passenger.sql`:
     - `schedule` (`id`, `created_at`, `updated_at`, `deleted_at`)
     - `schedule_slot` (`id`, `schedule_id` FK, `weekday varchar(16)`, `leg varchar(16)`, `shift varchar(16)`, `window_start time not null`, `window_end time`, timestamps, `deleted_at`), `check (window_end is null or window_end > window_start)`
     - `unlinked_passenger` (`id`, `token`, `driver_id` FK, `name`, `school_id` FK, `school_shift`, `address_id` FK, `notes`, `schedule_id` FK, timestamps, `deleted_at`)
@@ -63,7 +63,7 @@
     - endereço como `@ManyToOne` (o dono único é o índice parcial); agenda como `@OneToOne` com `cascade = ALL`
 - [x] 2.7 Criar `ScheduleRepository` e `UnlinkedPassengerRepository` (busca por token **dentro do motorista**, lista por motorista com fetch join de escola, endereço e slots — regra 17). Sem `ScheduleSlotRepository`: toda escrita de slot passa pelo `ScheduleModel` (`cascade = ALL`, `orphanRemoval = true`)
 - [x] 2.8 Acrescentar `schedule_slot`, `schedule` e `unlinked_passenger` ao `src/test/resources/db/clean.sql` na ordem de FK
-- [x] 2.9 **Aplicar a `V57` num PostgreSQL descartável e provar cada índice** com inserts manuais: slot duplicado no mesmo `(schedule, weekday, leg)` recusado; ida e volta no mesmo dia aceitas; slot soft-deletado e recriado aceito; `window_end` antes do início recusado; dois donos no mesmo `schedule` ou no mesmo endereço recusados; token repetido recusado; dono soft-deletado libera endereço e agenda; a consulta por `(schedule_id, weekday, shift)` usa o índice (R1)
+- [x] 2.9 **Aplicar a `V60` num PostgreSQL descartável e provar cada índice** com inserts manuais: slot duplicado no mesmo `(schedule, weekday, leg)` recusado; ida e volta no mesmo dia aceitas; slot soft-deletado e recriado aceito; `window_end` antes do início recusado; dois donos no mesmo `schedule` ou no mesmo endereço recusados; token repetido recusado; dono soft-deletado libera endereço e agenda; a consulta por `(schedule_id, weekday, shift)` usa o índice (R1)
 - [x] 2.10 `make lint` + `./mvnw verify -B`
 - [x] 2.11 QA da regra 55 (`scripts/qa/contract-core/qa.sh`, resultado no `qa.md`): índices e `CHECK` da `V57` conferidos por SQL no PostgreSQL da API
 
@@ -152,14 +152,14 @@
 > Depends on: PR 5 | Parallel with: —
 > Order: test → controller
 
-- [ ] 6.1 Criar branch `feat/contract-core-contract-http` de dentro da branch do PR 5
-- [ ] 6.2 Testes MockMvc com segurança: sem JWT → 401; admin cria → 201; cliente cria → 403; parte lê → 200; outro cliente lê → 403; parte lista os contratos do vínculo → 200; motorista faz `PATCH` → 403; admin faz `PATCH` `ENDED` → 200; `DELETE` → 204 e some da listagem; `restore` → 200; corpo sem `endsOn` → 400; slot sem `shift` → 400; `dueDay = 31`, `installments = 13` e `totalAmount = 0` → 400 com a mensagem da chave (D5); `endsOn` igual a `startsOn` → 422
-- [ ] 6.3 **Teste nomeado do PATCH vazio** (regra 16): corpo `{}` devolve 200 e nenhum campo muda
-- [ ] 6.4 **Teste nomeado de não vazamento:** nenhuma resposta contém `id`, só `token` (regra 13)
-- [ ] 6.5 Criar `contract.controller.ContractController` em `/api/contracts` (`POST`, `GET` paginado, `GET /{token}`, `PATCH /{token}`, `DELETE /{token}`, `POST /{token}/restore`) e `contract.controller.ClientDriverContractController` em `GET /api/client-drivers/{token}/contracts`, com as autorizações do D12
-- [ ] 6.6 Confirmar no `SecurityConfig` que nenhuma rota nova fica pública por omissão (regras 20 e 21)
-- [ ] 6.7 `make lint` + `./mvnw verify -B`
-- [ ] 6.8 QA da regra 55 (`scripts/qa/contract-core/qa.sh`, resultado no `qa.md`): contrato com caminho feliz e mau uso para admin, partes e terceiros: limites, colisões de horário, transições, remoção, restauração e escritas concorrentes no mesmo vínculo
+- [x] 6.1 Criar branch `feat/contract-core-contract-http` de dentro da branch do PR 5
+- [x] 6.2 Testes MockMvc com segurança: sem JWT → 401; admin cria → 201; cliente cria → 403; parte lê → 200; outro cliente lê → 403; parte lista os contratos do vínculo → 200; motorista faz `PATCH` → 403; admin faz `PATCH` `ENDED` → 200; `DELETE` → 204 e some da listagem; `restore` → 200; corpo sem `endsOn` → 400; slot sem `shift` → 400; `dueDay = 31`, `installments = 13` e `totalAmount = 0` → 400 com a mensagem da chave (D5); `endsOn` igual a `startsOn` → 422
+- [x] 6.3 **Teste nomeado do PATCH vazio** (regra 16): corpo `{}` devolve 200 e nenhum campo muda
+- [x] 6.4 **Teste nomeado de não vazamento:** nenhuma resposta contém `id`, só `token` (regra 13)
+- [x] 6.5 Criar `contract.controller.ContractController` em `/api/contracts` (`POST`, `GET` paginado, `GET /{token}`, `PATCH /{token}`, `DELETE /{token}`, `POST /{token}/restore`) e `contract.controller.ClientDriverContractController` em `GET /api/client-drivers/{token}/contracts`, com as autorizações do D12
+- [x] 6.6 Confirmar no `SecurityConfig` que nenhuma rota nova fica pública por omissão (regras 20 e 21)
+- [x] 6.7 `make lint` + `./mvnw verify -B`
+- [x] 6.8 QA da regra 55 (`scripts/qa/contract-core/qa.sh`, resultado no `qa.md`): contrato com caminho feliz e mau uso para admin, partes e terceiros: limites, colisões de horário, transições, remoção, restauração e escritas concorrentes no mesmo vínculo
 
 ## 7. PR 7 — Vínculo com status derivado e saneamento
 
