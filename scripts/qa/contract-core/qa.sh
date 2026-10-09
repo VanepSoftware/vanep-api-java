@@ -302,5 +302,36 @@ check_sql_rejected D11 "two live passengers with the same token" unlinked_passen
   "$NEW_ADDRESS; $NEW_SCHEDULE; $PASSENGER 'qap1', $DRIVER_ID, 'A', $SCHOOL_ID, 'MORNING', $LAST_ADDRESS, $LAST_SCHEDULE; $NEW_ADDRESS; $NEW_SCHEDULE; $PASSENGER 'qap1', $DRIVER_ID, 'B', $SCHOOL_ID, 'MORNING', $LAST_ADDRESS, $LAST_SCHEDULE"
 check D12 "the rolled-back checks left no passenger behind" 0 "$(count unlinked_passenger)"
 
+table "V58: contract and contract_item (database checks)"
+CONTRACTS_BEFORE_CHECKS=$(count contract)
+QA_LINK="insert into client_driver (token, client_id, driver_id, status) select 'qalink', c.id, d.id, 'PENDING' from client c join users uc on uc.id = c.user_id, driver d join users ud on ud.id = d.user_id where uc.email = 'bruno.lima@seed.vanep.com.br' and ud.email = 'gustavo.santos@seed.vanep.com.br'"
+LINK_ID="(select id from client_driver where token = 'qalink')"
+CONTRACT="insert into contract (token, client_driver_id, status, starts_on, ends_on, total_amount, installments, due_day) select"
+ACTIVE_CONTRACT="$CONTRACT 'qac1', $LINK_ID, 'ACTIVE', date '2027-02-01', date '2027-12-17', 4200, 12, 5"
+ended() { echo "$CONTRACT '$1', $LINK_ID, 'ENDED', date '${2:-2027-02-01}', date '${3:-2027-12-17}', ${4:-4200}, ${5:-12}, ${6:-5}"; }
+check_sql_rejected K1 "a second ACTIVE contract on the same link" contract_client_driver_active_key \
+  "$QA_LINK; $ACTIVE_CONTRACT; $CONTRACT 'qac2', $LINK_ID, 'ACTIVE', date '2027-02-01', date '2027-12-17', 4200, 12, 5"
+check_sql_accepted K2 "an ENDED contract next to the ACTIVE one" "$QA_LINK; $ACTIVE_CONTRACT; $(ended qac2)"
+check_sql_accepted K3 "a new ACTIVE contract once the old one is soft-deleted" \
+  "$QA_LINK; $ACTIVE_CONTRACT; update contract set deleted_at = now() where token = 'qac1'; $CONTRACT 'qac2', $LINK_ID, 'ACTIVE', date '2027-02-01', date '2027-12-17', 4200, 12, 5"
+check_sql_rejected K4 "end date on the start date" contract_period_check "$QA_LINK; $(ended qac1 2027-02-01 2027-02-01)"
+check_sql_rejected K5 "total amount of zero" contract_total_amount_check "$QA_LINK; $(ended qac1 2027-02-01 2027-12-17 0)"
+check_sql_rejected K6 "thirteen installments" contract_installments_check "$QA_LINK; $(ended qac1 2027-02-01 2027-12-17 4200 13)"
+check_sql_rejected K7 "zero installments" contract_installments_check "$QA_LINK; $(ended qac1 2027-02-01 2027-12-17 4200 0)"
+check_sql_rejected K8 "due day 29" contract_due_day_check "$QA_LINK; $(ended qac1 2027-02-01 2027-12-17 4200 12 29)"
+check_sql_accepted K9 "due day 28 and one installment" "$QA_LINK; $(ended qac1 2027-02-01 2027-12-17 4200 1 28)"
+check_sql_rejected K10 "two live contracts with the same token" contract_token_active_key "$QA_LINK; $(ended qac1); $(ended qac1)"
+ITEM="insert into contract_item (token, contract_id, dependent_id, school_id, pickup_city_id, pickup_street, monthly_amount, schedule_id) select"
+item_row() { echo "$ITEM '$1', (select id from contract where token = 'qac1'), d.id, d.school_id, a.city_id, $2, $3, $4 from dependent d join address a on a.id = d.address_id order by d.id limit 1"; }
+check_sql_rejected K11 "two items sharing one schedule" contract_item_schedule_id_active_key \
+  "$QA_LINK; $ACTIVE_CONTRACT; $NEW_SCHEDULE; $(item_row qai1 a.street 350 "$LAST_SCHEDULE"); $(item_row qai2 a.street 350 "$LAST_SCHEDULE")"
+check_sql_rejected K12 "an item priced at zero" contract_item_monthly_amount_check \
+  "$QA_LINK; $ACTIVE_CONTRACT; $NEW_SCHEDULE; $(item_row qai1 a.street 0 "$LAST_SCHEDULE")"
+check_sql_rejected K13 "an item without a pickup street" pickup_street \
+  "$QA_LINK; $ACTIVE_CONTRACT; $NEW_SCHEDULE; $(item_row qai1 null 350 "$LAST_SCHEDULE")"
+check_sql_accepted K14 "a valid item copying the dependent's school and address" \
+  "$QA_LINK; $ACTIVE_CONTRACT; $NEW_SCHEDULE; $(item_row qai1 a.street 350 "$LAST_SCHEDULE")"
+check K15 "the rolled-back checks left no contract behind" "$CONTRACTS_BEFORE_CHECKS" "$(count contract)"
+
 echo
 echo "ALL PASSED: $PASSED scenarios"
