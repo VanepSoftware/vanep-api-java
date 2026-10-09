@@ -9,6 +9,8 @@ delete from email_verification_token;
 delete from assistant_invite;
 delete from assistant;
 delete from trip;
+delete from contract_item;
+delete from contract;
 delete from unlinked_passenger;
 delete from schedule_slot;
 delete from schedule;
