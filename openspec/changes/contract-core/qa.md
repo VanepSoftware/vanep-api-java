@@ -1,6 +1,8 @@
 # QA — contract-core (constitution rule 55)
 
-Latest run: API built from `feat/contract-core-contract-schema`, which contains phases 1 to 3. Run date: 2026-10-13. Result: **52/52 passed**.
+Latest run: API built from `feat/contract-core-policies`, which contains phases 1 to 4. Run date: 2026-10-13. Result: **52/52 passed**.
+
+Phase 4 adds pure policies with no runtime surface, so this branch runs the script of phases 1 to 3 as a regression.
 
 ## How to run
 

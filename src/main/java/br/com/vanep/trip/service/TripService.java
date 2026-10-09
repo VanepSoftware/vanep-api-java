@@ -7,6 +7,7 @@ import br.com.vanep.shared.enums.OperationShift;
 import br.com.vanep.trip.dto.TripCreateRequestDTO;
 import br.com.vanep.trip.dto.TripResponseDTO;
 import br.com.vanep.trip.dto.TripUpdateRequestDTO;
+import br.com.vanep.trip.enums.TripCoherenceViolation;
 import br.com.vanep.trip.enums.TripStatus;
 import br.com.vanep.trip.mapper.TripMapper;
 import br.com.vanep.trip.model.TripModel;
@@ -197,11 +198,21 @@ public class TripService {
   private void requireCoherent(TripStatus status, Instant startedAt, Instant finishedAt) {
     coherence
         .validate(status, startedAt, finishedAt)
-        .map(violation -> violation.messageKey())
+        .map(violation -> messageKey(violation))
         .ifPresent(
             key -> {
               throw badRequest(key);
             });
+  }
+
+  String messageKey(TripCoherenceViolation violation) {
+    return switch (violation) {
+      case STARTED_AT_REQUIRED -> "trip.coherence.started_at_required";
+      case STARTED_AT_FORBIDDEN -> "trip.coherence.started_at_forbidden";
+      case FINISHED_AT_REQUIRED -> "trip.coherence.finished_at_required";
+      case FINISHED_AT_FORBIDDEN -> "trip.coherence.finished_at_forbidden";
+      case FINISHED_BEFORE_STARTED -> "trip.coherence.finished_before_started";
+    };
   }
 
   TripModel insertOrReread(DriverModel driver, LocalDate serviceDate, OperationShift shift) {
