@@ -1,8 +1,6 @@
 # QA — contract-core (constitution rule 55)
 
-Latest run: API built from `feat/contract-core-policies`, which contains phases 1 to 4. Run date: 2026-10-13. Result: **52/52 passed**.
-
-Phase 4 adds pure policies with no runtime surface, so this branch runs the script of phases 1 to 3 as a regression.
+Latest run: API built from `feat/contract-core-service`, which contains phases 1 to 5. Run date: 2026-10-13. Result: **57/57 passed**.
 
 ## How to run
 
@@ -31,7 +29,7 @@ Tokens come from the mobile password grant (`urn:vanep:params:oauth:grant-type:p
 
 ## Startup and migration
 
-Flyway applied `V56` to `V58` on an empty database at boot, after the `main` migrations up to `V55`. The seed creates the link between Ana Souza and Fabio Teixeira as `ACTIVE`, with no contract: the `ContractSeeder` arrives in phase 7. Before phase 7 the demo seed also runs before the city catalog, so it skips the seed school and creates Lucas and Marina Souza without school or address (the runner order is fixed in phase 7). The script creates that school with SQL and completes both dependents through `PATCH /api/dependent/{token}`, as the client would.
+Flyway applied `V56` to `V59` on an empty database at boot, after the `main` migrations up to `V55`. The seed creates the link between Ana Souza and Fabio Teixeira as `ACTIVE`, with no contract: the `ContractSeeder` arrives in phase 7. Before phase 7 the demo seed also runs before the city catalog, so it skips the seed school and creates Lucas and Marina Souza without school or address (the runner order is fixed in phase 7). The script creates that school with SQL and completes both dependents through `PATCH /api/dependent/{token}`, as the client would.
 
 ## Results
 
@@ -101,6 +99,16 @@ Flyway applied `V56` to `V58` on an empty database at boot, after the `main` mig
 | K13 | an item without a pickup street | rejected by pickup_street | PASS |
 | K14 | a valid item copying the dependent's school and address | accepted | PASS |
 | K15 | the rolled-back checks left no contract behind | 0 | PASS |
+
+### V59: contract permissions of the ADMIN bundle
+
+| id | scenario | expected | result |
+|---|---|---|---|
+| P1 | a real admin token carries the six contract permissions | 6 | PASS |
+| P2 | no other bundle has a contract permission | 0 | PASS |
+| P3 | re-applying V59 on a bundle without them adds back exactly the six | 98 | PASS |
+| P4 | re-applying V59 again changes nothing | 98 | PASS |
+| P5 | a fresh admin token still carries the six | 6 | PASS |
 
 ## Behaviors worth knowing
 

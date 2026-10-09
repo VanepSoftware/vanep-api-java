@@ -4,6 +4,7 @@ import br.com.vanep.assistant.repository.AssistantRepository;
 import br.com.vanep.client.repository.ClientRepository;
 import br.com.vanep.clientdriver.repository.ClientDriverRepository;
 import br.com.vanep.clientrating.repository.ClientRatingRepository;
+import br.com.vanep.contract.repository.ContractRepository;
 import br.com.vanep.conversation.repository.ConversationRepository;
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.drivercnh.repository.DriverCnhRepository;
@@ -28,6 +29,7 @@ public class SecurityEvaluator {
   private final TripRepository tripRepository;
   private final AssistantRepository assistantRepository;
   private final ConversationRepository conversationRepository;
+  private final ContractRepository contractRepository;
 
   public SecurityEvaluator(
       DriverRepository driverRepository,
@@ -40,7 +42,8 @@ public class SecurityEvaluator {
       DriverDocumentRepository driverDocumentRepository,
       TripRepository tripRepository,
       AssistantRepository assistantRepository,
-      ConversationRepository conversationRepository) {
+      ConversationRepository conversationRepository,
+      ContractRepository contractRepository) {
     this.driverRepository = driverRepository;
     this.clientRepository = clientRepository;
     this.clientDriverRepository = clientDriverRepository;
@@ -52,6 +55,7 @@ public class SecurityEvaluator {
     this.tripRepository = tripRepository;
     this.assistantRepository = assistantRepository;
     this.conversationRepository = conversationRepository;
+    this.contractRepository = contractRepository;
   }
 
   public boolean isDriverOwner(String token, Authentication authentication) {
@@ -156,6 +160,13 @@ public class SecurityEvaluator {
                         .findDriverUserTokenByLinkToken(token)
                         .map(uid::equals)
                         .orElse(false))
+        .orElse(false);
+  }
+
+  public boolean isContractParty(String token, Authentication authentication) {
+    return contractRepository
+        .findClientDriverTokenByToken(token)
+        .map(linkToken -> isClientDriverLinkParty(linkToken, authentication))
         .orElse(false);
   }
 

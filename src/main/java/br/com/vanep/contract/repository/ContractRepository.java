@@ -7,7 +7,9 @@ import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface ContractRepository extends JpaRepository<ContractModel, Long> {
   @Query(
@@ -51,6 +53,10 @@ public interface ContractRepository extends JpaRepository<ContractModel, Long> {
   List<ContractStatus> findStatusesByClientDriverId(Long clientDriverId);
 
   @Query(
+      "select contract.clientDriver.token from ContractModel contract where contract.token = :token")
+  Optional<String> findClientDriverTokenByToken(String token);
+
+  @Query(
       value =
           """
           select contract from ContractModel contract
@@ -62,4 +68,27 @@ public interface ContractRepository extends JpaRepository<ContractModel, Long> {
           """,
       countQuery = "select count(contract) from ContractModel contract")
   Page<ContractModel> findPage(Pageable pageable);
+
+  @Query(
+      value = "SELECT count(*) > 0 FROM contract WHERE token = :token AND deleted_at IS NOT NULL",
+      nativeQuery = true)
+  boolean existsDeletedByToken(@Param("token") String token);
+
+  @Query(
+      value =
+          """
+          SELECT count(*) > 0 FROM contract deleted
+          JOIN contract active ON active.client_driver_id = deleted.client_driver_id
+          WHERE deleted.token = :token
+            AND deleted.deleted_at IS NOT NULL
+            AND deleted.status = 'ACTIVE'
+            AND active.deleted_at IS NULL
+            AND active.status = 'ACTIVE'
+          """,
+      nativeQuery = true)
+  boolean existsActiveConflictForRestore(@Param("token") String token);
+
+  @Modifying
+  @Query(value = "UPDATE contract SET deleted_at = NULL WHERE token = :token", nativeQuery = true)
+  int restoreByToken(@Param("token") String token);
 }

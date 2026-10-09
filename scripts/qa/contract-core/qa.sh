@@ -333,5 +333,23 @@ check_sql_accepted K14 "a valid item copying the dependent's school and address"
   "$QA_LINK; $ACTIVE_CONTRACT; $NEW_SCHEDULE; $(item_row qai1 a.street 350 "$LAST_SCHEDULE")"
 check K15 "the rolled-back checks left no contract behind" "$CONTRACTS_BEFORE_CHECKS" "$(count contract)"
 
+table "V59: contract permissions of the ADMIN bundle"
+CONTRACT_PERMISSIONS='["list_contracts","show_contract","create_contract","update_contract","delete_contract","restore_contract"]'
+check P1 "a real admin token carries the six contract permissions" 6 \
+  "$(claims "$ADMIN" | jq --argjson p "$CONTRACT_PERMISSIONS" '[.permissions[] | select(IN($p[]))] | length')"
+check P2 "no other bundle has a contract permission" 0 \
+  "$(sql "select count(*) from role_permissions where name <> 'ADMIN' and permissions ?| array['list_contracts','show_contract','create_contract','update_contract','delete_contract','restore_contract']")"
+ADMIN_PERMISSIONS_BEFORE=$(sql "select jsonb_array_length(permissions) from role_permissions where name = 'ADMIN'")
+sql "update role_permissions set permissions = permissions - 'list_contracts' - 'show_contract' - 'create_contract' - 'update_contract' - 'delete_contract' - 'restore_contract' where name = 'ADMIN'" >/dev/null
+apply_migration V59
+check P3 "re-applying V59 on a bundle without them adds back exactly the six" "$ADMIN_PERMISSIONS_BEFORE" \
+  "$(sql "select jsonb_array_length(permissions) from role_permissions where name = 'ADMIN'")"
+apply_migration V59
+check P4 "re-applying V59 again changes nothing" "$ADMIN_PERMISSIONS_BEFORE" \
+  "$(sql "select jsonb_array_length(permissions) from role_permissions where name = 'ADMIN'")"
+ADMIN=$(login "$ADMIN_EMAIL")
+check P5 "a fresh admin token still carries the six" 6 \
+  "$(claims "$ADMIN" | jq --argjson p "$CONTRACT_PERMISSIONS" '[.permissions[] | select(IN($p[]))] | length')"
+
 echo
 echo "ALL PASSED: $PASSED scenarios"
