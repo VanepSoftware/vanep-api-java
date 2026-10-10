@@ -179,17 +179,17 @@
 > Depends on: PR 7 | Parallel with: —
 > Order: test → request DTO → messages → service → response DTO → mapper → controller
 
-- [ ] 8.1 Criar branch `feat/contract-core-unlinked-service` de dentro da branch do PR 7
-- [ ] 8.2 Testes unitários de `UnlinkedPassengerService` e dos métodos novos do `AddressService`: criar com endereço e agenda; motorista em análise cria; usuário `CLIENT` → 403; escola inexistente → 404 `unlinked_passenger.school.not_found`; agenda inválida → 400 antes de gravar o endereço; token de outro motorista → 404 `unlinked_passenger.not_found`; `PATCH` só de `notes` mantém o resto; `name` nulo ou em branco → 400; `schoolToken`, `schoolShift` ou `address` nulos → 400 `unlinked_passenger.field.null`; trocar a agenda mantém a mesma agenda com os slots novos; remover é soft delete e libera o endereço para o dono único
-- [ ] 8.3 Criar `UnlinkedPassengerCreateRequestDTO` (endereço pelo `DependentAddressRequestDTO`, slots pelo `ScheduleSlotRequestDTO` do PR 4), `UnlinkedPassengerUpdateRequestDTO` (`JsonNullable` em `name`, `schoolToken`, `schoolShift`, `address`, `notes`, construtor compacto com `undefined()`) e `UnlinkedPassengerScheduleRequestDTO` (corpo do `PUT /schedule`)
-- [ ] 8.4 Chaves de MessageSource (EN + pt-BR): `unlinked_passenger.not_found`, `unlinked_passenger.name.required`, `unlinked_passenger.name.too_long`, `unlinked_passenger.notes.too_long`, `unlinked_passenger.school.not_found`, `unlinked_passenger.field.null`
-- [ ] 8.5 Acrescentar `AddressService.upsertForUnlinkedPassenger` e `clearForUnlinkedPassenger`, reaproveitando o fluxo por catálogo de `upsertForDependent` (regra 6)
-- [ ] 8.6 Implementar `unlinkedpassenger.service.UnlinkedPassengerService` resolvendo o motorista com `requireByTokenAndType(uid, UserType.DRIVER)`. Sem gate de aprovação: o motorista em análise pode preparar a rota, e quem bloqueia a operação é o início da trip (RN-02)
-- [ ] 8.7 Criar `UnlinkedPassengerResponseDTO` e `UnlinkedPassengerMapper` (endereço pelo `AddressMapper`, slots pelo `ScheduleMapper` do PR 5)
-- [ ] 8.8 Testes MockMvc: sem JWT → 401; `CLIENT` → 403; motorista cria → 201; lista → só os dele; `GET` de outro motorista → 404; `PATCH` parcial → 200; `PUT /schedule` → 200 com os slots novos; `DELETE` → 204; corpo com `birthDate` não persiste nada além dos campos do D9
-- [ ] 8.9 **Teste nomeado do PATCH parcial** (regra 16): só `notes` → nome, escola, turno, endereço e agenda inalterados
-- [ ] 8.10 Criar `unlinkedpassenger.controller.UnlinkedPassengerController` com `@PreAuthorize("isAuthenticated()")`, no padrão do `DriverServiceAreaController`
-- [ ] 8.11 `make lint` + `./mvnw verify -B`
+- [x] 8.1 Criar branch `feat/contract-core-unlinked-service` de dentro da branch do PR 7
+- [x] 8.2 Testes unitários de `UnlinkedPassengerService` e dos métodos novos do `AddressService`: criar com endereço e agenda; motorista em análise cria; usuário `CLIENT` → 403; escola inexistente → 404 `unlinked_passenger.school.not_found`; agenda inválida → 400 antes de gravar o endereço; token de outro motorista → 404 `unlinked_passenger.not_found`; `PATCH` só de `notes` mantém o resto; `name` nulo ou em branco → 400; `schoolToken`, `schoolShift` ou `address` nulos → 400 `unlinked_passenger.field.null`; trocar a agenda mantém a mesma agenda com os slots novos; remover é soft delete e libera o endereço para o dono único
+- [x] 8.3 Criar `UnlinkedPassengerCreateRequestDTO` (endereço pelo `DependentAddressRequestDTO`, slots pelo `ScheduleSlotRequestDTO` do PR 4), `UnlinkedPassengerUpdateRequestDTO` (`JsonNullable` em `name`, `schoolToken`, `schoolShift`, `address`, `notes`, construtor compacto com `undefined()`) e `UnlinkedPassengerScheduleRequestDTO` (corpo do `PUT /schedule`)
+- [x] 8.4 Chaves de MessageSource (EN + pt-BR): `unlinked_passenger.not_found`, `unlinked_passenger.name.required`, `unlinked_passenger.name.too_long`, `unlinked_passenger.notes.too_long`, `unlinked_passenger.school.not_found`, `unlinked_passenger.field.null`
+- [x] 8.5 Acrescentar `AddressService.upsertForUnlinkedPassenger` e `clearForUnlinkedPassenger`, reaproveitando o fluxo por catálogo de `upsertForDependent` (regra 6)
+- [x] 8.6 Implementar `unlinkedpassenger.service.UnlinkedPassengerService` resolvendo o motorista com `requireByTokenAndType(uid, UserType.DRIVER)`. Sem gate de aprovação: o motorista em análise pode preparar a rota, e quem bloqueia a operação é o início da trip (RN-02)
+- [x] 8.7 Criar `UnlinkedPassengerResponseDTO` e `UnlinkedPassengerMapper` (endereço pelo `AddressMapper`, slots pelo `ScheduleMapper` do PR 5)
+- [x] 8.8 Testes MockMvc: sem JWT → 401; `CLIENT` → 403; motorista cria → 201; lista → só os dele; `GET` de outro motorista → 404; `PATCH` parcial → 200; `PUT /schedule` → 200 com os slots novos; `DELETE` → 204; corpo com `birthDate` não persiste nada além dos campos do D9
+- [x] 8.9 **Teste nomeado do PATCH parcial** (regra 16): só `notes` → nome, escola, turno, endereço e agenda inalterados
+- [x] 8.10 Criar `unlinkedpassenger.controller.UnlinkedPassengerController` com `@PreAuthorize("isAuthenticated()")`, no padrão do `DriverServiceAreaController`
+- [x] 8.11 `make lint` + `./mvnw verify -B`
 
 ## 9. PR 9 — Passageiros da rota
 
