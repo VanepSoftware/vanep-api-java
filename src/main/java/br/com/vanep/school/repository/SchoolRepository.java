@@ -14,6 +14,8 @@ public interface SchoolRepository extends JpaRepository<SchoolModel, Long> {
 
   boolean existsByName(String name);
 
+  Optional<SchoolModel> findFirstByName(String name);
+
   long countByAddressId(Long addressId);
 
   long countByAddressIdAndIdNot(Long addressId, Long id);

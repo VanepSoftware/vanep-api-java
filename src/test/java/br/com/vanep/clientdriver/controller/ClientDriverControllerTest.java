@@ -88,6 +88,39 @@ class ClientDriverControllerTest {
   }
 
   @Test
+  void aStatusSentOnCreationIsIgnored() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/client-drivers")
+                .with(adminJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"clientToken\":\""
+                        + maria.getToken()
+                        + "\",\"driverToken\":\""
+                        + carlos.getToken()
+                        + "\",\"status\":\"ACTIVE\"}"))
+        .andExpect(status().isCreated())
+        .andExpect(jsonPath("$.status").value("PENDING"));
+  }
+
+  @Test
+  void aPartyCannotActivateItsOwnLink() throws Exception {
+    ClientDriverModel link = persistLink(RelationshipStatus.PENDING);
+
+    mockMvc
+        .perform(
+            patch("/api/client-drivers/" + link.getToken())
+                .with(partyJwt(mariaUid, "CLIENT"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"status\":\"ACTIVE\"}"))
+        .andExpect(status().isMethodNotAllowed());
+
+    assertThat(links.findByToken(link.getToken()).orElseThrow().getStatus())
+        .isEqualTo(RelationshipStatus.PENDING);
+  }
+
+  @Test
   void rejectsCreateWhenDriverIsNotApproved() throws Exception {
     DriverModel pendingDriver = createDriver("pendente@vanep.com", "98765432100");
     pendingDriver.setApprovalStatus(DriverApprovalStatus.UNDER_REVIEW);
@@ -99,27 +132,6 @@ class ClientDriverControllerTest {
                 .with(adminJwt())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(createBody(maria.getToken(), pendingDriver.getToken())))
-        .andExpect(status().isUnprocessableEntity());
-  }
-
-  @Test
-  void rejectsPatchStatusToActiveWhenDriverIsNotApproved() throws Exception {
-    DriverModel pendingDriver = createDriver("pendente2@vanep.com", "98765432101");
-    pendingDriver.setApprovalStatus(DriverApprovalStatus.UNDER_REVIEW);
-    drivers.save(pendingDriver);
-
-    ClientDriverModel link = new ClientDriverModel();
-    link.setClient(maria);
-    link.setDriver(pendingDriver);
-    link.setStatus(RelationshipStatus.PENDING);
-    link = links.save(link);
-
-    mockMvc
-        .perform(
-            patch("/api/client-drivers/" + link.getToken())
-                .with(adminJwt())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"status\":\"ACTIVE\"}"))
         .andExpect(status().isUnprocessableEntity());
   }
 
@@ -220,51 +232,6 @@ class ClientDriverControllerTest {
   }
 
   @Test
-  void patchingTheStatusIsPersisted() throws Exception {
-    ClientDriverModel link = persistLink(RelationshipStatus.PENDING);
-
-    mockMvc
-        .perform(
-            patch("/api/client-drivers/" + link.getToken())
-                .with(adminJwt())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"status\":\"ACTIVE\"}"))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.status").value("ACTIVE"));
-  }
-
-  @Test
-  void anEmptyPatchLeavesEveryStoredFieldUnchanged() throws Exception {
-    ClientDriverModel link = persistLink(RelationshipStatus.ACTIVE);
-
-    mockMvc
-        .perform(
-            patch("/api/client-drivers/" + link.getToken())
-                .with(adminJwt())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{}"))
-        .andExpect(status().isOk());
-
-    ClientDriverModel stored = links.findByToken(link.getToken()).orElseThrow();
-    assertThat(stored.getStatus()).isEqualTo(RelationshipStatus.ACTIVE);
-    assertThat(stored.getClient().getToken()).isEqualTo(maria.getToken());
-    assertThat(stored.getDriver().getToken()).isEqualTo(carlos.getToken());
-  }
-
-  @Test
-  void clearingTheStatusIsRefused() throws Exception {
-    ClientDriverModel link = persistLink(RelationshipStatus.ACTIVE);
-
-    mockMvc
-        .perform(
-            patch("/api/client-drivers/" + link.getToken())
-                .with(adminJwt())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"status\":null}"))
-        .andExpect(status().isBadRequest());
-  }
-
-  @Test
   void eachPartyListsItsOwnLinks() throws Exception {
     persistLink(RelationshipStatus.ACTIVE);
 
@@ -346,7 +313,6 @@ class ClientDriverControllerTest {
             new SimpleGrantedAuthority("list_client_drivers"),
             new SimpleGrantedAuthority("show_client_driver"),
             new SimpleGrantedAuthority("create_client_driver"),
-            new SimpleGrantedAuthority("update_client_driver"),
             new SimpleGrantedAuthority("delete_client_driver"),
             new SimpleGrantedAuthority("restore_client_driver"));
   }

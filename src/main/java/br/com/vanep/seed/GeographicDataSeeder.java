@@ -6,15 +6,19 @@ import br.com.vanep.state.seed.StateSeeder;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 /**
  * Country/state/city reference catalog, required in every environment for driver search, the city
  * picker and CEP lookup to work. Enabled by default and independent of {@code vanep.seed.enabled},
  * which only gates the demo admin/fake data in {@link DataSeeder} — so production never has to turn
- * on fake data just to get the catalog.
+ * on fake data just to get the catalog. Runs before {@link DataSeeder}, whose seed school needs a
+ * city.
  */
 @Component
+@Order(Ordered.HIGHEST_PRECEDENCE)
 public class GeographicDataSeeder implements ApplicationRunner {
   private final CountrySeeder countrySeeder;
   private final StateSeeder stateSeeder;

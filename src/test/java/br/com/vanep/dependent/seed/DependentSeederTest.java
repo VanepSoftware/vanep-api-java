@@ -1,6 +1,7 @@
 package br.com.vanep.dependent.seed;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
@@ -8,12 +9,19 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import br.com.vanep.address.model.AddressModel;
+import br.com.vanep.address.repository.AddressRepository;
+import br.com.vanep.city.model.CityModel;
 import br.com.vanep.client.model.ClientModel;
 import br.com.vanep.client.repository.ClientRepository;
 import br.com.vanep.dependent.model.DependentModel;
 import br.com.vanep.dependent.repository.DependentRepository;
+import br.com.vanep.school.model.SchoolModel;
+import br.com.vanep.school.repository.SchoolRepository;
+import br.com.vanep.school.seed.SchoolSeeder;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -30,12 +38,15 @@ class DependentSeederTest {
   @Mock private DependentRepository dependents;
   @Mock private ClientRepository clients;
   @Mock private UserRepository users;
+  @Mock private SchoolRepository schools;
+  @Mock private AddressRepository addresses;
 
   private DependentSeeder seeder;
+  private long nextAddressId = 1L;
 
   @BeforeEach
   void setUp() {
-    seeder = new DependentSeeder(dependents, clients, users);
+    seeder = new DependentSeeder(dependents, clients, users, schools, addresses);
   }
 
   private UserModel seedUser() {
@@ -51,11 +62,39 @@ class DependentSeederTest {
     return client;
   }
 
-  @Test
-  void createsTwoDependentsWithExactlyOneDefault() {
+  private void givenSeedClientWithoutDependents() {
     when(users.findByEmail(SEED_CLIENT_EMAIL)).thenReturn(Optional.of(seedUser()));
     when(clients.findByUserId(10L)).thenReturn(Optional.of(seedClient()));
     when(dependents.existsByDocument(anyString())).thenReturn(false);
+  }
+
+  private void givenSeedSchool(SchoolModel school) {
+    when(schools.findFirstByName(SchoolSeeder.SEED_SCHOOL_NAME)).thenReturn(Optional.of(school));
+    when(addresses.save(any(AddressModel.class)))
+        .thenAnswer(
+            invocation -> {
+              AddressModel address = invocation.getArgument(0);
+              address.setId(nextAddressId++);
+              return address;
+            });
+  }
+
+  private SchoolModel school(Long id) {
+    SchoolModel school = new SchoolModel();
+    school.setId(id);
+    school.setCity(new CityModel());
+    return school;
+  }
+
+  private List<DependentModel> savedDependents() {
+    ArgumentCaptor<DependentModel> captor = ArgumentCaptor.forClass(DependentModel.class);
+    verify(dependents, times(2)).save(captor.capture());
+    return captor.getAllValues();
+  }
+
+  @Test
+  void createsTwoDependentsWithExactlyOneDefault() {
+    givenSeedClientWithoutDependents();
 
     seeder.seed();
 
@@ -67,6 +106,42 @@ class DependentSeederTest {
                 .filter(dependent -> dependent.isDefaultDependent())
                 .count())
         .isEqualTo(1);
+  }
+
+  @Test
+  void placesBothDependentsAtTheSeedSchoolWithACompleteHomeEach() {
+    givenSeedClientWithoutDependents();
+    SchoolModel school = school(7L);
+    givenSeedSchool(school);
+
+    seeder.seed();
+
+    assertThat(savedDependents())
+        .extracting(DependentModel::getSchoolId, DependentModel::getAddressId)
+        .containsExactly(tuple(7L, 1L), tuple(7L, 2L));
+    ArgumentCaptor<AddressModel> homes = ArgumentCaptor.forClass(AddressModel.class);
+    verify(addresses, times(2)).save(homes.capture());
+    assertThat(homes.getAllValues())
+        .allSatisfy(
+            home -> {
+              assertThat(home.getCity()).isSameAs(school.getCity());
+              assertThat(home.getZipCode()).isEqualTo("01001000");
+              assertThat(home.getStreet()).isEqualTo("Rua das Acácias");
+              assertThat(home.getNumber()).isEqualTo("250");
+              assertThat(home.getNeighborhood()).isEqualTo("Centro");
+            });
+  }
+
+  @Test
+  void createsTheDependentsWithoutSchoolAndAddressWhenTheSeedSchoolIsMissing() {
+    givenSeedClientWithoutDependents();
+    when(schools.findFirstByName(SchoolSeeder.SEED_SCHOOL_NAME)).thenReturn(Optional.empty());
+
+    seeder.seed();
+
+    assertThat(savedDependents())
+        .allMatch(dependent -> dependent.getSchoolId() == null && dependent.getAddressId() == null);
+    verify(addresses, never()).save(any());
   }
 
   @Test

@@ -13,7 +13,6 @@ import br.com.vanep.client.model.ClientModel;
 import br.com.vanep.client.repository.ClientRepository;
 import br.com.vanep.clientdriver.dto.ClientDriverCreateRequestDTO;
 import br.com.vanep.clientdriver.dto.ClientDriverResponseDTO;
-import br.com.vanep.clientdriver.dto.ClientDriverUpdateRequestDTO;
 import br.com.vanep.clientdriver.enums.RelationshipStatus;
 import br.com.vanep.clientdriver.mapper.ClientDriverMapper;
 import br.com.vanep.clientdriver.model.ClientDriverModel;
@@ -36,7 +35,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
-import org.openapitools.jackson.nullable.JsonNullable;
 import org.springframework.context.MessageSource;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
@@ -81,7 +79,7 @@ class ClientDriverServiceTest {
 
   @Test
   void createsTheLinkAsPending() {
-    service.create(new ClientDriverCreateRequestDTO("cli", "drv", null));
+    service.create(new ClientDriverCreateRequestDTO("cli", "drv"));
 
     verify(links).save(saved.capture());
     assertThat(saved.getValue().getStatus()).isEqualTo(RelationshipStatus.PENDING);
@@ -90,18 +88,10 @@ class ClientDriverServiceTest {
   }
 
   @Test
-  void honoursAnExplicitStatusOnCreate() {
-    service.create(new ClientDriverCreateRequestDTO("cli", "drv", RelationshipStatus.ACTIVE));
-
-    verify(links).save(saved.capture());
-    assertThat(saved.getValue().getStatus()).isEqualTo(RelationshipStatus.ACTIVE);
-  }
-
-  @Test
   void refusesADuplicatePair() {
     when(links.findByPair(1L, 2L)).thenReturn(Optional.of(link(RelationshipStatus.ACTIVE)));
 
-    assertThatThrownBy(() -> service.create(new ClientDriverCreateRequestDTO("cli", "drv", null)))
+    assertThatThrownBy(() -> service.create(new ClientDriverCreateRequestDTO("cli", "drv")))
         .isInstanceOf(ResponseStatusException.class)
         .hasMessageContaining("409")
         .hasMessageContaining("client_driver.duplicate_pair");
@@ -113,7 +103,7 @@ class ClientDriverServiceTest {
   void refusesAnUnknownClient() {
     when(clients.findByToken("ghost")).thenReturn(Optional.empty());
 
-    assertThatThrownBy(() -> service.create(new ClientDriverCreateRequestDTO("ghost", "drv", null)))
+    assertThatThrownBy(() -> service.create(new ClientDriverCreateRequestDTO("ghost", "drv")))
         .isInstanceOf(ResponseStatusException.class)
         .hasMessageContaining("404")
         .hasMessageContaining("client_driver.client.not_found");
@@ -123,7 +113,7 @@ class ClientDriverServiceTest {
   void refusesAnUnknownDriver() {
     when(drivers.findByToken("ghost")).thenReturn(Optional.empty());
 
-    assertThatThrownBy(() -> service.create(new ClientDriverCreateRequestDTO("cli", "ghost", null)))
+    assertThatThrownBy(() -> service.create(new ClientDriverCreateRequestDTO("cli", "ghost")))
         .isInstanceOf(ResponseStatusException.class)
         .hasMessageContaining("404")
         .hasMessageContaining("client_driver.driver.not_found");
@@ -138,7 +128,7 @@ class ClientDriverServiceTest {
             DriverApprovalStatus.REJECTED)) {
       carlos.setApprovalStatus(unapprovedStatus);
 
-      assertThatThrownBy(() -> service.create(new ClientDriverCreateRequestDTO("cli", "drv", null)))
+      assertThatThrownBy(() -> service.create(new ClientDriverCreateRequestDTO("cli", "drv")))
           .isInstanceOf(ResponseStatusException.class)
           .satisfies(
               e -> {
@@ -149,7 +139,7 @@ class ClientDriverServiceTest {
     }
 
     carlos.setApprovalStatus(null);
-    assertThatThrownBy(() -> service.create(new ClientDriverCreateRequestDTO("cli", "drv", null)))
+    assertThatThrownBy(() -> service.create(new ClientDriverCreateRequestDTO("cli", "drv")))
         .isInstanceOf(ResponseStatusException.class)
         .satisfies(
             e -> {
@@ -159,77 +149,6 @@ class ClientDriverServiceTest {
             });
 
     verify(links, never()).save(any());
-  }
-
-  @Test
-  void refusesUpdateToActiveWhenDriverIsNotApproved() {
-    ClientDriverModel stored = link(RelationshipStatus.PENDING);
-    carlos.setApprovalStatus(DriverApprovalStatus.UNDER_REVIEW);
-    when(links.findByToken("lnk")).thenReturn(Optional.of(stored));
-
-    assertThatThrownBy(
-            () ->
-                service.update(
-                    "lnk",
-                    new ClientDriverUpdateRequestDTO(JsonNullable.of(RelationshipStatus.ACTIVE))))
-        .isInstanceOf(ResponseStatusException.class)
-        .satisfies(
-            e -> {
-              ResponseStatusException ex = (ResponseStatusException) e;
-              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
-              assertThat(ex.getReason()).isEqualTo("client_driver.driver.not_approved");
-            });
-
-    assertThat(stored.getStatus()).isEqualTo(RelationshipStatus.PENDING);
-  }
-
-  @Test
-  void allowsUpdateToNonActiveStatusesEvenIfDriverIsNotApproved() {
-    ClientDriverModel stored = link(RelationshipStatus.PENDING);
-    carlos.setApprovalStatus(DriverApprovalStatus.UNDER_REVIEW);
-    when(links.findByToken("lnk")).thenReturn(Optional.of(stored));
-
-    service.update(
-        "lnk", new ClientDriverUpdateRequestDTO(JsonNullable.of(RelationshipStatus.BLOCKED)));
-
-    assertThat(stored.getStatus()).isEqualTo(RelationshipStatus.BLOCKED);
-  }
-
-  @Test
-  void patchingTheStatusIsPersisted() {
-    ClientDriverModel stored = link(RelationshipStatus.PENDING);
-    when(links.findByToken("lnk")).thenReturn(Optional.of(stored));
-
-    service.update(
-        "lnk", new ClientDriverUpdateRequestDTO(JsonNullable.of(RelationshipStatus.ACTIVE)));
-
-    assertThat(stored.getStatus()).isEqualTo(RelationshipStatus.ACTIVE);
-  }
-
-  @Test
-  void anEmptyPatchChangesNothing() {
-    ClientDriverModel stored = link(RelationshipStatus.ACTIVE);
-    when(links.findByToken("lnk")).thenReturn(Optional.of(stored));
-
-    service.update("lnk", new ClientDriverUpdateRequestDTO(JsonNullable.undefined()));
-
-    assertThat(stored.getStatus()).isEqualTo(RelationshipStatus.ACTIVE);
-    assertThat(stored.getClient()).isSameAs(maria);
-    assertThat(stored.getDriver()).isSameAs(carlos);
-  }
-
-  @Test
-  void clearingTheStatusIsRefused() {
-    ClientDriverModel stored = link(RelationshipStatus.ACTIVE);
-    when(links.findByToken("lnk")).thenReturn(Optional.of(stored));
-
-    assertThatThrownBy(
-            () -> service.update("lnk", new ClientDriverUpdateRequestDTO(JsonNullable.of(null))))
-        .isInstanceOf(ResponseStatusException.class)
-        .hasMessageContaining("400")
-        .hasMessageContaining("client_driver.status.required");
-
-    assertThat(stored.getStatus()).isEqualTo(RelationshipStatus.ACTIVE);
   }
 
   @Test
