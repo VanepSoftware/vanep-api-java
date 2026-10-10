@@ -10,11 +10,14 @@ import br.com.vanep.country.model.CountryModel;
 import br.com.vanep.country.repository.CountryRepository;
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
+import br.com.vanep.routepassenger.dto.RoutePassengerDTO;
+import br.com.vanep.routepassenger.enums.PassengerSource;
 import br.com.vanep.schedule.model.ScheduleModel;
 import br.com.vanep.schedule.model.ScheduleSlotModel;
 import br.com.vanep.schedule.repository.ScheduleRepository;
 import br.com.vanep.school.model.SchoolModel;
 import br.com.vanep.school.repository.SchoolRepository;
+import br.com.vanep.shared.SqlStatementCounter;
 import br.com.vanep.shared.enums.OperationShift;
 import br.com.vanep.shared.enums.RouteLeg;
 import br.com.vanep.shared.enums.SchoolShift;
@@ -24,6 +27,7 @@ import br.com.vanep.unlinkedpassenger.model.UnlinkedPassengerModel;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
+import jakarta.persistence.EntityManagerFactory;
 import java.math.BigDecimal;
 import java.time.DayOfWeek;
 import java.time.Instant;
@@ -52,6 +56,7 @@ class UnlinkedPassengerRepositoryTest {
   @Autowired private StateRepository states;
   @Autowired private CountryRepository countries;
   @Autowired private JdbcTemplate jdbc;
+  @Autowired private EntityManagerFactory entityManagerFactory;
 
   private DriverModel driver;
   private DriverModel otherDriver;
@@ -115,6 +120,71 @@ class UnlinkedPassengerRepositoryTest {
     assertThat(countSoftDeleted("unlinked_passenger")).isEqualTo(1);
     assertThat(countSoftDeleted("schedule")).isEqualTo(1);
     assertThat(countSoftDeleted("schedule_slot")).isEqualTo(2);
+  }
+
+  @Test
+  void findsTheRoutePassengersOfTheDriverWithTheirPickupAddress() {
+    UnlinkedPassengerModel lucas = passengers.save(newPassenger(driver, "Lucas", "Rua A"));
+    passengers.save(newPassenger(otherDriver, "Ana", "Rua B"));
+
+    List<RoutePassengerDTO> found =
+        passengers.findRoutePassengers(driver.getId(), DayOfWeek.MONDAY, OperationShift.MORNING);
+
+    assertThat(found)
+        .singleElement()
+        .satisfies(
+            passenger -> {
+              assertThat(passenger.source()).isEqualTo(PassengerSource.UNLINKED_PASSENGER);
+              assertThat(passenger.token()).isEqualTo(lucas.getToken());
+              assertThat(passenger.name()).isEqualTo("Lucas");
+              assertThat(passenger.schoolName()).isEqualTo("Escola Municipal");
+              assertThat(passenger.leg()).isEqualTo(RouteLeg.OUTBOUND);
+              assertThat(passenger.windowStart()).isEqualTo(LocalTime.of(6, 40));
+              assertThat(passenger.pickupStreet()).isEqualTo("Rua A");
+              assertThat(passenger.pickupCityToken()).isEqualTo(city.getToken());
+            });
+  }
+
+  @Test
+  void anotherShiftOrWeekdayReturnsNoRoutePassenger() {
+    passengers.save(newPassenger(driver, "Lucas", "Rua A"));
+
+    assertThat(
+            passengers.findRoutePassengers(driver.getId(), DayOfWeek.MONDAY, OperationShift.NIGHT))
+        .isEmpty();
+    assertThat(
+            passengers.findRoutePassengers(
+                driver.getId(), DayOfWeek.TUESDAY, OperationShift.MORNING))
+        .isEmpty();
+  }
+
+  @Test
+  void aDeletedPassengerIsNotARoutePassenger() {
+    passengers.delete(passengers.save(newPassenger(driver, "Lucas", "Rua A")));
+
+    assertThat(
+            passengers.findRoutePassengers(
+                driver.getId(), DayOfWeek.MONDAY, OperationShift.MORNING))
+        .isEmpty();
+  }
+
+  @Test
+  void findsTheRoutePassengersInOneStatementWhateverTheirNumber() {
+    SqlStatementCounter counter = new SqlStatementCounter(entityManagerFactory);
+    passengers.save(newPassenger(driver, "Lucas", "Rua A"));
+    long withOne = counter.countStatements(() -> findMondayMorningPassengers());
+
+    passengers.save(newPassenger(driver, "Ana", "Rua B"));
+    passengers.save(newPassenger(driver, "Bia", "Rua C"));
+    long withThree = counter.countStatements(() -> findMondayMorningPassengers());
+
+    assertThat(findMondayMorningPassengers()).hasSize(3);
+    assertThat(withOne).isEqualTo(1);
+    assertThat(withThree).isEqualTo(1);
+  }
+
+  private List<RoutePassengerDTO> findMondayMorningPassengers() {
+    return passengers.findRoutePassengers(driver.getId(), DayOfWeek.MONDAY, OperationShift.MORNING);
   }
 
   private UnlinkedPassengerModel newPassenger(DriverModel owner, String name, String street) {
