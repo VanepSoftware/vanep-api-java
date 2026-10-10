@@ -23,6 +23,7 @@ import br.com.vanep.dependent.repository.DependentRepository;
 import br.com.vanep.school.model.SchoolModel;
 import br.com.vanep.school.repository.SchoolRepository;
 import br.com.vanep.state.model.StateModel;
+import br.com.vanep.unlinkedpassenger.model.UnlinkedPassengerModel;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -399,6 +400,70 @@ class AddressServiceTest {
 
     verify(addressRepository, never()).save(any(AddressModel.class));
     verify(dependents, never()).save(any());
+  }
+
+  @Test
+  void upsertForUnlinkedPassengerCreatesTheAddressAndSetsItOnThePassenger() {
+    UnlinkedPassengerModel passenger = new UnlinkedPassengerModel();
+    applyCityInto("Rua Barão de Jaguara");
+    when(addressRepository.save(any(AddressModel.class)))
+        .thenAnswer(
+            inv -> {
+              AddressModel saved = inv.getArgument(0);
+              saved.setId(40L);
+              return saved;
+            });
+
+    service.upsertForUnlinkedPassenger(passenger, catalogRequest());
+
+    assertThat(passenger.getAddress().getId()).isEqualTo(40L);
+    assertThat(passenger.getAddress().getStreet()).isEqualTo("Rua Barão de Jaguara");
+    verifyNoInteractions(placeResolver);
+  }
+
+  @Test
+  void upsertForUnlinkedPassengerOverwritesItsOwnAddress() {
+    AddressModel existing = addressWithToken("passenger-address");
+    existing.setId(40L);
+    UnlinkedPassengerModel passenger = new UnlinkedPassengerModel();
+    passenger.setAddress(existing);
+    when(addressRepository.findById(40L)).thenReturn(Optional.of(existing));
+    applyCityInto("Avenida Nova");
+    when(addressRepository.save(existing)).thenReturn(existing);
+
+    service.upsertForUnlinkedPassenger(passenger, catalogRequest());
+
+    assertThat(existing.getStreet()).isEqualTo("Avenida Nova");
+    assertThat(passenger.getAddress()).isSameAs(existing);
+  }
+
+  @Test
+  void upsertForUnlinkedPassengerIsRejectedWhenADependentOwnsTheSameAddress() {
+    AddressModel existing = addressWithToken("shared-address");
+    existing.setId(40L);
+    UnlinkedPassengerModel passenger = new UnlinkedPassengerModel();
+    passenger.setAddress(existing);
+    when(dependents.countByAddressId(40L)).thenReturn(1L);
+
+    assertThatThrownBy(() -> service.upsertForUnlinkedPassenger(passenger, catalogRequest()))
+        .isInstanceOfSatisfying(
+            ResponseStatusException.class,
+            ex -> assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.CONFLICT));
+
+    verifyNoInteractions(catalogResolver);
+  }
+
+  @Test
+  void clearForUnlinkedPassengerSoftDeletesItsAddress() {
+    AddressModel existing = addressWithToken("passenger-address");
+    existing.setId(40L);
+    UnlinkedPassengerModel passenger = new UnlinkedPassengerModel();
+    passenger.setAddress(existing);
+    when(addressRepository.findById(40L)).thenReturn(Optional.of(existing));
+
+    service.clearForUnlinkedPassenger(passenger);
+
+    verify(addressRepository).delete(existing);
   }
 
   private DependentModel dependentWithId(Long id) {

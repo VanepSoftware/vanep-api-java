@@ -10,10 +10,10 @@ import br.com.vanep.dependent.model.DependentModel;
 import br.com.vanep.dependent.repository.DependentRepository;
 import br.com.vanep.school.model.SchoolModel;
 import br.com.vanep.school.repository.SchoolRepository;
+import br.com.vanep.unlinkedpassenger.model.UnlinkedPassengerModel;
 import java.util.Collection;
 import java.util.Map;
 import java.util.function.Consumer;
-import java.util.function.LongConsumer;
 import java.util.stream.Collectors;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
@@ -72,16 +72,7 @@ public class AddressService {
   public AddressResponseDTO upsertForDependent(
       Long dependentId, DependentAddressRequestDTO request) {
     DependentModel dependent = requireDependent(dependentId);
-    Consumer<AddressModel> writeCatalogAddress =
-        address ->
-            catalogResolver.applyCity(
-                address,
-                request.cityToken(),
-                request.street(),
-                request.zipCode(),
-                request.number(),
-                request.complement(),
-                request.neighborhood());
+    Consumer<AddressModel> writeCatalogAddress = catalogAddressWriter(request);
     return upsertOwnedAddress(
         dependent.getAddressId(),
         writeCatalogAddress,
@@ -90,10 +81,26 @@ public class AddressService {
             rejectIfOwnedByAnotherActiveOwner(
                 dependents.countByAddressIdAndIdNot(dependent.getAddressId(), dependent.getId()),
                 schools.countByAddressId(dependent.getAddressId())),
-        savedId -> {
-          dependent.setAddressId(savedId);
+        saved -> {
+          dependent.setAddressId(saved.getId());
           dependents.save(dependent);
         });
+  }
+
+  @Transactional
+  public AddressResponseDTO upsertForUnlinkedPassenger(
+      UnlinkedPassengerModel passenger, DependentAddressRequestDTO request) {
+    Long currentAddressId = passenger.getAddress() == null ? null : passenger.getAddress().getId();
+    Consumer<AddressModel> writeCatalogAddress = catalogAddressWriter(request);
+    return upsertOwnedAddress(
+        currentAddressId,
+        writeCatalogAddress,
+        writeCatalogAddress,
+        () ->
+            rejectIfOwnedByAnotherActiveOwner(
+                dependents.countByAddressId(currentAddressId),
+                schools.countByAddressId(currentAddressId)),
+        saved -> passenger.setAddress(saved));
   }
 
   @Transactional
@@ -107,8 +114,8 @@ public class AddressService {
             rejectIfOwnedByAnotherActiveOwner(
                 dependents.countByAddressId(school.getAddressId()),
                 schools.countByAddressIdAndIdNot(school.getAddressId(), school.getId())),
-        savedId -> {
-          school.setAddressId(savedId);
+        saved -> {
+          school.setAddressId(saved.getId());
           schools.save(school);
         });
   }
@@ -121,6 +128,11 @@ public class AddressService {
       dependent.setAddressId(null);
       dependents.save(dependent);
     }
+  }
+
+  @Transactional
+  public void clearForUnlinkedPassenger(UnlinkedPassengerModel passenger) {
+    softDeleteOwnedAddress(passenger.getAddress().getId());
   }
 
   @Transactional
@@ -138,7 +150,7 @@ public class AddressService {
       Consumer<AddressModel> writeToNewAddress,
       Consumer<AddressModel> writeToExistingAddress,
       Runnable rejectIfOwnedByAnother,
-      LongConsumer linkToOwner) {
+      Consumer<AddressModel> linkToOwner) {
     if (currentAddressId != null) {
       rejectIfOwnedByAnother.run();
       AddressModel address =
@@ -155,7 +167,7 @@ public class AddressService {
     AddressModel address = new AddressModel();
     writeToNewAddress.accept(address);
     AddressModel saved = addressRepository.save(address);
-    linkToOwner.accept(saved.getId());
+    linkToOwner.accept(saved);
     return mapper.toResponse(saved);
   }
 
@@ -189,6 +201,18 @@ public class AddressService {
         .findById(schoolId)
         .orElseThrow(
             () -> new ResponseStatusException(HttpStatus.NOT_FOUND, message("school.not_found")));
+  }
+
+  private Consumer<AddressModel> catalogAddressWriter(DependentAddressRequestDTO request) {
+    return address ->
+        catalogResolver.applyCity(
+            address,
+            request.cityToken(),
+            request.street(),
+            request.zipCode(),
+            request.number(),
+            request.complement(),
+            request.neighborhood());
   }
 
   private void applyToNewAddress(AddressModel address, AddressRequestDTO request) {
