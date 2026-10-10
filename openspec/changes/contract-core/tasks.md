@@ -91,17 +91,17 @@
 > Depends on: PR 3 | Parallel with: —
 > Order: test → request DTO → policy
 
-- [ ] 4.1 Criar branch `feat/contract-core-policies` de dentro da branch do PR 3
-- [ ] 4.2 Teste de `ContractTransitionPolicy` com a **matriz inteira** (64 pares), aceitando só as transições do D4; terminais não saem para lugar nenhum
-- [ ] 4.3 Implementar `contract.service.ContractTransitionPolicy`
-- [ ] 4.4 Teste de `ContractTermsPolicy` — **só as regras que cruzam campos** (D5): período de exatamente 12 meses aceito; 12 meses + 1 dia recusado (`contract.period.too_long`); ano letivo julho–junho aceito; `ends_on` igual a `starts_on` ou anterior recusado (`contract.period.invalid`). As faixas de `installments`, `due_day` e `total_amount` **não** entram na policy: são Bean Validation no DTO (tarefa 5.6). Devolve `Optional` de uma violação cujo enum carrega a chave de MessageSource (padrão `TripCoherencePolicy`)
-- [ ] 4.5 Implementar `contract.service.ContractTermsPolicy`
-- [ ] 4.6 Teste de `LinkStatusPolicy` com a tabela do D8: sem contrato → `PENDING`; só `ENDED` → `INACTIVE`; `ENDED` + `ACTIVE` → `ACTIVE`; só `SUSPENDED` → `ACTIVE`; só `SIGNED` → `ACTIVE`; `BLOCKED` permanece `BLOCKED` em todos os casos
-- [ ] 4.7 Implementar `clientdriver.service.LinkStatusPolicy`
-- [ ] 4.8 Teste de `ScheduleSlotPolicy`: lista vazia recusada; `(weekday, leg)` repetido recusado; `window_end` anterior ou igual a `window_start` recusado; `window_end` nulo aceito; integral (ida `MORNING`, volta `AFTERNOON` no mesmo dia) aceito
-- [ ] 4.9 Criar `schedule.dto.ScheduleSlotRequestDTO` (`weekday`, `leg`, `shift` obrigatórios; `windowStart` obrigatório; `windowEnd` opcional) — compartilhado pelo contrato e pelo aluno não vinculado
-- [ ] 4.10 Implementar `schedule.service.ScheduleSlotPolicy` sobre `List<ScheduleSlotRequestDTO>`, devolvendo `Optional<ScheduleSlotViolation>` com a chave de MessageSource (as chaves entram na tarefa 5.7)
-- [ ] 4.11 `make lint` + `./mvnw verify -B`
+- [x] 4.1 Criar branch `feat/contract-core-policies` de dentro da branch do PR 3
+- [x] 4.2 Teste de `ContractTransitionPolicy` com a **matriz inteira** (64 pares), aceitando só as transições do D4; terminais não saem para lugar nenhum
+- [x] 4.3 Implementar `contract.service.ContractTransitionPolicy`
+- [x] 4.4 Teste de `ContractTermsPolicy` — **só as regras que cruzam campos** (D5): período de exatamente 12 meses aceito; 12 meses + 1 dia recusado (`contract.period.too_long`); ano letivo julho–junho aceito; `ends_on` igual a `starts_on` ou anterior recusado (`contract.period.invalid`). As faixas de `installments`, `due_day` e `total_amount` **não** entram na policy: são Bean Validation no DTO (tarefa 5.6). Devolve `Optional` de uma violação cujo enum carrega a chave de MessageSource (padrão `TripCoherencePolicy`)
+- [x] 4.5 Implementar `contract.service.ContractTermsPolicy`
+- [x] 4.6 Teste de `LinkStatusPolicy` com a tabela do D8: sem contrato → `PENDING`; só `ENDED` → `INACTIVE`; `ENDED` + `ACTIVE` → `ACTIVE`; só `SUSPENDED` → `ACTIVE`; só `SIGNED` → `ACTIVE`; `BLOCKED` permanece `BLOCKED` em todos os casos
+- [x] 4.7 Implementar `clientdriver.service.LinkStatusPolicy`
+- [x] 4.8 Teste de `ScheduleSlotPolicy`: lista vazia recusada; `(weekday, leg)` repetido recusado; `window_end` anterior ou igual a `window_start` recusado; `window_end` nulo aceito; integral (ida `MORNING`, volta `AFTERNOON` no mesmo dia) aceito
+- [x] 4.9 Criar `schedule.dto.ScheduleSlotRequestDTO` (`weekday`, `leg`, `shift` obrigatórios; `windowStart` obrigatório; `windowEnd` opcional) — compartilhado pelo contrato e pelo aluno não vinculado
+- [x] 4.10 Implementar `schedule.service.ScheduleSlotPolicy` sobre `List<ScheduleSlotRequestDTO>`, devolvendo `Optional<ScheduleSlotViolation>` com a chave de MessageSource (as chaves entram na tarefa 5.7)
+- [x] 4.11 `make lint` + `./mvnw verify -B`
 
 ## 5. PR 5 — Serviço do contrato, permissões e acesso das partes
 
