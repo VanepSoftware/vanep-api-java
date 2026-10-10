@@ -1,6 +1,6 @@
 # QA — contract-core (constitution rule 55)
 
-Latest run: API built from `feat/contract-core-contract-http`, which contains phases 1 to 6. Run date: 2026-10-13. Result: **185/185 passed**.
+Latest run: API built from `feat/contract-core-client-driver-status`, which contains phases 1 to 7. Run date: 2026-10-13. Result: **202/202 passed**.
 
 ## How to run
 
@@ -29,7 +29,7 @@ Tokens come from the mobile password grant (`urn:vanep:params:oauth:grant-type:p
 
 ## Startup and migration
 
-Flyway applied `V56` to `V59` on an empty database at boot, after the `main` migrations up to `V55`. The seed creates the link between Ana Souza and Fabio Teixeira as `ACTIVE`, with no contract: the `ContractSeeder` arrives in phase 7. Before phase 7 the demo seed also runs before the city catalog, so it skips the seed school and creates Lucas and Marina Souza without school or address (the runner order is fixed in phase 7). The script creates that school with SQL and completes both dependents through `PATCH /api/dependent/{token}`, as the client would. The script first creates, through the API, the contract that seeder will create: Lucas Souza, Monday to Friday, outbound and return.
+Flyway applied `V56` to `V60` on an empty database at boot, after the `main` migrations up to `V55`. The seed creates the link between Ana Souza and Fabio Teixeira as `PENDING`, and the `ContractSeeder` activates it with an `ACTIVE` contract for Lucas Souza (Monday to Friday, outbound and return), so the run starts with one contract and one `ACTIVE` link (B1).
 
 ## Results
 
@@ -98,7 +98,7 @@ Flyway applied `V56` to `V59` on an empty database at boot, after the `main` mig
 | K12 | an item priced at zero | rejected by contract_item_monthly_amount_check | PASS |
 | K13 | an item without a pickup street | rejected by pickup_street | PASS |
 | K14 | a valid item copying the dependent's school and address | accepted | PASS |
-| K15 | the rolled-back checks left no contract behind | 0 | PASS |
+| K15 | the rolled-back checks left no contract behind | 1 | PASS |
 
 ### V59: contract permissions of the ADMIN bundle
 
@@ -106,8 +106,8 @@ Flyway applied `V56` to `V59` on an empty database at boot, after the `main` mig
 |---|---|---|---|
 | P1 | a real admin token carries the six contract permissions | 6 | PASS |
 | P2 | no other bundle has a contract permission | 0 | PASS |
-| P3 | re-applying V59 on a bundle without them adds back exactly the six | 98 | PASS |
-| P4 | re-applying V59 again changes nothing | 98 | PASS |
+| P3 | re-applying V59 on a bundle without them adds back exactly the six | 97 | PASS |
+| P4 | re-applying V59 again changes nothing | 97 | PASS |
 | P5 | a fresh admin token still carries the six | 6 | PASS |
 
 ### GET /api/contracts and GET /api/contracts/{token}
@@ -283,6 +283,33 @@ Flyway applied `V56` to `V59` on an empty database at boot, after the `main` mig
 | Z5 | two concurrent restores of active contracts on one link: one 200, one 409 | 200 409 | PASS |
 | Z6 | a single one came back | 1 | PASS |
 
+### The link status has no direct write path
+
+| id | scenario | expected | result |
+|---|---|---|---|
+| B1 | the seeded link is ACTIVE through its seeded ACTIVE contract | 200 | PASS |
+| B2 | a status sent on creation is ignored | 201 | PASS |
+| B3 | BLOCKED sent on creation is ignored too | 201 | PASS |
+| B4 | the same pair twice | 409 | PASS |
+| B5 | missing clientToken | 400 | PASS |
+| B6 | a client cannot create a link | 403 | PASS |
+| B7 | the client of the link cannot activate it | 405 | PASS |
+| B8 | the driver of the link cannot activate it | 405 | PASS |
+| B9 | the admin cannot either | 405 | PASS |
+| B10 | the link stayed PENDING | PENDING | PASS |
+| B11 | update_client_driver is in no bundle | 0 | PASS |
+| B12 | nor in a real admin token | 0 | PASS |
+| B13 | accepted effect: a client cannot rate a driver through a link without contract | 422 | PASS |
+
+### V60: legacy links brought in line
+
+| id | scenario | expected | result |
+|---|---|---|---|
+| M1 | an ACTIVE link without contract becomes PENDING | PENDING | PASS |
+| M2 | every other link keeps its status (ACTIVE with contract, INACTIVE, PENDING) | 1cd21021c3f746bc9cd4d0229=ACTIVE,5c6fa84351d0498e8e7f54fef=ACTIVE,73b20871950a4e119e9d424c7=ACTIVE,7afccd31982d41cbb2e01f791=ACTIVE,a8b5168542574f6a997e6a1d2=PENDING,aea6404bada0490a8231c7ee9=ACTIVE,cff29ca719c4404bb2bdb28f6=INACTIVE,f44a119ad2f84ceab30a2123a=PENDING | PASS |
+| M3 | re-applying V60 changes nothing | 0f4fd888271e433d87cd447f8=PENDING,1cd21021c3f746bc9cd4d0229=ACTIVE,5c6fa84351d0498e8e7f54fef=ACTIVE,73b20871950a4e119e9d424c7=ACTIVE,7afccd31982d41cbb2e01f791=ACTIVE,a8b5168542574f6a997e6a1d2=PENDING,aea6404bada0490a8231c7ee9=ACTIVE,cff29ca719c4404bb2bdb28f6=INACTIVE,f44a119ad2f84ceab30a2123a=PENDING | PASS |
+| M4 | V60 also strips update_client_driver from a bundle that has it | 0 | PASS |
+
 ## Behaviors worth knowing
 
 - **A JSON number is accepted where an enum is expected.** `{"shift": 1}` starts the `AFTERNOON` route: Jackson reads the number as the enum position. This is the API-wide default, not something this change introduced. S7 checks a wrong type that is refused (an array).
@@ -293,3 +320,4 @@ Flyway applied `V56` to `V59` on an empty database at boot, after the `main` mig
 - **Concurrent writes on one link keep a single `ACTIVE` contract (Z1 to Z6).** The service checks first and the partial unique index decides the race; the request that loses gets the same `409 contract.active_conflict` as the sequential check. Before the fix in phase 5, one of six concurrent creates returned 500.
 - **The weekday-and-leg collision is enforced by the service only** (R5 in `design.md`). Two simultaneous creates for the same dependent on different links are not guarded by the database in this phase, and the script does not race them.
 - **Unknown and read-only fields in the create body are ignored (L5).** A contract always starts `ACTIVE`, and the pickup address always comes from the dependent.
+- **B13 is the accepted effect of R2:** with the link status derived from contracts, a client cannot rate a driver until the admin registers the contract of the pair.
