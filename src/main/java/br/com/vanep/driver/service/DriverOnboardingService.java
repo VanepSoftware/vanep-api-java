@@ -155,7 +155,7 @@ public class DriverOnboardingService {
     if (!documentsStep.completed()) {
       String missing =
           documentsStep.missingTypes().stream()
-              .map(DocumentTypeEnum::name)
+              .map(type -> type.name())
               .collect(Collectors.joining(", "));
       errors.add(
           messages.getMessage(
@@ -206,7 +206,7 @@ public class DriverOnboardingService {
 
   DriverOnboardingStepDTO evaluateVehicleStep(DriverModel driver) {
     List<VehicleModel> vehicles = vehicleRepository.findByDriverId(driver.getId());
-    boolean hasActiveVehicle = vehicles.stream().anyMatch(VehicleModel::isActive);
+    boolean hasActiveVehicle = vehicles.stream().anyMatch(vehicle -> vehicle.isActive());
     List<String> pending = new ArrayList<>();
     if (!hasActiveVehicle) {
       pending.add("vehicle");
@@ -216,7 +216,7 @@ public class DriverOnboardingService {
 
   DriverOnboardingStepDTO evaluateCnhStep(DriverModel driver) {
     List<DriverCnhModel> cnhs = driverCnhRepository.findByDriverId(driver.getId());
-    List<DriverCnhModel> activeCnhs = cnhs.stream().filter(DriverCnhModel::isActive).toList();
+    List<DriverCnhModel> activeCnhs = cnhs.stream().filter(cnh -> cnh.isActive()).toList();
     List<String> pending = new ArrayList<>();
     if (activeCnhs.isEmpty()) {
       pending.add("cnh");

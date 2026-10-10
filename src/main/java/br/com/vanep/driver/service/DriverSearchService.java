@@ -85,7 +85,7 @@ public class DriverSearchService {
     Page<DriverModel> page =
         drivers.findSearchableNewestFirst(
             PageRequest.of(pageable.getPageNumber(), pageable.getPageSize()));
-    List<Long> driverIds = page.getContent().stream().map(DriverModel::getId).toList();
+    List<Long> driverIds = page.getContent().stream().map(driver -> driver.getId()).toList();
     Map<Long, List<String>> areaNamesByDriver =
         driverIds.isEmpty() ? Map.of() : findAreaNames(driverIds);
     return page.map(driver -> toResponse(driver, areaNamesByDriver));
