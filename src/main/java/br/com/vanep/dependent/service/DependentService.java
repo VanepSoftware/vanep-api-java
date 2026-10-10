@@ -13,7 +13,7 @@ import br.com.vanep.dependent.model.DependentModel;
 import br.com.vanep.dependent.repository.DependentRepository;
 import br.com.vanep.school.model.SchoolModel;
 import br.com.vanep.school.repository.SchoolRepository;
-import br.com.vanep.shared.enums.Shift;
+import br.com.vanep.shared.enums.SchoolShift;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
 import java.util.Collection;
@@ -194,11 +194,11 @@ public class DependentService {
     model.setSelf(value);
   }
 
-  private void applyRequiredShift(JsonNullable<Shift> shiftField, DependentModel model) {
+  private void applyRequiredShift(JsonNullable<SchoolShift> shiftField, DependentModel model) {
     if (!shiftField.isPresent()) {
       return;
     }
-    Shift shift = shiftField.get();
+    SchoolShift shift = shiftField.get();
     if (shift == null) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, message("dependent.field.null"));
     }

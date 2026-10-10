@@ -13,7 +13,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import br.com.vanep.driver.DriverApprovalStatus;
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
-import br.com.vanep.shared.enums.Shift;
+import br.com.vanep.shared.enums.OperationShift;
 import br.com.vanep.trip.enums.TripStatus;
 import br.com.vanep.trip.model.TripModel;
 import br.com.vanep.trip.repository.TripRepository;
@@ -81,8 +81,37 @@ class TripControllerTest {
   }
 
   @Test
+  void creatingAFullTimeTripIsRejected() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/trips")
+                .with(adminJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(createBody(owner.getToken(), "FULLTIME")))
+        .andExpect(status().isBadRequest());
+
+    assertThat(trips.findAll()).isEmpty();
+  }
+
+  @Test
+  void patchingTheShiftToFullTimeIsRejectedAndKeepsTheStoredShift() throws Exception {
+    TripModel trip = persistTrip(owner, TODAY, OperationShift.MORNING, TripStatus.SCHEDULED);
+
+    mockMvc
+        .perform(
+            patch("/api/trips/" + trip.getToken())
+                .with(adminJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"shift\":\"FULLTIME\"}"))
+        .andExpect(status().isBadRequest());
+
+    assertThat(trips.findByToken(trip.getToken()).orElseThrow().getShift())
+        .isEqualTo(OperationShift.MORNING);
+  }
+
+  @Test
   void rejectsDuplicateActiveSlot() throws Exception {
-    persistTrip(owner, TODAY, Shift.MORNING, TripStatus.SCHEDULED);
+    persistTrip(owner, TODAY, OperationShift.MORNING, TripStatus.SCHEDULED);
 
     mockMvc
         .perform(
@@ -95,8 +124,8 @@ class TripControllerTest {
 
   @Test
   void listingExcludesRemovedTrips() throws Exception {
-    TripModel kept = persistTrip(owner, TODAY, Shift.MORNING, TripStatus.SCHEDULED);
-    TripModel removed = persistTrip(owner, TODAY, Shift.AFTERNOON, TripStatus.SCHEDULED);
+    TripModel kept = persistTrip(owner, TODAY, OperationShift.MORNING, TripStatus.SCHEDULED);
+    TripModel removed = persistTrip(owner, TODAY, OperationShift.AFTERNOON, TripStatus.SCHEDULED);
     trips.delete(removed);
 
     mockMvc
@@ -108,7 +137,7 @@ class TripControllerTest {
 
   @Test
   void owningDriverReadsOwnTripWithoutShowPermission() throws Exception {
-    TripModel trip = persistTrip(owner, TODAY, Shift.MORNING, TripStatus.SCHEDULED);
+    TripModel trip = persistTrip(owner, TODAY, OperationShift.MORNING, TripStatus.SCHEDULED);
 
     mockMvc
         .perform(get("/api/trips/" + trip.getToken()).with(driverJwt(ownerUid)))
@@ -118,7 +147,7 @@ class TripControllerTest {
 
   @Test
   void anotherDriverCannotReadSomeoneElsesTrip() throws Exception {
-    TripModel trip = persistTrip(owner, TODAY, Shift.MORNING, TripStatus.SCHEDULED);
+    TripModel trip = persistTrip(owner, TODAY, OperationShift.MORNING, TripStatus.SCHEDULED);
 
     mockMvc
         .perform(get("/api/trips/" + trip.getToken()).with(driverJwt(otherDriverUid)))
@@ -127,7 +156,7 @@ class TripControllerTest {
 
   @Test
   void owningDriverCannotDeleteOwnTrip() throws Exception {
-    TripModel trip = persistTrip(owner, TODAY, Shift.MORNING, TripStatus.SCHEDULED);
+    TripModel trip = persistTrip(owner, TODAY, OperationShift.MORNING, TripStatus.SCHEDULED);
 
     mockMvc
         .perform(delete("/api/trips/" + trip.getToken()).with(driverJwt(ownerUid)))
@@ -138,7 +167,7 @@ class TripControllerTest {
 
   @Test
   void adminDeletesAndRestoresTrip() throws Exception {
-    TripModel trip = persistTrip(owner, TODAY, Shift.MORNING, TripStatus.SCHEDULED);
+    TripModel trip = persistTrip(owner, TODAY, OperationShift.MORNING, TripStatus.SCHEDULED);
 
     mockMvc
         .perform(delete("/api/trips/" + trip.getToken()).with(adminJwt()))
@@ -153,7 +182,7 @@ class TripControllerTest {
 
   @Test
   void adminReopensACompletedRoute() throws Exception {
-    TripModel trip = persistTrip(owner, TODAY, Shift.MORNING, TripStatus.COMPLETED);
+    TripModel trip = persistTrip(owner, TODAY, OperationShift.MORNING, TripStatus.COMPLETED);
     trip.setStartedAt(Instant.parse("2026-09-10T09:00:00Z"));
     trip.setFinishedAt(Instant.parse("2026-09-10T12:00:00Z"));
     trips.save(trip);
@@ -171,7 +200,7 @@ class TripControllerTest {
 
   @Test
   void reopeningWithoutClearingTheFinishIsRefused() throws Exception {
-    TripModel trip = persistTrip(owner, TODAY, Shift.MORNING, TripStatus.COMPLETED);
+    TripModel trip = persistTrip(owner, TODAY, OperationShift.MORNING, TripStatus.COMPLETED);
     trip.setStartedAt(Instant.parse("2026-09-10T09:00:00Z"));
     trip.setFinishedAt(Instant.parse("2026-09-10T12:00:00Z"));
     trips.save(trip);
@@ -228,7 +257,7 @@ class TripControllerTest {
 
   @Test
   void patchingOnlyStatusLeavesEveryOtherStoredFieldUnchanged() throws Exception {
-    TripModel trip = persistTrip(owner, TODAY, Shift.AFTERNOON, TripStatus.COMPLETED);
+    TripModel trip = persistTrip(owner, TODAY, OperationShift.AFTERNOON, TripStatus.COMPLETED);
     Instant startedAt = Instant.parse("2026-09-10T09:00:00Z");
     Instant finishedAt = Instant.parse("2026-09-10T12:00:00Z");
     trip.setStartedAt(startedAt);
@@ -245,14 +274,14 @@ class TripControllerTest {
 
     TripModel stored = trips.findByToken(trip.getToken()).orElseThrow();
     assertThat(stored.getStatus()).isEqualTo(TripStatus.CANCELLED);
-    assertThat(stored.getShift()).isEqualTo(Shift.AFTERNOON);
+    assertThat(stored.getShift()).isEqualTo(OperationShift.AFTERNOON);
     assertThat(stored.getStartedAt()).isEqualTo(startedAt);
     assertThat(stored.getFinishedAt()).isEqualTo(finishedAt);
   }
 
   @Test
   void clearingANonNullableFieldIsRefused() throws Exception {
-    TripModel trip = persistTrip(owner, TODAY, Shift.MORNING, TripStatus.SCHEDULED);
+    TripModel trip = persistTrip(owner, TODAY, OperationShift.MORNING, TripStatus.SCHEDULED);
 
     mockMvc
         .perform(
@@ -265,7 +294,7 @@ class TripControllerTest {
 
   @Test
   void responseExposesNoNumericIdentifier() throws Exception {
-    TripModel trip = persistTrip(owner, TODAY, Shift.MORNING, TripStatus.SCHEDULED);
+    TripModel trip = persistTrip(owner, TODAY, OperationShift.MORNING, TripStatus.SCHEDULED);
 
     mockMvc
         .perform(get("/api/trips/" + trip.getToken()).with(adminJwt()))
@@ -286,7 +315,7 @@ class TripControllerTest {
   }
 
   private TripModel persistTrip(
-      DriverModel driver, LocalDate serviceDate, Shift shift, TripStatus status) {
+      DriverModel driver, LocalDate serviceDate, OperationShift shift, TripStatus status) {
     TripModel trip = new TripModel();
     trip.setDriver(driver);
     trip.setServiceDate(serviceDate);

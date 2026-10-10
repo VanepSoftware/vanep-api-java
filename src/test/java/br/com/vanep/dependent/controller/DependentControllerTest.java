@@ -25,13 +25,14 @@ import br.com.vanep.dependent.repository.DependentRepository;
 import br.com.vanep.places.client.PlacesClient;
 import br.com.vanep.school.model.SchoolModel;
 import br.com.vanep.school.repository.SchoolRepository;
-import br.com.vanep.shared.enums.Shift;
+import br.com.vanep.shared.enums.SchoolShift;
 import br.com.vanep.state.model.StateModel;
 import br.com.vanep.state.repository.StateRepository;
 import br.com.vanep.user.enums.Gender;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
+import com.jayway.jsonpath.JsonPath;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -125,7 +126,7 @@ class DependentControllerTest {
     DependentModel dependent = new DependentModel();
     dependent.setClientId(clientId);
     dependent.setName(name);
-    dependent.setShift(Shift.MORNING);
+    dependent.setShift(SchoolShift.MORNING);
     dependent.setDefaultDependent(isDefault);
     return dependents.save(dependent);
   }
@@ -232,6 +233,26 @@ class DependentControllerTest {
         .andExpect(jsonPath("$.school").value(nullValue()))
         .andExpect(jsonPath("$.address").value(nullValue()))
         .andExpect(jsonPath("$.addressToken").doesNotExist());
+  }
+
+  @Test
+  void createWithFullTimeShiftPersistsAndReturnsFullTime() throws Exception {
+    String body =
+        mockMvc
+            .perform(
+                post("/api/dependent")
+                    .with(ownerJwt())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"name\":\"Lucas Souza\",\"shift\":\"FULLTIME\"}"))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.shift").value("FULLTIME"))
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    String token = JsonPath.read(body, "$.token");
+
+    assertThat(dependents.findByToken(token).orElseThrow().getShift())
+        .isEqualTo(SchoolShift.FULLTIME);
   }
 
   @Test

@@ -1,6 +1,6 @@
 package br.com.vanep.trip.repository;
 
-import br.com.vanep.shared.enums.Shift;
+import br.com.vanep.shared.enums.OperationShift;
 import br.com.vanep.trip.model.TripModel;
 import java.time.LocalDate;
 import java.util.List;
@@ -23,7 +23,7 @@ public interface TripRepository extends JpaRepository<TripModel, Long> {
         and trip.shift = :shift
       """)
   Optional<TripModel> findByDriverAndServiceDateAndShift(
-      Long driverId, LocalDate serviceDate, Shift shift);
+      Long driverId, LocalDate serviceDate, OperationShift shift);
 
   @Query(
       """

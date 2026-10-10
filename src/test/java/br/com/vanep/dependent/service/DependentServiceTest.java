@@ -26,7 +26,7 @@ import br.com.vanep.dependent.model.DependentModel;
 import br.com.vanep.dependent.repository.DependentRepository;
 import br.com.vanep.school.model.SchoolModel;
 import br.com.vanep.school.repository.SchoolRepository;
-import br.com.vanep.shared.enums.Shift;
+import br.com.vanep.shared.enums.SchoolShift;
 import br.com.vanep.user.enums.Gender;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
@@ -144,7 +144,7 @@ class DependentServiceTest {
         "kid@vanep.com",
         false,
         false,
-        Shift.MORNING,
+        SchoolShift.MORNING,
         null,
         address,
         null,
@@ -182,7 +182,7 @@ class DependentServiceTest {
     model.setEmail("kid@vanep.com");
     model.setBirthDate(LocalDate.of(2015, 3, 20));
     model.setDocument("11111111111");
-    model.setShift(Shift.MORNING);
+    model.setShift(SchoolShift.MORNING);
     model.setDefaultDependent(isDefault);
     return model;
   }
@@ -196,7 +196,7 @@ class DependentServiceTest {
       JsonNullable<String> email,
       JsonNullable<Boolean> isSelf,
       JsonNullable<Boolean> isDefault,
-      JsonNullable<Shift> shift,
+      JsonNullable<SchoolShift> shift,
       JsonNullable<DependentAddressRequestDTO> address,
       JsonNullable<String> schoolToken) {
     return new DependentUpdateDTO(

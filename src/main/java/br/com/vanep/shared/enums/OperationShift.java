@@ -1,8 +1,7 @@
 package br.com.vanep.shared.enums;
 
-public enum Shift {
+public enum OperationShift {
   MORNING,
   AFTERNOON,
-  NIGHT,
-  FULLTIME
+  NIGHT
 }

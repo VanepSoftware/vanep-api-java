@@ -3,7 +3,7 @@ package br.com.vanep.dependent.seed;
 import br.com.vanep.client.repository.ClientRepository;
 import br.com.vanep.dependent.model.DependentModel;
 import br.com.vanep.dependent.repository.DependentRepository;
-import br.com.vanep.shared.enums.Shift;
+import br.com.vanep.shared.enums.SchoolShift;
 import br.com.vanep.user.repository.UserRepository;
 import java.util.Optional;
 import org.slf4j.Logger;
@@ -52,7 +52,7 @@ public class DependentSeeder {
     dependent.setClientId(clientId);
     dependent.setName(name);
     dependent.setDocument(document);
-    dependent.setShift(Shift.MORNING);
+    dependent.setShift(SchoolShift.MORNING);
     dependent.setDefaultDependent(isDefault);
     dependents.save(dependent);
     log.info("Seed: dependent created ({}).", name);
