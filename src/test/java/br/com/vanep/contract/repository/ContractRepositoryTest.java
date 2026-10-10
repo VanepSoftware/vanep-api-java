@@ -44,6 +44,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.jdbc.Sql;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -64,6 +65,7 @@ class ContractRepositoryTest {
   @Autowired private StateRepository states;
   @Autowired private CountryRepository countries;
   @Autowired private JdbcTemplate jdbc;
+  @Autowired private TransactionTemplate transactions;
 
   private CityModel city;
   private ClientModel client;
@@ -92,7 +94,7 @@ class ContractRepositoryTest {
                 newItem(lucas, RouteLeg.OUTBOUND),
                 newItem(ana, RouteLeg.OUTBOUND)));
 
-    List<ContractItemModel> found = items.findByContractId(contract.getId());
+    List<ContractItemModel> found = items.findByContractIdIn(List.of(contract.getId()));
 
     assertThat(found)
         .extracting(item -> item.getDependent().getName())
@@ -154,20 +156,32 @@ class ContractRepositoryTest {
   }
 
   @Test
-  void returnsOnlyTheSlotsOfTheDependentsActiveContracts() {
-    contracts.save(newContract(link, ContractStatus.ACTIVE, newItem(lucas, RouteLeg.OUTBOUND)));
-    contracts.save(newContract(link, ContractStatus.ENDED, newItem(lucas, RouteLeg.RETURN)));
-    contracts.save(newContract(link, ContractStatus.SUSPENDED, newItem(lucas, RouteLeg.RETURN)));
+  void returnsTheSlotsOfTheDependentsSignedContractsNotEndedWithTheirSchedules() {
+    ContractModel active =
+        contracts.save(newContract(link, ContractStatus.ACTIVE, newItem(lucas, RouteLeg.OUTBOUND)));
     ClientDriverModel secondDriverLink =
         createLink(client, createDriver("second@vanep.com", "52998224725"));
+    ContractModel suspended =
+        contracts.save(
+            newContract(
+                secondDriverLink, ContractStatus.SUSPENDED, newItem(lucas, RouteLeg.RETURN)));
+    ContractModel signed =
+        contracts.save(newContract(link, ContractStatus.SIGNED, newItem(lucas, RouteLeg.RETURN)));
+    contracts.save(newContract(link, ContractStatus.ENDED, newItem(lucas, RouteLeg.RETURN)));
+    contracts.save(newContract(link, ContractStatus.CANCELLED, newItem(lucas, RouteLeg.OUTBOUND)));
     contracts.save(
         newContract(secondDriverLink, ContractStatus.ACTIVE, newItem(ana, RouteLeg.RETURN)));
 
-    List<ScheduleSlotModel> slots = items.findActiveSlotsByDependentId(lucas.getId());
+    List<ScheduleSlotModel> slots =
+        items.findSlotsByDependentIdAndContractStatusIn(
+            lucas.getId(), ContractStatus.SIGNED_AND_NOT_ENDED);
 
     assertThat(slots)
-        .extracting(slot -> slot.getWeekday(), slot -> slot.getLeg())
-        .containsExactly(tuple(DayOfWeek.MONDAY, RouteLeg.OUTBOUND));
+        .extracting(slot -> slot.getSchedule().getId(), slot -> slot.getLeg())
+        .containsExactlyInAnyOrder(
+            tuple(scheduleIdOf(active), RouteLeg.OUTBOUND),
+            tuple(scheduleIdOf(suspended), RouteLeg.RETURN),
+            tuple(scheduleIdOf(signed), RouteLeg.RETURN));
   }
 
   @Test
@@ -207,12 +221,86 @@ class ContractRepositoryTest {
 
     assertThat(contracts.findByToken(saved.getToken())).isEmpty();
     assertThat(contracts.findByClientDriverId(link.getId())).isEmpty();
-    assertThat(items.findByContractId(saved.getId())).isEmpty();
-    assertThat(items.findActiveSlotsByDependentId(lucas.getId())).isEmpty();
+    assertThat(items.findByContractIdIn(List.of(saved.getId()))).isEmpty();
+    assertThat(
+            items.findSlotsByDependentIdAndContractStatusIn(
+                lucas.getId(), ContractStatus.SIGNED_AND_NOT_ENDED))
+        .isEmpty();
     assertThat(countSoftDeleted("contract")).isEqualTo(1);
     assertThat(countSoftDeleted("contract_item")).isEqualTo(2);
     assertThat(countSoftDeleted("schedule")).isEqualTo(2);
     assertThat(countSoftDeleted("schedule_slot")).isEqualTo(2);
+  }
+
+  @Test
+  void findsTheItemsOfSeveralContractsInOneQuery() {
+    ContractModel ended =
+        contracts.save(newContract(link, ContractStatus.ENDED, newItem(lucas, RouteLeg.OUTBOUND)));
+    ContractModel active =
+        contracts.save(newContract(link, ContractStatus.ACTIVE, newItem(ana, RouteLeg.RETURN)));
+
+    assertThat(items.findByContractIdIn(List.of(ended.getId(), active.getId())))
+        .extracting(item -> item.getContract().getId(), item -> item.getDependent().getName())
+        .containsExactly(tuple(ended.getId(), "Lucas"), tuple(active.getId(), "Ana"));
+  }
+
+  @Test
+  void findsTheLinkTokenOfAContract() {
+    ContractModel saved =
+        contracts.save(newContract(link, ContractStatus.ACTIVE, newItem(lucas, RouteLeg.OUTBOUND)));
+
+    assertThat(contracts.findClientDriverTokenByToken(saved.getToken())).contains(link.getToken());
+    assertThat(contracts.findClientDriverTokenByToken("missing")).isEmpty();
+  }
+
+  @Test
+  void restoringBringsBackTheContractItsItemsSchedulesAndSlots() {
+    ContractModel saved =
+        contracts.save(
+            newContract(
+                link,
+                ContractStatus.ACTIVE,
+                newItem(lucas, RouteLeg.OUTBOUND),
+                newItem(ana, RouteLeg.OUTBOUND)));
+    contracts.delete(contracts.findByToken(saved.getToken()).orElseThrow());
+    assertThat(contracts.existsDeletedByToken(saved.getToken())).isTrue();
+
+    transactions.executeWithoutResult(
+        status -> {
+          contracts.restoreByToken(saved.getToken());
+          items.restoreByContractToken(saved.getToken());
+          items.restoreSchedulesByContractToken(saved.getToken());
+          items.restoreSlotsByContractToken(saved.getToken());
+        });
+
+    assertThat(contracts.existsDeletedByToken(saved.getToken())).isFalse();
+    assertThat(items.findByContractIdIn(List.of(saved.getId())))
+        .allSatisfy(item -> assertThat(item.getSchedule().getSlots()).hasSize(1))
+        .hasSize(2);
+    assertThat(countSoftDeleted("contract_item")).isZero();
+    assertThat(countSoftDeleted("schedule")).isZero();
+    assertThat(countSoftDeleted("schedule_slot")).isZero();
+  }
+
+  @Test
+  void aDeletedActiveContractConflictsOnRestoreOnlyWithAnotherActiveOfTheSameLink() {
+    ContractModel deletedActive =
+        contracts.save(newContract(link, ContractStatus.ACTIVE, newItem(lucas, RouteLeg.OUTBOUND)));
+    ContractModel deletedEnded =
+        contracts.save(newContract(link, ContractStatus.ENDED, newItem(lucas, RouteLeg.OUTBOUND)));
+    contracts.delete(contracts.findByToken(deletedActive.getToken()).orElseThrow());
+    contracts.delete(contracts.findByToken(deletedEnded.getToken()).orElseThrow());
+
+    assertThat(contracts.existsActiveConflictForRestore(deletedActive.getToken())).isFalse();
+
+    contracts.save(newContract(link, ContractStatus.ACTIVE, newItem(lucas, RouteLeg.OUTBOUND)));
+
+    assertThat(contracts.existsActiveConflictForRestore(deletedActive.getToken())).isTrue();
+    assertThat(contracts.existsActiveConflictForRestore(deletedEnded.getToken())).isFalse();
+  }
+
+  private Long scheduleIdOf(ContractModel contract) {
+    return contract.getItems().iterator().next().getSchedule().getId();
   }
 
   private ContractModel newContract(

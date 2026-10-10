@@ -109,8 +109,8 @@
 > Depends on: PR 4 | Parallel with: —
 > Order: test → migration → security/authorization → request DTO → messages → service → response DTO → mapper
 
-- [ ] 5.1 Criar branch `feat/contract-core-service` de dentro da branch do PR 4
-- [ ] 5.2 Testes unitários de `ContractService` (Mockito):
+- [x] 5.1 Criar branch `feat/contract-core-service` de dentro da branch do PR 4
+- [x] 5.2 Testes unitários de `ContractService` (Mockito):
     - criar com dois irmãos → contrato `ACTIVE`, itens com escola e endereço **copiados**, vínculo recalculado para `ACTIVE`
     - dependente de outro cliente → 422 `contract.item.dependent_not_in_link`
     - dependente sem escola / sem endereço → 422 `contract.item.school_required` / `contract.item.address_required`
@@ -121,24 +121,24 @@
     - período invertido ou acima de 12 meses → a chave da `ContractTermsPolicy` (422)
     - `PATCH` `ACTIVE → ENDED` → vínculo `INACTIVE`; `ACTIVE → SUSPENDED` → vínculo continua `ACTIVE`; `ENDED → ACTIVE` → 409 `contract.status.invalid_transition`; `SUPERSEDED` → 422 `contract.status.requires_successor`; `status: null` → 400 `contract.status.required`; `SUSPENDED → ACTIVE` com outro `ACTIVE` no par → 409 `contract.active_conflict`; `PATCH` vazio não grava nada
     - remover → vínculo recalculado; restaurar → itens, agendas e slots de volta e vínculo recalculado; restaurar com outro `ACTIVE` no par → 409 `contract.active_conflict`; restaurar com horário tomado por outro contrato assinado e não encerrado → 409 `contract.item.slot_conflict`; restaurar não colide com a própria agenda; restaurar contrato encerrado não confere colisão
-- [ ] 5.3 Migration `V56__admin_manages_contracts.sql`: acrescentar as seis permissões ao bundle `ADMIN`, idempotente, no padrão da `V48`. Provar num PostgreSQL descartável: bundle parcial recebe só as que faltam, `CLIENT` intocado, reaplicar não muda nada
-- [ ] 5.4 Acrescentar `LIST_CONTRACTS`, `SHOW_CONTRACT`, `CREATE_CONTRACT`, `UPDATE_CONTRACT`, `DELETE_CONTRACT`, `RESTORE_CONTRACT` ao `PermissionEnum` (o bundle `ADMIN` do seeder já sincroniza com o registro)
-- [ ] 5.5 Acrescentar `isContractParty(String token, Authentication authentication)` ao `SecurityEvaluator`, resolvendo o token do vínculo pelo contrato e reaproveitando a comparação do `isClientDriverLinkParty` (regra 22). Teste unitário: cliente do vínculo → true; motorista do vínculo → true; outro cliente → false; token inexistente → false
-- [ ] 5.6 Criar `ContractCreateRequestDTO` (vínculo por token, datas `@NotNull`, `totalAmount` `@DecimalMin(value = "0", inclusive = false)`, `installments` `@Min(1) @Max(12)`, `dueDay` `@Min(1) @Max(28)` — cada uma com `message = "{chave}"`, padrão do `DriverUpdateRequestDTO` — e itens `@NotEmpty`), `ContractItemRequestDTO` (dependente por token, `monthlyAmount` maior que zero e slots do `ScheduleSlotRequestDTO`) e `ContractUpdateRequestDTO` (`JsonNullable<ContractStatus> status`, construtor compacto com `undefined()`)
-- [ ] 5.7 Chaves de MessageSource (EN + pt-BR) para todas as mensagens acima, mais `contract.not_found`, `contract.period.too_long`, `contract.period.invalid`, `contract.amount.invalid`, `contract.installments.invalid`, `contract.due_day.invalid`, `contract.items.required` (estas quatro usadas pelas anotações dos DTOs da tarefa 5.6, `message = "{...}"`), `schedule.slot.duplicate`, `schedule.slot.window_invalid`, `schedule.slots.required` (regra 46)
-- [ ] 5.8 Implementar `schedule.service.ScheduleService` (`create(slots)` e `replace(schedule, slots)`, aplicando a `ScheduleSlotPolicy`; `replace` soft-deleta os slots antigos na mesma transação) com testes unitários próprios
+- [x] 5.3 Migration `V56__admin_manages_contracts.sql`: acrescentar as seis permissões ao bundle `ADMIN`, idempotente, no padrão da `V48`. Provar num PostgreSQL descartável: bundle parcial recebe só as que faltam, `CLIENT` intocado, reaplicar não muda nada
+- [x] 5.4 Acrescentar `LIST_CONTRACTS`, `SHOW_CONTRACT`, `CREATE_CONTRACT`, `UPDATE_CONTRACT`, `DELETE_CONTRACT`, `RESTORE_CONTRACT` ao `PermissionEnum` (o bundle `ADMIN` do seeder já sincroniza com o registro)
+- [x] 5.5 Acrescentar `isContractParty(String token, Authentication authentication)` ao `SecurityEvaluator`, resolvendo o token do vínculo pelo contrato e reaproveitando a comparação do `isClientDriverLinkParty` (regra 22). Teste unitário: cliente do vínculo → true; motorista do vínculo → true; outro cliente → false; token inexistente → false
+- [x] 5.6 Criar `ContractCreateRequestDTO` (vínculo por token, datas `@NotNull`, `totalAmount` `@DecimalMin(value = "0", inclusive = false)`, `installments` `@Min(1) @Max(12)`, `dueDay` `@Min(1) @Max(28)` — cada uma com `message = "{chave}"`, padrão do `DriverUpdateRequestDTO` — e itens `@NotEmpty`), `ContractItemRequestDTO` (dependente por token, `monthlyAmount` maior que zero e slots do `ScheduleSlotRequestDTO`) e `ContractUpdateRequestDTO` (`JsonNullable<ContractStatus> status`, construtor compacto com `undefined()`)
+- [x] 5.7 Chaves de MessageSource (EN + pt-BR) para todas as mensagens acima, mais `contract.not_found`, `contract.period.too_long`, `contract.period.invalid`, `contract.amount.invalid`, `contract.installments.invalid`, `contract.due_day.invalid`, `contract.items.required` (estas quatro usadas pelas anotações dos DTOs da tarefa 5.6, `message = "{...}"`), `schedule.slot.duplicate`, `schedule.slot.window_invalid`, `schedule.slots.required` (regra 46)
+- [x] 5.8 Implementar `schedule.service.ScheduleService` (`create(slots)` e `replace(schedule, slots)`, aplicando a `ScheduleSlotPolicy`; `replace` soft-deleta os slots antigos na mesma transação) com testes unitários próprios
     - `replace` = `schedule.getSlots().clear()` + `flush` + `addSlot` dos novos + `save` da agenda; o `orphanRemoval` soft-deleta os antigos antes dos inserts. Sem repositório de slot (tarefa 2.7)
     - **Provar num PostgreSQL descartável** (o H2 não tem o índice parcial): trocar uma agenda com "segunda, ida" por outra com "segunda, ida" em outro horário, pelo `ScheduleService`, passa sem violar `schedule_slot_weekday_leg_active_key`
-- [ ] 5.9 Implementar `contract.service.ContractService` (criar, buscar, listar por vínculo, página, mudar status, remover, restaurar). O recálculo do vínculo usa a `LinkStatusPolicy` e roda na mesma transação de toda escrita (D8)
+- [x] 5.9 Implementar `contract.service.ContractService` (criar, buscar, listar por vínculo, página, mudar status, remover, restaurar). O recálculo do vínculo usa a `LinkStatusPolicy` e roda na mesma transação de toda escrita (D8)
     - `ContractStatus.SIGNED_AND_NOT_ENDED` (`SIGNED`, `ACTIVE`, `SUSPENDED`) é o conjunto usado pela `LinkStatusPolicy` e pela colisão de horários do D6
     - `ContractItemRepository`: itens de vários contratos numa consulta (`findByContractIdIn`), para página e lista sem N+1; slots de um dependente por status do contrato (`findSlotsByDependentIdAndContractStatusIn`), com a agenda junto
     - a colisão de `(weekday, leg)` vale na criação e na restauração de um contrato assinado e não encerrado, ignorando a própria agenda
     - toda transição para `ACTIVE` confere o `ACTIVE` do par antes de gravar
     - restaurar volta contrato, itens, agendas e slots por SQL nativo (padrão do `restoreByToken`), com o conflito de `ACTIVE` conferido antes do `UPDATE`
     - provar os testes de repositório de contrato e agenda num PostgreSQL descartável com as migrations até a `V56`
-- [ ] 5.10 Criar `schedule.dto.ScheduleSlotResponseDTO` e `schedule.mapper.ScheduleMapper` — compartilhados pelas duas superfícies HTTP (PR 6 e PR 8). O mapper devolve os slots ordenados por dia (`DayOfWeek`) e trecho (`OUTBOUND` antes de `RETURN`), com teste: o banco não ordena o `weekday`, que é texto (tarefa 2.2)
-- [ ] 5.11 Criar `ContractResponseDTO`, `ContractItemResponseDTO` e `ContractMapper` (slots pelo `ScheduleMapper` da tarefa 5.10) (nunca devolver model — regra 12)
-- [ ] 5.12 `make lint` + `./mvnw verify -B`
+- [x] 5.10 Criar `schedule.dto.ScheduleSlotResponseDTO` e `schedule.mapper.ScheduleMapper` — compartilhados pelas duas superfícies HTTP (PR 6 e PR 8). O mapper devolve os slots ordenados por dia (`DayOfWeek`) e trecho (`OUTBOUND` antes de `RETURN`), com teste: o banco não ordena o `weekday`, que é texto (tarefa 2.2)
+- [x] 5.11 Criar `ContractResponseDTO`, `ContractItemResponseDTO` e `ContractMapper` (slots pelo `ScheduleMapper` da tarefa 5.10) (nunca devolver model — regra 12)
+- [x] 5.12 `make lint` + `./mvnw verify -B`
 
 ## 6. PR 6 — HTTP do contrato
 
