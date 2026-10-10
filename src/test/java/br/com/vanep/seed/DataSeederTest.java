@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -14,6 +15,7 @@ import br.com.vanep.auth.security.PermissionRegistry;
 import br.com.vanep.client.repository.ClientRepository;
 import br.com.vanep.clientdriver.seed.ClientDriverSeeder;
 import br.com.vanep.clientrating.seed.ClientRatingSeeder;
+import br.com.vanep.contract.seed.ContractSeeder;
 import br.com.vanep.dependent.seed.DependentSeeder;
 import br.com.vanep.driver.DriverApprovalStatus;
 import br.com.vanep.driver.DriverRepository;
@@ -26,6 +28,7 @@ import br.com.vanep.role.model.RoleModel;
 import br.com.vanep.role.repository.RoleRepository;
 import br.com.vanep.rolepermission.model.RolePermissionModel;
 import br.com.vanep.rolepermission.repository.RolePermissionRepository;
+import br.com.vanep.school.seed.SchoolSeeder;
 import br.com.vanep.trip.seed.TripSeeder;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
@@ -37,6 +40,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.boot.DefaultApplicationArguments;
@@ -50,6 +54,7 @@ class DataSeederTest {
   @Mock private RoleRepository roles;
   @Mock private RolePermissionRepository rolePermissions;
 
+  @Mock private SchoolSeeder schoolSeeder;
   @Mock private DependentSeeder dependentSeeder;
   @Mock private DriverCnhSeeder driverCnhSeeder;
   @Mock private DriverDocumentSeeder driverDocumentSeeder;
@@ -57,6 +62,7 @@ class DataSeederTest {
   @Mock private ClientRatingSeeder clientRatingSeeder;
   @Mock private TripSeeder tripSeeder;
   @Mock private ClientDriverSeeder clientDriverSeeder;
+  @Mock private ContractSeeder contractSeeder;
   @Mock private PasswordEncoder passwordEncoder;
 
   private DataSeeder seeder;
@@ -70,6 +76,7 @@ class DataSeederTest {
             drivers,
             roles,
             rolePermissions,
+            schoolSeeder,
             dependentSeeder,
             driverCnhSeeder,
             driverDocumentSeeder,
@@ -77,6 +84,7 @@ class DataSeederTest {
             clientRatingSeeder,
             tripSeeder,
             clientDriverSeeder,
+            contractSeeder,
             passwordEncoder);
 
     seeder.adminEmail = "admin@vanep.com.br";
@@ -269,6 +277,33 @@ class DataSeederTest {
     seeder.run(new DefaultApplicationArguments());
 
     verify(users, atLeastOnce()).save(any(UserModel.class));
+  }
+
+  @Test
+  void seedsTheSchoolBeforeTheDependentsAndTheContractRightAfterTheLink() {
+    seeder.enabled = true;
+    RoleModel adminRole = roleTaggedAs(RoleName.ADMIN);
+    adminRole.setRolePermission(new RolePermissionModel());
+    when(roles.findByRoleName(RoleName.ADMIN)).thenReturn(Optional.of(adminRole));
+    when(roles.findByRoleName(RoleName.CLIENT))
+        .thenReturn(Optional.of(roleTaggedAs(RoleName.CLIENT)));
+    when(roles.findByRoleName(RoleName.DRIVER))
+        .thenReturn(Optional.of(roleTaggedAs(RoleName.DRIVER)));
+    when(roles.findByRoleName(RoleName.ASSISTANT))
+        .thenReturn(Optional.of(roleTaggedAs(RoleName.ASSISTANT)));
+    when(users.existsByEmail(anyString())).thenReturn(true);
+    when(users.findByTypeAndRoleIdIsNull(UserType.ADMIN)).thenReturn(List.of());
+
+    seeder.run(new DefaultApplicationArguments());
+
+    InOrder order =
+        inOrder(
+            schoolSeeder, dependentSeeder, clientDriverSeeder, contractSeeder, driverRatingSeeder);
+    order.verify(schoolSeeder).seed();
+    order.verify(dependentSeeder).seed();
+    order.verify(clientDriverSeeder).seed();
+    order.verify(contractSeeder).seed();
+    order.verify(driverRatingSeeder).seed();
   }
 
   @Test

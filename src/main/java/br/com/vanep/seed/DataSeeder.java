@@ -6,6 +6,7 @@ import br.com.vanep.client.model.ClientModel;
 import br.com.vanep.client.repository.ClientRepository;
 import br.com.vanep.clientdriver.seed.ClientDriverSeeder;
 import br.com.vanep.clientrating.seed.ClientRatingSeeder;
+import br.com.vanep.contract.seed.ContractSeeder;
 import br.com.vanep.dependent.seed.DependentSeeder;
 import br.com.vanep.driver.DriverApprovalStatus;
 import br.com.vanep.driver.DriverRepository;
@@ -18,6 +19,7 @@ import br.com.vanep.role.model.RoleModel;
 import br.com.vanep.role.repository.RoleRepository;
 import br.com.vanep.rolepermission.model.RolePermissionModel;
 import br.com.vanep.rolepermission.repository.RolePermissionRepository;
+import br.com.vanep.school.seed.SchoolSeeder;
 import br.com.vanep.trip.seed.TripSeeder;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
@@ -48,6 +50,7 @@ public class DataSeeder implements ApplicationRunner {
   private final DriverRepository drivers;
   private final RoleRepository roles;
   private final RolePermissionRepository rolePermissions;
+  private final SchoolSeeder schoolSeeder;
   private final DependentSeeder dependentSeeder;
   private final DriverCnhSeeder driverCnhSeeder;
   private final DriverDocumentSeeder driverDocumentSeeder;
@@ -55,6 +58,7 @@ public class DataSeeder implements ApplicationRunner {
   private final ClientRatingSeeder clientRatingSeeder;
   private final TripSeeder tripSeeder;
   private final ClientDriverSeeder clientDriverSeeder;
+  private final ContractSeeder contractSeeder;
   private final PasswordEncoder passwordEncoder;
 
   @Value("${vanep.seed.enabled:false}")
@@ -78,6 +82,7 @@ public class DataSeeder implements ApplicationRunner {
       DriverRepository drivers,
       RoleRepository roles,
       RolePermissionRepository rolePermissions,
+      SchoolSeeder schoolSeeder,
       DependentSeeder dependentSeeder,
       DriverCnhSeeder driverCnhSeeder,
       DriverDocumentSeeder driverDocumentSeeder,
@@ -85,12 +90,14 @@ public class DataSeeder implements ApplicationRunner {
       ClientRatingSeeder clientRatingSeeder,
       TripSeeder tripSeeder,
       ClientDriverSeeder clientDriverSeeder,
+      ContractSeeder contractSeeder,
       PasswordEncoder passwordEncoder) {
     this.users = users;
     this.clients = clients;
     this.drivers = drivers;
     this.roles = roles;
     this.rolePermissions = rolePermissions;
+    this.schoolSeeder = schoolSeeder;
     this.dependentSeeder = dependentSeeder;
     this.driverCnhSeeder = driverCnhSeeder;
     this.driverDocumentSeeder = driverDocumentSeeder;
@@ -98,6 +105,7 @@ public class DataSeeder implements ApplicationRunner {
     this.clientRatingSeeder = clientRatingSeeder;
     this.tripSeeder = tripSeeder;
     this.clientDriverSeeder = clientDriverSeeder;
+    this.contractSeeder = contractSeeder;
     this.passwordEncoder = passwordEncoder;
   }
 
@@ -114,10 +122,12 @@ public class DataSeeder implements ApplicationRunner {
     seedAdmin();
     seedClients();
     seedDrivers();
+    schoolSeeder.seed();
     dependentSeeder.seed();
     driverCnhSeeder.seed();
     driverDocumentSeeder.seed();
     clientDriverSeeder.seed();
+    contractSeeder.seed();
     driverRatingSeeder.seed();
     clientRatingSeeder.seed();
     tripSeeder.seed();

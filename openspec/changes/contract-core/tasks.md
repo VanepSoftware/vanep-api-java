@@ -160,18 +160,18 @@
 > Depends on: PR 6 | Parallel with: —
 > Order: test → migration → security → request DTO → service → controller → seed
 
-- [ ] 7.1 Criar branch `feat/contract-core-client-driver-status` de dentro da branch do PR 6
-- [ ] 7.2 Testes: `POST /api/client-drivers` com `"status": "ACTIVE"` → 201 e `PENDING`; `PATCH /api/client-drivers/{token}` → 405; seeder em banco vazio → vínculo com contrato `ACTIVE` e status `ACTIVE`
-- [ ] 7.3 Testes de avaliação: conferir que os testes da #158 criam o vínculo `ACTIVE` direto no repositório, sem depender do `ClientDriverSeeder`, e que o caso "vínculo `PENDING` → 422 `driver_rating.link.not_active`" continua coberto e passa a cobrir o efeito da `V57`
-- [ ] 7.4 Migration `V57__client_driver_status_follows_contracts.sql`: vínculo `ACTIVE` sem contrato → `PENDING`; `update role_permissions set permissions = permissions - 'update_client_driver'`. Comment em `client_driver.status` (derivado dos contratos; `BLOCKED` é o único valor manual, fase 2)
-- [ ] 7.5 Remover `UPDATE_CLIENT_DRIVER` do `PermissionEnum`
-- [ ] 7.6 Remover `status` do `ClientDriverCreateRequestDTO`; remover `ClientDriverUpdateRequestDTO`
-- [ ] 7.7 `ClientDriverService.create` grava sempre `PENDING`; remover `ClientDriverService.update` e a chave `client_driver.status.required` se ficar sem uso (regra 34)
-- [ ] 7.8 Remover o `@PatchMapping` do `ClientDriverController`
-- [ ] 7.9 `ClientDriverSeeder` cria o vínculo `PENDING`; criar `contract.seed.ContractSeeder` (seeder por feature, não no `DataSeeder`) que cria pelo `ContractService.create` um contrato `ACTIVE` do vínculo semeado com um item para o dependente do cliente — ida e volta seg–sex, `MORNING`/`AFTERNOON` — e pula com log quando o dependente não tem escola ou endereço; criar `school.seed.SchoolSeeder`, que cria a escola de seed em São Paulo (IBGE `3550308`; sem a cidade, pula com log), e o `DependentSeeder` passa a criar os dependentes nessa escola, cada um com endereço completo (CEP, rua, número e bairro) na cidade dela; chamar o `SchoolSeeder` antes do `DependentSeeder` e o `ContractSeeder` no `DataSeeder` depois do `clientDriverSeeder`. O `GeographicDataSeeder` roda antes do `DataSeeder` (`@Order`), para o catálogo de cidades já existir no primeiro boot
-- [ ] 7.10 Aplicar a `V57` num PostgreSQL descartável com um vínculo `ACTIVE` sem contrato e conferir que vira `PENDING`
-- [ ] 7.11 **Registrar na descrição do PR** o efeito aceito (aviso no topo, R2): depois da `V57`, a avaliação de motorista fica bloqueada até o admin cadastrar o contrato de cada par
-- [ ] 7.12 `make lint` + `./mvnw verify -B`
+- [x] 7.1 Criar branch `feat/contract-core-client-driver-status` de dentro da branch do PR 6
+- [x] 7.2 Testes: `POST /api/client-drivers` com `"status": "ACTIVE"` → 201 e `PENDING`; `PATCH /api/client-drivers/{token}` → 405; seeder em banco vazio → vínculo com contrato `ACTIVE` e status `ACTIVE`
+- [x] 7.3 Testes de avaliação: conferir que os testes da #158 criam o vínculo `ACTIVE` direto no repositório, sem depender do `ClientDriverSeeder`, e que o caso "vínculo `PENDING` → 422 `driver_rating.link.not_active`" continua coberto e passa a cobrir o efeito da `V57`
+- [x] 7.4 Migration `V57__client_driver_status_follows_contracts.sql`: vínculo `ACTIVE` sem contrato → `PENDING`; `update role_permissions set permissions = permissions - 'update_client_driver'`. Comment em `client_driver.status` (derivado dos contratos; `BLOCKED` é o único valor manual, fase 2)
+- [x] 7.5 Remover `UPDATE_CLIENT_DRIVER` do `PermissionEnum`
+- [x] 7.6 Remover `status` do `ClientDriverCreateRequestDTO`; remover `ClientDriverUpdateRequestDTO`
+- [x] 7.7 `ClientDriverService.create` grava sempre `PENDING`; remover `ClientDriverService.update` e a chave `client_driver.status.required` se ficar sem uso (regra 34)
+- [x] 7.8 Remover o `@PatchMapping` do `ClientDriverController`
+- [x] 7.9 `ClientDriverSeeder` cria o vínculo `PENDING`; criar `contract.seed.ContractSeeder` (seeder por feature, não no `DataSeeder`) que cria pelo `ContractService.create` um contrato `ACTIVE` do vínculo semeado com um item para o dependente do cliente — ida e volta seg–sex, `MORNING`/`AFTERNOON` — e pula com log quando o dependente não tem escola ou endereço; criar `school.seed.SchoolSeeder`, que cria a escola de seed em São Paulo (IBGE `3550308`; sem a cidade, pula com log), e o `DependentSeeder` passa a criar os dependentes nessa escola, cada um com endereço completo (CEP, rua, número e bairro) na cidade dela; chamar o `SchoolSeeder` antes do `DependentSeeder` e o `ContractSeeder` no `DataSeeder` depois do `clientDriverSeeder`. O `GeographicDataSeeder` roda antes do `DataSeeder` (`@Order`), para o catálogo de cidades já existir no primeiro boot
+- [x] 7.10 Aplicar a `V57` num PostgreSQL descartável com um vínculo `ACTIVE` sem contrato e conferir que vira `PENDING`
+- [x] 7.11 **Registrar na descrição do PR** o efeito aceito (aviso no topo, R2): depois da `V57`, a avaliação de motorista fica bloqueada até o admin cadastrar o contrato de cada par
+- [x] 7.12 `make lint` + `./mvnw verify -B`
 
 ## 8. PR 8 — Aluno não vinculado: serviço e HTTP
 

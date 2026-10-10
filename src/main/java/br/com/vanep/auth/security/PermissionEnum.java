@@ -89,7 +89,6 @@ public enum PermissionEnum {
   LIST_CLIENT_DRIVERS("list_client_drivers"),
   SHOW_CLIENT_DRIVER("show_client_driver"),
   CREATE_CLIENT_DRIVER("create_client_driver"),
-  UPDATE_CLIENT_DRIVER("update_client_driver"),
   DELETE_CLIENT_DRIVER("delete_client_driver"),
   RESTORE_CLIENT_DRIVER("restore_client_driver"),
   LIST_CONTRACTS("list_contracts"),

@@ -1,8 +1,13 @@
 package br.com.vanep.dependent.seed;
 
+import br.com.vanep.address.model.AddressModel;
+import br.com.vanep.address.repository.AddressRepository;
 import br.com.vanep.client.repository.ClientRepository;
 import br.com.vanep.dependent.model.DependentModel;
 import br.com.vanep.dependent.repository.DependentRepository;
+import br.com.vanep.school.model.SchoolModel;
+import br.com.vanep.school.repository.SchoolRepository;
+import br.com.vanep.school.seed.SchoolSeeder;
 import br.com.vanep.shared.enums.SchoolShift;
 import br.com.vanep.user.repository.UserRepository;
 import java.util.Optional;
@@ -19,12 +24,20 @@ public class DependentSeeder {
   private final DependentRepository dependents;
   private final ClientRepository clients;
   private final UserRepository users;
+  private final SchoolRepository schools;
+  private final AddressRepository addresses;
 
   public DependentSeeder(
-      DependentRepository dependents, ClientRepository clients, UserRepository users) {
+      DependentRepository dependents,
+      ClientRepository clients,
+      UserRepository users,
+      SchoolRepository schools,
+      AddressRepository addresses) {
     this.dependents = dependents;
     this.clients = clients;
     this.users = users;
+    this.schools = schools;
+    this.addresses = addresses;
   }
 
   public void seed() {
@@ -54,7 +67,25 @@ public class DependentSeeder {
     dependent.setDocument(document);
     dependent.setShift(SchoolShift.MORNING);
     dependent.setDefaultDependent(isDefault);
+    schools
+        .findFirstByName(SchoolSeeder.SEED_SCHOOL_NAME)
+        .ifPresentOrElse(
+            school -> {
+              dependent.setSchoolId(school.getId());
+              dependent.setAddressId(createHome(school).getId());
+            },
+            () -> log.info("Seed: {} created without school and address; no seed school.", name));
     dependents.save(dependent);
     log.info("Seed: dependent created ({}).", name);
+  }
+
+  private AddressModel createHome(SchoolModel school) {
+    AddressModel address = new AddressModel();
+    address.setCity(school.getCity());
+    address.setZipCode("01001000");
+    address.setStreet("Rua das Acácias");
+    address.setNumber("250");
+    address.setNeighborhood("Centro");
+    return addresses.save(address);
   }
 }
