@@ -197,9 +197,9 @@
 > Depends on: PR 8 | Parallel with: —
 > Order: test → repository → service
 
-- [ ] 9.1 Criar branch `feat/contract-core-route-passengers` de dentro da branch do PR 8
-- [ ] 9.2 Testes (repositório + serviço): item de contrato `ACTIVE` e aluno não vinculado no mesmo slot → dois passageiros, com `source` diferente; contrato `SUSPENDED` → nenhum; contrato `ACTIVE` com `ends_on` passado → nenhum; `starts_on` futuro → nenhum; outro turno → vazio; outro dia da semana → vazio; soft-deletado → nenhum; contagem de queries constante com N passageiros (regra 17), medida pelo `Statistics` do Hibernate; serviço junta as duas fontes e ordena pela janela
-- [ ] 9.3 Acrescentar as duas consultas de passageiros (por motorista, dia da semana, turno e data) a `ContractItemRepository` e `UnlinkedPassengerRepository`, cada uma projetando direto no `RoutePassengerDTO` (`select new`, com join até slot, escola e endereço): um statement por fonte, sem carregar entidades nem as associações EAGER
-- [ ] 9.4 Criar `routepassenger.enums.PassengerSource` (`CONTRACT_ITEM`, `UNLINKED_PASSENGER`) e `routepassenger.dto.RoutePassengerDTO`
-- [ ] 9.5 Implementar `routepassenger.service.RoutePassengerQueryService.findPassengers(driver, serviceDate, OperationShift)`, ordenando por `window_start` (Q2)
-- [ ] 9.6 `make lint` + `./mvnw verify -B`
+- [x] 9.1 Criar branch `feat/contract-core-route-passengers` de dentro da branch do PR 8
+- [x] 9.2 Testes (repositório + serviço): item de contrato `ACTIVE` e aluno não vinculado no mesmo slot → dois passageiros, com `source` diferente; contrato `SUSPENDED` → nenhum; contrato `ACTIVE` com `ends_on` passado → nenhum; `starts_on` futuro → nenhum; outro turno → vazio; outro dia da semana → vazio; soft-deletado → nenhum; contagem de queries constante com N passageiros (regra 17), medida pelo `Statistics` do Hibernate; serviço junta as duas fontes e ordena pela janela
+- [x] 9.3 Acrescentar as duas consultas de passageiros (por motorista, dia da semana, turno e data) a `ContractItemRepository` e `UnlinkedPassengerRepository`, cada uma projetando direto no `RoutePassengerDTO` (`select new`, com join até slot, escola e endereço): um statement por fonte, sem carregar entidades nem as associações EAGER
+- [x] 9.4 Criar `routepassenger.enums.PassengerSource` (`CONTRACT_ITEM`, `UNLINKED_PASSENGER`) e `routepassenger.dto.RoutePassengerDTO`
+- [x] 9.5 Implementar `routepassenger.service.RoutePassengerQueryService.findPassengers(driver, serviceDate, OperationShift)`, ordenando por `window_start` (Q2)
+- [x] 9.6 `make lint` + `./mvnw verify -B`
