@@ -71,19 +71,19 @@
 > Depends on: PR 2 | Parallel with: —
 > Order: test → migration → model → repository
 
-- [ ] 3.1 Criar branch `feat/contract-core-contract-schema` de dentro da branch do PR 2
-- [ ] 3.2 Testes de repositório: contrato com dois itens, lidos com escola, endereço copiado e slots; contrato por token com o vínculo e as duas partes; contratos e status de um vínculo; contrato `ACTIVE` de um vínculo; slots de um dependente nos contratos `ACTIVE`; página com total; tokens opacos; soft delete esconde contrato, itens, agendas e slots e mantém as linhas
-- [ ] 3.3 Migration `V55__create_contract_tables.sql`:
+- [x] 3.1 Criar branch `feat/contract-core-contract-schema` de dentro da branch do PR 2
+- [x] 3.2 Testes de repositório: contrato com dois itens, lidos com escola, endereço copiado e slots; contrato por token com o vínculo e as duas partes; contratos e status de um vínculo; contrato `ACTIVE` de um vínculo; slots de um dependente nos contratos `ACTIVE`; página com total; tokens opacos; soft delete esconde contrato, itens, agendas e slots e mantém as linhas
+- [x] 3.3 Migration `V55__create_contract_tables.sql`:
     - `contract` (`id`, `token`, `client_driver_id` FK, `status varchar(24)`, `starts_on`, `ends_on`, `total_amount numeric(12,2)`, `installments smallint`, `due_day smallint`, `supersedes_contract_id` FK nula, timestamps, `deleted_at`) com `check (ends_on > starts_on)`, `check (total_amount > 0)`, `check (installments between 1 and 12)`, `check (due_day between 1 and 28)`
     - `contract_item` (`id`, `token`, `contract_id` FK, `dependent_id` FK, `school_id` FK, `pickup_city_id` FK, `pickup_zip_code`, `pickup_street`, `pickup_number`, `pickup_complement`, `pickup_neighborhood`, `pickup_district_id` FK, `pickup_google_place_id`, `monthly_amount numeric(12,2)`, `schedule_id` FK, timestamps, `deleted_at`) com `check (monthly_amount > 0)`
     - índices do `design.md`: único `(client_driver_id) where status = 'ACTIVE'`, `(client_driver_id)`, `(starts_on) where status = 'SIGNED'`, `(ends_on) where status = 'ACTIVE'`, `contract_item (contract_id)`, `(dependent_id)`, único `(schedule_id)`, únicos de `token` — todos com `deleted_at is null`
     - comments: contrato é o acordo (o documento é outra tabela, fase 3); endereço do item é cópia deliberada
-- [ ] 3.4 Criar `contract.enums.ContractStatus` com os oito valores (D4)
-- [ ] 3.5 Criar `contract.model.ContractModel` e `ContractItemModel` (`@SoftDelete`; o endereço copiado como colunas `pickup_*`, sem `@ManyToOne` para `address`). `items` como `Set` com `cascade = ALL`; `supersedes_contract_id` como `Long`, sem associação
-- [ ] 3.6 Criar `ContractRepository` (por token com fetch join do vínculo e partes; por vínculo; `ACTIVE` por vínculo; status de todos os contratos de um vínculo; página para o admin) e `ContractItemRepository` (itens de um contrato; slots de um dependente, para a colisão do D6)
-- [ ] 3.7 Acrescentar `contract_item` e `contract` ao `clean.sql` antes de `schedule_slot`/`schedule` e de `client_driver`/`dependent`
-- [ ] 3.8 **Aplicar a `V55` num PostgreSQL descartável e provar** o único `ACTIVE` por vínculo (segundo `ACTIVE` recusado; `ENDED` + `ACTIVE` aceito; `ACTIVE` soft-deletado + novo `ACTIVE` aceito), os `CHECK`s e a agenda única por item (R1). O `contract_active_ends_on_idx` só se confirma com volume de dados (fase 8)
-- [ ] 3.9 `make lint` + `./mvnw verify -B`
+- [x] 3.4 Criar `contract.enums.ContractStatus` com os oito valores (D4)
+- [x] 3.5 Criar `contract.model.ContractModel` e `ContractItemModel` (`@SoftDelete`; o endereço copiado como colunas `pickup_*`, sem `@ManyToOne` para `address`). `items` como `Set` com `cascade = ALL`; `supersedes_contract_id` como `Long`, sem associação
+- [x] 3.6 Criar `ContractRepository` (por token com fetch join do vínculo e partes; por vínculo; `ACTIVE` por vínculo; status de todos os contratos de um vínculo; página para o admin) e `ContractItemRepository` (itens de um contrato; slots de um dependente, para a colisão do D6)
+- [x] 3.7 Acrescentar `contract_item` e `contract` ao `clean.sql` antes de `schedule_slot`/`schedule` e de `client_driver`/`dependent`
+- [x] 3.8 **Aplicar a `V55` num PostgreSQL descartável e provar** o único `ACTIVE` por vínculo (segundo `ACTIVE` recusado; `ENDED` + `ACTIVE` aceito; `ACTIVE` soft-deletado + novo `ACTIVE` aceito), os `CHECK`s e a agenda única por item (R1). O `contract_active_ends_on_idx` só se confirma com volume de dados (fase 8)
+- [x] 3.9 `make lint` + `./mvnw verify -B`
 
 ## 4. PR 4 — Policies puras
 
