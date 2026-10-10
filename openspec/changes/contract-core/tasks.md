@@ -47,23 +47,23 @@
 > Depends on: PR 1 | Parallel with: —
 > Order: test → migration → model → repository
 
-- [ ] 2.1 Criar branch `feat/contract-core-schedule-schema` de dentro da branch do PR 1
-- [ ] 2.2 Testes de repositório: salvar agenda com slots e reler; aluno não vinculado por motorista, com escola, endereço e slots carregados fora da transação (prova o fetch join, `open-in-view` desligado); aluno de outro motorista não aparece; token só resolve dentro do motorista; token opaco gerado no persist; soft delete esconde a linha e mantém no banco, e o do aluno leva junto a agenda e os slots. A ordem dos slots não vem do banco: fica no `ScheduleMapper` (tarefa 5.10)
-- [ ] 2.3 Migration `V54__create_schedule_and_unlinked_passenger.sql`:
+- [x] 2.1 Criar branch `feat/contract-core-schedule-schema` de dentro da branch do PR 1
+- [x] 2.2 Testes de repositório: salvar agenda com slots e reler; aluno não vinculado por motorista, com escola, endereço e slots carregados fora da transação (prova o fetch join, `open-in-view` desligado); aluno de outro motorista não aparece; token só resolve dentro do motorista; token opaco gerado no persist; soft delete esconde a linha e mantém no banco, e o do aluno leva junto a agenda e os slots. A ordem dos slots não vem do banco: fica no `ScheduleMapper` (tarefa 5.10)
+- [x] 2.3 Migration `V54__create_schedule_and_unlinked_passenger.sql`:
     - `schedule` (`id`, `created_at`, `updated_at`, `deleted_at`)
     - `schedule_slot` (`id`, `schedule_id` FK, `weekday varchar(16)`, `leg varchar(16)`, `shift varchar(16)`, `window_start time not null`, `window_end time`, timestamps, `deleted_at`), `check (window_end is null or window_end > window_start)`
     - `unlinked_passenger` (`id`, `token`, `driver_id` FK, `name`, `school_id` FK, `school_shift`, `address_id` FK, `notes`, `schedule_id` FK, timestamps, `deleted_at`)
     - índices do `design.md` (Migration Plan): único `(schedule_id, weekday, leg)`, `(schedule_id, weekday, shift)`, `(driver_id)`, único `(address_id)`, único `(schedule_id)`, único `(token)` — todos `where deleted_at is null`
     - comments explicando o "porquê" de cada tabela (dono único da agenda, aluno sem contrato e sem aviso)
-- [ ] 2.4 **Trecho da agenda = `shared.enums.RouteLeg`** (`OUTBOUND`, `RETURN`), sem criar `ScheduleLeg` (D2, regras 5 e 6). Criar `RouteLeg` aqui; a `absence` troca o `AbsenceLeg` por ele ao entrar (aviso no topo)
-- [ ] 2.5 Criar `schedule.model.ScheduleModel` e `ScheduleSlotModel` (`@SoftDelete`, `weekday` como `DayOfWeek` com `@Enumerated(STRING)`, `shift` como `OperationShift`)
-- [ ] 2.6 Criar `unlinkedpassenger.model.UnlinkedPassengerModel` (`@SoftDelete`, token no `@PrePersist` como os demais models)
+- [x] 2.4 **Trecho da agenda = `shared.enums.RouteLeg`** (`OUTBOUND`, `RETURN`), sem criar `ScheduleLeg` (D2, regras 5 e 6). Criar `RouteLeg` aqui; a `absence` troca o `AbsenceLeg` por ele ao entrar (aviso no topo)
+- [x] 2.5 Criar `schedule.model.ScheduleModel` e `ScheduleSlotModel` (`@SoftDelete`, `weekday` como `DayOfWeek` com `@Enumerated(STRING)`, `shift` como `OperationShift`)
+- [x] 2.6 Criar `unlinkedpassenger.model.UnlinkedPassengerModel` (`@SoftDelete`, token no `@PrePersist` como os demais models)
     - todo to-one `EAGER`, como no resto do repo; N+1 evitado pelo fetch join das consultas
     - endereço como `@ManyToOne` (o dono único é o índice parcial); agenda como `@OneToOne` com `cascade = ALL`
-- [ ] 2.7 Criar `ScheduleRepository` e `UnlinkedPassengerRepository` (busca por token **dentro do motorista**, lista por motorista com fetch join de escola, endereço e slots — regra 17). Sem `ScheduleSlotRepository`: toda escrita de slot passa pelo `ScheduleModel` (`cascade = ALL`, `orphanRemoval = true`)
-- [ ] 2.8 Acrescentar `schedule_slot`, `schedule` e `unlinked_passenger` ao `src/test/resources/db/clean.sql` na ordem de FK
-- [ ] 2.9 **Aplicar a `V54` num PostgreSQL descartável e provar cada índice** com inserts manuais: slot duplicado no mesmo `(schedule, weekday, leg)` recusado; ida e volta no mesmo dia aceitas; slot soft-deletado e recriado aceito; `window_end` antes do início recusado; dois donos no mesmo `schedule` ou no mesmo endereço recusados; token repetido recusado; dono soft-deletado libera endereço e agenda; a consulta por `(schedule_id, weekday, shift)` usa o índice (R1)
-- [ ] 2.10 `make lint` + `./mvnw verify -B`
+- [x] 2.7 Criar `ScheduleRepository` e `UnlinkedPassengerRepository` (busca por token **dentro do motorista**, lista por motorista com fetch join de escola, endereço e slots — regra 17). Sem `ScheduleSlotRepository`: toda escrita de slot passa pelo `ScheduleModel` (`cascade = ALL`, `orphanRemoval = true`)
+- [x] 2.8 Acrescentar `schedule_slot`, `schedule` e `unlinked_passenger` ao `src/test/resources/db/clean.sql` na ordem de FK
+- [x] 2.9 **Aplicar a `V54` num PostgreSQL descartável e provar cada índice** com inserts manuais: slot duplicado no mesmo `(schedule, weekday, leg)` recusado; ida e volta no mesmo dia aceitas; slot soft-deletado e recriado aceito; `window_end` antes do início recusado; dois donos no mesmo `schedule` ou no mesmo endereço recusados; token repetido recusado; dono soft-deletado libera endereço e agenda; a consulta por `(schedule_id, weekday, shift)` usa o índice (R1)
+- [x] 2.10 `make lint` + `./mvnw verify -B`
 
 ## 3. PR 3 — Schema do contrato
 
