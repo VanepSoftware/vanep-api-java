@@ -22,6 +22,7 @@ import br.com.vanep.trip.seed.TripSeeder;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
+import br.com.vanep.vehicle.seed.VehicleSeeder;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
@@ -55,6 +56,7 @@ public class DataSeeder implements ApplicationRunner {
   private final ClientRatingSeeder clientRatingSeeder;
   private final TripSeeder tripSeeder;
   private final ClientDriverSeeder clientDriverSeeder;
+  private final VehicleSeeder vehicleSeeder;
   private final PasswordEncoder passwordEncoder;
 
   @Value("${vanep.seed.enabled:false}")
@@ -85,6 +87,7 @@ public class DataSeeder implements ApplicationRunner {
       ClientRatingSeeder clientRatingSeeder,
       TripSeeder tripSeeder,
       ClientDriverSeeder clientDriverSeeder,
+      VehicleSeeder vehicleSeeder,
       PasswordEncoder passwordEncoder) {
     this.users = users;
     this.clients = clients;
@@ -98,6 +101,7 @@ public class DataSeeder implements ApplicationRunner {
     this.clientRatingSeeder = clientRatingSeeder;
     this.tripSeeder = tripSeeder;
     this.clientDriverSeeder = clientDriverSeeder;
+    this.vehicleSeeder = vehicleSeeder;
     this.passwordEncoder = passwordEncoder;
   }
 
@@ -117,6 +121,7 @@ public class DataSeeder implements ApplicationRunner {
     dependentSeeder.seed();
     driverCnhSeeder.seed();
     driverDocumentSeeder.seed();
+    vehicleSeeder.seed();
     clientDriverSeeder.seed();
     driverRatingSeeder.seed();
     clientRatingSeeder.seed();
