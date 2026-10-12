@@ -179,6 +179,7 @@
 						<configuration>
 							<excludes>
 								<exclude>br/com/vanep/VanepApplication.class</exclude>
+								<exclude>br/com/vanep/**/seed/**</exclude>
 							</excludes>
 						</configuration>
 					</execution>
@@ -191,6 +192,7 @@
 						<configuration>
 							<excludes>
 								<exclude>br/com/vanep/VanepApplication.class</exclude>
+								<exclude>br/com/vanep/**/seed/**</exclude>
 							</excludes>
 							<rules>
 								<rule>
