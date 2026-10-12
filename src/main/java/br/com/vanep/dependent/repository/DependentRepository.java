@@ -29,6 +29,17 @@ public interface DependentRepository extends JpaRepository<DependentModel, Long>
       nativeQuery = true)
   Optional<Long> findClientIdOfDeletedByToken(@Param("token") String token);
 
+  @Modifying(flushAutomatically = true)
+  @Query(
+      value =
+          "UPDATE dependent SET is_default = false WHERE client_id = :clientId"
+              + " AND is_default AND deleted_at IS NULL"
+              + " AND EXISTS (SELECT 1 FROM dependent WHERE token = :token"
+              + " AND is_default AND deleted_at IS NOT NULL)",
+      nativeQuery = true)
+  int clearActiveDefaultsIfDeletedIsDefault(
+      @Param("clientId") Long clientId, @Param("token") String token);
+
   @Modifying
   @Query(value = "UPDATE dependent SET deleted_at = NULL WHERE token = :token", nativeQuery = true)
   int restoreByToken(@Param("token") String token);
