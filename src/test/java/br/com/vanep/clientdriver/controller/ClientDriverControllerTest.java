@@ -99,7 +99,7 @@ class ClientDriverControllerTest {
                 .with(adminJwt())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(createBody(maria.getToken(), pendingDriver.getToken())))
-        .andExpect(status().isUnprocessableEntity());
+        .andExpect(status().isUnprocessableContent());
   }
 
   @Test
@@ -120,7 +120,7 @@ class ClientDriverControllerTest {
                 .with(adminJwt())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"status\":\"ACTIVE\"}"))
-        .andExpect(status().isUnprocessableEntity());
+        .andExpect(status().isUnprocessableContent());
   }
 
   @Test

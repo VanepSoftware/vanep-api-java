@@ -420,6 +420,7 @@ class DependentServiceTest {
     when(mapper.toResponse(restored, "ctok", null, null)).thenReturn(mapped);
 
     DependentResponseDTO result = service.restore(clientJwt(), TOKEN);
+    verify(dependents).clearActiveDefaultsIfDeletedIsDefault(CLIENT_ID, TOKEN);
 
     assertThat(result.address()).isNull();
     verify(addressService, never()).upsertForDependent(any(), any());

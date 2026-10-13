@@ -149,7 +149,7 @@ public class ClientDriverService {
   }
 
   ResponseStatusException unprocessableEntity(String key) {
-    return new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, message(key));
+    return new ResponseStatusException(HttpStatus.UNPROCESSABLE_CONTENT, message(key));
   }
 
   String message(String key) {

@@ -143,7 +143,7 @@ class ClientDriverServiceTest {
           .satisfies(
               e -> {
                 ResponseStatusException ex = (ResponseStatusException) e;
-                assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+                assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
                 assertThat(ex.getReason()).isEqualTo("client_driver.driver.not_approved");
               });
     }
@@ -154,7 +154,7 @@ class ClientDriverServiceTest {
         .satisfies(
             e -> {
               ResponseStatusException ex = (ResponseStatusException) e;
-              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
               assertThat(ex.getReason()).isEqualTo("client_driver.driver.not_approved");
             });
 
@@ -176,7 +176,7 @@ class ClientDriverServiceTest {
         .satisfies(
             e -> {
               ResponseStatusException ex = (ResponseStatusException) e;
-              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
               assertThat(ex.getReason()).isEqualTo("client_driver.driver.not_approved");
             });
 

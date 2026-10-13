@@ -117,6 +117,7 @@ public class DependentService {
 
     addressService.clearForDependent(model.getId());
     dependents.delete(model);
+    dependents.flush();
     promoteDefaultAfterDelete(clientId, wasDefault);
   }
 
@@ -129,6 +130,7 @@ public class DependentService {
     Long clientId = dependents.findClientIdOfDeletedByToken(token).orElseThrow(this::notFound);
     assertOwnership(jwt, clientId);
 
+    dependents.clearActiveDefaultsIfDeletedIsDefault(clientId, token);
     dependents.restoreByToken(token);
     DependentModel restored = dependents.findByToken(token).orElseThrow(this::notFound);
     return toResponse(restored);
@@ -374,7 +376,7 @@ public class DependentService {
         .forEach(
             dependent -> {
               dependent.setDefaultDependent(false);
-              dependents.save(dependent);
+              dependents.saveAndFlush(dependent);
             });
   }
 
