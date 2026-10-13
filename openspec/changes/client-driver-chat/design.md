@@ -81,6 +81,16 @@ As duas permissões entram por migration idempotente (`||` com `@>`, como em `V5
 
 Texto de 1 a 2000 caracteres (`@NotBlank` e `@Size`). Histórico com `@PageableDefault(size = 30)`, ordenado por `sent_at desc`, com índice `(conversation_id, sent_at desc)`.
 
+### D11 — Texto cifrado no banco com AES-256-GCM, por `AttributeConverter`
+
+`ConversationMessageBodyConverter` (JPA) cifra ao gravar e decifra ao ler, usando `ConversationMessageCipher`. Formato `v1:<base64(iv || ciphertext || tag)>`, com IV aleatório de 96 bits por mensagem, então o mesmo texto nunca gera o mesmo valor. O GCM autentica: valor adulterado ou gravado com outra chave falha ao decifrar, em vez de virar texto errado. A chave vem de `VANEP_CHAT_ENCRYPTION_KEY` (64 hex, `openssl rand -hex 32`), como o pepper: valor de dev em `application-local.properties`, gerado pelo `make env` e recusado em produção pelo `ProductionSecretsValidator`. Sem chave válida a aplicação não sobe.
+
+**Por que no banco e não ponta a ponta:** a proteção pedida é contra quem lê o banco, os backups ou os dumps. Ponta a ponta exigiria chaves por aparelho, troca de chaves e perda de histórico ao trocar de celular, e a lista do motorista não teria prévia. O contrato da API e o app não mudam.
+
+**Por que um converter e não cifrar no service:** toda leitura e escrita de `body` passa por ele, inclusive as de código futuro. Não existe caminho que grave texto puro por esquecimento.
+
+**Linhas sem prefixo são devolvidas como estão:** mensagens gravadas entre a B2/B3 e a B4 (só em ambientes de dev) continuam legíveis. Não existe migration que cifre essas linhas, porque a chave não está no banco.
+
 ### Modelo
 
 ```
@@ -118,6 +128,9 @@ Ambos com `@SoftDelete` (regra 19), embora nenhuma rota apague nesta change.
 - **[Corrida no `POST /api/conversations`]** → índice único mais a releitura descrita em D2.
 - **[Rate limit]** O `RateLimitingFilter` pode contar o handshake em `/api/ws` e cada `POST` de mensagem. → Verificar na B3 se os limites atuais aceitam uma conversa normal. Nenhuma mudança está prevista.
 
+- **[Chave perdida ou trocada]** As mensagens existentes ficam ilegíveis (o GCM falha ao decifrar, e a leitura do histórico responde erro). → A chave é tão crítica quanto o pepper: gerar uma vez e guardar no cofre de segredos. Rotação de chave fica fora de escopo; o prefixo `v1:` deixa espaço para um `v2:` com outra chave.
+- **[Cifra sem vínculo com a linha]** Quem tem acesso de escrita ao banco pode copiar um valor cifrado de uma mensagem para outra. → Aceito: esse acesso já permite qualquer alteração. Amarrar o token da mensagem como AAD exigiria tirar a cifragem do converter.
+
 ## Migration Plan
 
 - `V53` cria as tabelas e adiciona as permissões aos bundles. É aditiva e não toca dados existentes.
@@ -134,5 +147,6 @@ Nenhuma bloqueante. O ícone de mensagens no `driver_shell` e a ordem da inbox j
 | B1 | Migration `V53`, `ConversationModel`, `ConversationMessageModel`, `ConversationParticipant`, repositories, `@sec.isConversationParty`, permissões em `PermissionEnum` e `DataSeeder` | — | Mobile M1 |
 | B2 | DTOs, mapper, `ConversationService`, `ConversationController` (4 rotas), mensagens pt-BR, evento `ConversationMessageSentEvent` publicado no envio | B1 merged | Mobile M1/M2 (com stubs) |
 | B3 | `spring-boot-starter-websocket`, `WebSocketConfig` (`/api/ws`, simple broker `/topic`), interceptor de `SUBSCRIBE`/`SEND`, listener `AFTER_COMMIT` que publica no tópico | B2 merged | Mobile M2 |
+| B4 | Texto cifrado no banco: `V54` (`body` → `text`), `ConversationMessageCipher`, `ConversationMessageBodyConverter`, chave `VANEP_CHAT_ENCRYPTION_KEY` (properties, `.env.example`, `make env`, `ProductionSecretsValidator`) | B3 merged | — |
 
 Estimativa por fase (linhas de produção / testes): B1 ~200 / ~150, B2 ~350 / ~250, B3 ~150 / ~150.

@@ -1,8 +1,8 @@
 > **Pilha de branches.** Cada fase depende da anterior, então cada branch nasce da anterior e cada PR aponta a anterior como `--base`.
 >
 > ```
-> main ─ feat/161-chat-schema ─ feat/161-chat-http ─ feat/161-chat-realtime
->        PR B1 → main                     PR B2 → B1                     PR B3 → B2
+> main ─ feat/161-chat-schema ─ feat/161-chat-http ─ feat/161-chat-realtime ─ feat/161-chat-encryption
+>        PR B1 → main                     PR B2 → B1                     PR B3 → B2                PR B4 → B3
 > ```
 >
 > **Mergear pelo `merge stack`**, ou apagando a branch a cada merge: o repo tem `delete_branch_on_merge: false`, e sem apagar a branch o GitHub não reaponta a base das filhas.
@@ -14,6 +14,7 @@
 | B1 | `V53`, models, enum, repositories, `@sec.isConversationParty`, permissões | — | Mobile M1 |
 | B2 | REST: abrir/retomar, inbox do motorista, histórico, envio, evento de mensagem enviada | B1 | Mobile M1/M2 (stubs) |
 | B3 | WebSocket: `/api/ws`, broker simples, autorização de `SUBSCRIBE`, publicação após commit | B2 | Mobile M2 |
+| B4 | Texto das mensagens cifrado no banco (AES-256-GCM) | B3 | — |
 
 Teto por PR: ~600 linhas produtivas e 10 arquivos novos (regra 41).
 
@@ -76,3 +77,20 @@ Teto por PR: ~600 linhas produtivas e 10 arquivos novos (regra 41).
 - [x] 3.10 Smoke: virou o `ConversationRealtimeIntegrationTest`, com sessões STOMP reais em porta aleatória e JWT assinado pelo `JWKSource` da aplicação. O motorista recebe ao vivo o que o cliente envia por REST, o intruso e outros destinos são recusados, o handshake sem token dá 401 e mensagem com rollback não é publicada
 - [x] 3.11 **QA manual da spec inteira (regra 55, adicionada nesta fase):** API da branch contra um Postgres descartável, tokens reais pelo grant do mobile, caminho feliz e mau uso em REST e WebSocket. Script em `scripts/qa/client-driver-chat/`, resultado em `qa.md`: 59/59
 - [x] 3.12 `make lint` + `./mvnw verify`. Abrir PR em pt-BR, `--base feat/161-chat-http`, `Refs #161`
+
+## 4. Phase B4 — texto cifrado no banco (PR B4)
+
+> Goal: banco, backups e dumps só guardam o texto das mensagens cifrado; a API e o app não percebem a diferença.
+> Depends on: B3 | Parallel with: —
+> Order: test → migration → model (converter) → service (cipher) → config
+
+- [x] 4.1 Criar branch `feat/161-chat-encryption` a partir de `feat/161-chat-realtime`
+- [x] 4.2 Testes do `ConversationMessageCipher`: ida e volta (com emoji e 2000 caracteres), mesmo texto gera valores diferentes, valor adulterado e chave errada falham, linha sem prefixo volta como está, chave ausente ou inválida impede a criação
+- [x] 4.3 Teste de repository: o valor gravado começa com `v1:` e não contém o texto; a entidade lida volta com o texto
+- [x] 4.4 Teste do `ProductionSecretsValidator`: recusa chave vazia e chave de dev
+- [x] 4.5 Migration `V54__conversation_message_body_as_text.sql`: `body` → `text`
+- [x] 4.6 `ConversationMessageCipher` (AES-256-GCM, IV de 96 bits, formato `v1:`) e `ConversationMessageBodyConverter` no campo `body`
+- [x] 4.7 Chave `vanep.chat.encryption-key` / `VANEP_CHAT_ENCRYPTION_KEY`: `application.properties`, valor de dev em `application-local.properties`, valor fixo em `application-test.properties`, placeholder em `.env.example`, geração no `make env`, checagem no `ProductionSecretsValidator`
+- [x] 4.8 QA manual (regra 55): `qa.sh` ganha a checagem do banco cifrado, rodar a spec inteira de novo e anotar no `qa.md` (incluindo subir sem chave). Resultado: 68/68 em cinco rodadas seguidas
+- [x] 4.9 `make lint` + `./mvnw verify`. Abrir PR em pt-BR, `--base feat/161-chat-realtime`, `Refs #161`
+

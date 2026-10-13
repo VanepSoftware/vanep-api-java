@@ -1,6 +1,8 @@
 # QA — client-driver-chat (constitution rule 55)
 
-Run against the API built from `feat/161-chat-realtime`, which contains phases B1–B3, so this run covers the whole spec. Run date: 2026-10-12. Result: **59/59 passed** (48 HTTP, 11 realtime), and a second run passed again.
+Latest run: API built from `feat/161-chat-encryption`, which contains phases B1–B4, so it covers the whole spec. Run date: 2026-10-12. Result: **68/68 passed** (48 HTTP, 9 encryption at rest, 11 realtime) on five consecutive runs.
+
+History: B3 (`feat/161-chat-realtime`) passed 59/59 twice, before the encryption checks existed. During the B4 run, the first two attempts stopped during setup without a message. After the setup steps were changed to fail with an explicit reason, five consecutive runs passed. The most likely cause is an interrupted run that left the seeded driver Helena under review, so the next setup could not find her; the script now reports that case directly.
 
 ## How to run
 
@@ -16,7 +18,8 @@ docker run -d --rm --name vanep-chat-qa-db -e POSTGRES_USER=vanep -e POSTGRES_PA
 set -a; . ./.env; set +a
 SPRING_PROFILES_ACTIVE=local SERVER_PORT=8081 POSTGRES_PORT=5433 POSTGRES_USER=vanep \
   POSTGRES_PASSWORD=vanep POSTGRES_DB=vanep VANEP_MAIL_ENABLED=false VANEP_SEED_ENABLED=true \
-  VANEP_OAUTH_ISSUER= java -jar target/vanep-0.0.1-SNAPSHOT.jar
+  VANEP_OAUTH_ISSUER= VANEP_CHAT_ENCRYPTION_KEY=$(openssl rand -hex 32) \
+  java -jar target/vanep-0.0.1-SNAPSHOT.jar
 
 # 3. The QA (needs curl, jq, docker and Node 22+)
 QA_DB_CONTAINER=vanep-chat-qa-db BASE_URL=http://localhost:8081 scripts/qa/client-driver-chat/qa.sh
@@ -29,9 +32,11 @@ Tokens come from the mobile password grant (`urn:vanep:params:oauth:grant-type:p
 
 The script stops at the first mismatch with a non-zero exit. That was checked by running a copy that expected `200` on M33: it failed on M33 with exit code 1.
 
-## Migration
+## Startup and migration
 
-Flyway applied `V53` on an empty database at boot. `role_permissions` after boot: `CLIENT` has `create_conversation` only, `DRIVER` has `list_driver_conversations` only, `ADMIN` has both, `ASSISTANT` has neither. A decoded driver token carries `list_driver_conversations` and not `create_conversation`.
+With `VANEP_CHAT_ENCRYPTION_KEY=abc` and with an empty `VANEP_CHAT_ENCRYPTION_KEY=`, the application refused to start (exit 1) with "vanep.chat.encryption-key must be 64 hex characters (openssl rand -hex 32)." The `prod` check against the development key is covered by `ProductionSecretsValidatorTest`, since starting the `prod` profile also needs the production JWK and secrets.
+
+Flyway applied `V53` and `V54` on an empty database at boot. `role_permissions` after boot: `CLIENT` has `create_conversation` only, `DRIVER` has `list_driver_conversations` only, `ADMIN` has both, `ASSISTANT` has neither. A decoded driver token carries `list_driver_conversations` and not `create_conversation`.
 
 ## Results
 
@@ -103,6 +108,21 @@ Flyway applied `V53` on an empty database at boot. `role_permissions` after boot
 | M33 | a client cannot list driver conversations | 403 | PASS |
 | M34 | no token | 401 | PASS |
 
+### Encryption at rest
+
+Checked directly in the database with `psql`. A stored body looks like `v1:EceMXp7abeoyp8iSZa6kJocYpYGZ2YAwgFMe8UKl4zapeLee4mV+NCx93…`.
+
+| id | scenario | expected | result |
+|---|---|---|---|
+| E1 | the stored body of H4 is ciphertext with the `v1:` prefix, without the plaintext | `v1:...` | PASS |
+| E2 | no row in the table holds plaintext (every body has the prefix) | 0 rows | PASS |
+| E3a/E3b | the same text ("Oi") sent twice | 201, 201 | PASS |
+| E3 | the two identical texts are stored as two different values (random IV) | 2 distinct | PASS |
+| E4 | both are read back as "Oi" | 200 | PASS |
+| E5 | a row inserted as plaintext (written before encryption) is still readable | 200 | PASS |
+| E6 | a tampered ciphertext makes the history fail instead of returning altered text, and the response does not leak plaintext | 500 | PASS |
+| E7 | the history is readable again once the tampered row is gone | 200 | PASS |
+
 ### WebSocket `/api/ws` (STOMP)
 
 | id | scenario | expected | result |
@@ -124,4 +144,5 @@ Flyway applied `V53` on an empty database at boot. `role_permissions` after boot
 - **Unknown conversation is 403, not 404 (M22, M31).** `@sec.isConversationParty` runs before the service, and a token that does not exist has no party. The API does not reveal whether a conversation token exists.
 - **Paging input is forgiving (M26–M28).** Spring's `Pageable` resolver falls back to the defaults on negative or non-numeric values and caps the page size. Bad paging never errors, and never returns another conversation's data.
 - **Markup is data, not HTML (H8).** The body is stored and returned verbatim. The app renders it with `Text`, which does not interpret markup. A future web client must also render it as text.
+- **A corrupted ciphertext breaks that conversation's history with a 500 (E6).** GCM refuses altered data on purpose. Only someone with write access to the database, or a changed `VANEP_CHAT_ENCRYPTION_KEY`, can cause it. Losing or changing the key makes every stored message unreadable, so the key must be generated once and kept with the other secrets.
 - **The sender gets their own message on the topic (W4).** The app deduplicates by message token (mobile spec, D5), so the message shows once.

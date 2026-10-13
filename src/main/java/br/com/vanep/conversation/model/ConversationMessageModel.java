@@ -2,6 +2,7 @@ package br.com.vanep.conversation.model;
 
 import br.com.vanep.conversation.enums.ConversationParticipant;
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -43,7 +44,8 @@ public class ConversationMessageModel {
   @Column(nullable = false, length = 16)
   private ConversationParticipant sender;
 
-  @Column(nullable = false, length = BODY_MAX_LENGTH)
+  @Convert(converter = ConversationMessageBodyConverter.class)
+  @Column(nullable = false, columnDefinition = "text")
   private String body;
 
   @Column(name = "sent_at", nullable = false, updatable = false)

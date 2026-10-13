@@ -21,6 +21,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.jdbc.Sql;
 
@@ -34,6 +35,7 @@ class ConversationRepositoryTest {
   @Autowired private ClientRepository clients;
   @Autowired private DriverRepository drivers;
   @Autowired private UserRepository users;
+  @Autowired private JdbcTemplate jdbc;
 
   private ClientModel maria;
   private DriverModel carlos;
@@ -136,6 +138,23 @@ class ConversationRepositoryTest {
     assertThat(page.getContent())
         .extracting(ConversationMessageModel::getBody)
         .containsExactly("para o Carlos");
+  }
+
+  @Test
+  void theBodyIsStoredEncryptedAndReadBackAsText() {
+    ConversationModel conversation = conversations.save(newConversation(maria, carlos));
+    ConversationMessageModel saved =
+        messages.save(newMessage(conversation, "Tem vaga para a manhã?", Instant.now()));
+
+    String stored =
+        jdbc.queryForObject(
+            "select body from conversation_message where id = ?", String.class, saved.getId());
+
+    assertThat(stored).startsWith("v1:").doesNotContain("vaga");
+    assertThat(messages.findById(saved.getId()))
+        .get()
+        .extracting(ConversationMessageModel::getBody)
+        .isEqualTo("Tem vaga para a manhã?");
   }
 
   private ConversationModel newConversation(ClientModel client, DriverModel driver) {

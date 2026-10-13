@@ -12,6 +12,7 @@ O perfil do motorista no app já mostra o botão "Conversar com o motorista", ma
 - **Tempo real por WebSocket (STOMP).** O envio continua por REST. Ao salvar uma mensagem, o servidor a publica em `/topic/conversations/{token}`. O handshake em `/api/ws` é autenticado pela cadeia de segurança da API que já existe, e a assinatura de um tópico só é aceita para quem é parte da conversa.
 - Novas permissões `create_conversation` (bundle `CLIENT`) e `list_driver_conversations` (bundle `DRIVER`), entregues por migration e pelo `DataSeeder`.
 - Nova dependência `spring-boot-starter-websocket`.
+- **O texto das mensagens é cifrado no banco** (AES-256-GCM, chave em `VANEP_CHAT_ENCRYPTION_KEY`). Banco, backups e dumps só guardam texto cifrado; a API decifra ao responder para as partes. O contrato da API e o app não mudam.
 
 **Fora de escopo** (pode entrar depois sem quebrar o contrato):
 
@@ -33,7 +34,8 @@ Nenhuma.
 
 ## Impact
 
-- **Banco:** nova migration `V53` com as tabelas `conversation` e `conversation_message` e as permissões nos bundles `CLIENT` e `DRIVER`.
+- **Banco:** nova migration `V53` com as tabelas `conversation` e `conversation_message` e as permissões nos bundles `CLIENT` e `DRIVER`. A `V54` muda `conversation_message.body` para `text`, porque o texto cifrado é maior que o original.
+- **Configuração:** nova variável obrigatória `VANEP_CHAT_ENCRYPTION_KEY`.
 - **Código:** novo feature package `br.com.vanep.conversation`. `SecurityEvaluator` ganha `isConversationParty`. `PermissionEnum` e `DataSeeder` ganham as duas permissões. Nova config de WebSocket em `config`.
 - **API:** quatro rotas REST novas sob `/api/conversations` e o endpoint STOMP `/api/ws`.
 - **Dependências:** `spring-boot-starter-websocket`.

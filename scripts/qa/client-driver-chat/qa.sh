@@ -47,15 +47,22 @@ expect() {
 }
 
 login() {
-  curl -s -X POST "$BASE_URL/oauth2/token" \
+  local response
+  response=$(curl -s -X POST "$BASE_URL/oauth2/token" \
     -d "grant_type=urn:vanep:params:oauth:grant-type:password" \
-    --data-urlencode "username=$1" -d "password=$SEED_PASSWORD" -d "client_id=$MOBILE_CLIENT_ID" |
-    jq -er '.access_token'
+    --data-urlencode "username=$1" -d "password=$SEED_PASSWORD" -d "client_id=$MOBILE_CLIENT_ID")
+  jq -er '.access_token' <<<"$response" 2>/dev/null || {
+    echo "SETUP FAIL | login as $1 | $response" >&2
+    return 1
+  }
 }
 
 driver_token_named() {
   request GET /api/drivers/recommended "$ANA"
-  jq -er --arg name "$1" '(if type == "array" then . else .content end)[] | select(.name == $name) | .token' <<<"$RESP_BODY"
+  jq -er --arg name "$1" '(if type == "array" then . else .content end)[] | select(.name == $name) | .token' <<<"$RESP_BODY" || {
+    echo "SETUP FAIL | driver token for $1 | HTTP $RESP_STATUS $RESP_BODY" >&2
+    return 1
+  }
 }
 
 message_count() {
@@ -147,6 +154,7 @@ echo "| id | scenario | expected | result |"
 echo "|---|---|---|---|"
 request POST "/api/conversations/$CONV_ANA/messages" "$ANA" '{"body":"Tem vaga para a manhã?"}'
 expect H4 "the client sends" 201 '.sender == "CLIENT" and .body == "Tem vaga para a manhã?" and .token != "" and (.sentAt | test("Z$"))'
+FIRST_MESSAGE=$(jq -r .token <<<"$RESP_BODY")
 request POST "/api/conversations/$CONV_ANA/messages" "$FABIO" '{"body":"Tenho sim, saio às 6h30."}'
 expect H5 "the driver replies" 201 '.sender == "DRIVER"'
 AT_LIMIT=$(printf 'a%.0s' $(seq 1 2000))
@@ -226,6 +234,41 @@ request GET /api/conversations/me "$ANA"
 expect M33 "a client cannot list driver conversations" 403
 request GET /api/conversations/me ""
 expect M34 "no token" 401
+
+echo
+echo "== Encryption at rest (database checks)"
+echo "| id | scenario | expected | result |"
+echo "|---|---|---|---|"
+STORED=$(sql "select body from conversation_message where token = '$FIRST_MESSAGE'")
+RESP_BODY="$STORED"
+[[ $STORED == v1:* && $STORED != *vaga* ]] || fail "E1 the stored body is ciphertext" "v1: prefix, no plaintext" "$STORED"
+PASSED=$((PASSED + 1))
+printf '| %s | %s | %s | PASS |\n' E1 "the stored body is ciphertext with the v1: prefix" "v1:..."
+PLAINTEXT_ROWS=$(sql "select count(*) from conversation_message where body like '%vaga%' or body like '%script%' or body like '%Bom dia%' or body not like 'v1:%'")
+RESP_BODY="$PLAINTEXT_ROWS rows"
+[[ $PLAINTEXT_ROWS == 0 ]] || fail "E2 no row holds plaintext" "0 rows" "$PLAINTEXT_ROWS rows"
+PASSED=$((PASSED + 1))
+printf '| %s | %s | %s | PASS |\n' E2 "no row in the table holds plaintext" "0 rows"
+request POST "/api/conversations/$CONV_CARLA/messages" "$CARLA" '{"body":"Oi"}'
+expect E3a "same text, first send" 201
+request POST "/api/conversations/$CONV_CARLA/messages" "$CARLA" '{"body":"Oi"}'
+expect E3b "same text, second send" 201
+DISTINCT_CIPHERTEXTS=$(sql "select count(distinct m.body) from conversation_message m join conversation c on c.id = m.conversation_id where c.token = '$CONV_CARLA'")
+RESP_BODY="$DISTINCT_CIPHERTEXTS distinct values"
+[[ $DISTINCT_CIPHERTEXTS == 2 ]] || fail "E3 same text, different ciphertext" "2 distinct values" "$RESP_BODY"
+PASSED=$((PASSED + 1))
+printf '| %s | %s | %s | PASS |\n' E3 "the same text twice is stored as two different values" "2 distinct"
+request GET "/api/conversations/$CONV_CARLA/messages" "$GUSTAVO"
+expect E4 "both are read back as the original text" 200 '[.content[].body] == ["Oi", "Oi"]'
+sql "insert into conversation_message (token, conversation_id, sender, body, sent_at) select 'legacyqa', id, 'CLIENT', 'Mensagem antiga', now() - interval '1 day' from conversation where token = '$CONV_CARLA'" >/dev/null
+request GET "/api/conversations/$CONV_CARLA/messages" "$GUSTAVO"
+expect E5 "a body stored before encryption is still readable" 200 '.content[-1].body == "Mensagem antiga"'
+sql "update conversation_message set body = 'v1:' || translate(substr((select body from conversation_message where token = '$FIRST_MESSAGE'), 4), 'ABCDEFGH', 'BCDEFGHA') where token = 'legacyqa'" >/dev/null
+request GET "/api/conversations/$CONV_CARLA/messages" "$GUSTAVO"
+expect E6 "a tampered ciphertext is never returned as text" 500 '(tostring | contains("vaga") | not)'
+sql "delete from conversation_message where token = 'legacyqa'" >/dev/null
+request GET "/api/conversations/$CONV_CARLA/messages" "$GUSTAVO"
+expect E7 "the history is readable again once the bad row is gone" 200
 
 echo
 echo "== WebSocket /api/ws"

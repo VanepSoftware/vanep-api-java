@@ -135,3 +135,39 @@ A STOMP endpoint MUST be exposed at `/api/ws`. Its handshake MUST require a vali
 
 - **WHEN** sending a message fails validation or authorization
 - **THEN** nothing is published to the conversation's topic
+
+### Requirement: Message bodies are encrypted at rest
+
+The system MUST store every message body encrypted with AES-256-GCM, with a random 96-bit IV per message, in the format `v1:<base64(iv || ciphertext || tag)>`. The plaintext MUST NOT appear in the database. The API MUST return the decrypted text to the parties, so the REST and WebSocket contracts do not change. The key MUST come from `VANEP_CHAT_ENCRYPTION_KEY` (64 hex characters). The application MUST refuse to start without a valid key, and under the `prod` profile it MUST also refuse the development key. A body stored before encryption shipped, without the `v1:` prefix, MUST be returned as stored.
+
+#### Scenario: The database only holds ciphertext
+
+- **WHEN** a party sends "Tem vaga para a manhã?"
+- **THEN** the stored body starts with `v1:` and does not contain the plaintext
+- **AND** reading the history returns "Tem vaga para a manhã?"
+
+#### Scenario: The same text never produces the same ciphertext
+
+- **WHEN** the same text is sent twice
+- **THEN** the two stored bodies differ
+
+#### Scenario: A tampered body is not returned as text
+
+- **WHEN** a stored ciphertext is altered or was written with another key
+- **THEN** decrypting it fails instead of returning altered text
+
+#### Scenario: The application does not start without a key
+
+- **WHEN** the application starts with `VANEP_CHAT_ENCRYPTION_KEY` missing or not 64 hex characters
+- **THEN** startup fails with a message naming the property
+
+#### Scenario: Production refuses the development key
+
+- **WHEN** the application starts under the `prod` profile with the development key
+- **THEN** startup fails
+
+#### Scenario: A message stored before encryption is still readable
+
+- **WHEN** a body without the `v1:` prefix is read
+- **THEN** it is returned as stored
+
