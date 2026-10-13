@@ -41,9 +41,9 @@ When the pair already has a conversation, the system MUST return it with HTTP 20
 - **WHEN** a client calls `POST /api/conversations` with the token of a driver that is not approved, not active or does not exist
 - **THEN** the system returns HTTP 404 `conversation.driver.not_found`
 
-### Requirement: The driver lists their conversations
+### Requirement: Each party lists their conversations
 
-`GET /api/conversations/me` MUST require the `list_driver_conversations` permission, which the `DRIVER` bundle holds. It MUST return only the conversations of the caller's driver profile, ordered by the time of the last message, most recent first, with conversations without messages ordered by creation time. Each item MUST carry the conversation token, the client's name and the time of the last message. The query MUST NOT issue one query per conversation.
+`GET /api/conversations/me` MUST require the `list_driver_conversations` permission (held by the `DRIVER` bundle) or the `list_client_conversations` permission (held by the `CLIENT` bundle). It MUST return only the conversations of the caller's own profile, chosen by the caller's user type: a driver gets the conversations of their driver profile, a client gets those of their client profile, and any other user type gets an empty list. The list MUST be ordered by the time of the last message, most recent first, with conversations without messages ordered by creation time. Each item MUST carry the conversation token, the driver's token and name, the client's name and the time of the last message. The query MUST NOT issue one query per conversation.
 
 #### Scenario: The driver sees only their own conversations
 
@@ -56,9 +56,15 @@ When the pair already has a conversation, the system MUST return it with HTTP 20
 - **WHEN** client A sent a message after client B to the same driver
 - **THEN** the conversation with client A comes before the one with client B
 
-#### Scenario: A client cannot list driver conversations
+#### Scenario: The client sees only their own conversations
 
-- **WHEN** a user with only the `CLIENT` bundle calls `GET /api/conversations/me`
+- **WHEN** a client with conversations with two drivers calls `GET /api/conversations/me`
+- **THEN** the response holds exactly those two conversations, most recent message first
+- **AND** no conversation of another client appears
+
+#### Scenario: Listing requires a list permission
+
+- **WHEN** a user without `list_driver_conversations` or `list_client_conversations` calls `GET /api/conversations/me`
 - **THEN** the system returns HTTP 403
 
 ### Requirement: Only the two parties read and send messages

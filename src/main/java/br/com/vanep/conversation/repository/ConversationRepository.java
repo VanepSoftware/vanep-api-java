@@ -44,6 +44,19 @@ public interface ConversationRepository extends JpaRepository<ConversationModel,
 
   @Query(
       """
+      select conversation from ConversationModel conversation
+      join fetch conversation.client client
+      join fetch client.user
+      join fetch conversation.driver driver
+      join fetch driver.user
+      where client.id = :clientId
+      order by coalesce(conversation.lastMessageAt, conversation.createdAt) desc,
+               conversation.id desc
+      """)
+  List<ConversationModel> findByClientIdMostRecentFirst(Long clientId);
+
+  @Query(
+      """
       select conversation.client.user.token from ConversationModel conversation
       where conversation.token = :token
       """)

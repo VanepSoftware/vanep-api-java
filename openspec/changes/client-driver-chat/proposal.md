@@ -7,10 +7,10 @@ O perfil do motorista no app já mostra o botão "Conversar com o motorista", ma
 - Nova entidade **conversa**, única por par (cliente, motorista). Ela **não depende do vínculo `client_driver`**: existe antes do contrato e continua depois dele.
 - Nova entidade **mensagem**, com autor, texto e data, pertencente a uma conversa.
 - **Só o cliente inicia.** `POST /api/conversations` abre a conversa com um motorista pesquisável (mesma regra de `@sec.isSearchableDriver`) ou devolve a que já existe para o par.
-- **O motorista lista e responde.** `GET /api/conversations/me` devolve as conversas do motorista logado, da mais recente para a mais antiga.
+- **Cada lado lista as próprias conversas.** `GET /api/conversations/me` devolve as conversas de quem chama (motorista ou cliente), da mais recente para a mais antiga. É o que as abas de Mensagens do app mostram.
 - `GET /api/conversations/{token}/messages`, paginado, e `POST /api/conversations/{token}/messages`, restritos às duas partes da conversa (`@sec.isConversationParty`).
 - **Tempo real por WebSocket (STOMP).** O envio continua por REST. Ao salvar uma mensagem, o servidor a publica em `/topic/conversations/{token}`. O handshake em `/api/ws` é autenticado pela cadeia de segurança da API que já existe, e a assinatura de um tópico só é aceita para quem é parte da conversa.
-- Novas permissões `create_conversation` (bundle `CLIENT`) e `list_driver_conversations` (bundle `DRIVER`), entregues por migration e pelo `DataSeeder`.
+- Novas permissões `create_conversation` e `list_client_conversations` (bundle `CLIENT`) e `list_driver_conversations` (bundle `DRIVER`), entregues por migration e pelo `DataSeeder`.
 - Nova dependência `spring-boot-starter-websocket`.
 - **O texto das mensagens é cifrado no banco** (AES-256-GCM, chave em `VANEP_CHAT_ENCRYPTION_KEY`). Banco, backups e dumps só guardam texto cifrado; a API decifra ao responder para as partes. O contrato da API e o app não mudam.
 
@@ -19,7 +19,6 @@ O perfil do motorista no app já mostra o botão "Conversar com o motorista", ma
 - Push com o app fechado (FCM/APNs)
 - Confirmação de leitura, "digitando..." e contador de não lidas
 - Anexos, editar ou apagar mensagem
-- Inbox do cliente: ele volta para a conversa pelo perfil do motorista
 - Chat no frontend web
 - Broker externo (RabbitMQ/Redis). O broker em memória atende uma instância
 

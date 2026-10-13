@@ -140,9 +140,27 @@ class ConversationControllerTest {
   }
 
   @Test
-  void aClientCannotListDriverConversations() throws Exception {
+  void theClientSeesOnlyTheirConversationsMostRecentFirst() throws Exception {
+    DriverModel helena = createDriver("Helena", "helena@vanep.com", "15350946056");
+    ClientModel bruno = createClient("Bruno", "bruno@vanep.com", "12345678909");
+    ConversationModel withCarlos = newConversation(maria, carlos);
+    withCarlos.setLastMessageAt(Instant.parse("2020-01-01T09:00:00Z"));
+    ConversationModel withHelena = newConversation(maria, helena);
+    withHelena.setLastMessageAt(Instant.parse("2020-01-01T10:00:00Z"));
+    conversations.saveAll(List.of(withCarlos, withHelena, newConversation(bruno, carlos)));
+
     mockMvc
         .perform(get("/api/conversations/me").with(clientJwt(maria)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.length()").value(2))
+        .andExpect(jsonPath("$[0].driverName").value("Helena"))
+        .andExpect(jsonPath("$[1].driverName").value("Carlos"));
+  }
+
+  @Test
+  void listingRequiresAConversationListPermission() throws Exception {
+    mockMvc
+        .perform(get("/api/conversations/me").with(partyJwt(maria.getUser())))
         .andExpect(status().isForbidden());
   }
 
@@ -230,7 +248,8 @@ class ConversationControllerTest {
     return partyJwt(client.getUser())
         .authorities(
             new SimpleGrantedAuthority("ROLE_CLIENT"),
-            new SimpleGrantedAuthority("create_conversation"));
+            new SimpleGrantedAuthority("create_conversation"),
+            new SimpleGrantedAuthority("list_client_conversations"));
   }
 
   private JwtRequestPostProcessor driverJwt(DriverModel driver) {

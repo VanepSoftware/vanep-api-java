@@ -72,7 +72,7 @@ Enviar mensagem atualiza `conversation.last_message_at` na mesma transação. A 
 ### D9 — Permissões
 
 - `create_conversation` no bundle `CLIENT`, que só o cliente tem (decisão de produto: só ele inicia).
-- `list_driver_conversations` no bundle `DRIVER`.
+- `list_driver_conversations` no bundle `DRIVER` e `list_client_conversations` no bundle `CLIENT` (B5). `GET /me` aceita qualquer uma das duas, e o service escolhe a lista pelo tipo do usuário, como o `ClientDriverService.findMine`.
 - Ler e enviar mensagens não usam permissão: valem só `@sec.isConversationParty`, porque a relação com a conversa é o que autoriza.
 
 As duas permissões entram por migration idempotente (`||` com `@>`, como em `V51`) e pelo `DataSeeder`. O bundle `ADMIN` as recebe automaticamente via `PermissionEnum`.
@@ -148,5 +148,6 @@ Nenhuma bloqueante. O ícone de mensagens no `driver_shell` e a ordem da inbox j
 | B2 | DTOs, mapper, `ConversationService`, `ConversationController` (4 rotas), mensagens pt-BR, evento `ConversationMessageSentEvent` publicado no envio | B1 merged | Mobile M1/M2 (com stubs) |
 | B3 | `spring-boot-starter-websocket`, `WebSocketConfig` (`/api/ws`, simple broker `/topic`), interceptor de `SUBSCRIBE`/`SEND`, listener `AFTER_COMMIT` que publica no tópico | B2 merged | Mobile M2 |
 | B4 | Texto cifrado no banco: `V54` (`body` → `text`), `ConversationMessageCipher`, `ConversationMessageBodyConverter`, chave `VANEP_CHAT_ENCRYPTION_KEY` (properties, `.env.example`, `make env`, `ProductionSecretsValidator`) | B3 merged | — |
+| B5 | `GET /me` para o cliente: `V55` (`list_client_conversations`), `findByClientIdMostRecentFirst`, `listMyConversations` por tipo de usuário | B4 merged | — |
 
 Estimativa por fase (linhas de produção / testes): B1 ~200 / ~150, B2 ~350 / ~250, B3 ~150 / ~150.

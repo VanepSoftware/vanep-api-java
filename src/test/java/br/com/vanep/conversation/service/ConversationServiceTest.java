@@ -22,6 +22,7 @@ import br.com.vanep.conversation.repository.ConversationMessageRepository;
 import br.com.vanep.conversation.repository.ConversationRepository;
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
+import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.service.UserService;
 import java.util.List;
@@ -75,10 +76,12 @@ class ConversationServiceTest {
     maria = new ClientModel();
     maria.setId(1L);
     maria.setUser(user(10L, "maria-uid", "Maria"));
+    maria.getUser().setType(UserType.CLIENT);
     carlos = new DriverModel();
     carlos.setId(2L);
     carlos.setToken("carlos-token");
     carlos.setUser(user(20L, "carlos-uid", "Carlos"));
+    carlos.getUser().setType(UserType.DRIVER);
     conversation = new ConversationModel();
     conversation.setId(100L);
     conversation.setToken("conversation-token");
@@ -147,19 +150,37 @@ class ConversationServiceTest {
   }
 
   @Test
-  void aUserWithoutDriverProfileHasNoDriverConversations() {
-    when(drivers.findByUserId(10L)).thenReturn(Optional.empty());
+  void theCallerDriverListsTheirConversations() {
+    when(conversations.findByDriverIdMostRecentFirst(2L)).thenReturn(List.of(conversation));
 
-    assertThat(service.listDriverConversations("maria-uid")).isEmpty();
+    assertThat(service.listMyConversations("carlos-uid"))
+        .extracting(found -> found.clientName())
+        .containsExactly("Maria");
   }
 
   @Test
-  void listsTheConversationsOfTheCallerDriver() {
-    when(conversations.findByDriverIdMostRecentFirst(2L)).thenReturn(List.of(conversation));
+  void theCallerClientListsTheirConversations() {
+    when(conversations.findByClientIdMostRecentFirst(1L)).thenReturn(List.of(conversation));
 
-    assertThat(service.listDriverConversations("carlos-uid"))
-        .extracting(found -> found.clientName())
-        .containsExactly("Maria");
+    assertThat(service.listMyConversations("maria-uid"))
+        .extracting(found -> found.driverName())
+        .containsExactly("Carlos");
+  }
+
+  @Test
+  void aCallerWithoutTheProfileOfTheirTypeHasNoConversations() {
+    when(drivers.findByUserId(20L)).thenReturn(Optional.empty());
+
+    assertThat(service.listMyConversations("carlos-uid")).isEmpty();
+  }
+
+  @Test
+  void anAdminHasNoConversationsOfTheirOwn() {
+    UserModel admin = user(30L, "admin-uid", "Admin");
+    admin.setType(UserType.ADMIN);
+    when(users.requireByToken("admin-uid")).thenReturn(admin);
+
+    assertThat(service.listMyConversations("admin-uid")).isEmpty();
   }
 
   @Test

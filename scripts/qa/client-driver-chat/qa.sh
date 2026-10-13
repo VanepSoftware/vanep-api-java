@@ -223,7 +223,7 @@ request GET "/api/conversations/$CONV_ANA/messages" ""
 expect M32 "no token" 401
 
 echo
-echo "== GET /api/conversations/me (driver inbox)"
+echo "== GET /api/conversations/me (each party's conversations)"
 echo "| id | scenario | expected | result |"
 echo "|---|---|---|---|"
 request GET /api/conversations/me "$FABIO"
@@ -231,7 +231,9 @@ expect H13 "the driver sees both clients, latest message first" 200 "length == 2
 request GET /api/conversations/me "$GUSTAVO"
 expect H14 "another driver sees only their own" 200 "length == 1 and .[0].token == \"$CONV_CARLA\" and .[0].lastMessageAt == null"
 request GET /api/conversations/me "$ANA"
-expect M33 "a client cannot list driver conversations" 403
+expect H15 "the client sees only their own conversation" 200 "length == 1 and .[0].token == \"$CONV_ANA\" and .[0].driverName == \"Fabio Teixeira\" and .[0].lastMessageAt != null"
+request GET /api/conversations/me "$BRUNO"
+expect H16 "another client sees only theirs" 200 "length == 1 and .[0].token == \"$CONV_BRUNO\""
 request GET /api/conversations/me ""
 expect M34 "no token" 401
 

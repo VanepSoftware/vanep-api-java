@@ -85,6 +85,24 @@ class ConversationRepositoryTest {
   }
 
   @Test
+  void clientConversationsHoldOnlyTheirOwnMostRecentMessageFirst() {
+    DriverModel helena = createDriver("Helena", "helena@vanep.com", "15350946056");
+    ClientModel bruno = createClient("Bruno", "bruno@vanep.com", "12345678909");
+    ConversationModel older = newConversation(maria, carlos);
+    older.setLastMessageAt(Instant.parse("2020-01-01T09:00:00Z"));
+    ConversationModel newer = newConversation(maria, helena);
+    newer.setLastMessageAt(Instant.parse("2020-01-01T10:00:00Z"));
+    conversations.saveAll(List.of(older, newer));
+    conversations.save(newConversation(bruno, carlos));
+
+    List<ConversationModel> found = conversations.findByClientIdMostRecentFirst(maria.getId());
+
+    assertThat(found)
+        .extracting(ConversationModel::getId)
+        .containsExactly(newer.getId(), older.getId());
+  }
+
+  @Test
   void resolvesTheUserTokensOfBothParties() {
     ConversationModel saved = conversations.save(newConversation(maria, carlos));
 

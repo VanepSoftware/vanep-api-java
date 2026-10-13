@@ -93,7 +93,8 @@ public enum PermissionEnum {
   DELETE_CLIENT_DRIVER("delete_client_driver"),
   RESTORE_CLIENT_DRIVER("restore_client_driver"),
   CREATE_CONVERSATION("create_conversation"),
-  LIST_DRIVER_CONVERSATIONS("list_driver_conversations");
+  LIST_DRIVER_CONVERSATIONS("list_driver_conversations"),
+  LIST_CLIENT_CONVERSATIONS("list_client_conversations");
 
   private final String value;
 

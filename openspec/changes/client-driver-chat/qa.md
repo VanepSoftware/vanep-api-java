@@ -1,6 +1,8 @@
 # QA — client-driver-chat (constitution rule 55)
 
-Latest run: API built from `feat/161-chat-encryption`, which contains phases B1–B4, so it covers the whole spec. Run date: 2026-10-12. Result: **68/68 passed** (48 HTTP, 9 encryption at rest, 11 realtime) on five consecutive runs.
+Latest run: API built from `feat/161-chat-client-inbox`, which contains phases B1–B5, so it covers the whole spec. Run date: 2026-10-12. Result: **69/69 passed** (49 HTTP, 9 encryption at rest, 11 realtime) on three consecutive runs.
+
+Earlier runs: B4 passed 68/68 on five consecutive runs.
 
 History: B3 (`feat/161-chat-realtime`) passed 59/59 twice, before the encryption checks existed. During the B4 run, the first two attempts stopped during setup without a message. After the setup steps were changed to fail with an explicit reason, five consecutive runs passed. The most likely cause is an interrupted run that left the seeded driver Helena under review, so the next setup could not find her; the script now reports that case directly.
 
@@ -36,7 +38,7 @@ The script stops at the first mismatch with a non-zero exit. That was checked by
 
 With `VANEP_CHAT_ENCRYPTION_KEY=abc` and with an empty `VANEP_CHAT_ENCRYPTION_KEY=`, the application refused to start (exit 1) with "vanep.chat.encryption-key must be 64 hex characters (openssl rand -hex 32)." The `prod` check against the development key is covered by `ProductionSecretsValidatorTest`, since starting the `prod` profile also needs the production JWK and secrets.
 
-Flyway applied `V53` and `V54` on an empty database at boot. `role_permissions` after boot: `CLIENT` has `create_conversation` only, `DRIVER` has `list_driver_conversations` only, `ADMIN` has both, `ASSISTANT` has neither. A decoded driver token carries `list_driver_conversations` and not `create_conversation`.
+Flyway applied `V53`, `V54` and `V55` on an empty database at boot. `role_permissions` after boot: `CLIENT` has `create_conversation` only, `DRIVER` has `list_driver_conversations` only, `ADMIN` has both, `ASSISTANT` has neither. A decoded driver token carries `list_driver_conversations` and not `create_conversation`.
 
 ## Results
 
@@ -99,13 +101,14 @@ Flyway applied `V53` and `V54` on an empty database at boot. `role_permissions` 
 | M31 | unknown conversation | 403 | PASS |
 | M32 | no token | 401 | PASS |
 
-### `GET /api/conversations/me` — driver inbox
+### `GET /api/conversations/me` — each party's conversations
 
 | id | scenario | expected | result |
 |---|---|---|---|
 | H13 | the driver sees both clients, latest message first | 200 | PASS |
 | H14 | another driver sees only their own (no messages yet, `lastMessageAt` null) | 200 | PASS |
-| M33 | a client cannot list driver conversations | 403 | PASS |
+| H15 | the client sees only their own conversation, with the driver's name (B5) | 200 | PASS |
+| H16 | another client sees only theirs (B5) | 200 | PASS |
 | M34 | no token | 401 | PASS |
 
 ### Encryption at rest

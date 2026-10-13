@@ -44,9 +44,9 @@ public class ConversationController {
   }
 
   @GetMapping("/me")
-  @PreAuthorize("hasAuthority('list_driver_conversations')")
+  @PreAuthorize("hasAnyAuthority('list_driver_conversations', 'list_client_conversations')")
   public List<ConversationResponseDTO> mine(Authentication authentication) {
-    return service.listDriverConversations(SecurityHelper.requireCallerUid(authentication));
+    return service.listMyConversations(SecurityHelper.requireCallerUid(authentication));
   }
 
   @GetMapping("/{token}/messages")

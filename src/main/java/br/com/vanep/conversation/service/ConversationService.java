@@ -95,15 +95,25 @@ public class ConversationService {
   }
 
   @Transactional(readOnly = true)
-  public List<ConversationResponseDTO> listDriverConversations(String callerUid) {
+  public List<ConversationResponseDTO> listMyConversations(String callerUid) {
     UserModel caller = users.requireByToken(callerUid);
-    return drivers
-        .findByUserId(caller.getId())
-        .map(driver -> conversations.findByDriverIdMostRecentFirst(driver.getId()))
-        .orElse(List.of())
-        .stream()
-        .map(mapper::toResponse)
-        .toList();
+    return findConversationsOf(caller).stream().map(mapper::toResponse).toList();
+  }
+
+  List<ConversationModel> findConversationsOf(UserModel caller) {
+    return switch (caller.getType()) {
+      case DRIVER ->
+          drivers
+              .findByUserId(caller.getId())
+              .map(driver -> conversations.findByDriverIdMostRecentFirst(driver.getId()))
+              .orElse(List.of());
+      case CLIENT ->
+          clients
+              .findByUserId(caller.getId())
+              .map(client -> conversations.findByClientIdMostRecentFirst(client.getId()))
+              .orElse(List.of());
+      default -> List.of();
+    };
   }
 
   @Transactional(readOnly = true)

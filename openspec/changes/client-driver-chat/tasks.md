@@ -1,8 +1,8 @@
 > **Pilha de branches.** Cada fase depende da anterior, então cada branch nasce da anterior e cada PR aponta a anterior como `--base`.
 >
 > ```
-> main ─ feat/161-chat-schema ─ feat/161-chat-http ─ feat/161-chat-realtime ─ feat/161-chat-encryption
->        PR B1 → main                     PR B2 → B1                     PR B3 → B2                PR B4 → B3
+> main ─ feat/161-chat-schema ─ feat/161-chat-http ─ feat/161-chat-realtime ─ feat/161-chat-encryption ─ feat/161-chat-client-inbox
+>        PR B1 → main                     PR B2 → B1                     PR B3 → B2                PR B4 → B3                  PR B5 → B4
 > ```
 >
 > **Mergear pelo `merge stack`**, ou apagando a branch a cada merge: o repo tem `delete_branch_on_merge: false`, e sem apagar a branch o GitHub não reaponta a base das filhas.
@@ -15,6 +15,7 @@
 | B2 | REST: abrir/retomar, inbox do motorista, histórico, envio, evento de mensagem enviada | B1 | Mobile M1/M2 (stubs) |
 | B3 | WebSocket: `/api/ws`, broker simples, autorização de `SUBSCRIBE`, publicação após commit | B2 | Mobile M2 |
 | B4 | Texto das mensagens cifrado no banco (AES-256-GCM) | B3 | — |
+| B5 | `GET /me` lista as conversas do cliente também (aba Mensagens do app) | B4 | — |
 
 Teto por PR: ~600 linhas produtivas e 10 arquivos novos (regra 41).
 
@@ -93,4 +94,16 @@ Teto por PR: ~600 linhas produtivas e 10 arquivos novos (regra 41).
 - [x] 4.7 Chave `vanep.chat.encryption-key` / `VANEP_CHAT_ENCRYPTION_KEY`: `application.properties`, valor de dev em `application-local.properties`, valor fixo em `application-test.properties`, placeholder em `.env.example`, geração no `make env`, checagem no `ProductionSecretsValidator`
 - [x] 4.8 QA manual (regra 55): `qa.sh` ganha a checagem do banco cifrado, rodar a spec inteira de novo e anotar no `qa.md` (incluindo subir sem chave). Resultado: 68/68 em cinco rodadas seguidas
 - [x] 4.9 `make lint` + `./mvnw verify`. Abrir PR em pt-BR, `--base feat/161-chat-realtime`, `Refs #161`
+
+## 5. Phase B5 — o cliente lista as próprias conversas (PR B5)
+
+> Goal: a aba Mensagens do cliente no app mostra as conversas dele.
+> Depends on: B4 | Parallel with: —
+
+- [x] 5.1 Criar branch `feat/161-chat-client-inbox` a partir de `feat/161-chat-encryption`
+- [x] 5.2 Testes: repository (`findByClientIdMostRecentFirst`), service (`listMyConversations` para motorista, cliente, perfil ausente e admin) e controller (cliente vê só as dele, mais recente primeiro; sem permissão de listagem dá 403)
+- [x] 5.3 Migration `V55__client_lists_own_conversations.sql`: `list_client_conversations` nos bundles `CLIENT` e `ADMIN`, idempotente
+- [x] 5.4 `PermissionEnum.LIST_CLIENT_CONVERSATIONS`, `DataSeeder` (bundle `CLIENT`), `findByClientIdMostRecentFirst`, `listMyConversations` e `/me` com `hasAnyAuthority`
+- [x] 5.5 QA manual (regra 55): `qa.sh` cobre a lista do cliente; rodar a spec inteira. Resultado: 69/69 em três rodadas seguidas
+- [x] 5.6 `make lint` + `./mvnw verify`. Abrir PR em pt-BR, `--base feat/161-chat-encryption`, `Refs #161`
 
