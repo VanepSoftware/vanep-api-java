@@ -74,4 +74,5 @@ Teto por PR: ~600 linhas produtivas e 10 arquivos novos (regra 41).
 - [x] 3.8 `ConversationMessagePublisher` com `@TransactionalEventListener(phase = AFTER_COMMIT)`
 - [x] 3.9 Verificar se o `RateLimitingFilter` atinge `/api/ws` e o envio de mensagens, e se os limites aceitam uma conversa normal (risco do design). Resultado: ele só limita POSTs de autenticação; o chat não é afetado
 - [x] 3.10 Smoke: virou o `ConversationRealtimeIntegrationTest`, com sessões STOMP reais em porta aleatória e JWT assinado pelo `JWKSource` da aplicação. O motorista recebe ao vivo o que o cliente envia por REST, o intruso e outros destinos são recusados, o handshake sem token dá 401 e mensagem com rollback não é publicada
-- [x] 3.11 `make lint` + `./mvnw verify`. Abrir PR em pt-BR, `--base feat/161-chat-http`, `Refs #161`
+- [x] 3.11 **QA manual da spec inteira (regra 55, adicionada nesta fase):** API da branch contra um Postgres descartável, tokens reais pelo grant do mobile, caminho feliz e mau uso em REST e WebSocket. Script em `scripts/qa/client-driver-chat/`, resultado em `qa.md`: 59/59
+- [x] 3.12 `make lint` + `./mvnw verify`. Abrir PR em pt-BR, `--base feat/161-chat-http`, `Refs #161`
