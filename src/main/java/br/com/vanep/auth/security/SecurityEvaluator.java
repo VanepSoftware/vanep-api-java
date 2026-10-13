@@ -4,6 +4,7 @@ import br.com.vanep.assistant.repository.AssistantRepository;
 import br.com.vanep.client.repository.ClientRepository;
 import br.com.vanep.clientdriver.repository.ClientDriverRepository;
 import br.com.vanep.clientrating.repository.ClientRatingRepository;
+import br.com.vanep.conversation.repository.ConversationRepository;
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.drivercnh.repository.DriverCnhRepository;
 import br.com.vanep.driverdocument.repository.DriverDocumentRepository;
@@ -26,6 +27,7 @@ public class SecurityEvaluator {
   private final DriverDocumentRepository driverDocumentRepository;
   private final TripRepository tripRepository;
   private final AssistantRepository assistantRepository;
+  private final ConversationRepository conversationRepository;
 
   public SecurityEvaluator(
       DriverRepository driverRepository,
@@ -37,7 +39,8 @@ public class SecurityEvaluator {
       ClientRatingRepository clientRatingRepository,
       DriverDocumentRepository driverDocumentRepository,
       TripRepository tripRepository,
-      AssistantRepository assistantRepository) {
+      AssistantRepository assistantRepository,
+      ConversationRepository conversationRepository) {
     this.driverRepository = driverRepository;
     this.clientRepository = clientRepository;
     this.clientDriverRepository = clientDriverRepository;
@@ -48,6 +51,7 @@ public class SecurityEvaluator {
     this.driverDocumentRepository = driverDocumentRepository;
     this.tripRepository = tripRepository;
     this.assistantRepository = assistantRepository;
+    this.conversationRepository = conversationRepository;
   }
 
   public boolean isDriverOwner(String token, Authentication authentication) {
@@ -167,6 +171,21 @@ public class SecurityEvaluator {
                             uid.equals(assistant.getUser().getToken())
                                 || (assistant.getDriver() != null
                                     && uid.equals(assistant.getDriver().getUser().getToken()))))
+        .orElse(false);
+  }
+
+  public boolean isConversationParty(String token, Authentication authentication) {
+    return SecurityHelper.getCallerUid(authentication)
+        .map(
+            uid ->
+                conversationRepository
+                        .findClientUserTokenByToken(token)
+                        .map(uid::equals)
+                        .orElse(false)
+                    || conversationRepository
+                        .findDriverUserTokenByToken(token)
+                        .map(uid::equals)
+                        .orElse(false))
         .orElse(false);
   }
 }

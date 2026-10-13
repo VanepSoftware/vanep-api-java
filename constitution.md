@@ -65,6 +65,16 @@ Rules that MUST be followed in this codebase. Stack: **Java 25, Spring Boot 4, M
 
     > Rule 50 is numbered out of sequence on purpose: it belongs to Testing, but inserting it as 26 would renumber rules 26–49 and invalidate every `regra N` reference already written across `openspec/`.
 
+55. **Every backend phase is exercised against a running API before its PR, on the happy path and on user misuse, and the run is committed.** Automated tests (rules 23, 43) prove the code in isolation, with mocked authorities and H2 without Flyway; they do not prove the real migration, the permission bundles inside a real issued token, or the real HTTP/WebSocket stack. Before opening each phase PR:
+    - Start the app from the phase branch against a **throwaway PostgreSQL** (a disposable container, never the shared dev database), so Flyway runs for real and nothing leaks into anyone's data.
+    - Get **real tokens through the same OAuth flow the clients use** (e.g. the mobile password grant on `/oauth2/token`) for every actor the phase involves — never hand-built JWTs.
+    - Exercise every endpoint or channel the phase delivers on the **happy path**: each spec scenario, for each actor allowed to do it.
+    - Exercise **misuse**: no token and an invalid token; the wrong actor (another role, another user's resource); missing fields, blank values, wrong JSON types and malformed JSON; values just past a limit and exactly at it; unknown and deleted tokens; repeated or concurrent requests; and every case the spec says must be rejected. Check that a rejected request changed nothing.
+    - Use `curl` + `jq` for HTTP, and a small scripted client for other protocols (e.g. Node for STOMP over WebSocket). Commit the run as an executable script under `scripts/qa/<change>/` that asserts each expected status and body and exits non-zero on the first mismatch, so anyone can re-run it.
+    - Record the result in `openspec/changes/<change>/qa.md`: how to run it, and a table of scenario → request → expected → observed. The PR description links that file and states the pass count.
+
+    A phase with a failing or skipped scenario is not ready for review. Numbered 55 for the same reason as rule 50.
+
 ## Code quality (Clean Code)
 
 26. **Write tests before the code** they cover (test-first).
