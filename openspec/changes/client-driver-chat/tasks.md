@@ -48,15 +48,15 @@ Teto por PR: ~600 linhas produtivas e 10 arquivos novos (regra 41).
 > Depends on: B1 | Parallel with: Mobile M1/M2
 > Order: test → request DTO → service → controller → response DTO
 
-- [ ] 2.1 Criar branch `feat/161-chat-http` a partir de `feat/161-chat-schema`
-- [ ] 2.2 Testes unitários do `ConversationService`: abrir cria (201) ou devolve a existente (200); motorista não pesquisável gera 404 `conversation.driver.not_found`; violação do índice único na corrida relê a existente (D2); enviar resolve `sender` pelo chamador, atualiza `last_message_at` e publica `ConversationMessageSentEvent`
-- [ ] 2.3 Testes de slice (`MockMvc` + segurança) para todos os cenários do spec: 403 do motorista no `POST /api/conversations`, 403 do cliente no `GET /me`, 403 de terceiro nas duas rotas de mensagem, 400 para texto em branco e para 2001 caracteres, histórico paginado do mais novo para o mais antigo
-- [ ] 2.4 `ConversationCreateRequestDTO` (`driverToken`) e `ConversationMessageCreateRequestDTO` (`body`, `@NotBlank`, `@Size(max = 2000)`)
-- [ ] 2.5 Chaves `conversation.driver.not_found` (e outras que surgirem) em `messages.properties` e `messages_pt_BR.properties`
-- [ ] 2.6 `ConversationService`: `openConversation`, `listDriverConversations`, `listMessages`, `sendMessage`. O envio publica `ConversationMessageSentEvent` (record) via `ApplicationEventPublisher`
-- [ ] 2.7 `ConversationController` em `/api/conversations` com `@PreAuthorize`: `hasAuthority('create_conversation')`, `hasAuthority('list_driver_conversations')` e `@sec.isConversationParty(#token, authentication)`
-- [ ] 2.8 `ConversationResponseDTO` (token, token e nome do motorista, nome do cliente, `lastMessageAt`), `ConversationMessageResponseDTO` (token, body, sender, sentAt) e `ConversationMapper`
-- [ ] 2.9 `make lint` + `./mvnw verify`. Abrir PR em pt-BR, `--base feat/161-chat-schema`
+- [x] 2.1 Criar branch `feat/161-chat-http` a partir de `feat/161-chat-schema`
+- [x] 2.2 Testes unitários do `ConversationService`: abrir cria (201) ou devolve a existente (200); motorista não pesquisável gera 404 `conversation.driver.not_found`; violação do índice único na corrida relê a existente (D2); enviar resolve `sender` pelo chamador, atualiza `last_message_at` e publica `ConversationMessageSentEvent`
+- [x] 2.3 Testes de slice (`MockMvc` + segurança) para todos os cenários do spec: 403 do motorista no `POST /api/conversations`, 403 do cliente no `GET /me`, 403 de terceiro nas duas rotas de mensagem, 400 para texto em branco e para 2001 caracteres, histórico paginado do mais novo para o mais antigo
+- [x] 2.4 `ConversationCreateRequestDTO` (`driverToken`) e `ConversationMessageCreateRequestDTO` (`body`, `@NotBlank`, `@Size(max = 2000)`). `ConversationMessageSentEvent` em `conversation.event`
+- [x] 2.5 Chaves `conversation.driver.not_found` (e outras que surgirem) em `messages.properties` e `messages_pt_BR.properties`
+- [x] 2.6 `ConversationService`: `openConversation`, `listDriverConversations`, `listMessages`, `sendMessage`. O envio publica `ConversationMessageSentEvent` (record) via `ApplicationEventPublisher`
+- [x] 2.7 `ConversationController` em `/api/conversations` com `@PreAuthorize`: `hasAuthority('create_conversation')`, `hasAuthority('list_driver_conversations')` e `@sec.isConversationParty(#token, authentication)`
+- [x] 2.8 `ConversationResponseDTO` (token, token e nome do motorista, nome do cliente, `lastMessageAt`), `ConversationMessageResponseDTO` (token, body, sender, sentAt) e `ConversationMapper`
+- [x] 2.9 `make lint` + `./mvnw verify`. Abrir PR em pt-BR, `--base feat/161-chat-schema`, `Refs #161`
 
 ## 3. Phase B3 — tempo real (PR B3)
 
