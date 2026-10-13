@@ -64,14 +64,14 @@ Teto por PR: ~600 linhas produtivas e 10 arquivos novos (regra 41).
 > Depends on: B2 | Parallel with: Mobile M2
 > Order: test → dependency → config → security (interceptor) → listener
 
-- [ ] 3.1 Criar branch `feat/161-chat-realtime` a partir de `feat/161-chat-http`
-- [ ] 3.2 Testes do interceptor: `SUBSCRIBE` em `/topic/conversations/{token}` passa para a parte e falha para um terceiro, para outro destino e para um frame `SEND` (D3, D5)
-- [ ] 3.3 Teste do listener: o evento publica `ConversationMessageResponseDTO` em `/topic/conversations/{token}` via `SimpMessagingTemplate` mockado. Teste de integração: uma mensagem salva em transação com rollback não publica nada (D6)
-- [ ] 3.4 Teste de slice: handshake em `/api/ws` sem Bearer responde 401 (D4)
-- [ ] 3.5 Adicionar `spring-boot-starter-websocket` ao `pom.xml`
-- [ ] 3.6 `WebSocketConfig` em `config`: `@EnableWebSocketMessageBroker`, endpoint `/api/ws`, `enableSimpleBroker("/topic")` e registro do interceptor no `clientInboundChannel`. Nenhuma URL fixa (regra 1); se precisar de allowed origins, ler de property com env var
-- [ ] 3.7 `ConversationSubscriptionInterceptor` (`ChannelInterceptor`) que delega a `SecurityEvaluator.isConversationParty`
-- [ ] 3.8 `ConversationMessagePublisher` com `@TransactionalEventListener(phase = AFTER_COMMIT)`
-- [ ] 3.9 Verificar se o `RateLimitingFilter` atinge `/api/ws` e o envio de mensagens, e se os limites aceitam uma conversa normal (risco do design)
-- [ ] 3.10 Smoke manual: duas sessões (cliente e motorista) assinam o tópico com um cliente STOMP, uma envia por REST e a outra recebe
-- [ ] 3.11 `make lint` + `./mvnw verify`. Abrir PR em pt-BR, `--base feat/161-chat-http`, `Closes #N`
+- [x] 3.1 Criar branch `feat/161-chat-realtime` a partir de `feat/161-chat-http`
+- [x] 3.2 Testes do interceptor: `SUBSCRIBE` em `/topic/conversations/{token}` passa para a parte e falha para um terceiro, para outro destino e para um frame `SEND` (D3, D5)
+- [x] 3.3 Teste do listener: o evento publica `ConversationMessageResponseDTO` em `/topic/conversations/{token}` via `SimpMessagingTemplate` mockado. Teste de integração: uma mensagem salva em transação com rollback não publica nada (D6)
+- [x] 3.4 Teste de slice: handshake em `/api/ws` sem Bearer responde 401 (D4)
+- [x] 3.5 Adicionar `spring-boot-starter-websocket` ao `pom.xml`
+- [x] 3.6 `WebSocketConfig` em `config`: `@EnableWebSocketMessageBroker`, endpoint `/api/ws`, `enableSimpleBroker("/topic")` e registro do interceptor no `clientInboundChannel`. Nenhuma URL fixa (regra 1); se precisar de allowed origins, ler de property com env var
+- [x] 3.7 `ConversationSubscriptionInterceptor` (em `conversation.realtime`) (`ChannelInterceptor`) que delega a `SecurityEvaluator.isConversationParty`
+- [x] 3.8 `ConversationMessagePublisher` com `@TransactionalEventListener(phase = AFTER_COMMIT)`
+- [x] 3.9 Verificar se o `RateLimitingFilter` atinge `/api/ws` e o envio de mensagens, e se os limites aceitam uma conversa normal (risco do design). Resultado: ele só limita POSTs de autenticação; o chat não é afetado
+- [x] 3.10 Smoke: virou o `ConversationRealtimeIntegrationTest`, com sessões STOMP reais em porta aleatória e JWT assinado pelo `JWKSource` da aplicação. O motorista recebe ao vivo o que o cliente envia por REST, o intruso e outros destinos são recusados, o handshake sem token dá 401 e mensagem com rollback não é publicada
+- [x] 3.11 `make lint` + `./mvnw verify`. Abrir PR em pt-BR, `--base feat/161-chat-http`, `Refs #161`
