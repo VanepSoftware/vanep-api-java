@@ -186,14 +186,18 @@ public class DataSeeder implements ApplicationRunner {
       bundle = rolePermissions.save(bundle);
       clientRole.setRolePermission(bundle);
       roles.save(clientRole);
-      log.info("Seed: CLIENT bundle created with dependents and driver rating permissions.");
+      log.info(
+          "Seed: CLIENT bundle created with dependents, driver rating and conversation"
+              + " permissions.");
     }
   }
 
   static List<String> clientPermissions() {
     return Stream.concat(
             PermissionEnum.crudFor("dependents").stream(),
-            Stream.of(PermissionEnum.CREATE_DRIVER_RATING.value()))
+            Stream.of(
+                PermissionEnum.CREATE_DRIVER_RATING.value(),
+                PermissionEnum.CREATE_CONVERSATION.value()))
         .toList();
   }
 
@@ -241,7 +245,8 @@ public class DataSeeder implements ApplicationRunner {
               PermissionEnum.FINISH_TRIP.value(),
               PermissionEnum.CREATE_CLIENT_RATING.value(),
               PermissionEnum.LIST_CLIENT_RATINGS.value(),
-              PermissionEnum.SHOW_CLIENT_RATING.value()));
+              PermissionEnum.SHOW_CLIENT_RATING.value(),
+              PermissionEnum.LIST_DRIVER_CONVERSATIONS.value()));
       bundle = rolePermissions.save(bundle);
       driverRole.setRolePermission(bundle);
       roles.save(driverRole);

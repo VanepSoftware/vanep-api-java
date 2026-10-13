@@ -9,6 +9,8 @@ delete from email_verification_token;
 delete from assistant_invite;
 delete from assistant;
 delete from trip;
+delete from conversation_message;
+delete from conversation;
 delete from driver_service_area;
 delete from driver_rating;
 delete from client_rating;
