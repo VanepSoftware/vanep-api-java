@@ -23,7 +23,7 @@
 
 - [x] Ler `constitution.md` inteiro antes de qualquer trabalho (`openspec/rules.md` regra 1)
 - [x] Revisar `proposal.md`, `design.md` e os seis specs (`operation-shift`, `contract-schedule`, `contract-core`, `client-driver-derived-status`, `unlinked-passengers`, `route-passengers`)
-- [x] **Confirmar os números de Flyway** em `main` e em **todas as branches remotas** (`git ls-tree`). Esta change usa `V59` a `V60`. **Reconfirmar antes do merge de cada PR com migration** (R7)
+- [x] **Confirmar os números de Flyway** em `main` e em **todas as branches remotas** (`git ls-tree`). Esta change usa `V56` a `V60`. **Reconfirmar antes do merge de cada PR com migration** (R7)
 - [x] Branch `spec/contract-core` a partir da `main`, só com `openspec/changes/contract-core/`. É a base da pilha; a branch `spike/contract-proposal` não vai para a `main`
 
 ## 1. PR 1 — Turno escolar e turno da operação
@@ -34,11 +34,11 @@
 
 - [x] 1.1 Criar branch `feat/contract-core-shift-split` a partir da `spec/contract-core` (o PR aponta para ela como `--base`)
 - [x] 1.2 Testes: `POST /api/drivers/me/trips/start` com `FULLTIME` → 400 e nenhuma trip; com `MORNING` → 200 (já coberto, continua); `POST /api/trips` e `PATCH /api/trips/{token}` do admin com `FULLTIME` → 400 (o `PATCH` mantém o turno gravado); dependent com `FULLTIME` continua 201, devolve e grava `FULLTIME`; repositório de trip grava e lê `OperationShift` (testes existentes, com o tipo trocado)
-- [x] 1.3 Migration `V59__trip_operation_shift.sql`: `update trip set shift = 'MORNING' where shift = 'FULLTIME'`; `comment on column trip.shift` (turno da operação, sem `FULLTIME`); `comment on column dependent.shift` (turno escolar; dias e horários vêm da agenda do contrato — A1)
+- [x] 1.3 Migration `V56__trip_operation_shift.sql`: `update trip set shift = 'MORNING' where shift = 'FULLTIME'`; `comment on column trip.shift` (turno da operação, sem `FULLTIME`); `comment on column dependent.shift` (turno escolar; dias e horários vêm da agenda do contrato — A1)
 - [x] 1.4 Renomear `shared.enums.Shift` para `SchoolShift` e ajustar `DependentModel`, `DependentMapper`, DTOs, `DependentService` e `DependentSeeder` (refactor mecânico, JSON igual)
 - [x] 1.5 Criar `shared.enums.OperationShift` (`MORNING`, `AFTERNOON`, `NIGHT`) e trocar o tipo em `TripModel`, `TripRepository`, DTOs de trip, `TripService` e `TripSeeder`
 - [x] 1.6 Conferir que a `absence` (#160) não está na `main`: ela entra depois desta change e troca os tipos de turno nas policies dela ao entrar (aviso no topo)
-- [x] 1.7 Aplicar a `V59` num PostgreSQL descartável com trips `FULLTIME` e `AFTERNOON` semeadas à mão: `FULLTIME` vira `MORNING`, `AFTERNOON` fica intacta, e os comments de `trip.shift` e `dependent.shift` são gravados (R1)
+- [x] 1.7 Aplicar a `V56` num PostgreSQL descartável com trips `FULLTIME` e `AFTERNOON` semeadas à mão: `FULLTIME` vira `MORNING`, `AFTERNOON` fica intacta, e os comments de `trip.shift` e `dependent.shift` são gravados (R1)
 - [x] 1.8 `make lint` + `./mvnw verify -B`
 - [x] 1.9 QA da regra 55 (`scripts/qa/contract-core/qa.sh`, resultado no `qa.md`): início de rota e trip do admin recusam `FULLTIME`, dependente aceita `FULLTIME` e a `V56` reaplicada converte uma trip `FULLTIME`
 
@@ -50,7 +50,7 @@
 
 - [x] 2.1 Criar branch `feat/contract-core-schedule-schema` de dentro da branch do PR 1
 - [x] 2.2 Testes de repositório: salvar agenda com slots e reler; aluno não vinculado por motorista, com escola, endereço e slots carregados fora da transação (prova o fetch join, `open-in-view` desligado); aluno de outro motorista não aparece; token só resolve dentro do motorista; token opaco gerado no persist; soft delete esconde a linha e mantém no banco, e o do aluno leva junto a agenda e os slots. A ordem dos slots não vem do banco: fica no `ScheduleMapper` (tarefa 5.10)
-- [x] 2.3 Migration `V60__create_schedule_and_unlinked_passenger.sql`:
+- [x] 2.3 Migration `V57__create_schedule_and_unlinked_passenger.sql`:
     - `schedule` (`id`, `created_at`, `updated_at`, `deleted_at`)
     - `schedule_slot` (`id`, `schedule_id` FK, `weekday varchar(16)`, `leg varchar(16)`, `shift varchar(16)`, `window_start time not null`, `window_end time`, timestamps, `deleted_at`), `check (window_end is null or window_end > window_start)`
     - `unlinked_passenger` (`id`, `token`, `driver_id` FK, `name`, `school_id` FK, `school_shift`, `address_id` FK, `notes`, `schedule_id` FK, timestamps, `deleted_at`)
@@ -63,7 +63,7 @@
     - endereço como `@ManyToOne` (o dono único é o índice parcial); agenda como `@OneToOne` com `cascade = ALL`
 - [x] 2.7 Criar `ScheduleRepository` e `UnlinkedPassengerRepository` (busca por token **dentro do motorista**, lista por motorista com fetch join de escola, endereço e slots — regra 17). Sem `ScheduleSlotRepository`: toda escrita de slot passa pelo `ScheduleModel` (`cascade = ALL`, `orphanRemoval = true`)
 - [x] 2.8 Acrescentar `schedule_slot`, `schedule` e `unlinked_passenger` ao `src/test/resources/db/clean.sql` na ordem de FK
-- [x] 2.9 **Aplicar a `V60` num PostgreSQL descartável e provar cada índice** com inserts manuais: slot duplicado no mesmo `(schedule, weekday, leg)` recusado; ida e volta no mesmo dia aceitas; slot soft-deletado e recriado aceito; `window_end` antes do início recusado; dois donos no mesmo `schedule` ou no mesmo endereço recusados; token repetido recusado; dono soft-deletado libera endereço e agenda; a consulta por `(schedule_id, weekday, shift)` usa o índice (R1)
+- [x] 2.9 **Aplicar a `V57` num PostgreSQL descartável e provar cada índice** com inserts manuais: slot duplicado no mesmo `(schedule, weekday, leg)` recusado; ida e volta no mesmo dia aceitas; slot soft-deletado e recriado aceito; `window_end` antes do início recusado; dois donos no mesmo `schedule` ou no mesmo endereço recusados; token repetido recusado; dono soft-deletado libera endereço e agenda; a consulta por `(schedule_id, weekday, shift)` usa o índice (R1)
 - [x] 2.10 `make lint` + `./mvnw verify -B`
 - [x] 2.11 QA da regra 55 (`scripts/qa/contract-core/qa.sh`, resultado no `qa.md`): índices e `CHECK` da `V57` conferidos por SQL no PostgreSQL da API
 
@@ -113,8 +113,8 @@
 > Depends on: PR 4 | Parallel with: —
 > Order: test → migration → security/authorization → request DTO → messages → service → response DTO → mapper
 
-- [ ] 5.1 Criar branch `feat/contract-core-service` de dentro da branch do PR 4
-- [ ] 5.2 Testes unitários de `ContractService` (Mockito):
+- [x] 5.1 Criar branch `feat/contract-core-service` de dentro da branch do PR 4
+- [x] 5.2 Testes unitários de `ContractService` (Mockito):
     - criar com dois irmãos → contrato `ACTIVE`, itens com escola e endereço **copiados**, vínculo recalculado para `ACTIVE`
     - dependente de outro cliente → 422 `contract.item.dependent_not_in_link`
     - dependente sem escola / sem endereço → 422 `contract.item.school_required` / `contract.item.address_required`
@@ -123,28 +123,28 @@
     - vínculo já com `ACTIVE` → 409 `contract.active_conflict`
     - criar, reativar ou restaurar perdendo a corrida para o índice parcial do `ACTIVE` → 409 `contract.active_conflict`, nunca 500
     - motorista não aprovado → 422 `contract.driver.not_approved`; vínculo `BLOCKED` → 422 `contract.link.blocked`
-    - período invertido ou acima de 12 meses → a chave da `ContractTermsPolicy` (422)
+    - período invertido ou acima de 12 meses → `contract.period.invalid` / `contract.period.too_long` (422)
     - `PATCH` `ACTIVE → ENDED` → vínculo `INACTIVE`; `ACTIVE → SUSPENDED` → vínculo continua `ACTIVE`; `ENDED → ACTIVE` → 409 `contract.status.invalid_transition`; `SUPERSEDED` → 422 `contract.status.requires_successor`; `status: null` → 400 `contract.status.required`; `SUSPENDED → ACTIVE` com outro `ACTIVE` no par → 409 `contract.active_conflict`; `PATCH` vazio não grava nada
     - remover → vínculo recalculado; restaurar → itens, agendas e slots de volta e vínculo recalculado; restaurar com outro `ACTIVE` no par → 409 `contract.active_conflict`; restaurar com horário tomado por outro contrato assinado e não encerrado → 409 `contract.item.slot_conflict`; restaurar não colide com a própria agenda; restaurar contrato encerrado não confere colisão
-- [ ] 5.3 Migration `V59__admin_manages_contracts.sql`: acrescentar as seis permissões ao bundle `ADMIN`, idempotente, no padrão da `V48`. Provar num PostgreSQL descartável: bundle parcial recebe só as que faltam, `CLIENT` intocado, reaplicar não muda nada
-- [ ] 5.4 Acrescentar `LIST_CONTRACTS`, `SHOW_CONTRACT`, `CREATE_CONTRACT`, `UPDATE_CONTRACT`, `DELETE_CONTRACT`, `RESTORE_CONTRACT` ao `PermissionEnum` (o bundle `ADMIN` do seeder já sincroniza com o registro)
-- [ ] 5.5 Acrescentar `isContractParty(String token, Authentication authentication)` ao `SecurityEvaluator`, resolvendo o token do vínculo pelo contrato e reaproveitando a comparação do `isClientDriverLinkParty` (regra 22). Teste unitário: cliente do vínculo → true; motorista do vínculo → true; outro cliente → false; token inexistente → false
-- [ ] 5.6 Criar `ContractCreateRequestDTO` (vínculo por token, datas `@NotNull`, `totalAmount` `@DecimalMin(value = "0", inclusive = false)`, `installments` `@Min(1) @Max(12)`, `dueDay` `@Min(1) @Max(28)` — cada uma com `message = "{chave}"`, padrão do `DriverUpdateRequestDTO` — e itens `@NotEmpty`), `ContractItemRequestDTO` (dependente por token, `monthlyAmount` maior que zero e slots do `ScheduleSlotRequestDTO`) e `ContractUpdateRequestDTO` (`JsonNullable<ContractStatus> status`, construtor compacto com `undefined()`)
-- [ ] 5.7 Chaves de MessageSource (EN + pt-BR) para todas as mensagens acima, mais `contract.not_found`, `contract.period.too_long`, `contract.period.invalid`, `contract.amount.invalid`, `contract.installments.invalid`, `contract.due_day.invalid`, `contract.items.required` (estas quatro usadas pelas anotações dos DTOs da tarefa 5.6, `message = "{...}"`), `schedule.slot.duplicate`, `schedule.slot.window_invalid`, `schedule.slots.required` (regra 46)
-- [ ] 5.8 Implementar `schedule.service.ScheduleService` (`create(slots)` e `replace(schedule, slots)`, aplicando a `ScheduleSlotPolicy`; `replace` soft-deleta os slots antigos na mesma transação) com testes unitários próprios
+- [x] 5.3 Migration `V59__admin_manages_contracts.sql`: acrescentar as seis permissões ao bundle `ADMIN`, idempotente, no padrão da `V48`. Provar num PostgreSQL descartável: bundle parcial recebe só as que faltam, `CLIENT` intocado, reaplicar não muda nada
+- [x] 5.4 Acrescentar `LIST_CONTRACTS`, `SHOW_CONTRACT`, `CREATE_CONTRACT`, `UPDATE_CONTRACT`, `DELETE_CONTRACT`, `RESTORE_CONTRACT` ao `PermissionEnum` (o bundle `ADMIN` do seeder já sincroniza com o registro)
+- [x] 5.5 Acrescentar `isContractParty(String token, Authentication authentication)` ao `SecurityEvaluator`, resolvendo o token do vínculo pelo contrato e reaproveitando a comparação do `isClientDriverLinkParty` (regra 22). Teste unitário: cliente do vínculo → true; motorista do vínculo → true; outro cliente → false; token inexistente → false
+- [x] 5.6 Criar `ContractCreateRequestDTO` (vínculo por token, datas `@NotNull`, `totalAmount` `@DecimalMin(value = "0", inclusive = false)`, `installments` `@Min(1) @Max(12)`, `dueDay` `@Min(1) @Max(28)` — cada uma com `message = "{chave}"`, padrão do `DriverUpdateRequestDTO` — e itens `@NotEmpty`), `ContractItemRequestDTO` (dependente por token, `monthlyAmount` maior que zero e slots do `ScheduleSlotRequestDTO`) e `ContractUpdateRequestDTO` (`JsonNullable<ContractStatus> status`, construtor compacto com `undefined()`)
+- [x] 5.7 Chaves de MessageSource (EN + pt-BR) para todas as mensagens acima, mais `contract.not_found`, `contract.period.too_long`, `contract.period.invalid`, `contract.amount.invalid`, `contract.installments.invalid`, `contract.due_day.invalid`, `contract.items.required` (estas quatro usadas pelas anotações dos DTOs da tarefa 5.6, `message = "{...}"`), `schedule.slot.duplicate`, `schedule.slot.window_invalid`, `schedule.slots.required` (regra 46)
+- [x] 5.8 Implementar `schedule.service.ScheduleService` (`create(slots)` e `replace(schedule, slots)`, aplicando a `ScheduleSlotPolicy`; `replace` soft-deleta os slots antigos na mesma transação) com testes unitários próprios
     - `replace` = `schedule.getSlots().clear()` + `flush` + `addSlot` dos novos + `save` da agenda; o `orphanRemoval` soft-deleta os antigos antes dos inserts. Sem repositório de slot (tarefa 2.7)
     - **Provar num PostgreSQL descartável** (o H2 não tem o índice parcial): trocar uma agenda com "segunda, ida" por outra com "segunda, ida" em outro horário, pelo `ScheduleService`, passa sem violar `schedule_slot_weekday_leg_active_key`
-- [ ] 5.9 Implementar `contract.service.ContractService` (criar, buscar, listar por vínculo, página, mudar status, remover, restaurar). O recálculo do vínculo usa a `LinkStatusPolicy` e roda na mesma transação de toda escrita (D8)
+- [x] 5.9 Implementar `contract.service.ContractService` (criar, buscar, listar por vínculo, página, mudar status, remover, restaurar). O recálculo do vínculo usa a `LinkStatusPolicy` e roda na mesma transação de toda escrita (D8)
     - `ContractStatus.SIGNED_AND_NOT_ENDED` (`SIGNED`, `ACTIVE`, `SUSPENDED`) é o conjunto usado pela `LinkStatusPolicy` e pela colisão de horários do D6
     - `ContractItemRepository`: itens de vários contratos numa consulta (`findByContractIdIn`), para página e lista sem N+1; slots de um dependente por status do contrato (`findSlotsByDependentIdAndContractStatusIn`), com a agenda junto
     - a colisão de `(weekday, leg)` vale na criação e na restauração de um contrato assinado e não encerrado, ignorando a própria agenda
     - toda transição para `ACTIVE` confere o `ACTIVE` do par antes de gravar, e a escrita que perde a corrida para o índice parcial devolve o mesmo 409
     - restaurar volta contrato, itens, agendas e slots por SQL nativo (padrão do `restoreByToken`), com o conflito de `ACTIVE` conferido antes do `UPDATE`
     - provar os testes de repositório de contrato e agenda num PostgreSQL descartável com as migrations até a `V59`
-- [ ] 5.10 Criar `schedule.dto.ScheduleSlotResponseDTO` e `schedule.mapper.ScheduleMapper` — compartilhados pelas duas superfícies HTTP (PR 6 e PR 8). O mapper devolve os slots ordenados por dia (`DayOfWeek`) e trecho (`OUTBOUND` antes de `RETURN`), com teste: o banco não ordena o `weekday`, que é texto (tarefa 2.2)
-- [ ] 5.11 Criar `ContractResponseDTO`, `ContractItemResponseDTO` e `ContractMapper` (slots pelo `ScheduleMapper` da tarefa 5.10) (nunca devolver model — regra 12)
-- [ ] 5.12 `make lint` + `./mvnw verify -B`
-- [ ] 5.13 QA da regra 55 (`scripts/qa/contract-core/qa.sh`, resultado no `qa.md`): as seis permissões no token real do admin, nenhum outro bundle com elas e a `V59` reaplicada num bundle sem elas
+- [x] 5.10 Criar `schedule.dto.ScheduleSlotResponseDTO` e `schedule.mapper.ScheduleMapper` — compartilhados pelas duas superfícies HTTP (PR 6 e PR 8). O mapper devolve os slots ordenados por dia (`DayOfWeek`) e trecho (`OUTBOUND` antes de `RETURN`), com teste: o banco não ordena o `weekday`, que é texto (tarefa 2.2)
+- [x] 5.11 Criar `ContractResponseDTO`, `ContractItemResponseDTO` e `ContractMapper` (slots pelo `ScheduleMapper` da tarefa 5.10) (nunca devolver model — regra 12)
+- [x] 5.12 `make lint` + `./mvnw verify -B`
+- [x] 5.13 QA da regra 55 (`scripts/qa/contract-core/qa.sh`, resultado no `qa.md`): as seis permissões no token real do admin, nenhum outro bundle com elas e a `V59` reaplicada num bundle sem elas
 
 ## 6. PR 6 — HTTP do contrato
 
