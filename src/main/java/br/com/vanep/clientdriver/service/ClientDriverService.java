@@ -4,7 +4,6 @@ import br.com.vanep.client.model.ClientModel;
 import br.com.vanep.client.repository.ClientRepository;
 import br.com.vanep.clientdriver.dto.ClientDriverCreateRequestDTO;
 import br.com.vanep.clientdriver.dto.ClientDriverResponseDTO;
-import br.com.vanep.clientdriver.dto.ClientDriverUpdateRequestDTO;
 import br.com.vanep.clientdriver.enums.RelationshipStatus;
 import br.com.vanep.clientdriver.mapper.ClientDriverMapper;
 import br.com.vanep.clientdriver.model.ClientDriverModel;
@@ -75,7 +74,7 @@ public class ClientDriverService {
     ClientDriverModel link = new ClientDriverModel();
     link.setClient(client);
     link.setDriver(driver);
-    link.setStatus(request.status() != null ? request.status() : RelationshipStatus.PENDING);
+    link.setStatus(RelationshipStatus.PENDING);
     return mapper.toResponse(links.save(link));
   }
 
@@ -97,25 +96,6 @@ public class ClientDriverService {
             ? links.findByDriverUserId(caller.getId())
             : links.findByClientUserId(caller.getId());
     return mine.stream().map(mapper::toResponse).toList();
-  }
-
-  @Transactional
-  public ClientDriverResponseDTO update(String token, ClientDriverUpdateRequestDTO request) {
-    ClientDriverModel link = requireLink(token);
-
-    if (request.status().isPresent()) {
-      RelationshipStatus status = request.status().get();
-      if (status == null) {
-        throw badRequest("client_driver.status.required");
-      }
-      if (status == RelationshipStatus.ACTIVE
-          && link.getDriver().getApprovalStatus() != DriverApprovalStatus.APPROVED) {
-        throw unprocessableEntity("client_driver.driver.not_approved");
-      }
-      link.setStatus(status);
-    }
-
-    return mapper.toResponse(links.save(link));
   }
 
   @Transactional
@@ -142,10 +122,6 @@ public class ClientDriverService {
 
   ResponseStatusException notFound(String key) {
     return new ResponseStatusException(HttpStatus.NOT_FOUND, message(key));
-  }
-
-  ResponseStatusException badRequest(String key) {
-    return new ResponseStatusException(HttpStatus.BAD_REQUEST, message(key));
   }
 
   ResponseStatusException unprocessableEntity(String key) {

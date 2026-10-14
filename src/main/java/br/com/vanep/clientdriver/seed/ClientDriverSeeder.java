@@ -46,7 +46,7 @@ public class ClientDriverSeeder {
     ClientDriverModel link = new ClientDriverModel();
     link.setClient(client);
     link.setDriver(driver);
-    link.setStatus(RelationshipStatus.ACTIVE);
+    link.setStatus(RelationshipStatus.PENDING);
     links.save(link);
 
     log.info("Seed: client_driver created ({} <-> {}).", client.getToken(), driver.getToken());

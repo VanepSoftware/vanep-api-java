@@ -699,5 +699,47 @@ check Z5 "two concurrent restores of active contracts on one link: one 200, one 
 check Z6 "a single one came back" 1 \
   "$(sql "select count(*) from contract c join client_driver l on l.id = c.client_driver_id where l.token = '$BRUNO_FABIO' and c.deleted_at is null")"
 
+table "The link status has no direct write path"
+request GET "/api/client-drivers/$SEED_LINK" "$ADMIN"
+expect B1 "the seeded link is ACTIVE through its seeded ACTIVE contract" 200 '.status == "ACTIVE"'
+request POST /api/client-drivers "$ADMIN" "$(jq -nc --arg c "$CARLA_CLIENT" --arg d "$HELENA_DRIVER" '{clientToken: $c, driverToken: $d, status: "ACTIVE"}')"
+expect B2 "a status sent on creation is ignored" 201 '.status == "PENDING"'
+CARLA_HELENA=$(jq -r .token <<<"$RESP_BODY")
+request POST /api/client-drivers "$ADMIN" "$(jq -nc --arg c "$CARLA_CLIENT" --arg d "$FABIO_DRIVER" '{clientToken: $c, driverToken: $d, status: "BLOCKED"}')"
+expect B3 "BLOCKED sent on creation is ignored too" 201 '.status == "PENDING"'
+request POST /api/client-drivers "$ADMIN" "$(jq -nc --arg c "$CARLA_CLIENT" --arg d "$HELENA_DRIVER" '{clientToken: $c, driverToken: $d}')"
+expect B4 "the same pair twice" 409 '.detail == "Este cliente e este motorista já estão vinculados."'
+request POST /api/client-drivers "$ADMIN" "$(jq -nc --arg d "$HELENA_DRIVER" '{driverToken: $d}')"
+expect B5 "missing clientToken" 400
+request POST /api/client-drivers "$CARLA" "$(jq -nc --arg c "$CARLA_CLIENT" --arg d "$HELENA_DRIVER" '{clientToken: $c, driverToken: $d}')"
+expect B6 "a client cannot create a link" 403
+request PATCH "/api/client-drivers/$CARLA_HELENA" "$CARLA" '{"status":"ACTIVE"}'
+expect B7 "the client of the link cannot activate it" 405
+request PATCH "/api/client-drivers/$CARLA_HELENA" "$HELENA" '{"status":"ACTIVE"}'
+expect B8 "the driver of the link cannot activate it" 405
+request PATCH "/api/client-drivers/$CARLA_HELENA" "$ADMIN" '{"status":"ACTIVE"}'
+expect B9 "the admin cannot either" 405
+check B10 "the link stayed PENDING" PENDING "$(link_status "$CARLA_HELENA")"
+check B11 "update_client_driver is in no bundle" 0 "$(sql "select count(*) from role_permissions where permissions ? 'update_client_driver'")"
+check B12 "nor in a real admin token" 0 "$(claims "$ADMIN" | jq '[.permissions[] | select(. == "update_client_driver")] | length')"
+request POST /api/driver-ratings "$CARLA" "$(jq -nc --arg d "$HELENA_DRIVER" '{driverToken: $d, rating: 5}')"
+expect B13 "accepted effect: a client cannot rate a driver through a link without contract" 422 \
+  '.detail == "Só é possível avaliar um motorista com quem você tem vínculo ativo."'
+
+table "V60: legacy links brought in line"
+sql "update client_driver set status = 'ACTIVE' where token = '$CARLA_HELENA'" >/dev/null
+STATUSES_BEFORE=$(sql "select string_agg(token || '=' || status, ',' order by token) from client_driver where token <> '$CARLA_HELENA'")
+apply_migration V60
+check M1 "an ACTIVE link without contract becomes PENDING" PENDING "$(link_status "$CARLA_HELENA")"
+check M2 "every other link keeps its status (ACTIVE with contract, INACTIVE, PENDING)" "$STATUSES_BEFORE" \
+  "$(sql "select string_agg(token || '=' || status, ',' order by token) from client_driver where token <> '$CARLA_HELENA'")"
+SNAPSHOT=$(sql "select string_agg(token || '=' || status, ',' order by token) from client_driver")
+apply_migration V60
+check M3 "re-applying V60 changes nothing" "$SNAPSHOT" "$(sql "select string_agg(token || '=' || status, ',' order by token) from client_driver")"
+sql "update client_driver set status = 'ACTIVE' where token = '$CARLA_HELENA'; update role_permissions set permissions = permissions || '[\"update_client_driver\"]'::jsonb where name = 'ADMIN'" >/dev/null
+apply_migration V60
+check M4 "V60 also strips update_client_driver from a bundle that has it" 0 \
+  "$(sql "select count(*) from role_permissions where permissions ? 'update_client_driver'")"
+
 echo
 echo "ALL PASSED: $PASSED scenarios"
