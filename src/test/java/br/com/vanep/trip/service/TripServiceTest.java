@@ -13,6 +13,7 @@ import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.shared.enums.OperationShift;
 import br.com.vanep.trip.dto.TripResponseDTO;
+import br.com.vanep.trip.enums.TripCoherenceViolation;
 import br.com.vanep.trip.enums.TripStatus;
 import br.com.vanep.trip.mapper.TripMapper;
 import br.com.vanep.trip.model.TripModel;
@@ -174,6 +175,20 @@ class TripServiceTest {
         .thenReturn(List.of(storedTrip(TripStatus.COMPLETED), storedTrip(TripStatus.IN_PROGRESS)));
 
     assertThat(service.findToday(CALLER)).hasSize(2);
+  }
+
+  @Test
+  void eachCoherenceViolationResolvesToItsOwnMessageKey() {
+    assertThat(service.messageKey(TripCoherenceViolation.STARTED_AT_REQUIRED))
+        .isEqualTo("trip.coherence.started_at_required");
+    assertThat(service.messageKey(TripCoherenceViolation.STARTED_AT_FORBIDDEN))
+        .isEqualTo("trip.coherence.started_at_forbidden");
+    assertThat(service.messageKey(TripCoherenceViolation.FINISHED_AT_REQUIRED))
+        .isEqualTo("trip.coherence.finished_at_required");
+    assertThat(service.messageKey(TripCoherenceViolation.FINISHED_AT_FORBIDDEN))
+        .isEqualTo("trip.coherence.finished_at_forbidden");
+    assertThat(service.messageKey(TripCoherenceViolation.FINISHED_BEFORE_STARTED))
+        .isEqualTo("trip.coherence.finished_before_started");
   }
 
   @Test
