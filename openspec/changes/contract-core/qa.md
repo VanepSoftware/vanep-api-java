@@ -1,6 +1,6 @@
 # QA — contract-core (constitution rule 55)
 
-Latest run: API built from `feat/contract-core-shift-split`, which contains phases 1 to 1. Run date: 2026-10-13. Result: **25/25 passed**.
+Latest run: API built from `feat/contract-core-schedule-schema`, which contains phases 1 to 2. Run date: 2026-10-13. Result: **37/37 passed**.
 
 ## How to run
 
@@ -29,7 +29,7 @@ Tokens come from the mobile password grant (`urn:vanep:params:oauth:grant-type:p
 
 ## Startup and migration
 
-Flyway applied `V56` on an empty database at boot, after the `main` migrations up to `V55`. The seed creates the link between Ana Souza and Fabio Teixeira as `ACTIVE`, with no contract: the `ContractSeeder` arrives in phase 7. Before phase 7 the demo seed also runs before the city catalog, so it skips the seed school and creates Lucas and Marina Souza without school or address (the runner order is fixed in phase 7). The script creates that school with SQL and completes both dependents through `PATCH /api/dependent/{token}`, as the client would.
+Flyway applied `V56` and `V57` on an empty database at boot, after the `main` migrations up to `V55`. The seed creates the link between Ana Souza and Fabio Teixeira as `ACTIVE`, with no contract: the `ContractSeeder` arrives in phase 7. Before phase 7 the demo seed also runs before the city catalog, so it skips the seed school and creates Lucas and Marina Souza without school or address (the runner order is fixed in phase 7). The script creates that school with SQL and completes both dependents through `PATCH /api/dependent/{token}`, as the client would.
 
 ## Results
 
@@ -63,7 +63,25 @@ Flyway applied `V56` on an empty database at boot, after the `main` migrations u
 | S24 | V56 left the other shifts alone | AFTERNOON | PASS |
 | S25 | trip.shift and dependent.shift are documented | yes | PASS |
 
+### V57: schedule, schedule_slot and unlinked_passenger (database checks)
+
+| id | scenario | expected | result |
+|---|---|---|---|
+| D1 | the same weekday and leg twice in one schedule | rejected by schedule_slot_weekday_leg_active_key | PASS |
+| D2 | outbound and return on the same weekday | accepted | PASS |
+| D3 | a soft-deleted slot frees its weekday and leg | accepted | PASS |
+| D4 | window end before its start | rejected by schedule_slot_window_check | PASS |
+| D5 | window end equal to its start | rejected by schedule_slot_window_check | PASS |
+| D6 | window without an end | accepted | PASS |
+| D7 | a slot that points to no schedule | rejected by schedule_slot_schedule_id_fkey | PASS |
+| D8 | two unlinked passengers sharing one schedule | rejected by unlinked_passenger_schedule_id_active_key | PASS |
+| D9 | two unlinked passengers sharing one address | rejected by unlinked_passenger_address_id_active_key | PASS |
+| D10 | a soft-deleted passenger frees its schedule and address | accepted | PASS |
+| D11 | two live passengers with the same token | rejected by unlinked_passenger_token_active_key | PASS |
+| D12 | the rolled-back checks left no passenger behind | 0 | PASS |
+
 ## Behaviors worth knowing
 
 - **A JSON number is accepted where an enum is expected.** `{"shift": 1}` starts the `AFTERNOON` route: Jackson reads the number as the enum position. This is the API-wide default, not something this change introduced. S7 checks a wrong type that is refused (an array).
 - **Re-applying a migration (S22, P3, M1) runs its SQL again through `psql`** against rows written by the script. The data migrations of this change are idempotent, which is what makes this a fair test of what they do to rows that already exist.
+- **The schema checks (D, K) run each statement in a transaction that is rolled back**, on the same database the API migrated at boot, so they prove the indexes and `CHECK`s exactly as Flyway applied them and leave nothing behind (D12, K15).
