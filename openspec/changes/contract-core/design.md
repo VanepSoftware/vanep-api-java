@@ -47,13 +47,13 @@ Os dois ficam em `br.com.vanep.shared.enums` (cada um é usado por duas features
 
 **Consequência para a `trip`:** aluno integral gera duas trips, `MORNING` na ida e `AFTERNOON` na volta. Isso responde a **Q1 da `trip-daily-operation`**, que deixou a pergunta para a #151 — a resposta sai daqui porque é o tipo do turno que decide, e não o checklist.
 
-**Linhas existentes:** a `V56` converte `trip.shift = 'FULLTIME'` em `MORNING`. Sem isso, o Hibernate falharia ao ler a linha num enum que não tem o valor. `MORNING` porque uma rota "integral" começava de manhã, e nenhum checklist depende dela ainda (a #151 não existe). Só existe banco local de desenvolvimento, e o `TripSeeder` não grava `FULLTIME`; o `update` é defensivo, para uma trip `FULLTIME` criada à mão pela API.
+**Linhas existentes:** a `V59` converte `trip.shift = 'FULLTIME'` em `MORNING`. Sem isso, o Hibernate falharia ao ler a linha num enum que não tem o valor. `MORNING` porque uma rota "integral" começava de manhã, e nenhum checklist depende dela ainda (a #151 não existe). Só existe banco local de desenvolvimento, e o `TripSeeder` não grava `FULLTIME`; o `update` é defensivo, para uma trip `FULLTIME` criada à mão pela API.
 
 **Consequência para a `absence` (#160), feita em paralelo:** o `AbsenceLegShiftPolicy` e o `AbsenceScopePolicy` usam o mesmo `Shift` para duas perguntas diferentes — o turno da trip (`uniqueLegOf`) e o turno escolar do dependente (`allows`). Como a `absence` entra depois desta change, é a branch dela que separa os dois ao entrar: o lado da trip passa a receber `OperationShift` (e `uniqueLegOf` deixa de ter o caso vazio do `FULLTIME`) e o lado do dependente passa a receber `SchoolShift`. Só troca de tipo; a regra da `absence` não muda.
 
 Rejeitado: manter `FULLTIME` em `trip` e validar no serviço. O banco e o Java continuariam aceitando um valor que não tem significado operacional — a mesma ambiguidade que o R6 da `trip-daily-operation` registrou.
 
-Rejeitado: `CHECK` na coluna `trip.shift`. Nenhuma coluna de enum do repositório tem `CHECK`; o tipo Java é a garantia, e a `V56` limpa o que já existe.
+Rejeitado: `CHECK` na coluna `trip.shift`. Nenhuma coluna de enum do repositório tem `CHECK`; o tipo Java é a garantia, e a `V59` limpa o que já existe.
 
 ### D2 — Agenda em `schedule` + `schedule_slot`, um `schedule` por dono
 
@@ -273,11 +273,11 @@ Além da regra 19, o soft delete é o que mantém íntegro o histórico do check
 |---|---|---|
 | **R1** | A suíte roda em H2 com `ddl-auto`, então nenhum índice parcial (um `ACTIVE` por par, um slot por dia e trecho, dono único de agenda e endereço) é exercitado em teste | Mesmo procedimento da tarefa 1.6 da `trip-daily-operation`: aplicar as migrations num PostgreSQL descartável e provar cada índice com inserts manuais. Não declarar `uniqueConstraints` só para teste |
 | **R2** | A `V60` devolve a `PENDING` todos os vínculos hoje `ACTIVE`, porque nenhum tem contrato | É a correção, não efeito colateral: `ACTIVE` sem contrato é o estado que o E1 elimina. `PENDING`, e não `INACTIVE` como dizia o texto do E5 no spike, porque a regra do D8 dá `PENDING` a quem nunca teve contrato — e a migration tem de deixar o banco exatamente como a policy o deixaria. **⚠️ Efeito aceito:** desde a #158 (`dd5f814`), o `DriverRatingService` só aceita vínculo `ACTIVE` (`422 driver_rating.link.not_active`). Depois da `V60`, nenhum cliente avalia motorista até o admin cadastrar o contrato do par. Decisão de produto de 07/10: aceitável, porque é o mesmo resultado que o E3 do spike pede (só avalia quem contratou). A avaliação de cliente não confere status. O admin cadastra os contratos reais depois |
-| **R3** | A `V56` muda o turno de trips `FULLTIME` existentes | Não há banco de homologação nem de produção, e o seeder não grava `FULLTIME`; só uma trip criada à mão num banco local seria afetada. Nenhum checklist depende delas |
+| **R3** | A `V59` muda o turno de trips `FULLTIME` existentes | Não há banco de homologação nem de produção, e o seeder não grava `FULLTIME`; só uma trip criada à mão num banco local seria afetada. Nenhum checklist depende delas |
 | **R4** | `address` não tem coordenadas; o ponto do embarque copiado é só o `google_place_id` | Suficiente para a rota da fase 1. Se o modelo de endereço ganhar coordenadas, a cópia do item é a única exceção aceitável à regra "núcleo não ganha coluna" — e precisa de decisão própria quando acontecer |
 | **R5** | A regra "mesmo dependente sem o mesmo (dia, trecho) em dois contratos `ACTIVE`" é do serviço, não do banco; duas criações simultâneas passariam | Nesta fase só o admin cria contrato, e a corrida exige dois admins no mesmo dependente no mesmo segundo. A fase 5, que ativa contratos pelo fluxo real, revisita com lock por dependente |
 | **R6** | O preço por item (`monthly_amount`) e o `total_amount` do contrato não são conciliados | Deliberado: o total pode ter desconto de irmão, taxa de reserva abatida ou parcelamento diferente de 12. O total é o que vale para cobrança; o item é o preço de tabela exibido. A fase 3 mostra os dois no resumo |
-| **R7** | Os números das migrations colidem com trabalho em paralelo | A `main` está em `V55` (o chat, #161, entrou com `V53` a `V55`) e esta change usa `V56` a `V60`, entrando antes da `absence` (#160, `V52`), que renumera para depois da `V60` ao entrar: o Flyway recusa versão repetida ou abaixo da última aplicada (`outOfOrder` desligado), inclusive no deploy do `cd.yml`, e o `scripts/check-migrations.sh` pega isso no CI. Reconfirmar antes de cada merge com migration |
+| **R7** | Os números das migrations colidem com trabalho em paralelo | A `main` está em `V58` (o chat, #161, entrou com `V56` a `V58`) e esta change usa `V59` a `V60`, entrando antes da `absence` (#160, `V52`), que renumera para depois da `V60` ao entrar: o Flyway recusa versão repetida ou abaixo da última aplicada (`outOfOrder` desligado), inclusive no deploy do `cd.yml`, e o `scripts/check-migrations.sh` pega isso no CI. Reconfirmar antes de cada merge com migration |
 | **R8** | Remover o `PATCH` de `client_driver` é breaking change de API | Sem consumidor: verificado em 03/10 que `vanep-mobile` e `vanep-frontend` não chamam `/client-drivers` |
 | **R9** | A `absence` (#160) é feita em paralelo, apontando para `client_driver_id` + `dependent_id`, fora da convenção do D11 | Combinado com o autor: a `absence` entra na `main` depois desta change e se adapta ao entrar — tipos de turno (D1), `RouteLeg` (D2), `contract_item_id` / `unlinked_passenger_id` com o `CHECK` de exatamente um e a unicidade por passageiro (D11), migration renumerada (R7). Esta change não tem PR para a `absence` |
 
@@ -292,8 +292,8 @@ Além da regra 19, o soft delete é o que mantém íntegro o histórico do check
 
 | Migration | PR | Conteúdo |
 |---|---|---|
-| **V56** | 1 | `update trip set shift = 'MORNING' where shift = 'FULLTIME'`; comments em `trip.shift` (turno da operação, sem `FULLTIME`) e em `dependent.shift` (turno escolar; dias e horários vêm da agenda do contrato — A1) |
-| **V57** | 2 | `schedule`, `schedule_slot`, `unlinked_passenger` com FKs, `CHECK` da janela, comments e índices (abaixo) |
+| **V59** | 1 | `update trip set shift = 'MORNING' where shift = 'FULLTIME'`; comments em `trip.shift` (turno da operação, sem `FULLTIME`) e em `dependent.shift` (turno escolar; dias e horários vêm da agenda do contrato — A1) |
+| **V60** | 2 | `schedule`, `schedule_slot`, `unlinked_passenger` com FKs, `CHECK` da janela, comments e índices (abaixo) |
 | **V58** | 3 | `contract`, `contract_item` com FKs, `CHECK`s de período e valores, comments e índices (abaixo) |
 | **V59** | 5 | `role_permissions` do `ADMIN` recebe as seis permissões de contrato — idempotente, padrão da V48, para ambiente com `vanep.seed.enabled=false` |
 | **V60** | 7 | Vínculo `ACTIVE` sem contrato vira `PENDING` (E5) — é o valor que a `LinkStatusPolicy` dá a um par que nunca teve contrato (D8); `update_client_driver` sai de todos os bundles (`permissions - 'update_client_driver'`) |
@@ -336,8 +336,8 @@ main
 | PR | Conteúdo | Depends on | Parallel with |
 |---|---|---|---|
 | 0 | Branch `spec/contract-core`: só `openspec/changes/contract-core/`, sem código | — | — |
-| 1 | `SchoolShift` + `OperationShift`, `trip` e `dependent` ajustados, `V56` | 0 | — |
-| 2 | `V57`, `shared.enums.RouteLeg`, `ScheduleModel`, `ScheduleSlotModel`, `UnlinkedPassengerModel` e repositórios | 1 | — |
+| 1 | `SchoolShift` + `OperationShift`, `trip` e `dependent` ajustados, `V59` | 0 | — |
+| 2 | `V60`, `shared.enums.RouteLeg`, `ScheduleModel`, `ScheduleSlotModel`, `UnlinkedPassengerModel` e repositórios | 1 | — |
 | 3 | `V58`, `ContractStatus`, `ContractModel`, `ContractItemModel` e repositórios | 2 | — |
 | 4 | Policies puras: `ContractTransitionPolicy`, `ContractTermsPolicy`, `LinkStatusPolicy`, `ScheduleSlotPolicy` | 3 | — |
 | 5 | `ContractService` (criar, ler, mudar status, remover, restaurar, recalcular vínculo), DTOs e mapper do contrato, `ScheduleService`, DTOs e mapper da agenda, `@sec.isContractParty`, permissões, `V59`, mensagens | 4 | — |

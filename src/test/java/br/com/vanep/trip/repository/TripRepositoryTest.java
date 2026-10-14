@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
-import br.com.vanep.shared.enums.Shift;
+import br.com.vanep.shared.enums.OperationShift;
 import br.com.vanep.trip.enums.TripStatus;
 import br.com.vanep.trip.model.TripModel;
 import br.com.vanep.user.enums.UserType;
@@ -42,9 +42,11 @@ class TripRepositoryTest {
 
   @Test
   void findsTodaysTripByDriverServiceDateAndShift() {
-    TripModel saved = repository.save(newTrip(driver, TODAY, Shift.MORNING));
+    TripModel saved = repository.save(newTrip(driver, TODAY, OperationShift.MORNING));
 
-    assertThat(repository.findByDriverAndServiceDateAndShift(driver.getId(), TODAY, Shift.MORNING))
+    assertThat(
+            repository.findByDriverAndServiceDateAndShift(
+                driver.getId(), TODAY, OperationShift.MORNING))
         .get()
         .extracting(trip -> trip.getId())
         .isEqualTo(saved.getId());
@@ -52,7 +54,7 @@ class TripRepositoryTest {
 
   @Test
   void generatesOpaqueTokenOnPersist() {
-    TripModel saved = repository.save(newTrip(driver, TODAY, Shift.MORNING));
+    TripModel saved = repository.save(newTrip(driver, TODAY, OperationShift.MORNING));
 
     assertThat(saved.getToken()).isNotBlank();
     assertThat(saved.getToken()).doesNotContain("-");
@@ -64,7 +66,7 @@ class TripRepositoryTest {
 
   @Test
   void defaultsToScheduledWhenStatusIsNotSet() {
-    TripModel saved = repository.save(newTrip(driver, TODAY, Shift.MORNING));
+    TripModel saved = repository.save(newTrip(driver, TODAY, OperationShift.MORNING));
 
     assertThat(saved.getStatus()).isEqualTo(TripStatus.SCHEDULED);
     assertThat(saved.getStartedAt()).isNull();
@@ -73,38 +75,41 @@ class TripRepositoryTest {
 
   @Test
   void returnsEmptyWhenTheDriverHasNoTripForThatShift() {
-    repository.save(newTrip(driver, TODAY, Shift.MORNING));
+    repository.save(newTrip(driver, TODAY, OperationShift.MORNING));
 
     assertThat(
-            repository.findByDriverAndServiceDateAndShift(driver.getId(), TODAY, Shift.AFTERNOON))
+            repository.findByDriverAndServiceDateAndShift(
+                driver.getId(), TODAY, OperationShift.AFTERNOON))
         .isEmpty();
   }
 
   @Test
   void doesNotReturnYesterdaysTripAsTodays() {
-    repository.save(newTrip(driver, YESTERDAY, Shift.MORNING));
+    repository.save(newTrip(driver, YESTERDAY, OperationShift.MORNING));
 
-    assertThat(repository.findByDriverAndServiceDateAndShift(driver.getId(), TODAY, Shift.MORNING))
+    assertThat(
+            repository.findByDriverAndServiceDateAndShift(
+                driver.getId(), TODAY, OperationShift.MORNING))
         .isEmpty();
     assertThat(repository.findByDriverAndServiceDate(driver.getId(), TODAY)).isEmpty();
   }
 
   @Test
   void keepsTwoShiftsOfTheSameDayAsSeparateTrips() {
-    repository.save(newTrip(driver, TODAY, Shift.MORNING));
-    repository.save(newTrip(driver, TODAY, Shift.AFTERNOON));
+    repository.save(newTrip(driver, TODAY, OperationShift.MORNING));
+    repository.save(newTrip(driver, TODAY, OperationShift.AFTERNOON));
 
     List<TripModel> today = repository.findByDriverAndServiceDate(driver.getId(), TODAY);
 
     assertThat(today).hasSize(2);
     assertThat(today)
         .extracting(trip -> trip.getShift())
-        .containsExactlyInAnyOrder(Shift.MORNING, Shift.AFTERNOON);
+        .containsExactlyInAnyOrder(OperationShift.MORNING, OperationShift.AFTERNOON);
   }
 
   @Test
   void softDeletedTripIsAbsentFromDefaultQueries() {
-    TripModel saved = repository.save(newTrip(driver, TODAY, Shift.MORNING));
+    TripModel saved = repository.save(newTrip(driver, TODAY, OperationShift.MORNING));
 
     repository.delete(saved);
 
@@ -115,13 +120,15 @@ class TripRepositoryTest {
 
   @Test
   void allowsANewTripAfterTheSameSlotWasSoftDeleted() {
-    TripModel removed = repository.save(newTrip(driver, TODAY, Shift.MORNING));
+    TripModel removed = repository.save(newTrip(driver, TODAY, OperationShift.MORNING));
     repository.delete(removed);
 
-    TripModel recreated = repository.save(newTrip(driver, TODAY, Shift.MORNING));
+    TripModel recreated = repository.save(newTrip(driver, TODAY, OperationShift.MORNING));
 
     assertThat(recreated.getId()).isNotEqualTo(removed.getId());
-    assertThat(repository.findByDriverAndServiceDateAndShift(driver.getId(), TODAY, Shift.MORNING))
+    assertThat(
+            repository.findByDriverAndServiceDateAndShift(
+                driver.getId(), TODAY, OperationShift.MORNING))
         .get()
         .extracting(trip -> trip.getId())
         .isEqualTo(recreated.getId());
@@ -131,14 +138,14 @@ class TripRepositoryTest {
   void keepsTheSameShiftOfTwoDriversAsSeparateTrips() {
     DriverModel other = createDriver("other@vanep.com", "52998224725");
 
-    repository.save(newTrip(driver, TODAY, Shift.MORNING));
-    repository.save(newTrip(other, TODAY, Shift.MORNING));
+    repository.save(newTrip(driver, TODAY, OperationShift.MORNING));
+    repository.save(newTrip(other, TODAY, OperationShift.MORNING));
 
     assertThat(repository.findByDriverAndServiceDate(driver.getId(), TODAY)).hasSize(1);
     assertThat(repository.findByDriverAndServiceDate(other.getId(), TODAY)).hasSize(1);
   }
 
-  private TripModel newTrip(DriverModel owner, LocalDate serviceDate, Shift shift) {
+  private TripModel newTrip(DriverModel owner, LocalDate serviceDate, OperationShift shift) {
     TripModel trip = new TripModel();
     trip.setDriver(owner);
     trip.setServiceDate(serviceDate);

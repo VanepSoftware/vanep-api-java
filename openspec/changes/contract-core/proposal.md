@@ -52,7 +52,7 @@ Nenhuma em `openspec/specs/`. A mudança no vínculo entra como capability nova 
 
 ## Impact
 
-- **Schema:** `V56` (dados de `trip` com `FULLTIME` + comments), `V57` (`schedule`, `schedule_slot`, `unlinked_passenger`), `V58` (`contract`, `contract_item`), `V59` (permissões do bundle `ADMIN` em ambiente sem seeder), `V60` (saneamento de `client_driver`). Nenhuma migration aplicada é editada (regra 2). A `main` está em `V55` (chat, #161). Esta change entra antes da `absence` (#160, `V52`), que renumera para depois da `V60` (R7). Reconfirmar antes do merge de cada PR com migration
+- **Schema:** `V59` (dados de `trip` com `FULLTIME` + comments), `V60` (`schedule`, `schedule_slot`, `unlinked_passenger`), `V58` (`contract`, `contract_item`), `V59` (permissões do bundle `ADMIN` em ambiente sem seeder), `V60` (saneamento de `client_driver`). Nenhuma migration aplicada é editada (regra 2). A `main` está em `V58` (chat, #161). Esta change entra antes da `absence` (#160, `V52`), que renumera para depois da `V60` (R7). Reconfirmar antes do merge de cada PR com migration
 - **Pacotes novos:** `br.com.vanep.schedule`, `br.com.vanep.contract`, `br.com.vanep.unlinkedpassenger`, `br.com.vanep.routepassenger`
 - **Pacotes alterados:** `shared.enums` (`Shift` → `SchoolShift` + `OperationShift`; `RouteLeg` novo), `trip`, `dependent` (tipo do enum), `clientdriver` (sem `PATCH`, sem `status` no create), `address` (`upsertForUnlinkedPassenger`), `auth.security` (`@sec.isContractParty`, `PermissionEnum`), `seed`
 - **API — breaking, sem consumidor:** `PATCH /api/client-drivers/{token}` some e o `POST` ignora `status`; `trip` passa a recusar `FULLTIME` (`400`). Verificado em 03/10: nem `vanep-mobile` nem `vanep-frontend` chamam `/client-drivers` ou usam `FULLTIME`

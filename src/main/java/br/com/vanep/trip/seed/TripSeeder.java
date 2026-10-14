@@ -3,7 +3,7 @@ package br.com.vanep.trip.seed;
 import br.com.vanep.driver.DriverApprovalStatus;
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
-import br.com.vanep.shared.enums.Shift;
+import br.com.vanep.shared.enums.OperationShift;
 import br.com.vanep.trip.enums.TripStatus;
 import br.com.vanep.trip.model.TripModel;
 import br.com.vanep.trip.repository.TripRepository;
@@ -52,7 +52,7 @@ public class TripSeeder {
     TripModel completed = new TripModel();
     completed.setDriver(driver);
     completed.setServiceDate(yesterday);
-    completed.setShift(Shift.MORNING);
+    completed.setShift(OperationShift.MORNING);
     completed.setStatus(TripStatus.COMPLETED);
     completed.setStartedAt(now.minus(30, ChronoUnit.HOURS));
     completed.setFinishedAt(now.minus(26, ChronoUnit.HOURS));
@@ -60,7 +60,7 @@ public class TripSeeder {
     TripModel inProgress = new TripModel();
     inProgress.setDriver(driver);
     inProgress.setServiceDate(today);
-    inProgress.setShift(Shift.MORNING);
+    inProgress.setShift(OperationShift.MORNING);
     inProgress.setStatus(TripStatus.IN_PROGRESS);
     inProgress.setStartedAt(now.minus(2, ChronoUnit.HOURS));
 

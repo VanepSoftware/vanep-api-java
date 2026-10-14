@@ -6,7 +6,7 @@ import br.com.vanep.dependent.dto.DependentCreateDTO;
 import br.com.vanep.dependent.dto.DependentResponseDTO;
 import br.com.vanep.dependent.dto.DependentSchoolDTO;
 import br.com.vanep.dependent.model.DependentModel;
-import br.com.vanep.shared.enums.Shift;
+import br.com.vanep.shared.enums.SchoolShift;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -22,7 +22,7 @@ public class DependentMapper {
     model.setPhone(dto.getPhone());
     model.setEmail(dto.getEmail());
     model.setSelf(Boolean.TRUE.equals(dto.getIsSelf()));
-    model.setShift(dto.getShift() != null ? dto.getShift() : Shift.MORNING);
+    model.setShift(dto.getShift() != null ? dto.getShift() : SchoolShift.MORNING);
     return model;
   }
 

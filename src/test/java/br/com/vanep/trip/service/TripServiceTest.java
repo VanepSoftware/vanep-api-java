@@ -11,7 +11,7 @@ import static org.mockito.Mockito.when;
 import br.com.vanep.driver.DriverApprovalStatus;
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
-import br.com.vanep.shared.enums.Shift;
+import br.com.vanep.shared.enums.OperationShift;
 import br.com.vanep.trip.dto.TripResponseDTO;
 import br.com.vanep.trip.enums.TripStatus;
 import br.com.vanep.trip.mapper.TripMapper;
@@ -82,7 +82,7 @@ class TripServiceTest {
     TripModel trip = new TripModel();
     trip.setDriver(driver);
     trip.setServiceDate(LocalDate.now(TripService.SERVICE_ZONE));
-    trip.setShift(Shift.MORNING);
+    trip.setShift(OperationShift.MORNING);
     trip.setStatus(status);
     trip.setToken("trip-token");
     return trip;
@@ -93,7 +93,7 @@ class TripServiceTest {
     when(trips.findByDriverAndServiceDateAndShift(any(), any(), any()))
         .thenReturn(Optional.empty());
 
-    TripResponseDTO started = service.startToday(CALLER, Shift.MORNING);
+    TripResponseDTO started = service.startToday(CALLER, OperationShift.MORNING);
 
     assertThat(started.status()).isEqualTo(TripStatus.IN_PROGRESS);
     assertThat(started.startedAt()).isNotNull();
@@ -107,7 +107,7 @@ class TripServiceTest {
     when(trips.findByDriverAndServiceDateAndShift(any(), any(), any()))
         .thenReturn(Optional.of(running));
 
-    TripResponseDTO again = service.startToday(CALLER, Shift.MORNING);
+    TripResponseDTO again = service.startToday(CALLER, OperationShift.MORNING);
 
     assertThat(again.startedAt()).isEqualTo(original);
     verify(trips, never()).save(any(TripModel.class));
@@ -118,7 +118,7 @@ class TripServiceTest {
     when(trips.findByDriverAndServiceDateAndShift(any(), any(), any()))
         .thenReturn(Optional.of(storedTrip(TripStatus.COMPLETED)));
 
-    assertThatThrownBy(() -> service.startToday(CALLER, Shift.MORNING))
+    assertThatThrownBy(() -> service.startToday(CALLER, OperationShift.MORNING))
         .isInstanceOf(ResponseStatusException.class);
   }
 
@@ -131,7 +131,7 @@ class TripServiceTest {
     when(trips.saveAndFlush(any(TripModel.class)))
         .thenThrow(new DataIntegrityViolationException("slot ocupado"));
 
-    TripResponseDTO started = service.startToday(CALLER, Shift.MORNING);
+    TripResponseDTO started = service.startToday(CALLER, OperationShift.MORNING);
 
     assertThat(started.token()).isEqualTo(winner.getToken());
     assertThat(started.status()).isEqualTo(TripStatus.IN_PROGRESS);
@@ -142,7 +142,7 @@ class TripServiceTest {
     when(trips.findByDriverAndServiceDateAndShift(any(), any(), any()))
         .thenReturn(Optional.empty());
 
-    assertThatThrownBy(() -> service.finishToday(CALLER, Shift.MORNING))
+    assertThatThrownBy(() -> service.finishToday(CALLER, OperationShift.MORNING))
         .isInstanceOf(ResponseStatusException.class);
   }
 
@@ -154,7 +154,8 @@ class TripServiceTest {
     when(trips.findByDriverAndServiceDateAndShift(any(), any(), any()))
         .thenReturn(Optional.of(completed));
 
-    assertThat(service.finishToday(CALLER, Shift.MORNING).finishedAt()).isEqualTo(original);
+    assertThat(service.finishToday(CALLER, OperationShift.MORNING).finishedAt())
+        .isEqualTo(original);
     verify(trips, never()).save(any(TripModel.class));
   }
 
@@ -162,7 +163,7 @@ class TripServiceTest {
   void aDriverPendingApprovalCannotOperate() {
     driver.setApprovalStatus(DriverApprovalStatus.PENDING);
 
-    assertThatThrownBy(() -> service.startToday(CALLER, Shift.MORNING))
+    assertThatThrownBy(() -> service.startToday(CALLER, OperationShift.MORNING))
         .isInstanceOf(ResponseStatusException.class);
     verify(trips, never()).saveAndFlush(any(TripModel.class));
   }

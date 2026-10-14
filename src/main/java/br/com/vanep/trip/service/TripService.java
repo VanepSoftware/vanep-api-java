@@ -3,7 +3,7 @@ package br.com.vanep.trip.service;
 import br.com.vanep.driver.DriverApprovalStatus;
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
-import br.com.vanep.shared.enums.Shift;
+import br.com.vanep.shared.enums.OperationShift;
 import br.com.vanep.trip.dto.TripCreateRequestDTO;
 import br.com.vanep.trip.dto.TripResponseDTO;
 import br.com.vanep.trip.dto.TripUpdateRequestDTO;
@@ -63,7 +63,7 @@ public class TripService {
   }
 
   @Transactional
-  public TripResponseDTO startToday(String callerUid, Shift shift) {
+  public TripResponseDTO startToday(String callerUid, OperationShift shift) {
     DriverModel driver = requireApprovedDriver(callerUid);
     LocalDate serviceDate = today();
 
@@ -85,7 +85,7 @@ public class TripService {
   }
 
   @Transactional
-  public TripResponseDTO finishToday(String callerUid, Shift shift) {
+  public TripResponseDTO finishToday(String callerUid, OperationShift shift) {
     DriverModel driver = requireApprovedDriver(callerUid);
     TripModel trip =
         trips
@@ -156,7 +156,7 @@ public class TripService {
     TripModel trip = requireTrip(token);
 
     if (request.shift().isPresent()) {
-      Shift shift = request.shift().get();
+      OperationShift shift = request.shift().get();
       if (shift == null) {
         throw badRequest("trip.field.null");
       }
@@ -204,7 +204,7 @@ public class TripService {
             });
   }
 
-  TripModel insertOrReread(DriverModel driver, LocalDate serviceDate, Shift shift) {
+  TripModel insertOrReread(DriverModel driver, LocalDate serviceDate, OperationShift shift) {
     TripModel trip = new TripModel();
     trip.setDriver(driver);
     trip.setServiceDate(serviceDate);
