@@ -1,6 +1,6 @@
 # QA — contract-core (constitution rule 55)
 
-Latest run: API built from `feat/contract-core-client-driver-status`, which contains phases 1 to 7. Run date: 2026-10-13. Result: **202/202 passed**.
+Latest run: API built from `feat/contract-core-unlinked-service`, which contains phases 1 to 8. Run date: 2026-10-13. Result: **269/269 passed**.
 
 ## How to run
 
@@ -306,9 +306,91 @@ Flyway applied `V56` to `V60` on an empty database at boot, after the `main` mig
 | id | scenario | expected | result |
 |---|---|---|---|
 | M1 | an ACTIVE link without contract becomes PENDING | PENDING | PASS |
-| M2 | every other link keeps its status (ACTIVE with contract, INACTIVE, PENDING) | 1cd21021c3f746bc9cd4d0229=ACTIVE,5c6fa84351d0498e8e7f54fef=ACTIVE,73b20871950a4e119e9d424c7=ACTIVE,7afccd31982d41cbb2e01f791=ACTIVE,a8b5168542574f6a997e6a1d2=PENDING,aea6404bada0490a8231c7ee9=ACTIVE,cff29ca719c4404bb2bdb28f6=INACTIVE,f44a119ad2f84ceab30a2123a=PENDING | PASS |
-| M3 | re-applying V60 changes nothing | 0f4fd888271e433d87cd447f8=PENDING,1cd21021c3f746bc9cd4d0229=ACTIVE,5c6fa84351d0498e8e7f54fef=ACTIVE,73b20871950a4e119e9d424c7=ACTIVE,7afccd31982d41cbb2e01f791=ACTIVE,a8b5168542574f6a997e6a1d2=PENDING,aea6404bada0490a8231c7ee9=ACTIVE,cff29ca719c4404bb2bdb28f6=INACTIVE,f44a119ad2f84ceab30a2123a=PENDING | PASS |
+| M2 | every other link keeps its status (ACTIVE with contract, INACTIVE, PENDING) | 2bcf67ea392e4c0b96b9b2140=ACTIVE,52219b305f66402db916fee71=PENDING,55c432d7d17943588a626d8fa=ACTIVE,619bba5b54d84ef0904feab7c=PENDING,a298b72eba2f4a6a8a9900c9d=ACTIVE,ca7158cba05845f8a18225d03=ACTIVE,e4a3022e2297415d81f4e3767=ACTIVE,fda4bf23be0341c997c0318a4=INACTIVE | PASS |
+| M3 | re-applying V60 changes nothing | 2bcf67ea392e4c0b96b9b2140=ACTIVE,52219b305f66402db916fee71=PENDING,55c432d7d17943588a626d8fa=ACTIVE,5816225925964a6f9f2cd1711=PENDING,619bba5b54d84ef0904feab7c=PENDING,a298b72eba2f4a6a8a9900c9d=ACTIVE,ca7158cba05845f8a18225d03=ACTIVE,e4a3022e2297415d81f4e3767=ACTIVE,fda4bf23be0341c997c0318a4=INACTIVE | PASS |
 | M4 | V60 also strips update_client_driver from a bundle that has it | 0 | PASS |
+
+### /api/drivers/me/unlinked-passengers — the driver's own students
+
+| id | scenario | expected | result |
+|---|---|---|---|
+| U1 | a driver registers a student they already transport | 201 | PASS |
+| U2 | it appears in the driver's list | 200 | PASS |
+| U3 | the driver reads it | 200 | PASS |
+| U4 | another driver's list does not show it | 200 | PASS |
+| U5 | another driver reading it | 404 | PASS |
+| U6 | another driver patching it | 404 | PASS |
+| U7 | another driver replacing its schedule | 404 | PASS |
+| U8 | another driver deleting it | 404 | PASS |
+| U9 | a client cannot manage unlinked passengers | 403 | PASS |
+| U10 | neither can the admin | 403 | PASS |
+| U11 | a client cannot create one | 403 | PASS |
+| U12 | no token | 401 | PASS |
+| U13 | invalid token | 401 | PASS |
+| U14 | unknown token | 404 | PASS |
+
+### POST — validation
+
+| id | scenario | expected | result |
+|---|---|---|---|
+| N1 | missing name | 400 | PASS |
+| N2 | blank name | 400 | PASS |
+| N3 | a 256-character name | 400 | PASS |
+| N4 | 501-character notes | 400 | PASS |
+| N5 | missing school | 400 | PASS |
+| N6 | unknown school, pt-BR message | 404 | PASS |
+| N7 | missing school shift | 400 | PASS |
+| N8 | unknown school shift | 400 | PASS |
+| N9 | missing address | 400 | PASS |
+| N10 | invalid zip code | 400 | PASS |
+| N11 | unknown city | 404 | PASS |
+| N12 | empty schedule, pt-BR message | 400 | PASS |
+| N13 | missing schedule | 400 | PASS |
+| N14 | the same weekday and leg twice | 400 | PASS |
+| N15 | window end before its start | 400 | PASS |
+| N16 | a slot with the FULLTIME shift | 400 | PASS |
+| N17 | name with the wrong JSON type | 400 | PASS |
+| N18 | malformed JSON | 400 | PASS |
+| N19 | wrong content type | 415 | PASS |
+| N20 | the rejected creates stored nothing | 1 71 | PASS |
+| N21 | a 255-character name and 500-character notes | 201 | PASS |
+| N22 | unknown personal fields are not stored | 201 | PASS |
+| N23 | the table has no column for them | 0 | PASS |
+| N24 | a driver pending approval registers one too | 201 | PASS |
+| N25 | five concurrent creates: no limit, five 201 | 201x5 | PASS |
+| N26 | with five distinct tokens | 200 | PASS |
+
+### PATCH, PUT /schedule and DELETE
+
+| id | scenario | expected | result |
+|---|---|---|---|
+| W1 | a single-field PATCH (notes) | 200 | PASS |
+| W2 | name, school, shift, address and schedule unchanged | unchanged | PASS |
+| W3 | an empty PATCH changes nothing | 200 | PASS |
+| W4 | notes can be cleared | 200 | PASS |
+| W5 | name cannot be cleared | 400 | PASS |
+| W6 | school shift cannot be cleared | 400 | PASS |
+| W7 | school cannot be cleared | 400 | PASS |
+| W8 | address cannot be cleared | 400 | PASS |
+| W9 | a 256-character name | 400 | PASS |
+| W10 | unknown school shift | 400 | PASS |
+| W11 | unknown school | 404 | PASS |
+| W12 | the rejected patches changed nothing | 200 | PASS |
+| W13 | name, school shift and address patched together | 200 | PASS |
+| W14 | the schedule is replaced by five outbound slots | 200 | PASS |
+| W15 | then by three | 200 | PASS |
+| W16 | the previous fifteen slots remain soft-deleted, three are live | 15 3 | PASS |
+| W17 | an empty schedule | 400 | PASS |
+| W18 | a body without slots | 400 | PASS |
+| W19 | a window ending before it starts | 400 | PASS |
+| W20 | the same weekday and leg twice | 400 | PASS |
+| W21 | the rejected replacements kept the three slots | 200 | PASS |
+| W22 | the driver deletes it | 204 | PASS |
+| W23 | it left the list | 200 | PASS |
+| W24 | reading it is not found | 404 | PASS |
+| W25 | deleting it again is not found | 404 | PASS |
+| W26 | patching it is not found | 404 | PASS |
+| W27 | the row, its schedule and slots keep deleted_at | true true true | PASS |
 
 ## Behaviors worth knowing
 
@@ -321,3 +403,5 @@ Flyway applied `V56` to `V60` on an empty database at boot, after the `main` mig
 - **The weekday-and-leg collision is enforced by the service only** (R5 in `design.md`). Two simultaneous creates for the same dependent on different links are not guarded by the database in this phase, and the script does not race them.
 - **Unknown and read-only fields in the create body are ignored (L5).** A contract always starts `ACTIVE`, and the pickup address always comes from the dependent.
 - **B13 is the accepted effect of R2:** with the link status derived from contracts, a client cannot rate a driver until the admin registers the contract of the pair.
+- **A JSON number is accepted where text is expected.** `{"name": 42}` creates a passenger named "42", the same API-wide Jackson default as above. N17 checks an object, which is refused.
+- **The admin also gets 403 on `/api/drivers/me/unlinked-passengers` (U10):** the caller must be a driver, and the token in the URL is resolved among the caller's own passengers (U5 to U8 are 404).

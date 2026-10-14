@@ -741,5 +741,165 @@ apply_migration V60
 check M4 "V60 also strips update_client_driver from a bundle that has it" 0 \
   "$(sql "select count(*) from role_permissions where permissions ? 'update_client_driver'")"
 
+table "/api/drivers/me/unlinked-passengers — the driver's own students"
+UP=/api/drivers/me/unlinked-passengers
+RAFAEL_BODY=$(jq -nc --arg s "$SCHOOL" --argjson a "$(address "Rua das Palmeiras" 77)" --argjson slots "$ROUND_TRIP" \
+  '{name: "Rafael Prado", schoolToken: $s, schoolShift: "FULLTIME", address: $a, notes: "Desce no portão B", slots: $slots}')
+rafael() { jq -c "$1" <<<"$RAFAEL_BODY"; }
+PASSENGERS_BEFORE="$(count unlinked_passenger) $(count schedule_slot)"
+request POST "$UP" "$GUSTAVO" "$RAFAEL_BODY"
+expect U1 "a driver registers a student they already transport" 201 \
+  '.token != null and .name == "Rafael Prado" and .schoolShift == "FULLTIME" and .address.street == "Rua das Palmeiras" and (.slots | length) == 10'
+RAFAEL=$(jq -r .token <<<"$RESP_BODY")
+request GET "$UP" "$GUSTAVO"
+expect U2 "it appears in the driver's list" 200 "map(.token) == [\"$RAFAEL\"]"
+request GET "$UP/$RAFAEL" "$GUSTAVO"
+expect U3 "the driver reads it" 200 '.notes == "Desce no portão B" and .schoolName == "Escola Municipal Seed"'
+BEFORE_NOTES=$(jq -c 'del(.notes, .updatedAt)' <<<"$RESP_BODY")
+request GET "$UP" "$FABIO"
+expect U4 "another driver's list does not show it" 200 'length == 0'
+request GET "$UP/$RAFAEL" "$FABIO"
+expect U5 "another driver reading it" 404 '.detail == "Aluno não vinculado não encontrado."'
+request PATCH "$UP/$RAFAEL" "$FABIO" '{"notes":"x"}'
+expect U6 "another driver patching it" 404
+request PUT "$UP/$RAFAEL/schedule" "$FABIO" "$(jq -nc --argjson s "$MONDAY_OUTBOUND" '{slots: $s}')"
+expect U7 "another driver replacing its schedule" 404
+request DELETE "$UP/$RAFAEL" "$FABIO"
+expect U8 "another driver deleting it" 404
+request GET "$UP" "$ANA"
+expect U9 "a client cannot manage unlinked passengers" 403
+request GET "$UP" "$ADMIN"
+expect U10 "neither can the admin" 403
+request POST "$UP" "$ANA" "$RAFAEL_BODY"
+expect U11 "a client cannot create one" 403
+request GET "$UP" ""
+expect U12 "no token" 401
+request GET "$UP" "not-a-jwt"
+expect U13 "invalid token" 401
+request GET "$UP/doesnotexist" "$GUSTAVO"
+expect U14 "unknown token" 404
+
+table "POST — validation"
+COUNT_AFTER_CREATE="$(count unlinked_passenger) $(count schedule_slot)"
+request POST "$UP" "$GUSTAVO" "$(rafael 'del(.name)')"
+expect N1 "missing name" 400
+request POST "$UP" "$GUSTAVO" "$(rafael '.name = "   "')"
+expect N2 "blank name" 400
+request POST "$UP" "$GUSTAVO" "$(rafael '.name = ("a" * 256)')"
+expect N3 "a 256-character name" 400
+request POST "$UP" "$GUSTAVO" "$(rafael '.notes = ("a" * 501)')"
+expect N4 "501-character notes" 400
+request POST "$UP" "$GUSTAVO" "$(rafael 'del(.schoolToken)')"
+expect N5 "missing school" 400
+request POST "$UP" "$GUSTAVO" "$(rafael '.schoolToken = "doesnotexist"')"
+expect N6 "unknown school, pt-BR message" 404 '.detail == "Escola não encontrada."'
+request POST "$UP" "$GUSTAVO" "$(rafael 'del(.schoolShift)')"
+expect N7 "missing school shift" 400
+request POST "$UP" "$GUSTAVO" "$(rafael '.schoolShift = "EVENING"')"
+expect N8 "unknown school shift" 400
+request POST "$UP" "$GUSTAVO" "$(rafael 'del(.address)')"
+expect N9 "missing address" 400
+request POST "$UP" "$GUSTAVO" "$(rafael '.address.zipCode = "123"')"
+expect N10 "invalid zip code" 400
+request POST "$UP" "$GUSTAVO" "$(rafael '.address.cityToken = "doesnotexist"')"
+expect N11 "unknown city" 404
+request POST "$UP" "$GUSTAVO" "$(rafael '.slots = []')"
+expect N12 "empty schedule, pt-BR message" 400 '.detail == "A agenda precisa de pelo menos um horário."'
+request POST "$UP" "$GUSTAVO" "$(rafael 'del(.slots)')"
+expect N13 "missing schedule" 400
+request POST "$UP" "$GUSTAVO" "$(rafael '.slots += [.slots[0]]')"
+expect N14 "the same weekday and leg twice" 400 '.detail == "O mesmo dia e trecho não pode aparecer duas vezes na agenda."'
+request POST "$UP" "$GUSTAVO" "$(rafael '.slots[0].windowEnd = "06:00"')"
+expect N15 "window end before its start" 400 '.detail == "O fim da janela deve ser posterior ao início."'
+request POST "$UP" "$GUSTAVO" "$(rafael '.slots[0].shift = "FULLTIME"')"
+expect N16 "a slot with the FULLTIME shift" 400
+request POST "$UP" "$GUSTAVO" "$(rafael '.name = {first: "Rafael"}')"
+expect N17 "name with the wrong JSON type" 400
+request POST "$UP" "$GUSTAVO" '{"name":'
+expect N18 "malformed JSON" 400
+request POST "$UP" "$GUSTAVO" "$RAFAEL_BODY" "text/plain"
+expect N19 "wrong content type" 415
+check N20 "the rejected creates stored nothing" "$COUNT_AFTER_CREATE" "$(count unlinked_passenger) $(count schedule_slot)"
+request POST "$UP" "$GUSTAVO" "$(rafael '.name = ("a" * 255) | .notes = ("n" * 500)')"
+expect N21 "a 255-character name and 500-character notes" 201
+LONG=$(jq -r .token <<<"$RESP_BODY")
+request POST "$UP" "$GUSTAVO" "$(rafael '.name = "Bia Prado" | .birthDate = "2015-01-01" | .document = "12345678909" | .phone = "11999990000" | del(.notes)')"
+expect N22 "unknown personal fields are not stored" 201 '(has("birthDate") or has("document") or has("phone")) | not'
+BIA=$(jq -r .token <<<"$RESP_BODY")
+check N23 "the table has no column for them" 0 \
+  "$(sql "select count(*) from information_schema.columns where table_name = 'unlinked_passenger' and column_name in ('birth_date', 'document', 'phone', 'email')")"
+sql "update driver set approval_status = 'PENDING' where user_id = (select id from users where email = 'helena.costa@seed.vanep.com.br')" >/dev/null
+HELENA=$(login helena.costa@seed.vanep.com.br)
+request POST "$UP" "$HELENA" "$(rafael '.name = "Davi Costa"')"
+expect N24 "a driver pending approval registers one too" 201
+restore_drivers
+PARALLEL_DIR="$(mktemp -d)"
+for attempt in 1 2 3 4 5; do
+  curl -s -o /dev/null -w '%{http_code}\n' -X POST "$BASE_URL$UP" -H "Authorization: Bearer $FABIO" \
+    -H "Content-Type: application/json" --data-binary "$(rafael ".name = \"Aluno $attempt\"")" >"$PARALLEL_DIR/$attempt" &
+done
+wait
+check N25 "five concurrent creates: no limit, five 201" "201x5" "$(cat "$PARALLEL_DIR"/* | sort | uniq -c | awk '{print $2 "x" $1}')"
+rm -rf "$PARALLEL_DIR"
+request GET "$UP" "$FABIO"
+expect N26 "with five distinct tokens" 200 '[.[].token] | unique | length == 5'
+
+table "PATCH, PUT /schedule and DELETE"
+request PATCH "$UP/$RAFAEL" "$GUSTAVO" '{"notes":"Portão A"}'
+expect W1 "a single-field PATCH (notes)" 200 '.notes == "Portão A"'
+check W2 "name, school, shift, address and schedule unchanged" unchanged \
+  "$([[ $(jq -c 'del(.notes, .updatedAt)' <<<"$RESP_BODY") == "$BEFORE_NOTES" ]] && echo unchanged || echo "$RESP_BODY")"
+request PATCH "$UP/$RAFAEL" "$GUSTAVO" '{}'
+expect W3 "an empty PATCH changes nothing" 200 '.notes == "Portão A" and .name == "Rafael Prado"'
+request PATCH "$UP/$RAFAEL" "$GUSTAVO" '{"notes":null}'
+expect W4 "notes can be cleared" 200 '.notes == null'
+request PATCH "$UP/$RAFAEL" "$GUSTAVO" '{"name":null}'
+expect W5 "name cannot be cleared" 400
+request PATCH "$UP/$RAFAEL" "$GUSTAVO" '{"schoolShift":null}'
+expect W6 "school shift cannot be cleared" 400
+request PATCH "$UP/$RAFAEL" "$GUSTAVO" '{"schoolToken":null}'
+expect W7 "school cannot be cleared" 400
+request PATCH "$UP/$RAFAEL" "$GUSTAVO" '{"address":null}'
+expect W8 "address cannot be cleared" 400
+request PATCH "$UP/$RAFAEL" "$GUSTAVO" "$(jq -nc '{name: ("a" * 256)}')"
+expect W9 "a 256-character name" 400
+request PATCH "$UP/$RAFAEL" "$GUSTAVO" '{"schoolShift":"EVENING"}'
+expect W10 "unknown school shift" 400
+request PATCH "$UP/$RAFAEL" "$GUSTAVO" '{"schoolToken":"doesnotexist"}'
+expect W11 "unknown school" 404
+request GET "$UP/$RAFAEL" "$GUSTAVO"
+expect W12 "the rejected patches changed nothing" 200 '.name == "Rafael Prado" and .schoolShift == "FULLTIME" and .address.street == "Rua das Palmeiras"'
+request PATCH "$UP/$RAFAEL" "$GUSTAVO" "$(jq -nc --argjson a "$(address "Rua Nova" 5)" '{name: "Rafael P. Prado", schoolShift: "AFTERNOON", address: $a}')"
+expect W13 "name, school shift and address patched together" 200 \
+  '.name == "Rafael P. Prado" and .schoolShift == "AFTERNOON" and .address.street == "Rua Nova" and (.slots | length) == 10'
+request PUT "$UP/$RAFAEL/schedule" "$GUSTAVO" "$(jq -nc --argjson s "$(slots OUTBOUND MORNING 06:40 - MONDAY TUESDAY WEDNESDAY THURSDAY FRIDAY)" '{slots: $s}')"
+expect W14 "the schedule is replaced by five outbound slots" 200 '(.slots | length) == 5 and all(.slots[]; .leg == "OUTBOUND")'
+request PUT "$UP/$RAFAEL/schedule" "$GUSTAVO" "$(jq -nc --argjson s "$(slots OUTBOUND MORNING 07:00 - MONDAY WEDNESDAY FRIDAY)" '{slots: $s}')"
+expect W15 "then by three" 200 '[.slots[].weekday] == ["MONDAY", "WEDNESDAY", "FRIDAY"] and all(.slots[]; .windowStart == "07:00:00")'
+check W16 "the previous fifteen slots remain soft-deleted, three are live" "15 3" \
+  "$(sql "select count(*) filter (where s.deleted_at is not null) || ' ' || count(*) filter (where s.deleted_at is null) from schedule_slot s join unlinked_passenger p on p.schedule_id = s.schedule_id where p.token = '$RAFAEL'")"
+request PUT "$UP/$RAFAEL/schedule" "$GUSTAVO" '{"slots":[]}'
+expect W17 "an empty schedule" 400
+request PUT "$UP/$RAFAEL/schedule" "$GUSTAVO" '{}'
+expect W18 "a body without slots" 400
+request PUT "$UP/$RAFAEL/schedule" "$GUSTAVO" "$(jq -nc --argjson s "$(slots OUTBOUND MORNING 07:00 06:00 MONDAY)" '{slots: $s}')"
+expect W19 "a window ending before it starts" 400
+request PUT "$UP/$RAFAEL/schedule" "$GUSTAVO" "$(jq -nc --argjson s "$(slots OUTBOUND MORNING 07:00 - MONDAY MONDAY)" '{slots: $s}')"
+expect W20 "the same weekday and leg twice" 400
+request GET "$UP/$RAFAEL" "$GUSTAVO"
+expect W21 "the rejected replacements kept the three slots" 200 '(.slots | length) == 3'
+request DELETE "$UP/$RAFAEL" "$GUSTAVO"
+expect W22 "the driver deletes it" 204
+request GET "$UP" "$GUSTAVO"
+expect W23 "it left the list" 200 "map(.token) | index(\"$RAFAEL\") == null"
+request GET "$UP/$RAFAEL" "$GUSTAVO"
+expect W24 "reading it is not found" 404
+request DELETE "$UP/$RAFAEL" "$GUSTAVO"
+expect W25 "deleting it again is not found" 404
+request PATCH "$UP/$RAFAEL" "$GUSTAVO" '{"notes":"x"}'
+expect W26 "patching it is not found" 404
+check W27 "the row, its schedule and slots keep deleted_at" "true true true" \
+  "$(sql "select (p.deleted_at is not null) || ' ' || (s.deleted_at is not null) || ' ' || bool_and(sl.deleted_at is not null) from unlinked_passenger p join schedule s on s.id = p.schedule_id join schedule_slot sl on sl.schedule_id = s.id where p.token = '$RAFAEL' group by p.deleted_at, s.deleted_at")"
+
 echo
 echo "ALL PASSED: $PASSED scenarios"

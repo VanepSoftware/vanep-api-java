@@ -23,7 +23,7 @@
 
 - [x] Ler `constitution.md` inteiro antes de qualquer trabalho (`openspec/rules.md` regra 1)
 - [x] Revisar `proposal.md`, `design.md` e os seis specs (`operation-shift`, `contract-schedule`, `contract-core`, `client-driver-derived-status`, `unlinked-passengers`, `route-passengers`)
-- [x] **Confirmar os números de Flyway** em `main` e em **todas as branches remotas** (`git ls-tree`). Esta change usa `V56` a `V60`. **Reconfirmar antes do merge de cada PR com migration** (R7)
+- [x] **Confirmar os números de Flyway** em `main` e em **todas as branches remotas** (`git ls-tree`). Esta change usa `V59` a `V60`. **Reconfirmar antes do merge de cada PR com migration** (R7)
 - [x] Branch `spec/contract-core` a partir da `main`, só com `openspec/changes/contract-core/`. É a base da pilha; a branch `spike/contract-proposal` não vai para a `main`
 
 ## 1. PR 1 — Turno escolar e turno da operação
@@ -34,11 +34,11 @@
 
 - [x] 1.1 Criar branch `feat/contract-core-shift-split` a partir da `spec/contract-core` (o PR aponta para ela como `--base`)
 - [x] 1.2 Testes: `POST /api/drivers/me/trips/start` com `FULLTIME` → 400 e nenhuma trip; com `MORNING` → 200 (já coberto, continua); `POST /api/trips` e `PATCH /api/trips/{token}` do admin com `FULLTIME` → 400 (o `PATCH` mantém o turno gravado); dependent com `FULLTIME` continua 201, devolve e grava `FULLTIME`; repositório de trip grava e lê `OperationShift` (testes existentes, com o tipo trocado)
-- [x] 1.3 Migration `V56__trip_operation_shift.sql`: `update trip set shift = 'MORNING' where shift = 'FULLTIME'`; `comment on column trip.shift` (turno da operação, sem `FULLTIME`); `comment on column dependent.shift` (turno escolar; dias e horários vêm da agenda do contrato — A1)
+- [x] 1.3 Migration `V59__trip_operation_shift.sql`: `update trip set shift = 'MORNING' where shift = 'FULLTIME'`; `comment on column trip.shift` (turno da operação, sem `FULLTIME`); `comment on column dependent.shift` (turno escolar; dias e horários vêm da agenda do contrato — A1)
 - [x] 1.4 Renomear `shared.enums.Shift` para `SchoolShift` e ajustar `DependentModel`, `DependentMapper`, DTOs, `DependentService` e `DependentSeeder` (refactor mecânico, JSON igual)
 - [x] 1.5 Criar `shared.enums.OperationShift` (`MORNING`, `AFTERNOON`, `NIGHT`) e trocar o tipo em `TripModel`, `TripRepository`, DTOs de trip, `TripService` e `TripSeeder`
 - [x] 1.6 Conferir que a `absence` (#160) não está na `main`: ela entra depois desta change e troca os tipos de turno nas policies dela ao entrar (aviso no topo)
-- [x] 1.7 Aplicar a `V56` num PostgreSQL descartável com trips `FULLTIME` e `AFTERNOON` semeadas à mão: `FULLTIME` vira `MORNING`, `AFTERNOON` fica intacta, e os comments de `trip.shift` e `dependent.shift` são gravados (R1)
+- [x] 1.7 Aplicar a `V59` num PostgreSQL descartável com trips `FULLTIME` e `AFTERNOON` semeadas à mão: `FULLTIME` vira `MORNING`, `AFTERNOON` fica intacta, e os comments de `trip.shift` e `dependent.shift` são gravados (R1)
 - [x] 1.8 `make lint` + `./mvnw verify -B`
 - [x] 1.9 QA da regra 55 (`scripts/qa/contract-core/qa.sh`, resultado no `qa.md`): início de rota e trip do admin recusam `FULLTIME`, dependente aceita `FULLTIME` e a `V56` reaplicada converte uma trip `FULLTIME`
 
@@ -50,7 +50,7 @@
 
 - [x] 2.1 Criar branch `feat/contract-core-schedule-schema` de dentro da branch do PR 1
 - [x] 2.2 Testes de repositório: salvar agenda com slots e reler; aluno não vinculado por motorista, com escola, endereço e slots carregados fora da transação (prova o fetch join, `open-in-view` desligado); aluno de outro motorista não aparece; token só resolve dentro do motorista; token opaco gerado no persist; soft delete esconde a linha e mantém no banco, e o do aluno leva junto a agenda e os slots. A ordem dos slots não vem do banco: fica no `ScheduleMapper` (tarefa 5.10)
-- [x] 2.3 Migration `V57__create_schedule_and_unlinked_passenger.sql`:
+- [x] 2.3 Migration `V60__create_schedule_and_unlinked_passenger.sql`:
     - `schedule` (`id`, `created_at`, `updated_at`, `deleted_at`)
     - `schedule_slot` (`id`, `schedule_id` FK, `weekday varchar(16)`, `leg varchar(16)`, `shift varchar(16)`, `window_start time not null`, `window_end time`, timestamps, `deleted_at`), `check (window_end is null or window_end > window_start)`
     - `unlinked_passenger` (`id`, `token`, `driver_id` FK, `name`, `school_id` FK, `school_shift`, `address_id` FK, `notes`, `schedule_id` FK, timestamps, `deleted_at`)
@@ -63,7 +63,7 @@
     - endereço como `@ManyToOne` (o dono único é o índice parcial); agenda como `@OneToOne` com `cascade = ALL`
 - [x] 2.7 Criar `ScheduleRepository` e `UnlinkedPassengerRepository` (busca por token **dentro do motorista**, lista por motorista com fetch join de escola, endereço e slots — regra 17). Sem `ScheduleSlotRepository`: toda escrita de slot passa pelo `ScheduleModel` (`cascade = ALL`, `orphanRemoval = true`)
 - [x] 2.8 Acrescentar `schedule_slot`, `schedule` e `unlinked_passenger` ao `src/test/resources/db/clean.sql` na ordem de FK
-- [x] 2.9 **Aplicar a `V57` num PostgreSQL descartável e provar cada índice** com inserts manuais: slot duplicado no mesmo `(schedule, weekday, leg)` recusado; ida e volta no mesmo dia aceitas; slot soft-deletado e recriado aceito; `window_end` antes do início recusado; dois donos no mesmo `schedule` ou no mesmo endereço recusados; token repetido recusado; dono soft-deletado libera endereço e agenda; a consulta por `(schedule_id, weekday, shift)` usa o índice (R1)
+- [x] 2.9 **Aplicar a `V60` num PostgreSQL descartável e provar cada índice** com inserts manuais: slot duplicado no mesmo `(schedule, weekday, leg)` recusado; ida e volta no mesmo dia aceitas; slot soft-deletado e recriado aceito; `window_end` antes do início recusado; dois donos no mesmo `schedule` ou no mesmo endereço recusados; token repetido recusado; dono soft-deletado libera endereço e agenda; a consulta por `(schedule_id, weekday, shift)` usa o índice (R1)
 - [x] 2.10 `make lint` + `./mvnw verify -B`
 - [x] 2.11 QA da regra 55 (`scripts/qa/contract-core/qa.sh`, resultado no `qa.md`): índices e `CHECK` da `V57` conferidos por SQL no PostgreSQL da API
 
@@ -187,18 +187,18 @@
 > Depends on: PR 7 | Parallel with: —
 > Order: test → request DTO → messages → service → response DTO → mapper → controller
 
-- [ ] 8.1 Criar branch `feat/contract-core-unlinked-service` de dentro da branch do PR 7
-- [ ] 8.2 Testes unitários de `UnlinkedPassengerService` e dos métodos novos do `AddressService`: criar com endereço e agenda; motorista em análise cria; usuário `CLIENT` → 403; escola inexistente → 404 `unlinked_passenger.school.not_found`; agenda inválida → 400 antes de gravar o endereço; token de outro motorista → 404 `unlinked_passenger.not_found`; `PATCH` só de `notes` mantém o resto; `name` nulo ou em branco → 400; `schoolToken`, `schoolShift` ou `address` nulos → 400 `unlinked_passenger.field.null`; trocar a agenda mantém a mesma agenda com os slots novos; remover é soft delete e libera o endereço para o dono único
-- [ ] 8.3 Criar `UnlinkedPassengerCreateRequestDTO` (endereço pelo `DependentAddressRequestDTO`, slots pelo `ScheduleSlotRequestDTO` do PR 4), `UnlinkedPassengerUpdateRequestDTO` (`JsonNullable` em `name`, `schoolToken`, `schoolShift`, `address`, `notes`, construtor compacto com `undefined()`) e `UnlinkedPassengerScheduleRequestDTO` (corpo do `PUT /schedule`)
-- [ ] 8.4 Chaves de MessageSource (EN + pt-BR): `unlinked_passenger.not_found`, `unlinked_passenger.name.required`, `unlinked_passenger.name.too_long`, `unlinked_passenger.notes.too_long`, `unlinked_passenger.school.not_found`, `unlinked_passenger.field.null`
-- [ ] 8.5 Acrescentar `AddressService.upsertForUnlinkedPassenger` e `clearForUnlinkedPassenger`, reaproveitando o fluxo por catálogo de `upsertForDependent` (regra 6)
-- [ ] 8.6 Implementar `unlinkedpassenger.service.UnlinkedPassengerService` resolvendo o motorista com `requireByTokenAndType(uid, UserType.DRIVER)`. Sem gate de aprovação: o motorista em análise pode preparar a rota, e quem bloqueia a operação é o início da trip (RN-02)
-- [ ] 8.7 Criar `UnlinkedPassengerResponseDTO` e `UnlinkedPassengerMapper` (endereço pelo `AddressMapper`, slots pelo `ScheduleMapper` do PR 5)
-- [ ] 8.8 Testes MockMvc: sem JWT → 401; `CLIENT` → 403; motorista cria → 201; lista → só os dele; `GET` de outro motorista → 404; `PATCH` parcial → 200; `PUT /schedule` → 200 com os slots novos; `DELETE` → 204; corpo com `birthDate` não persiste nada além dos campos do D9
-- [ ] 8.9 **Teste nomeado do PATCH parcial** (regra 16): só `notes` → nome, escola, turno, endereço e agenda inalterados
-- [ ] 8.10 Criar `unlinkedpassenger.controller.UnlinkedPassengerController` com `@PreAuthorize("isAuthenticated()")`, no padrão do `DriverServiceAreaController`
-- [ ] 8.11 `make lint` + `./mvnw verify -B`
-- [ ] 8.12 QA da regra 55 (`scripts/qa/contract-core/qa.sh`, resultado no `qa.md`): aluno não vinculado com caminho feliz e mau uso: dono, outro motorista, cliente e admin, validações, `PATCH` de um campo, troca de agenda e soft delete
+- [x] 8.1 Criar branch `feat/contract-core-unlinked-service` de dentro da branch do PR 7
+- [x] 8.2 Testes unitários de `UnlinkedPassengerService` e dos métodos novos do `AddressService`: criar com endereço e agenda; motorista em análise cria; usuário `CLIENT` → 403; escola inexistente → 404 `unlinked_passenger.school.not_found`; agenda inválida → 400 antes de gravar o endereço; token de outro motorista → 404 `unlinked_passenger.not_found`; `PATCH` só de `notes` mantém o resto; `name` nulo ou em branco → 400; `schoolToken`, `schoolShift` ou `address` nulos → 400 `unlinked_passenger.field.null`; trocar a agenda mantém a mesma agenda com os slots novos; remover é soft delete e libera o endereço para o dono único
+- [x] 8.3 Criar `UnlinkedPassengerCreateRequestDTO` (endereço pelo `DependentAddressRequestDTO`, slots pelo `ScheduleSlotRequestDTO` do PR 4), `UnlinkedPassengerUpdateRequestDTO` (`JsonNullable` em `name`, `schoolToken`, `schoolShift`, `address`, `notes`, construtor compacto com `undefined()`) e `UnlinkedPassengerScheduleRequestDTO` (corpo do `PUT /schedule`)
+- [x] 8.4 Chaves de MessageSource (EN + pt-BR): `unlinked_passenger.not_found`, `unlinked_passenger.name.required`, `unlinked_passenger.name.too_long`, `unlinked_passenger.notes.too_long`, `unlinked_passenger.school.not_found`, `unlinked_passenger.field.null`
+- [x] 8.5 Acrescentar `AddressService.upsertForUnlinkedPassenger` e `clearForUnlinkedPassenger`, reaproveitando o fluxo por catálogo de `upsertForDependent` (regra 6)
+- [x] 8.6 Implementar `unlinkedpassenger.service.UnlinkedPassengerService` resolvendo o motorista com `requireByTokenAndType(uid, UserType.DRIVER)`. Sem gate de aprovação: o motorista em análise pode preparar a rota, e quem bloqueia a operação é o início da trip (RN-02)
+- [x] 8.7 Criar `UnlinkedPassengerResponseDTO` e `UnlinkedPassengerMapper` (endereço pelo `AddressMapper`, slots pelo `ScheduleMapper` do PR 5)
+- [x] 8.8 Testes MockMvc: sem JWT → 401; `CLIENT` → 403; motorista cria → 201; lista → só os dele; `GET` de outro motorista → 404; `PATCH` parcial → 200; `PUT /schedule` → 200 com os slots novos; `DELETE` → 204; corpo com `birthDate` não persiste nada além dos campos do D9
+- [x] 8.9 **Teste nomeado do PATCH parcial** (regra 16): só `notes` → nome, escola, turno, endereço e agenda inalterados
+- [x] 8.10 Criar `unlinkedpassenger.controller.UnlinkedPassengerController` com `@PreAuthorize("isAuthenticated()")`, no padrão do `DriverServiceAreaController`
+- [x] 8.11 `make lint` + `./mvnw verify -B`
+- [x] 8.12 QA da regra 55 (`scripts/qa/contract-core/qa.sh`, resultado no `qa.md`): aluno não vinculado com caminho feliz e mau uso: dono, outro motorista, cliente e admin, validações, `PATCH` de um campo, troca de agenda e soft delete
 
 ## 9. PR 9 — Passageiros da rota
 
