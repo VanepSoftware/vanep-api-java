@@ -1,6 +1,6 @@
 # QA — contract-core (constitution rule 55)
 
-Latest run: API built from `feat/contract-core-schedule-schema`, which contains phases 1 to 2. Run date: 2026-10-13. Result: **37/37 passed**.
+Latest run: API built from `feat/contract-core-contract-schema`, which contains phases 1 to 3. Run date: 2026-10-13. Result: **52/52 passed**.
 
 ## How to run
 
@@ -29,7 +29,7 @@ Tokens come from the mobile password grant (`urn:vanep:params:oauth:grant-type:p
 
 ## Startup and migration
 
-Flyway applied `V56` and `V57` on an empty database at boot, after the `main` migrations up to `V55`. The seed creates the link between Ana Souza and Fabio Teixeira as `ACTIVE`, with no contract: the `ContractSeeder` arrives in phase 7. Before phase 7 the demo seed also runs before the city catalog, so it skips the seed school and creates Lucas and Marina Souza without school or address (the runner order is fixed in phase 7). The script creates that school with SQL and completes both dependents through `PATCH /api/dependent/{token}`, as the client would.
+Flyway applied `V56` to `V58` on an empty database at boot, after the `main` migrations up to `V55`. The seed creates the link between Ana Souza and Fabio Teixeira as `ACTIVE`, with no contract: the `ContractSeeder` arrives in phase 7. Before phase 7 the demo seed also runs before the city catalog, so it skips the seed school and creates Lucas and Marina Souza without school or address (the runner order is fixed in phase 7). The script creates that school with SQL and completes both dependents through `PATCH /api/dependent/{token}`, as the client would.
 
 ## Results
 
@@ -79,6 +79,26 @@ Flyway applied `V56` and `V57` on an empty database at boot, after the `main` mi
 | D10 | a soft-deleted passenger frees its schedule and address | accepted | PASS |
 | D11 | two live passengers with the same token | rejected by unlinked_passenger_token_active_key | PASS |
 | D12 | the rolled-back checks left no passenger behind | 0 | PASS |
+
+### V58: contract and contract_item (database checks)
+
+| id | scenario | expected | result |
+|---|---|---|---|
+| K1 | a second ACTIVE contract on the same link | rejected by contract_client_driver_active_key | PASS |
+| K2 | an ENDED contract next to the ACTIVE one | accepted | PASS |
+| K3 | a new ACTIVE contract once the old one is soft-deleted | accepted | PASS |
+| K4 | end date on the start date | rejected by contract_period_check | PASS |
+| K5 | total amount of zero | rejected by contract_total_amount_check | PASS |
+| K6 | thirteen installments | rejected by contract_installments_check | PASS |
+| K7 | zero installments | rejected by contract_installments_check | PASS |
+| K8 | due day 29 | rejected by contract_due_day_check | PASS |
+| K9 | due day 28 and one installment | accepted | PASS |
+| K10 | two live contracts with the same token | rejected by contract_token_active_key | PASS |
+| K11 | two items sharing one schedule | rejected by contract_item_schedule_id_active_key | PASS |
+| K12 | an item priced at zero | rejected by contract_item_monthly_amount_check | PASS |
+| K13 | an item without a pickup street | rejected by pickup_street | PASS |
+| K14 | a valid item copying the dependent's school and address | accepted | PASS |
+| K15 | the rolled-back checks left no contract behind | 0 | PASS |
 
 ## Behaviors worth knowing
 
