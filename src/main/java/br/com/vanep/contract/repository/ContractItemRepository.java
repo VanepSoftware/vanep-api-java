@@ -2,7 +2,11 @@ package br.com.vanep.contract.repository;
 
 import br.com.vanep.contract.enums.ContractStatus;
 import br.com.vanep.contract.model.ContractItemModel;
+import br.com.vanep.routepassenger.dto.RoutePassengerDTO;
 import br.com.vanep.schedule.model.ScheduleSlotModel;
+import br.com.vanep.shared.enums.OperationShift;
+import java.time.DayOfWeek;
+import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -37,6 +41,30 @@ public interface ContractItemRepository extends JpaRepository<ContractItemModel,
       """)
   List<ScheduleSlotModel> findSlotsByDependentIdAndContractStatusIn(
       Long dependentId, Collection<ContractStatus> statuses);
+
+  @Query(
+      """
+      select new br.com.vanep.routepassenger.dto.RoutePassengerDTO(
+        br.com.vanep.routepassenger.enums.PassengerSource.CONTRACT_ITEM,
+        item.token, dependent.name, school.token, school.name,
+        slot.leg, slot.windowStart, slot.windowEnd,
+        item.pickupZipCode, item.pickupStreet, item.pickupNumber, item.pickupComplement,
+        item.pickupNeighborhood, district.name, city.token, city.name, item.pickupGooglePlaceId)
+      from ContractItemModel item
+      join item.contract contract
+      join item.dependent dependent
+      join item.school school
+      join item.pickupCity city
+      left join item.pickupDistrict district
+      join item.schedule schedule
+      join schedule.slots slot
+      where contract.clientDriver.driver.id = :driverId
+        and contract.status = br.com.vanep.contract.enums.ContractStatus.ACTIVE
+        and contract.startsOn <= :serviceDate and contract.endsOn >= :serviceDate
+        and slot.weekday = :weekday and slot.shift = :shift
+      """)
+  List<RoutePassengerDTO> findRoutePassengers(
+      Long driverId, LocalDate serviceDate, DayOfWeek weekday, OperationShift shift);
 
   @Modifying
   @Query(

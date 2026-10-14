@@ -60,7 +60,7 @@ class ConversationRepositoryTest {
 
     assertThat(conversations.findByPair(maria.getId(), carlos.getId()))
         .get()
-        .extracting(ConversationModel::getId)
+        .extracting(conversation -> conversation.getId())
         .isEqualTo(saved.getId());
   }
 
@@ -80,7 +80,7 @@ class ConversationRepositoryTest {
     List<ConversationModel> found = conversations.findByDriverIdMostRecentFirst(carlos.getId());
 
     assertThat(found)
-        .extracting(ConversationModel::getId)
+        .extracting(conversation -> conversation.getId())
         .containsExactly(withoutMessages.getId(), newer.getId(), older.getId());
   }
 
@@ -98,7 +98,7 @@ class ConversationRepositoryTest {
     List<ConversationModel> found = conversations.findByClientIdMostRecentFirst(maria.getId());
 
     assertThat(found)
-        .extracting(ConversationModel::getId)
+        .extracting(conversation -> conversation.getId())
         .containsExactly(newer.getId(), older.getId());
   }
 
@@ -136,7 +136,7 @@ class ConversationRepositoryTest {
         messages.findByConversationIdNewestFirst(conversation.getId(), PageRequest.of(0, 3));
 
     assertThat(page.getContent())
-        .extracting(ConversationMessageModel::getBody)
+        .extracting(message -> message.getBody())
         .containsExactly("message 4", "message 3", "message 2");
     assertThat(page.getTotalElements()).isEqualTo(5);
     assertThat(page.hasNext()).isTrue();
@@ -154,7 +154,7 @@ class ConversationRepositoryTest {
         messages.findByConversationIdNewestFirst(withCarlos.getId(), PageRequest.of(0, 30));
 
     assertThat(page.getContent())
-        .extracting(ConversationMessageModel::getBody)
+        .extracting(message -> message.getBody())
         .containsExactly("para o Carlos");
   }
 
@@ -171,7 +171,7 @@ class ConversationRepositoryTest {
     assertThat(stored).startsWith("v1:").doesNotContain("vaga");
     assertThat(messages.findById(saved.getId()))
         .get()
-        .extracting(ConversationMessageModel::getBody)
+        .extracting(message -> message.getBody())
         .isEqualTo("Tem vaga para a manhã?");
   }
 

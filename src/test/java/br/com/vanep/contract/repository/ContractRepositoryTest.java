@@ -18,10 +18,13 @@ import br.com.vanep.dependent.model.DependentModel;
 import br.com.vanep.dependent.repository.DependentRepository;
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
+import br.com.vanep.routepassenger.dto.RoutePassengerDTO;
+import br.com.vanep.routepassenger.enums.PassengerSource;
 import br.com.vanep.schedule.model.ScheduleModel;
 import br.com.vanep.schedule.model.ScheduleSlotModel;
 import br.com.vanep.school.model.SchoolModel;
 import br.com.vanep.school.repository.SchoolRepository;
+import br.com.vanep.shared.SqlStatementCounter;
 import br.com.vanep.shared.enums.OperationShift;
 import br.com.vanep.shared.enums.RouteLeg;
 import br.com.vanep.state.model.StateModel;
@@ -29,6 +32,7 @@ import br.com.vanep.state.repository.StateRepository;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
+import jakarta.persistence.EntityManagerFactory;
 import java.math.BigDecimal;
 import java.time.DayOfWeek;
 import java.time.Instant;
@@ -52,6 +56,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 class ContractRepositoryTest {
 
   private static final LocalDate STARTS_ON = LocalDate.of(2027, 2, 1);
+  private static final LocalDate MONDAY_IN_TERM = LocalDate.of(2027, 3, 1);
 
   @Autowired private ContractRepository contracts;
   @Autowired private ContractItemRepository items;
@@ -66,6 +71,7 @@ class ContractRepositoryTest {
   @Autowired private CountryRepository countries;
   @Autowired private JdbcTemplate jdbc;
   @Autowired private TransactionTemplate transactions;
+  @Autowired private EntityManagerFactory entityManagerFactory;
 
   private CityModel city;
   private ClientModel client;
@@ -297,6 +303,108 @@ class ContractRepositoryTest {
 
     assertThat(contracts.existsActiveConflictForRestore(deletedActive.getToken())).isTrue();
     assertThat(contracts.existsActiveConflictForRestore(deletedEnded.getToken())).isFalse();
+  }
+
+  @Test
+  void findsTheRoutePassengersOfTheDriversActiveContractWithTheCopiedPickup() {
+    ContractModel active =
+        contracts.save(newContract(link, ContractStatus.ACTIVE, newItem(lucas, RouteLeg.OUTBOUND)));
+    String itemToken = active.getItems().iterator().next().getToken();
+
+    List<RoutePassengerDTO> passengers = findMondayMorningPassengers(MONDAY_IN_TERM);
+
+    assertThat(passengers)
+        .singleElement()
+        .satisfies(
+            passenger -> {
+              assertThat(passenger.source()).isEqualTo(PassengerSource.CONTRACT_ITEM);
+              assertThat(passenger.token()).isEqualTo(itemToken);
+              assertThat(passenger.name()).isEqualTo("Lucas");
+              assertThat(passenger.schoolToken()).isEqualTo(school.getToken());
+              assertThat(passenger.leg()).isEqualTo(RouteLeg.OUTBOUND);
+              assertThat(passenger.windowStart()).isEqualTo(LocalTime.of(6, 40));
+              assertThat(passenger.pickupStreet()).isEqualTo("Rua A");
+              assertThat(passenger.pickupCityToken()).isEqualTo(city.getToken());
+            });
+  }
+
+  @Test
+  void aSuspendedContractPutsNobodyOnTheRoute() {
+    contracts.save(newContract(link, ContractStatus.SUSPENDED, newItem(lucas, RouteLeg.OUTBOUND)));
+
+    assertThat(findMondayMorningPassengers(MONDAY_IN_TERM)).isEmpty();
+  }
+
+  @Test
+  void anActiveContractOutsideItsPeriodPutsNobodyOnTheRoute() {
+    contracts.save(newContract(link, ContractStatus.ACTIVE, newItem(lucas, RouteLeg.OUTBOUND)));
+
+    assertThat(findMondayMorningPassengers(STARTS_ON.minusWeeks(1))).isEmpty();
+    assertThat(findMondayMorningPassengers(LocalDate.of(2028, 1, 3))).isEmpty();
+  }
+
+  @Test
+  void anotherShiftOrWeekdayReturnsNobody() {
+    contracts.save(newContract(link, ContractStatus.ACTIVE, newItem(lucas, RouteLeg.OUTBOUND)));
+
+    assertThat(
+            items.findRoutePassengers(
+                driverId(), MONDAY_IN_TERM, DayOfWeek.MONDAY, OperationShift.AFTERNOON))
+        .isEmpty();
+    assertThat(
+            items.findRoutePassengers(
+                driverId(), MONDAY_IN_TERM.plusDays(1), DayOfWeek.TUESDAY, OperationShift.MORNING))
+        .isEmpty();
+  }
+
+  @Test
+  void aDeletedContractPutsNobodyOnTheRoute() {
+    ContractModel active =
+        contracts.save(newContract(link, ContractStatus.ACTIVE, newItem(lucas, RouteLeg.OUTBOUND)));
+
+    contracts.delete(active);
+
+    assertThat(findMondayMorningPassengers(MONDAY_IN_TERM)).isEmpty();
+  }
+
+  @Test
+  void anotherDriversContractsAreNotRoutePassengers() {
+    contracts.save(newContract(link, ContractStatus.ACTIVE, newItem(lucas, RouteLeg.OUTBOUND)));
+    DriverModel otherDriver = createDriver("other@vanep.com", "52998224725");
+
+    assertThat(
+            items.findRoutePassengers(
+                otherDriver.getId(), MONDAY_IN_TERM, DayOfWeek.MONDAY, OperationShift.MORNING))
+        .isEmpty();
+  }
+
+  @Test
+  void findsTheRoutePassengersInOneStatementWhateverTheirNumber() {
+    SqlStatementCounter counter = new SqlStatementCounter(entityManagerFactory);
+    contracts.save(newContract(link, ContractStatus.ACTIVE, newItem(lucas, RouteLeg.OUTBOUND)));
+    long withOne = counter.countStatements(() -> findMondayMorningPassengers(MONDAY_IN_TERM));
+
+    for (int index = 2; index <= 4; index++) {
+      ClientModel otherClient = createClient("client" + index + "@vanep.com", "2000000000" + index);
+      ClientDriverModel otherLink = createLink(otherClient, link.getDriver());
+      DependentModel dependent = createDependent(otherClient, "Dependent " + index);
+      contracts.save(
+          newContract(otherLink, ContractStatus.ACTIVE, newItem(dependent, RouteLeg.OUTBOUND)));
+    }
+    long withFour = counter.countStatements(() -> findMondayMorningPassengers(MONDAY_IN_TERM));
+
+    assertThat(findMondayMorningPassengers(MONDAY_IN_TERM)).hasSize(4);
+    assertThat(withOne).isEqualTo(1);
+    assertThat(withFour).isEqualTo(1);
+  }
+
+  private List<RoutePassengerDTO> findMondayMorningPassengers(LocalDate serviceDate) {
+    return items.findRoutePassengers(
+        driverId(), serviceDate, DayOfWeek.MONDAY, OperationShift.MORNING);
+  }
+
+  private Long driverId() {
+    return link.getDriver().getId();
   }
 
   private Long scheduleIdOf(ContractModel contract) {

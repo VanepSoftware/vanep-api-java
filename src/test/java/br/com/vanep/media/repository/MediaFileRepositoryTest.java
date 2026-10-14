@@ -61,10 +61,10 @@ class MediaFileRepositoryTest {
     moved = repository.save(moved);
 
     assertThat(repository.findByProvider(StorageProvider.LOCAL, PageRequest.of(0, 10)))
-        .extracting(MediaFileModel::getToken)
+        .extracting(file -> file.getToken())
         .containsExactly(local.getToken());
     assertThat(repository.findByProvider(StorageProvider.FIREBASE, PageRequest.of(0, 10)))
-        .extracting(MediaFileModel::getToken)
+        .extracting(file -> file.getToken())
         .containsExactly(moved.getToken());
   }
 

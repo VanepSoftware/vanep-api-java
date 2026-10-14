@@ -1,6 +1,8 @@
 # QA — contract-core (constitution rule 55)
 
-Latest run: API built from `feat/contract-core-unlinked-service`, which contains phases 1 to 8. Run date: 2026-10-13. Result: **269/269 passed**.
+Latest run: API built from `feat/contract-core-route-passengers`, which contains phases 1 to 9. Run date: 2026-10-13. Result: **269/269 passed**.
+
+Phase 9 adds `RoutePassengerQueryService` without an HTTP endpoint (the spec forbids one in this change), so this branch runs the whole script as a regression. The query is covered by its repository and service tests (task 9.2).
 
 ## How to run
 
@@ -306,8 +308,8 @@ Flyway applied `V56` to `V60` on an empty database at boot, after the `main` mig
 | id | scenario | expected | result |
 |---|---|---|---|
 | M1 | an ACTIVE link without contract becomes PENDING | PENDING | PASS |
-| M2 | every other link keeps its status (ACTIVE with contract, INACTIVE, PENDING) | 2bcf67ea392e4c0b96b9b2140=ACTIVE,52219b305f66402db916fee71=PENDING,55c432d7d17943588a626d8fa=ACTIVE,619bba5b54d84ef0904feab7c=PENDING,a298b72eba2f4a6a8a9900c9d=ACTIVE,ca7158cba05845f8a18225d03=ACTIVE,e4a3022e2297415d81f4e3767=ACTIVE,fda4bf23be0341c997c0318a4=INACTIVE | PASS |
-| M3 | re-applying V60 changes nothing | 2bcf67ea392e4c0b96b9b2140=ACTIVE,52219b305f66402db916fee71=PENDING,55c432d7d17943588a626d8fa=ACTIVE,5816225925964a6f9f2cd1711=PENDING,619bba5b54d84ef0904feab7c=PENDING,a298b72eba2f4a6a8a9900c9d=ACTIVE,ca7158cba05845f8a18225d03=ACTIVE,e4a3022e2297415d81f4e3767=ACTIVE,fda4bf23be0341c997c0318a4=INACTIVE | PASS |
+| M2 | every other link keeps its status (ACTIVE with contract, INACTIVE, PENDING) | 0334e3f4b9244d7b875cde693=ACTIVE,081ee0b3a4104d9f8bff0b2b8=INACTIVE,128d992627164e4b944af4835=ACTIVE,22302cd5329e484ab0fb49bf4=ACTIVE,2f813be0548a4d899db0d7c25=PENDING,4928d4f9072c4d19b40e9e138=ACTIVE,5d765f283e744b8a87a91013a=PENDING,b20cc69da80e460580c8ba21d=ACTIVE | PASS |
+| M3 | re-applying V60 changes nothing | 0334e3f4b9244d7b875cde693=ACTIVE,081ee0b3a4104d9f8bff0b2b8=INACTIVE,128d992627164e4b944af4835=ACTIVE,22302cd5329e484ab0fb49bf4=ACTIVE,2f813be0548a4d899db0d7c25=PENDING,4928d4f9072c4d19b40e9e138=ACTIVE,5d765f283e744b8a87a91013a=PENDING,6a4c4467ad2e42b6bed2b9b0b=PENDING,b20cc69da80e460580c8ba21d=ACTIVE | PASS |
 | M4 | V60 also strips update_client_driver from a bundle that has it | 0 | PASS |
 
 ### /api/drivers/me/unlinked-passengers — the driver's own students
