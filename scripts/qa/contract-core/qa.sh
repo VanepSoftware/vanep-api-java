@@ -352,4 +352,352 @@ check P5 "a fresh admin token still carries the six" 6 \
   "$(claims "$ADMIN" | jq --argjson p "$CONTRACT_PERMISSIONS" '[.permissions[] | select(IN($p[]))] | length')"
 
 echo
+echo "== setup for the contract endpoints"
+PEDRO=$(create_dependent "$BRUNO" "Pedro Lima" yes yes)
+JULIA=$(create_dependent "$BRUNO" "Julia Lima" yes yes)
+THEO=$(create_dependent "$BRUNO" "Theo Lima" yes yes)
+NO_ADDRESS=$(create_dependent "$BRUNO" "Sem Endereco Lima" yes no)
+NO_SCHOOL=$(create_dependent "$BRUNO" "Sem Escola Lima" no yes)
+CAIO=$(create_dependent "$CARLA" "Caio Nunes" yes yes)
+request GET /api/clients/me "$BRUNO"
+BRUNO_CLIENT=$(jq -r .token <<<"$RESP_BODY")
+request GET /api/clients/me "$CARLA"
+CARLA_CLIENT=$(jq -r .token <<<"$RESP_BODY")
+ANA_GUSTAVO=$(create_link "$ANA_CLIENT" "$GUSTAVO_DRIVER")
+ANA_HELENA=$(create_link "$ANA_CLIENT" "$HELENA_DRIVER")
+BRUNO_HELENA=$(create_link "$BRUNO_CLIENT" "$HELENA_DRIVER")
+BRUNO_GUSTAVO=$(create_link "$BRUNO_CLIENT" "$GUSTAVO_DRIVER")
+BRUNO_FABIO=$(create_link "$BRUNO_CLIENT" "$FABIO_DRIVER")
+CARLA_GUSTAVO=$(create_link "$CARLA_CLIENT" "$GUSTAVO_DRIVER")
+ROUND_TRIP=$(weekday_round_trip)
+if [[ $(count contract) == 0 ]]; then
+  SEED_SLOTS=$(jq -nc --argjson out "$(slots OUTBOUND MORNING 06:40 - "${WEEKDAYS[@]}")" \
+    --argjson back "$(slots RETURN AFTERNOON 12:10 - "${WEEKDAYS[@]}")" '$out + $back')
+  request POST /api/contracts "$ADMIN" "$(contract_body "$SEED_LINK" "$(date +%Y-%m-01)" \
+    "$(date -v+11m +%Y-%m-01 2>/dev/null || date -d "+11 months" +%Y-%m-01)" "[$(item "$LUCAS" "$SEED_SLOTS")]")"
+  [[ $RESP_STATUS == 201 ]] || { echo "SETUP FAIL | baseline contract | HTTP $RESP_STATUS $RESP_BODY" >&2; exit 1; }
+fi
+request GET /api/contracts "$ADMIN"
+SEED_CONTRACT=$(jq -r '.content[0].token' <<<"$RESP_BODY")
+OUTBOUND_WEEK=$(slots OUTBOUND MORNING 06:40 06:50 "${WEEKDAYS[@]}")
+RETURN_WEEK=$(slots RETURN AFTERNOON 12:30 - "${WEEKDAYS[@]}")
+MONDAY_OUTBOUND=$(slots OUTBOUND MORNING 06:40 06:50 MONDAY)
+THEO_BODY=$(contract_body "$BRUNO_GUSTAVO" 2027-02-01 2027-12-17 "[$(item "$THEO" "$MONDAY_OUTBOUND")]")
+end_contract() {
+  request PATCH "/api/contracts/$1" "$ADMIN" '{"status":"ENDED"}'
+  [[ $RESP_STATUS == 200 ]] || { echo "SETUP FAIL | end contract | HTTP $RESP_STATUS $RESP_BODY" >&2; return 1; }
+}
+echo "fixtures ok"
+
+table "GET /api/contracts and GET /api/contracts/{token}"
+request GET /api/contracts "$ADMIN"
+expect C1 "the admin lists the seeded contract" 200 '.totalElements == 1 and .content[0].status == "ACTIVE"'
+request GET "/api/contracts/$SEED_CONTRACT" "$ANA"
+expect C2 "the client of the link reads it" 200 '.clientName == "Ana Souza" and (.items | length) == 1 and (.items[0].slots | length) == 10'
+request GET "/api/contracts/$SEED_CONTRACT" "$FABIO"
+expect C3 "the driver of the link reads it" 200 '.driverName == "Fabio Teixeira"'
+expect C4 "the response carries tokens and no id field" 200 \
+  '([.. | objects | keys[]] | index("id")) == null and .token != null and .clientDriverToken != null and .items[0].token != null and .items[0].dependentToken != null'
+request GET "/api/contracts/$SEED_CONTRACT" "$BRUNO"
+expect C5 "another client cannot read it" 403
+request GET "/api/contracts/$SEED_CONTRACT" "$GUSTAVO"
+expect C6 "another driver cannot read it" 403
+request GET "/api/contracts/$SEED_CONTRACT" ""
+expect C7 "no token" 401
+request GET "/api/contracts/$SEED_CONTRACT" "not-a-jwt"
+expect C8 "invalid token" 401
+request GET /api/contracts/doesnotexist "$ANA"
+expect C9 "a party asking for an unknown contract" 403
+request GET /api/contracts/doesnotexist "$ADMIN"
+expect C10 "the admin asking for an unknown contract, pt-BR message" 404 '.detail == "Contrato não encontrado."'
+request GET /api/contracts "$ANA"
+expect C11 "a client cannot list every contract" 403
+request GET "/api/client-drivers/$SEED_LINK/contracts" "$ANA"
+expect C12 "the client lists the contracts of their link" 200 'length == 1'
+request GET "/api/client-drivers/$SEED_LINK/contracts" "$FABIO"
+expect C13 "the driver lists the contracts of their link" 200 'length == 1'
+request GET "/api/client-drivers/$SEED_LINK/contracts" "$BRUNO"
+expect C14 "another client cannot list them" 403
+request GET "/api/client-drivers/$SEED_LINK/contracts" "$ADMIN"
+expect C15 "the admin lists them" 200 'length == 1'
+
+table "POST /api/contracts — the admin creates active contracts"
+request POST /api/contracts "$ADMIN" "$(contract_body "$ANA_GUSTAVO" 2027-02-01 2027-12-17 "[$(item "$MARINA" "$OUTBOUND_WEEK")]")"
+expect H1 "outbound Monday to Friday with one driver" 201 \
+  '.status == "ACTIVE" and .items[0].pickupStreet == "Rua das Acácias" and .items[0].pickupNumber == "250" and .items[0].schoolName == "Escola Municipal Seed" and .items[0].pickupCityName == "São Paulo" and (.items[0].slots | length) == 5'
+MARINA_OUTBOUND=$(jq -r .token <<<"$RESP_BODY")
+check H2 "creating the contract activated the pending link" ACTIVE "$(link_status "$ANA_GUSTAVO")"
+request POST /api/contracts "$ADMIN" "$(contract_body "$ANA_HELENA" 2027-02-01 2027-12-17 "[$(item "$MARINA" "$RETURN_WEEK")]")"
+expect H3 "the same student, return only, with another driver" 201 '.items[0].slots | all(.leg == "RETURN" and .windowEnd == null)'
+MARINA_RETURN=$(jq -r .token <<<"$RESP_BODY")
+request POST /api/contracts "$ADMIN" "$(contract_body "$BRUNO_HELENA" 2027-02-01 2027-12-17 "[$(item "$PEDRO" "$ROUND_TRIP" 350), $(item "$JULIA" "$ROUND_TRIP" 300)]")"
+expect H4 "siblings share one contract with their own prices" 201 '(.items | length) == 2 and ([.items[].monthlyAmount] | sort) == [300, 350]'
+SIBLINGS=$(jq -r .token <<<"$RESP_BODY")
+check H5 "the siblings contract stored two items and twenty slots" "2 20" \
+  "$(sql "select count(distinct i.id) || ' ' || count(s.id) from contract_item i join contract c on c.id = i.contract_id join schedule_slot s on s.schedule_id = i.schedule_id where c.token = '$SIBLINGS'")"
+
+table "POST /api/contracts — terms, items and schedule rejected"
+CONTRACTS_BEFORE="$(count contract) $(count contract_item) $(count schedule) $(count schedule_slot)"
+theo() { jq -c "$1" <<<"$THEO_BODY"; }
+request POST /api/contracts "$ADMIN" "$(theo 'del(.endsOn)')"
+expect V1 "missing endsOn" 400
+request POST /api/contracts "$ADMIN" "$(theo 'del(.startsOn)')"
+expect V2 "missing startsOn" 400
+request POST /api/contracts "$ADMIN" "$(theo '.endsOn = .startsOn')"
+expect V3 "end date on the start date, pt-BR message" 422 '.detail == "A data de término deve ser posterior à data de início."'
+request POST /api/contracts "$ADMIN" "$(theo '.endsOn = "2027-01-31"')"
+expect V4 "end date before the start date" 422 '.detail == "A data de término deve ser posterior à data de início."'
+request POST /api/contracts "$ADMIN" "$(theo '.endsOn = "2028-02-02"')"
+expect V5 "one day past twelve months, pt-BR message" 422 '.detail == "O período do contrato não pode passar de doze meses."'
+request POST /api/contracts "$ADMIN" "$(theo '.dueDay = 31')"
+expect V6 "due day 31" 400
+request POST /api/contracts "$ADMIN" "$(theo '.dueDay = 29')"
+expect V7 "due day 29" 400
+request POST /api/contracts "$ADMIN" "$(theo '.dueDay = 0')"
+expect V8 "due day 0" 400
+request POST /api/contracts "$ADMIN" "$(theo '.installments = 13')"
+expect V9 "thirteen installments" 400
+request POST /api/contracts "$ADMIN" "$(theo '.installments = 0')"
+expect V10 "zero installments" 400
+request POST /api/contracts "$ADMIN" "$(theo '.totalAmount = 0')"
+expect V11 "total amount of zero" 400
+request POST /api/contracts "$ADMIN" "$(theo '.totalAmount = -10')"
+expect V12 "negative total amount" 400
+request POST /api/contracts "$ADMIN" "$(theo '.totalAmount = "abc"')"
+expect V13 "total amount with the wrong JSON type" 400
+request POST /api/contracts "$ADMIN" "$(theo '.items = []')"
+expect V14 "no items" 400
+request POST /api/contracts "$ADMIN" "$(theo 'del(.items)')"
+expect V15 "missing items" 400
+request POST /api/contracts "$ADMIN" "$(theo '.items[0].monthlyAmount = 0')"
+expect V16 "item priced at zero" 400
+request POST /api/contracts "$ADMIN" "$(theo '.items += .items')"
+expect V17 "the same dependent twice, pt-BR message" 400 '.detail == "O mesmo dependente não pode aparecer duas vezes no contrato."'
+request POST /api/contracts "$ADMIN" "$(jq -c --arg d "$LUCAS" '.items[0].dependentToken = $d' <<<"$THEO_BODY")"
+expect V18 "a dependent of another client, pt-BR message" 422 '.detail == "O dependente não pertence ao cliente deste vínculo."'
+request POST /api/contracts "$ADMIN" "$(theo '.items[0].dependentToken = "doesnotexist"')"
+expect V19 "unknown dependent" 404 '.detail == "Dependente não encontrado."'
+request POST /api/contracts "$ADMIN" "$(jq -c --arg d "$NO_ADDRESS" '.items[0].dependentToken = $d' <<<"$THEO_BODY")"
+expect V20 "a dependent without an address, pt-BR message" 422 '.detail == "O dependente precisa ter endereço para ser contratado."'
+request POST /api/contracts "$ADMIN" "$(jq -c --arg d "$NO_SCHOOL" '.items[0].dependentToken = $d' <<<"$THEO_BODY")"
+expect V21 "a dependent without a school, pt-BR message" 422 '.detail == "O dependente precisa ter escola para ser contratado."'
+request POST /api/contracts "$ADMIN" "$(theo '.clientDriverToken = "doesnotexist"')"
+expect V22 "unknown link" 404 '.detail == "Vínculo não encontrado."'
+request POST /api/contracts "$ADMIN" "$(theo '.clientDriverToken = "  "')"
+expect V23 "blank link token" 400
+request POST /api/contracts "$ADMIN" "$(theo '.items[0].slots = []')"
+expect V24 "empty schedule, pt-BR message" 400 '.detail == "A agenda precisa de pelo menos um horário."'
+request POST /api/contracts "$ADMIN" "$(theo 'del(.items[0].slots)')"
+expect V25 "missing schedule" 400 '.detail == "A agenda precisa de pelo menos um horário."'
+request POST /api/contracts "$ADMIN" "$(theo '.items[0].slots += .items[0].slots')"
+expect V26 "the same weekday and leg twice, pt-BR message" 400 '.detail == "O mesmo dia e trecho não pode aparecer duas vezes na agenda."'
+request POST /api/contracts "$ADMIN" "$(theo '.items[0].slots[0].windowEnd = "06:30"')"
+expect V27 "window end before its start, pt-BR message" 400 '.detail == "O fim da janela deve ser posterior ao início."'
+request POST /api/contracts "$ADMIN" "$(theo '.items[0].slots[0].windowEnd = "06:40"')"
+expect V28 "window end equal to its start" 400 '.detail == "O fim da janela deve ser posterior ao início."'
+request POST /api/contracts "$ADMIN" "$(theo 'del(.items[0].slots[0].shift)')"
+expect V29 "a slot without shift (never derived from the time)" 400
+request POST /api/contracts "$ADMIN" "$(theo '.items[0].slots[0].shift = "FULLTIME"')"
+expect V30 "a slot with the FULLTIME shift" 400
+request POST /api/contracts "$ADMIN" "$(theo '.items[0].slots[0].weekday = "FUNDAY"')"
+expect V31 "unknown weekday" 400
+request POST /api/contracts "$ADMIN" "$(theo '.items[0].slots[0].windowStart = "25:00"')"
+expect V32 "impossible time" 400
+request POST /api/contracts "$ADMIN" '{"clientDriverToken":'
+expect V33 "malformed JSON" 400
+request POST /api/contracts "$ADMIN" "$THEO_BODY" "text/plain"
+expect V34 "wrong content type" 415
+request POST /api/contracts "" "$THEO_BODY"
+expect V35 "no token" 401
+request POST /api/contracts "$BRUNO" "$THEO_BODY"
+expect V36 "the client of the link cannot create" 403
+request POST /api/contracts "$GUSTAVO" "$THEO_BODY"
+expect V37 "the driver of the link cannot create" 403
+sql "update driver set approval_status = 'PENDING' where user_id = (select id from users where email = 'gustavo.santos@seed.vanep.com.br')" >/dev/null
+request POST /api/contracts "$ADMIN" "$THEO_BODY"
+expect V38 "a driver pending approval, pt-BR message" 422 '.detail == "O motorista não está aprovado para ser contratado."'
+restore_drivers
+sql "update client_driver set status = 'BLOCKED' where token = '$BRUNO_GUSTAVO'" >/dev/null
+request POST /api/contracts "$ADMIN" "$THEO_BODY"
+expect V39 "a blocked link, pt-BR message" 422 '.detail == "Um vínculo bloqueado não pode ser contratado."'
+sql "update client_driver set status = 'PENDING' where token = '$BRUNO_GUSTAVO'" >/dev/null
+request POST /api/contracts "$ADMIN" "$(contract_body "$SEED_LINK" 2027-02-01 2027-12-17 "[$(item "$LUCAS" "$(slots RETURN NIGHT 22:00 - SATURDAY)")]")"
+expect V40 "a second active contract on the same link, pt-BR message" 409 '.detail == "Este vínculo já tem um contrato ativo."'
+check V41 "the rejected creates stored nothing" "$CONTRACTS_BEFORE" "$(count contract) $(count contract_item) $(count schedule) $(count schedule_slot)"
+check V42 "and left the link pending" PENDING "$(link_status "$BRUNO_GUSTAVO")"
+
+table "POST /api/contracts — limits accepted"
+request POST /api/contracts "$ADMIN" "$(theo '.endsOn = "2028-02-01"')"
+expect L1 "exactly twelve months" 201
+end_contract "$(jq -r .token <<<"$RESP_BODY")"
+request POST /api/contracts "$ADMIN" "$(theo '.startsOn = "2027-07-01" | .endsOn = "2028-06-30"')"
+expect L2 "a school year that crosses the calendar year" 201
+end_contract "$(jq -r .token <<<"$RESP_BODY")"
+request POST /api/contracts "$ADMIN" "$(theo '.dueDay = 28 | .installments = 1')"
+expect L3 "due day 28 and a single installment" 201
+end_contract "$(jq -r .token <<<"$RESP_BODY")"
+request POST /api/contracts "$ADMIN" "$(theo '.items[0].slots[0].windowEnd = "06:41" | .totalAmount = 0.01 | .items[0].monthlyAmount = 0.01')"
+expect L4 "one-minute window and one-cent amounts" 201
+end_contract "$(jq -r .token <<<"$RESP_BODY")"
+request POST /api/contracts "$ADMIN" "$(theo '.birthDate = "2015-01-01" | .status = "ENDED" | .items[0].pickupStreet = "Rua Falsa"')"
+expect L5 "unknown and read-only fields in the body are ignored" 201 '.status == "ACTIVE" and .items[0].pickupStreet == "Rua dos Ipês"'
+end_contract "$(jq -r .token <<<"$RESP_BODY")"
+
+table "Weekday and leg collisions"
+request POST /api/contracts "$ADMIN" "$(contract_body "$BRUNO_GUSTAVO" 2027-02-01 2027-12-17 "[$(item "$PEDRO" "$MONDAY_OUTBOUND")]")"
+expect X1 "the dependent already rides that weekday and leg, pt-BR message" 409 '.detail == "O dependente já tem este dia e trecho em outro contrato assinado e não encerrado."'
+request PATCH "/api/contracts/$SIBLINGS" "$ADMIN" '{"status":"SUSPENDED"}'
+expect X2 "the admin suspends the siblings contract" 200 '.status == "SUSPENDED"'
+check X3 "a suspended contract keeps the link active" ACTIVE "$(link_status "$BRUNO_HELENA")"
+request POST /api/contracts "$ADMIN" "$(contract_body "$BRUNO_GUSTAVO" 2027-02-01 2027-12-17 "[$(item "$PEDRO" "$MONDAY_OUTBOUND")]")"
+expect X4 "a suspended contract still reserves its slots" 409
+request PATCH "/api/contracts/$SIBLINGS" "$ADMIN" '{"status":"ACTIVE"}'
+expect X5 "reactivating the suspended contract never collides" 200 '.status == "ACTIVE"'
+request POST /api/contracts "$ADMIN" "$(contract_body "$BRUNO_GUSTAVO" 2027-02-01 2027-12-17 "[$(item "$PEDRO" "$(slots OUTBOUND NIGHT 18:00 - SATURDAY)")]")"
+expect X6 "a weekday the dependent does not ride yet" 201
+end_contract "$(jq -r .token <<<"$RESP_BODY")"
+
+table "PATCH /api/contracts/{token} — status only, through the state machine"
+request POST /api/contracts "$ADMIN" "$THEO_BODY"
+expect T0 "a new contract on a link whose contracts all ended" 201
+THEO_CONTRACT=$(jq -r .token <<<"$RESP_BODY")
+check T1 "the link went from INACTIVE back to ACTIVE, same link" "ACTIVE same link" \
+  "$(link_status "$BRUNO_GUSTAVO") $([[ $(jq -r .clientDriverToken <<<"$RESP_BODY") == "$BRUNO_GUSTAVO" ]] && echo same link)"
+request GET "/api/contracts/$THEO_CONTRACT" "$ADMIN"
+BEFORE_PATCH=$(jq -c 'del(.updatedAt)' <<<"$RESP_BODY")
+request PATCH "/api/contracts/$THEO_CONTRACT" "$ADMIN" '{}'
+expect T2 "an empty PATCH" 200
+AFTER_PATCH=$(jq -c 'del(.updatedAt)' <<<"$RESP_BODY")
+check T3 "the empty PATCH changed no stored field" unchanged "$([[ $AFTER_PATCH == "$BEFORE_PATCH" ]] && echo unchanged || echo "$AFTER_PATCH")"
+request PATCH "/api/contracts/$THEO_CONTRACT" "$ADMIN" '{"endsOn":"2030-01-01","totalAmount":1,"installments":1}'
+expect T4 "dates and amounts are not patchable" 200 '.endsOn == "2027-12-17" and .totalAmount == 4200 and .installments == 12'
+request PATCH "/api/contracts/$THEO_CONTRACT" "$ADMIN" '{"status":null}'
+expect T5 "null status, pt-BR message" 400 '.detail == "O status não pode ser nulo."'
+request PATCH "/api/contracts/$THEO_CONTRACT" "$ADMIN" '{"status":"FINISHED"}'
+expect T6 "unknown status" 400
+request PATCH "/api/contracts/$THEO_CONTRACT" "$ADMIN" '{"status":'
+expect T7 "malformed JSON" 400
+request PATCH "/api/contracts/$THEO_CONTRACT" "$ADMIN" '{"status":"SUPERSEDED"}'
+expect T8 "superseding by PATCH, pt-BR message" 422 '.detail == "Um contrato só é substituído por um aditivo."'
+request PATCH "/api/contracts/$THEO_CONTRACT" "$ADMIN" '{"status":"AWAITING_SIGNATURES"}'
+expect T9 "ACTIVE back to AWAITING_SIGNATURES, pt-BR message" 409 '.detail == "Esta mudança de status não é permitida."'
+request PATCH "/api/contracts/$THEO_CONTRACT" "$GUSTAVO" '{"status":"ENDED"}'
+expect T10 "the driver of the link cannot end it" 403
+request PATCH "/api/contracts/$THEO_CONTRACT" "$BRUNO" '{"status":"ENDED"}'
+expect T11 "the client of the link cannot end it" 403
+request PATCH "/api/contracts/$THEO_CONTRACT" "" '{"status":"ENDED"}'
+expect T12 "no token" 401
+request PATCH /api/contracts/doesnotexist "$ADMIN" '{"status":"ENDED"}'
+expect T13 "unknown contract" 404
+request GET "/api/contracts/$THEO_CONTRACT" "$ADMIN"
+expect T14 "the rejected patches left it ACTIVE" 200 '.status == "ACTIVE"'
+request PATCH "/api/contracts/$THEO_CONTRACT" "$ADMIN" '{"status":"ENDED"}'
+expect T15 "the admin ends the contract" 200 '.status == "ENDED"'
+check T16 "ending the only live contract deactivates the link" INACTIVE "$(link_status "$BRUNO_GUSTAVO")"
+request PATCH "/api/contracts/$THEO_CONTRACT" "$ADMIN" '{"status":"ACTIVE"}'
+expect T17 "reopening an ended contract" 409
+request GET "/api/contracts/$THEO_CONTRACT" "$ADMIN"
+expect T18 "the ended contract stays ENDED" 200 '.status == "ENDED"'
+
+table "DELETE and POST /restore"
+request DELETE "/api/contracts/$MARINA_OUTBOUND" "$GUSTAVO"
+expect R1 "the driver of the link cannot delete it" 403
+request DELETE "/api/contracts/$MARINA_OUTBOUND" "$ADMIN"
+expect R2 "the admin deletes the only contract of a link" 204
+check R3 "deleting the only contract returns the link to PENDING" PENDING "$(link_status "$ANA_GUSTAVO")"
+request GET /api/contracts "$ADMIN"
+expect R4 "the deleted contract left the listing" 200 "[.content[].token] | index(\"$MARINA_OUTBOUND\") == null"
+check R5 "the row, its items, schedules and slots keep deleted_at" "true true true true" \
+  "$(sql "select bool_and(c.deleted_at is not null) || ' ' || bool_and(i.deleted_at is not null) || ' ' || bool_and(s.deleted_at is not null) || ' ' || bool_and(sl.deleted_at is not null) from contract c join contract_item i on i.contract_id = c.id join schedule s on s.id = i.schedule_id join schedule_slot sl on sl.schedule_id = s.id where c.token = '$MARINA_OUTBOUND'")"
+request GET "/api/contracts/$MARINA_OUTBOUND" "$ADMIN"
+expect R6 "the admin no longer finds it" 404
+request GET "/api/contracts/$MARINA_OUTBOUND" "$ANA"
+expect R7 "neither does the client of the link" 403
+request DELETE "/api/contracts/$MARINA_OUTBOUND" "$ADMIN"
+expect R8 "deleting it again" 404
+request POST "/api/contracts/$MARINA_OUTBOUND/restore" "$ANA"
+expect R9 "the client cannot restore it" 403
+request POST "/api/contracts/$MARINA_OUTBOUND/restore" "$ADMIN"
+expect R10 "the admin restores it with items and schedule" 200 '.status == "ACTIVE" and (.items[0].slots | length) == 5'
+check R11 "restoring it activates the link again" ACTIVE "$(link_status "$ANA_GUSTAVO")"
+request POST "/api/contracts/$MARINA_OUTBOUND/restore" "$ADMIN"
+expect R12 "restoring a live contract" 404
+request POST /api/contracts/doesnotexist/restore "$ADMIN"
+expect R13 "restoring an unknown contract" 404
+request DELETE "/api/contracts/$MARINA_OUTBOUND" "$ADMIN"
+expect R14 "the admin deletes it again" 204
+request POST /api/contracts "$ADMIN" "$(contract_body "$ANA_GUSTAVO" 2027-02-01 2027-12-17 "[$(item "$MARINA" "$(slots OUTBOUND MORNING 07:00 - MONDAY)")]")"
+expect R15 "a newer active contract on the same link" 201
+NEWER=$(jq -r .token <<<"$RESP_BODY")
+request POST "/api/contracts/$MARINA_OUTBOUND/restore" "$ADMIN"
+expect R16 "restoring over the newer active contract" 409 '.detail == "Este vínculo já tem um contrato ativo."'
+request DELETE "/api/contracts/$NEWER" "$ADMIN"
+expect R17 "the newer one is deleted" 204
+request PATCH "/api/contracts/$MARINA_RETURN" "$ADMIN" '{"status":"ENDED"}'
+expect R18 "the return-only contract ends, freeing that link" 200 '.status == "ENDED"'
+request POST /api/contracts "$ADMIN" "$(contract_body "$ANA_HELENA" 2027-02-01 2027-12-17 "[$(item "$MARINA" "$MONDAY_OUTBOUND")]")"
+expect R19 "meanwhile another driver takes Monday outbound" 201
+request POST "/api/contracts/$MARINA_OUTBOUND/restore" "$ADMIN"
+expect R20 "restoring a contract whose slots were taken meanwhile" 409 '.detail == "O dependente já tem este dia e trecho em outro contrato assinado e não encerrado."'
+check R21 "the contract stays deleted" 1 "$(sql "select count(*) from contract where token = '$MARINA_OUTBOUND' and deleted_at is not null")"
+
+table "Pickup address is a copy"
+request PATCH "/api/dependent/$MARINA" "$ANA" "$(jq -nc --argjson a "$(address "Rua B" 20)" '{address: $a}')"
+expect A1 "the client moves the dependent to Rua B, 20" 200 '.address.street == "Rua B"'
+request GET "/api/client-drivers/$ANA_HELENA/contracts" "$ANA"
+expect A2 "the contracts still pick up at Rua das Acácias, 250" 200 '[.[].items[].pickupStreet] | unique == ["Rua das Acácias"]'
+
+table "Concurrent creates on one link"
+PARALLEL_DIR="$(mktemp -d)"
+CAIO_BODY=$(contract_body "$CARLA_GUSTAVO" 2027-02-01 2027-12-17 "[$(item "$CAIO" "$OUTBOUND_WEEK")]")
+for attempt in 1 2 3 4 5 6; do
+  curl -s -o "$PARALLEL_DIR/$attempt.json" -w '%{http_code}\n' -X POST "$BASE_URL/api/contracts" \
+    -H "Authorization: Bearer $ADMIN" -H "Content-Type: application/json" \
+    --data-binary "$CAIO_BODY" >"$PARALLEL_DIR/$attempt.status" &
+done
+wait
+STATUSES=$(cat "$PARALLEL_DIR"/*.status | sort | uniq -c | awk '{print $2 "x" $1}' | paste -sd ' ' -)
+rm -rf "$PARALLEL_DIR"
+check Z1 "six concurrent creates for one link: one 201, five 409" "201x1 409x5" "$STATUSES"
+check Z2 "and a single active contract was stored" 1 \
+  "$(sql "select count(*) from contract c join client_driver l on l.id = c.client_driver_id where l.token = '$CARLA_GUSTAVO' and c.deleted_at is null")"
+in_parallel() {
+  local dir method=$1 first=$2 second=$3 body=${4-}
+  dir="$(mktemp -d)"
+  for path in "$first" "$second"; do
+    curl -s -o /dev/null -w '%{http_code}\n' -X "$method" "$BASE_URL$path" -H "Authorization: Bearer $ADMIN" \
+      -H "Content-Type: application/json" ${body:+--data-binary "$body"} >"$dir/$(basename "$(dirname "$path")")$RANDOM" &
+  done
+  wait
+  cat "$dir"/* | sort | paste -sd ' ' -
+  rm -rf "$dir"
+}
+CAIO_A=$(sql "select c.token from contract c join client_driver l on l.id = c.client_driver_id where l.token = '$CARLA_GUSTAVO' and c.deleted_at is null")
+request PATCH "/api/contracts/$CAIO_A" "$ADMIN" '{"status":"SUSPENDED"}'
+expect Z3a "the winner is suspended" 200
+request POST /api/contracts "$ADMIN" "$(contract_body "$CARLA_GUSTAVO" 2027-02-01 2027-12-17 "[$(item "$CAIO" "$RETURN_WEEK")]")"
+expect Z3b "a second contract on the link, return only" 201
+CAIO_B=$(jq -r .token <<<"$RESP_BODY")
+request PATCH "/api/contracts/$CAIO_B" "$ADMIN" '{"status":"SUSPENDED"}'
+expect Z3c "and suspended too" 200
+check Z3 "two concurrent reactivations on one link: one 200, one 409" "200 409" \
+  "$(in_parallel PATCH "/api/contracts/$CAIO_A" "/api/contracts/$CAIO_B" '{"status":"ACTIVE"}')"
+check Z4 "a single contract of the link is ACTIVE" 1 \
+  "$(sql "select count(*) from contract c join client_driver l on l.id = c.client_driver_id where l.token = '$CARLA_GUSTAVO' and c.status = 'ACTIVE' and c.deleted_at is null")"
+request POST /api/contracts "$ADMIN" "$(contract_body "$BRUNO_FABIO" 2027-02-01 2027-12-17 "[$(item "$THEO" "$(slots RETURN NIGHT 22:00 - SATURDAY)")]")"
+expect Z5a "an active contract on another link" 201
+THEO_C=$(jq -r .token <<<"$RESP_BODY")
+request DELETE "/api/contracts/$THEO_C" "$ADMIN"
+expect Z5b "deleted" 204
+request POST /api/contracts "$ADMIN" "$(contract_body "$BRUNO_FABIO" 2027-02-01 2027-12-17 "[$(item "$THEO" "$(slots RETURN NIGHT 22:00 - SUNDAY)")]")"
+expect Z5c "a second active contract on that link" 201
+THEO_D=$(jq -r .token <<<"$RESP_BODY")
+request DELETE "/api/contracts/$THEO_D" "$ADMIN"
+expect Z5d "deleted too" 204
+check Z5 "two concurrent restores of active contracts on one link: one 200, one 409" "200 409" \
+  "$(in_parallel POST "/api/contracts/$THEO_C/restore" "/api/contracts/$THEO_D/restore")"
+check Z6 "a single one came back" 1 \
+  "$(sql "select count(*) from contract c join client_driver l on l.id = c.client_driver_id where l.token = '$BRUNO_FABIO' and c.deleted_at is null")"
+
+echo
 echo "ALL PASSED: $PASSED scenarios"

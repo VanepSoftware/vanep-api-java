@@ -1,6 +1,6 @@
 # QA — contract-core (constitution rule 55)
 
-Latest run: API built from `feat/contract-core-service`, which contains phases 1 to 5. Run date: 2026-10-13. Result: **57/57 passed**.
+Latest run: API built from `feat/contract-core-contract-http`, which contains phases 1 to 6. Run date: 2026-10-13. Result: **185/185 passed**.
 
 ## How to run
 
@@ -29,7 +29,7 @@ Tokens come from the mobile password grant (`urn:vanep:params:oauth:grant-type:p
 
 ## Startup and migration
 
-Flyway applied `V56` to `V59` on an empty database at boot, after the `main` migrations up to `V55`. The seed creates the link between Ana Souza and Fabio Teixeira as `ACTIVE`, with no contract: the `ContractSeeder` arrives in phase 7. Before phase 7 the demo seed also runs before the city catalog, so it skips the seed school and creates Lucas and Marina Souza without school or address (the runner order is fixed in phase 7). The script creates that school with SQL and completes both dependents through `PATCH /api/dependent/{token}`, as the client would.
+Flyway applied `V56` to `V59` on an empty database at boot, after the `main` migrations up to `V55`. The seed creates the link between Ana Souza and Fabio Teixeira as `ACTIVE`, with no contract: the `ContractSeeder` arrives in phase 7. Before phase 7 the demo seed also runs before the city catalog, so it skips the seed school and creates Lucas and Marina Souza without school or address (the runner order is fixed in phase 7). The script creates that school with SQL and completes both dependents through `PATCH /api/dependent/{token}`, as the client would. The script first creates, through the API, the contract that seeder will create: Lucas Souza, Monday to Friday, outbound and return.
 
 ## Results
 
@@ -110,8 +110,186 @@ Flyway applied `V56` to `V59` on an empty database at boot, after the `main` mig
 | P4 | re-applying V59 again changes nothing | 98 | PASS |
 | P5 | a fresh admin token still carries the six | 6 | PASS |
 
+### GET /api/contracts and GET /api/contracts/{token}
+
+| id | scenario | expected | result |
+|---|---|---|---|
+| C1 | the admin lists the seeded contract | 200 | PASS |
+| C2 | the client of the link reads it | 200 | PASS |
+| C3 | the driver of the link reads it | 200 | PASS |
+| C4 | the response carries tokens and no id field | 200 | PASS |
+| C5 | another client cannot read it | 403 | PASS |
+| C6 | another driver cannot read it | 403 | PASS |
+| C7 | no token | 401 | PASS |
+| C8 | invalid token | 401 | PASS |
+| C9 | a party asking for an unknown contract | 403 | PASS |
+| C10 | the admin asking for an unknown contract, pt-BR message | 404 | PASS |
+| C11 | a client cannot list every contract | 403 | PASS |
+| C12 | the client lists the contracts of their link | 200 | PASS |
+| C13 | the driver lists the contracts of their link | 200 | PASS |
+| C14 | another client cannot list them | 403 | PASS |
+| C15 | the admin lists them | 200 | PASS |
+
+### POST /api/contracts — the admin creates active contracts
+
+| id | scenario | expected | result |
+|---|---|---|---|
+| H1 | outbound Monday to Friday with one driver | 201 | PASS |
+| H2 | creating the contract activated the pending link | ACTIVE | PASS |
+| H3 | the same student, return only, with another driver | 201 | PASS |
+| H4 | siblings share one contract with their own prices | 201 | PASS |
+| H5 | the siblings contract stored two items and twenty slots | 2 20 | PASS |
+
+### POST /api/contracts — terms, items and schedule rejected
+
+| id | scenario | expected | result |
+|---|---|---|---|
+| V1 | missing endsOn | 400 | PASS |
+| V2 | missing startsOn | 400 | PASS |
+| V3 | end date on the start date, pt-BR message | 422 | PASS |
+| V4 | end date before the start date | 422 | PASS |
+| V5 | one day past twelve months, pt-BR message | 422 | PASS |
+| V6 | due day 31 | 400 | PASS |
+| V7 | due day 29 | 400 | PASS |
+| V8 | due day 0 | 400 | PASS |
+| V9 | thirteen installments | 400 | PASS |
+| V10 | zero installments | 400 | PASS |
+| V11 | total amount of zero | 400 | PASS |
+| V12 | negative total amount | 400 | PASS |
+| V13 | total amount with the wrong JSON type | 400 | PASS |
+| V14 | no items | 400 | PASS |
+| V15 | missing items | 400 | PASS |
+| V16 | item priced at zero | 400 | PASS |
+| V17 | the same dependent twice, pt-BR message | 400 | PASS |
+| V18 | a dependent of another client, pt-BR message | 422 | PASS |
+| V19 | unknown dependent | 404 | PASS |
+| V20 | a dependent without an address, pt-BR message | 422 | PASS |
+| V21 | a dependent without a school, pt-BR message | 422 | PASS |
+| V22 | unknown link | 404 | PASS |
+| V23 | blank link token | 400 | PASS |
+| V24 | empty schedule, pt-BR message | 400 | PASS |
+| V25 | missing schedule | 400 | PASS |
+| V26 | the same weekday and leg twice, pt-BR message | 400 | PASS |
+| V27 | window end before its start, pt-BR message | 400 | PASS |
+| V28 | window end equal to its start | 400 | PASS |
+| V29 | a slot without shift (never derived from the time) | 400 | PASS |
+| V30 | a slot with the FULLTIME shift | 400 | PASS |
+| V31 | unknown weekday | 400 | PASS |
+| V32 | impossible time | 400 | PASS |
+| V33 | malformed JSON | 400 | PASS |
+| V34 | wrong content type | 415 | PASS |
+| V35 | no token | 401 | PASS |
+| V36 | the client of the link cannot create | 403 | PASS |
+| V37 | the driver of the link cannot create | 403 | PASS |
+| V38 | a driver pending approval, pt-BR message | 422 | PASS |
+| V39 | a blocked link, pt-BR message | 422 | PASS |
+| V40 | a second active contract on the same link, pt-BR message | 409 | PASS |
+| V41 | the rejected creates stored nothing | 4 5 5 40 | PASS |
+| V42 | and left the link pending | PENDING | PASS |
+
+### POST /api/contracts — limits accepted
+
+| id | scenario | expected | result |
+|---|---|---|---|
+| L1 | exactly twelve months | 201 | PASS |
+| L2 | a school year that crosses the calendar year | 201 | PASS |
+| L3 | due day 28 and a single installment | 201 | PASS |
+| L4 | one-minute window and one-cent amounts | 201 | PASS |
+| L5 | unknown and read-only fields in the body are ignored | 201 | PASS |
+
+### Weekday and leg collisions
+
+| id | scenario | expected | result |
+|---|---|---|---|
+| X1 | the dependent already rides that weekday and leg, pt-BR message | 409 | PASS |
+| X2 | the admin suspends the siblings contract | 200 | PASS |
+| X3 | a suspended contract keeps the link active | ACTIVE | PASS |
+| X4 | a suspended contract still reserves its slots | 409 | PASS |
+| X5 | reactivating the suspended contract never collides | 200 | PASS |
+| X6 | a weekday the dependent does not ride yet | 201 | PASS |
+
+### PATCH /api/contracts/{token} — status only, through the state machine
+
+| id | scenario | expected | result |
+|---|---|---|---|
+| T0 | a new contract on a link whose contracts all ended | 201 | PASS |
+| T1 | the link went from INACTIVE back to ACTIVE, same link | ACTIVE same link | PASS |
+| T2 | an empty PATCH | 200 | PASS |
+| T3 | the empty PATCH changed no stored field | unchanged | PASS |
+| T4 | dates and amounts are not patchable | 200 | PASS |
+| T5 | null status, pt-BR message | 400 | PASS |
+| T6 | unknown status | 400 | PASS |
+| T7 | malformed JSON | 400 | PASS |
+| T8 | superseding by PATCH, pt-BR message | 422 | PASS |
+| T9 | ACTIVE back to AWAITING_SIGNATURES, pt-BR message | 409 | PASS |
+| T10 | the driver of the link cannot end it | 403 | PASS |
+| T11 | the client of the link cannot end it | 403 | PASS |
+| T12 | no token | 401 | PASS |
+| T13 | unknown contract | 404 | PASS |
+| T14 | the rejected patches left it ACTIVE | 200 | PASS |
+| T15 | the admin ends the contract | 200 | PASS |
+| T16 | ending the only live contract deactivates the link | INACTIVE | PASS |
+| T17 | reopening an ended contract | 409 | PASS |
+| T18 | the ended contract stays ENDED | 200 | PASS |
+
+### DELETE and POST /restore
+
+| id | scenario | expected | result |
+|---|---|---|---|
+| R1 | the driver of the link cannot delete it | 403 | PASS |
+| R2 | the admin deletes the only contract of a link | 204 | PASS |
+| R3 | deleting the only contract returns the link to PENDING | PENDING | PASS |
+| R4 | the deleted contract left the listing | 200 | PASS |
+| R5 | the row, its items, schedules and slots keep deleted_at | true true true true | PASS |
+| R6 | the admin no longer finds it | 404 | PASS |
+| R7 | neither does the client of the link | 403 | PASS |
+| R8 | deleting it again | 404 | PASS |
+| R9 | the client cannot restore it | 403 | PASS |
+| R10 | the admin restores it with items and schedule | 200 | PASS |
+| R11 | restoring it activates the link again | ACTIVE | PASS |
+| R12 | restoring a live contract | 404 | PASS |
+| R13 | restoring an unknown contract | 404 | PASS |
+| R14 | the admin deletes it again | 204 | PASS |
+| R15 | a newer active contract on the same link | 201 | PASS |
+| R16 | restoring over the newer active contract | 409 | PASS |
+| R17 | the newer one is deleted | 204 | PASS |
+| R18 | the return-only contract ends, freeing that link | 200 | PASS |
+| R19 | meanwhile another driver takes Monday outbound | 201 | PASS |
+| R20 | restoring a contract whose slots were taken meanwhile | 409 | PASS |
+| R21 | the contract stays deleted | 1 | PASS |
+
+### Pickup address is a copy
+
+| id | scenario | expected | result |
+|---|---|---|---|
+| A1 | the client moves the dependent to Rua B, 20 | 200 | PASS |
+| A2 | the contracts still pick up at Rua das Acácias, 250 | 200 | PASS |
+
+### Concurrent creates on one link
+
+| id | scenario | expected | result |
+|---|---|---|---|
+| Z1 | six concurrent creates for one link: one 201, five 409 | 201x1 409x5 | PASS |
+| Z2 | and a single active contract was stored | 1 | PASS |
+| Z3a | the winner is suspended | 200 | PASS |
+| Z3b | a second contract on the link, return only | 201 | PASS |
+| Z3c | and suspended too | 200 | PASS |
+| Z3 | two concurrent reactivations on one link: one 200, one 409 | 200 409 | PASS |
+| Z4 | a single contract of the link is ACTIVE | 1 | PASS |
+| Z5a | an active contract on another link | 201 | PASS |
+| Z5b | deleted | 204 | PASS |
+| Z5c | a second active contract on that link | 201 | PASS |
+| Z5d | deleted too | 204 | PASS |
+| Z5 | two concurrent restores of active contracts on one link: one 200, one 409 | 200 409 | PASS |
+| Z6 | a single one came back | 1 | PASS |
+
 ## Behaviors worth knowing
 
 - **A JSON number is accepted where an enum is expected.** `{"shift": 1}` starts the `AFTERNOON` route: Jackson reads the number as the enum position. This is the API-wide default, not something this change introduced. S7 checks a wrong type that is refused (an array).
 - **Re-applying a migration (S22, P3, M1) runs its SQL again through `psql`** against rows written by the script. The data migrations of this change are idempotent, which is what makes this a fair test of what they do to rows that already exist.
 - **The schema checks (D, K) run each statement in a transaction that is rolled back**, on the same database the API migrated at boot, so they prove the indexes and `CHECK`s exactly as Flyway applied them and leave nothing behind (D12, K15).
+- **A Bean Validation failure is a 400 with the generic detail `Invalid request content.`**, as on every endpoint of the API (the dependent endpoint does the same). The key the spec names for those cases (`contract.due_day.invalid`, `contract.installments.invalid`, `contract.amount.invalid`) is resolved into the field error but not shown in the body. Errors raised by the services (422, 409 and the schedule 400s) carry the pt-BR message, and the script asserts it.
+- **An unknown contract token is 403 for a party and 404 for the admin (C9, C10).** `@sec.isContractParty` runs before the service, so the API does not reveal whether a token exists to someone without `show_contract`.
+- **Concurrent writes on one link keep a single `ACTIVE` contract (Z1 to Z6).** The service checks first and the partial unique index decides the race; the request that loses gets the same `409 contract.active_conflict` as the sequential check. Before the fix in phase 5, one of six concurrent creates returned 500.
+- **The weekday-and-leg collision is enforced by the service only** (R5 in `design.md`). Two simultaneous creates for the same dependent on different links are not guarded by the database in this phase, and the script does not race them.
+- **Unknown and read-only fields in the create body are ignored (L5).** A contract always starts `ACTIVE`, and the pickup address always comes from the dependent.
