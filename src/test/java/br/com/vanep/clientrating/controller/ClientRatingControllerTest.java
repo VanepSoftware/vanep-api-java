@@ -16,6 +16,9 @@ import br.com.vanep.clientdriver.model.ClientDriverModel;
 import br.com.vanep.clientdriver.repository.ClientDriverRepository;
 import br.com.vanep.clientrating.model.ClientRatingModel;
 import br.com.vanep.clientrating.repository.ClientRatingRepository;
+import br.com.vanep.contract.enums.ContractStatus;
+import br.com.vanep.contract.model.ContractModel;
+import br.com.vanep.contract.repository.ContractRepository;
 import br.com.vanep.driver.DriverApprovalStatus;
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
@@ -24,11 +27,14 @@ import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.MessageSource;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor;
@@ -49,6 +55,8 @@ class ClientRatingControllerTest {
   @Autowired private DriverRepository drivers;
   @Autowired private ClientRatingRepository clientRatings;
   @Autowired private ClientDriverRepository links;
+  @Autowired private ContractRepository contracts;
+  @Autowired private MessageSource messages;
 
   private MockMvc mockMvc;
 
@@ -57,6 +65,8 @@ class ClientRatingControllerTest {
   private String driverUserUid;
   private String ratingToken;
   private String driverToken;
+  private DriverModel driver;
+  private int documentSequence;
 
   @BeforeEach
   void setUp() {
@@ -75,7 +85,7 @@ class ClientRatingControllerTest {
     driverUserEmail = driverUser.getEmail();
     driverUserUid = driverUser.getToken();
 
-    DriverModel driver = new DriverModel();
+    driver = new DriverModel();
     driver.setUser(driverUser);
     driver.setBasePrice(BigDecimal.valueOf(50));
     driver.setApprovalStatus(DriverApprovalStatus.APPROVED);
@@ -102,6 +112,7 @@ class ClientRatingControllerTest {
     link.setDriver(driver);
     link.setStatus(RelationshipStatus.ACTIVE);
     link = links.save(link);
+    giveTheLinkAContract(link, ContractStatus.ACTIVE);
 
     // Initial Rating
     ClientRatingModel rating = new ClientRatingModel();
@@ -273,5 +284,90 @@ class ClientRatingControllerTest {
         .andExpect(jsonPath("$.rating").value(3.0));
 
     assertThat(clientRatings.count()).isEqualTo(1);
+  }
+
+  @Test
+  void aLinkWithoutContractCannotRateTheClient() throws Exception {
+    String pendingClientToken = linkTheDriverToANewClient(RelationshipStatus.PENDING);
+
+    mockMvc
+        .perform(
+            post("/api/client-ratings")
+                .with(driverJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(ratingBody(pendingClientToken)))
+        .andExpect(status().isUnprocessableContent())
+        .andExpect(jsonPath("$.detail").value(message("client_rating.link.never_contracted")));
+
+    assertThat(clientRatings.count()).isEqualTo(1);
+  }
+
+  @Test
+  void anInactiveLinkWhoseContractEndedCanRateTheClient() throws Exception {
+    String formerClientToken =
+        linkTheDriverToANewClient(RelationshipStatus.INACTIVE, ContractStatus.ENDED);
+
+    mockMvc
+        .perform(
+            post("/api/client-ratings")
+                .with(driverJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(ratingBody(formerClientToken)))
+        .andExpect(status().isCreated());
+
+    assertThat(clientRatings.count()).isEqualTo(2);
+  }
+
+  private String linkTheDriverToANewClient(
+      RelationshipStatus status, ContractStatus... contractStatuses) {
+    UserModel clientUser = new UserModel();
+    clientUser.setType(UserType.CLIENT);
+    clientUser.setName("Linked Client");
+    clientUser.setEmail("linked" + (++documentSequence) + "@vanep.com");
+    clientUser.setDocument(String.format("5%010d", documentSequence));
+    clientUser.setVerified(true);
+    clientUser.setTermsAcceptedAt(Instant.now());
+    clientUser = users.save(clientUser);
+
+    ClientModel linkedClient = new ClientModel();
+    linkedClient.setUser(clientUser);
+    linkedClient = clients.save(linkedClient);
+
+    ClientDriverModel link = new ClientDriverModel();
+    link.setClient(linkedClient);
+    link.setDriver(driver);
+    link.setStatus(status);
+    link = links.save(link);
+    for (ContractStatus contractStatus : contractStatuses) {
+      giveTheLinkAContract(link, contractStatus);
+    }
+    return linkedClient.getToken();
+  }
+
+  private ContractModel giveTheLinkAContract(ClientDriverModel link, ContractStatus status) {
+    ContractModel contract = new ContractModel();
+    contract.setClientDriver(link);
+    contract.setStatus(status);
+    contract.setStartsOn(LocalDate.of(2027, 2, 1));
+    contract.setEndsOn(LocalDate.of(2027, 12, 1));
+    contract.setTotalAmount(new BigDecimal("4200.00"));
+    contract.setInstallments(12);
+    contract.setDueDay(5);
+    return contracts.save(contract);
+  }
+
+  private String ratingBody(String clientToken) {
+    return """
+        {
+          "clientToken": "%s",
+          "rating": 4.00,
+          "comment": "On time"
+        }
+        """
+        .formatted(clientToken);
+  }
+
+  private String message(String key) {
+    return messages.getMessage(key, null, LocaleContextHolder.getLocale());
   }
 }

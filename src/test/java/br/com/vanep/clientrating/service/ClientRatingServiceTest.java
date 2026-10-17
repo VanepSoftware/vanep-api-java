@@ -13,11 +13,14 @@ import br.com.vanep.client.repository.ClientRepository;
 import br.com.vanep.clientdriver.enums.RelationshipStatus;
 import br.com.vanep.clientdriver.model.ClientDriverModel;
 import br.com.vanep.clientdriver.repository.ClientDriverRepository;
+import br.com.vanep.clientdriver.service.LinkRatingEligibilityPolicy;
 import br.com.vanep.clientrating.dto.ClientRatingCreateRequestDTO;
 import br.com.vanep.clientrating.dto.ClientRatingResponseDTO;
 import br.com.vanep.clientrating.mapper.ClientRatingMapper;
 import br.com.vanep.clientrating.model.ClientRatingModel;
 import br.com.vanep.clientrating.repository.ClientRatingRepository;
+import br.com.vanep.contract.enums.ContractStatus;
+import br.com.vanep.contract.repository.ContractRepository;
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.user.model.UserModel;
@@ -28,6 +31,8 @@ import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.Mock;
@@ -47,6 +52,7 @@ class ClientRatingServiceTest {
   @Mock private UserRepository userRepository;
   @Mock private ClientRatingMapper mapper;
   @Mock private MessageSource messages;
+  @Mock private ContractRepository contracts;
 
   @Captor private ArgumentCaptor<ClientRatingModel> saved;
 
@@ -62,7 +68,9 @@ class ClientRatingServiceTest {
             linkRepository,
             userRepository,
             mapper,
-            messages);
+            messages,
+            new LinkRatingEligibilityPolicy(),
+            contracts);
   }
 
   private DriverModel mockDriver(Long id, Long userId) {
@@ -101,6 +109,18 @@ class ClientRatingServiceTest {
     return link;
   }
 
+  private void givenTheLinkHadContracts(Long linkId, ContractStatus... statuses) {
+    when(contracts.findStatusesByClientDriverId(linkId)).thenReturn(List.of(statuses));
+  }
+
+  private void givenTheDriverRatesTheClientOfLink(ClientDriverModel link) {
+    UserModel caller = link.getDriver().getUser();
+    when(userRepository.findByEmail(caller.getEmail())).thenReturn(Optional.of(caller));
+    when(driverRepository.findByUserId(caller.getId())).thenReturn(Optional.of(link.getDriver()));
+    when(clientRepository.findByToken("client-token")).thenReturn(Optional.of(link.getClient()));
+    when(linkRepository.findByPair(1L, 2L)).thenReturn(Optional.of(link));
+  }
+
   @Test
   void createSuccessfully() {
     UserModel caller = new UserModel();
@@ -128,6 +148,7 @@ class ClientRatingServiceTest {
     when(driverRepository.findByUserId(20L)).thenReturn(Optional.of(driver));
     when(clientRepository.findByToken("client-token")).thenReturn(Optional.of(client));
     when(linkRepository.findByPair(1L, 2L)).thenReturn(Optional.of(mockLink(7L, client, driver)));
+    givenTheLinkHadContracts(7L, ContractStatus.ACTIVE);
     when(clientRatingRepository.existsByLinkId(7L)).thenReturn(false);
     when(clientRatingRepository.save(any(ClientRatingModel.class)))
         .thenAnswer(inv -> inv.getArgument(0));
@@ -179,6 +200,7 @@ class ClientRatingServiceTest {
     when(driverRepository.findByUserId(20L)).thenReturn(Optional.of(driver));
     when(clientRepository.findByToken("client-token")).thenReturn(Optional.of(client));
     when(linkRepository.findByPair(1L, 2L)).thenReturn(Optional.of(mockLink(7L, client, driver)));
+    givenTheLinkHadContracts(7L, ContractStatus.ACTIVE);
     when(clientRatingRepository.existsByLinkId(7L)).thenReturn(true);
     when(messages.getMessage(anyString(), any(), any())).thenReturn("Duplicate rating");
 
@@ -262,6 +284,7 @@ class ClientRatingServiceTest {
     when(driverRepository.findByUserId(20L)).thenReturn(Optional.of(driver));
     when(clientRepository.findByToken("client-token")).thenReturn(Optional.of(client));
     when(linkRepository.findByPair(1L, 2L)).thenReturn(Optional.of(link));
+    givenTheLinkHadContracts(7L, ContractStatus.ACTIVE);
     when(clientRatingRepository.existsByLinkId(7L)).thenReturn(false);
     when(clientRatingRepository.save(any(ClientRatingModel.class)))
         .thenAnswer(inv -> inv.getArgument(0));
@@ -314,6 +337,69 @@ class ClientRatingServiceTest {
         .isInstanceOf(ResponseStatusException.class)
         .hasMessageContaining("404")
         .hasMessageContaining("client_rating.link.not_found");
+
+    verify(clientRatingRepository, never()).save(any());
+  }
+
+  @Test
+  void createAcceptsAnInactiveLinkWhoseContractEnded() {
+    ClientDriverModel link = mockLink(7L, mockClient(1L, 10L), mockDriver(2L, 20L));
+    link.setStatus(RelationshipStatus.INACTIVE);
+    givenTheDriverRatesTheClientOfLink(link);
+    givenTheLinkHadContracts(7L, ContractStatus.ENDED);
+    when(clientRatingRepository.existsByLinkId(7L)).thenReturn(false);
+    when(clientRatingRepository.save(any(ClientRatingModel.class)))
+        .thenAnswer(inv -> inv.getArgument(0));
+    when(clientRatingRepository.calculateAverageRatingForClient(1L))
+        .thenReturn(Optional.of(BigDecimal.valueOf(4.00)));
+
+    service.create(
+        new ClientRatingCreateRequestDTO("client-token", BigDecimal.valueOf(4.00), "ok"),
+        "driver@vanep.com");
+
+    verify(clientRatingRepository).save(saved.capture());
+    assertThat(saved.getValue().getLink()).isSameAs(link);
+  }
+
+  @Test
+  void createRefusesALinkWithoutContract() {
+    ClientDriverModel link = mockLink(7L, mockClient(1L, 10L), mockDriver(2L, 20L));
+    link.setStatus(RelationshipStatus.PENDING);
+    givenTheDriverRatesTheClientOfLink(link);
+    givenTheLinkHadContracts(7L);
+    when(messages.getMessage(anyString(), any(), any())).thenAnswer(c -> c.getArgument(0));
+
+    assertThatThrownBy(
+            () ->
+                service.create(
+                    new ClientRatingCreateRequestDTO(
+                        "client-token", BigDecimal.valueOf(5.00), "Nice"),
+                    "driver@vanep.com"))
+        .isInstanceOf(ResponseStatusException.class)
+        .hasMessageContaining("422")
+        .hasMessageContaining("client_rating.link.never_contracted");
+
+    verify(clientRatingRepository, never()).save(any());
+  }
+
+  @ParameterizedTest
+  @EnumSource(
+      value = ContractStatus.class,
+      names = {"AWAITING_SIGNATURES", "SIGNED", "CANCELLED"})
+  void createRefusesALinkWhoseContractNeverReachedActive(ContractStatus contractStatus) {
+    ClientDriverModel link = mockLink(7L, mockClient(1L, 10L), mockDriver(2L, 20L));
+    givenTheDriverRatesTheClientOfLink(link);
+    givenTheLinkHadContracts(7L, contractStatus);
+    when(messages.getMessage(anyString(), any(), any())).thenAnswer(c -> c.getArgument(0));
+
+    assertThatThrownBy(
+            () ->
+                service.create(
+                    new ClientRatingCreateRequestDTO(
+                        "client-token", BigDecimal.valueOf(5.00), "Nice"),
+                    "driver@vanep.com"))
+        .isInstanceOf(ResponseStatusException.class)
+        .hasMessageContaining("client_rating.link.never_contracted");
 
     verify(clientRatingRepository, never()).save(any());
   }
