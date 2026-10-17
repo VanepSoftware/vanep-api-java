@@ -359,6 +359,7 @@ public class DataSeeder implements ApplicationRunner {
       driver.setCnpj(seed.cnpj());
       driver.setBasePrice(BigDecimal.valueOf(50));
       driver.setApprovalStatus(DriverApprovalStatus.APPROVED);
+      driver.setAvailable(true);
       drivers.save(driver);
       log.info("Seed: driver created ({}).", seed.email());
     }

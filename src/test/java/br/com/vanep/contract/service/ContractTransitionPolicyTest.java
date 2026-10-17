@@ -3,6 +3,9 @@ package br.com.vanep.contract.service;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import br.com.vanep.contract.enums.ContractStatus;
+import java.util.ArrayDeque;
+import java.util.Deque;
+import java.util.EnumSet;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
@@ -56,5 +59,22 @@ class ContractTransitionPolicyTest {
             .isFalse();
       }
     }
+  }
+
+  @Test
+  void reachedActiveHoldsExactlyTheStatusesReachableOnlyThroughActive() {
+    Set<ContractStatus> reachableWithoutActive = EnumSet.of(ContractStatus.AWAITING_SIGNATURES);
+    Deque<ContractStatus> pending = new ArrayDeque<>(reachableWithoutActive);
+    while (!pending.isEmpty()) {
+      for (ContractStatus next : policy.nextStatusesOf(pending.pop())) {
+        if (next != ContractStatus.ACTIVE && reachableWithoutActive.add(next)) {
+          pending.push(next);
+        }
+      }
+    }
+
+    assertThat(ContractStatus.REACHED_ACTIVE)
+        .containsExactlyInAnyOrderElementsOf(
+            EnumSet.complementOf(EnumSet.copyOf(reachableWithoutActive)));
   }
 }

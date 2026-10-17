@@ -55,6 +55,7 @@ public interface DriverRepository extends JpaRepository<DriverModel, Long> {
           select driver from DriverModel driver
           join fetch driver.user
           where driver.active = true
+            and driver.available = true
             and driver.approvalStatus = br.com.vanep.driver.DriverApprovalStatus.APPROVED
           order by driver.createdAt desc, driver.id desc
           """,
@@ -62,6 +63,7 @@ public interface DriverRepository extends JpaRepository<DriverModel, Long> {
           """
           select count(driver) from DriverModel driver
           where driver.active = true
+            and driver.available = true
             and driver.approvalStatus = br.com.vanep.driver.DriverApprovalStatus.APPROVED
           """)
   Page<DriverModel> findSearchableNewestFirst(Pageable pageable);

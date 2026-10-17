@@ -5,112 +5,11 @@
 # to the change.
 set -euo pipefail
 
-BASE_URL="${BASE_URL:-http://localhost:8081}"
-QA_DB_CONTAINER="${QA_DB_CONTAINER:?set QA_DB_CONTAINER to the throwaway Postgres container}"
-QA_DB_USER="${QA_DB_USER:-vanep}"
-QA_DB_NAME="${QA_DB_NAME:-vanep}"
-SEED_PASSWORD="${SEED_PASSWORD:-password}"
-ADMIN_EMAIL="${ADMIN_EMAIL:-admin@vanep.com.br}"
-MOBILE_CLIENT_ID="${MOBILE_CLIENT_ID:-vanep-mobile}"
-
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-MIGRATIONS="$SCRIPT_DIR/../../../src/main/resources/db/migration"
-BODY_FILE="$(mktemp)"
-RESP_STATUS=""
-RESP_BODY=""
-PASSED=0
+# shellcheck source=../lib.sh
+source "$SCRIPT_DIR/../lib.sh"
+
 WEEKDAYS=(MONDAY TUESDAY WEDNESDAY THURSDAY FRIDAY)
-
-sql() {
-  docker exec "$QA_DB_CONTAINER" psql -U "$QA_DB_USER" -d "$QA_DB_NAME" -Atqc "$1"
-}
-
-sql_error() {
-  docker exec -i "$QA_DB_CONTAINER" psql -U "$QA_DB_USER" -d "$QA_DB_NAME" -Atq -v ON_ERROR_STOP=1 \
-    <<<"begin; $1; rollback;" 2>&1 >/dev/null || true
-}
-
-apply_migration() {
-  docker exec -i "$QA_DB_CONTAINER" psql -U "$QA_DB_USER" -d "$QA_DB_NAME" -q -v ON_ERROR_STOP=1 \
-    <"$(ls "$MIGRATIONS"/"$1"__*.sql)" >/dev/null
-}
-
-fail() {
-  echo "FAIL | $1 | expected: $2 | observed: $3" >&2
-  echo "response body: $RESP_BODY" >&2
-  exit 1
-}
-
-pass() {
-  PASSED=$((PASSED + 1))
-  printf '| %s | %s | %s | PASS |\n' "$1" "$2" "$3"
-}
-
-request() {
-  local method=$1 path=$2 token=$3 body=${4-} content_type=${5:-application/json}
-  local args=(-s -o "$BODY_FILE" -w '%{http_code}' -X "$method" "$BASE_URL$path")
-  if [[ -n $token ]]; then args+=(-H "Authorization: Bearer $token"); fi
-  if [[ -n $body ]]; then args+=(-H "Content-Type: $content_type" --data-binary "$body"); fi
-  RESP_STATUS=$(curl "${args[@]}")
-  RESP_BODY=$(cat "$BODY_FILE")
-}
-
-expect() {
-  local id=$1 scenario=$2 status=$3 assertion=${4-}
-  [[ $RESP_STATUS == "$status" ]] || fail "$id $scenario" "HTTP $status" "HTTP $RESP_STATUS"
-  if [[ -n $assertion ]]; then
-    jq -e "$assertion" <<<"$RESP_BODY" >/dev/null || fail "$id $scenario" "$assertion" "$RESP_BODY"
-  fi
-  pass "$id" "$scenario" "$status"
-}
-
-check() {
-  local id=$1 scenario=$2 expected=$3 observed=$4
-  RESP_BODY="$observed"
-  [[ $observed == "$expected" ]] || fail "$id $scenario" "$expected" "$observed"
-  pass "$id" "$scenario" "$expected"
-}
-
-check_sql_rejected() {
-  local id=$1 scenario=$2 constraint=$3 statement=$4 error
-  error=$(sql_error "$statement")
-  RESP_BODY="$error"
-  [[ $error == *"$constraint"* ]] || fail "$id $scenario" "rejected by $constraint" "${error:-accepted}"
-  pass "$id" "$scenario" "rejected by $constraint"
-}
-
-check_sql_accepted() {
-  local id=$1 scenario=$2 statement=$3 error
-  error=$(sql_error "$statement")
-  RESP_BODY="$error"
-  [[ -z $error ]] || fail "$id $scenario" "accepted" "$error"
-  pass "$id" "$scenario" "accepted"
-}
-
-login() {
-  local response
-  response=$(curl -s -X POST "$BASE_URL/oauth2/token" \
-    -d "grant_type=urn:vanep:params:oauth:grant-type:password" \
-    --data-urlencode "username=$1" -d "password=$SEED_PASSWORD" -d "client_id=$MOBILE_CLIENT_ID")
-  jq -er '.access_token' <<<"$response" 2>/dev/null || {
-    echo "SETUP FAIL | login as $1 | $response" >&2
-    return 1
-  }
-}
-
-claims() {
-  local payload
-  payload=$(cut -d. -f2 <<<"$1" | tr '_-' '/+')
-  while (( ${#payload} % 4 )); do payload="$payload="; done
-  base64 -d <<<"$payload" 2>/dev/null || base64 -D <<<"$payload"
-}
-
-table() {
-  echo
-  echo "== $1"
-  echo "| id | scenario | expected | result |"
-  echo "|---|---|---|---|"
-}
 
 slots() {
   local leg=$1 shift_name=$2 start=$3 end=$4
@@ -162,10 +61,6 @@ create_link() {
 link_status() {
   request GET "/api/client-drivers/$1" "$ADMIN"
   jq -r .status <<<"$RESP_BODY"
-}
-
-count() {
-  sql "select count(*) from $1"
 }
 
 restore_drivers() {
@@ -661,17 +556,6 @@ rm -rf "$PARALLEL_DIR"
 check Z1 "six concurrent creates for one link: one 201, five 409" "201x1 409x5" "$STATUSES"
 check Z2 "and a single active contract was stored" 1 \
   "$(sql "select count(*) from contract c join client_driver l on l.id = c.client_driver_id where l.token = '$CARLA_GUSTAVO' and c.deleted_at is null")"
-in_parallel() {
-  local dir method=$1 first=$2 second=$3 body=${4-}
-  dir="$(mktemp -d)"
-  for path in "$first" "$second"; do
-    curl -s -o /dev/null -w '%{http_code}\n' -X "$method" "$BASE_URL$path" -H "Authorization: Bearer $ADMIN" \
-      -H "Content-Type: application/json" ${body:+--data-binary "$body"} >"$dir/$(basename "$(dirname "$path")")$RANDOM" &
-  done
-  wait
-  cat "$dir"/* | sort | paste -sd ' ' -
-  rm -rf "$dir"
-}
 CAIO_A=$(sql "select c.token from contract c join client_driver l on l.id = c.client_driver_id where l.token = '$CARLA_GUSTAVO' and c.deleted_at is null")
 request PATCH "/api/contracts/$CAIO_A" "$ADMIN" '{"status":"SUSPENDED"}'
 expect Z3a "the winner is suspended" 200
@@ -681,7 +565,7 @@ CAIO_B=$(jq -r .token <<<"$RESP_BODY")
 request PATCH "/api/contracts/$CAIO_B" "$ADMIN" '{"status":"SUSPENDED"}'
 expect Z3c "and suspended too" 200
 check Z3 "two concurrent reactivations on one link: one 200, one 409" "200 409" \
-  "$(in_parallel PATCH "/api/contracts/$CAIO_A" "/api/contracts/$CAIO_B" '{"status":"ACTIVE"}')"
+  "$(in_parallel PATCH "$ADMIN" '{"status":"ACTIVE"}' "/api/contracts/$CAIO_A" "/api/contracts/$CAIO_B")"
 check Z4 "a single contract of the link is ACTIVE" 1 \
   "$(sql "select count(*) from contract c join client_driver l on l.id = c.client_driver_id where l.token = '$CARLA_GUSTAVO' and c.status = 'ACTIVE' and c.deleted_at is null")"
 request POST /api/contracts "$ADMIN" "$(contract_body "$BRUNO_FABIO" 2027-02-01 2027-12-17 "[$(item "$THEO" "$(slots RETURN NIGHT 22:00 - SATURDAY)")]")"
@@ -695,7 +579,7 @@ THEO_D=$(jq -r .token <<<"$RESP_BODY")
 request DELETE "/api/contracts/$THEO_D" "$ADMIN"
 expect Z5d "deleted too" 204
 check Z5 "two concurrent restores of active contracts on one link: one 200, one 409" "200 409" \
-  "$(in_parallel POST "/api/contracts/$THEO_C/restore" "/api/contracts/$THEO_D/restore")"
+  "$(in_parallel POST "$ADMIN" "" "/api/contracts/$THEO_C/restore" "/api/contracts/$THEO_D/restore")"
 check Z6 "a single one came back" 1 \
   "$(sql "select count(*) from contract c join client_driver l on l.id = c.client_driver_id where l.token = '$BRUNO_FABIO' and c.deleted_at is null")"
 
@@ -724,7 +608,7 @@ check B11 "update_client_driver is in no bundle" 0 "$(sql "select count(*) from 
 check B12 "nor in a real admin token" 0 "$(claims "$ADMIN" | jq '[.permissions[] | select(. == "update_client_driver")] | length')"
 request POST /api/driver-ratings "$CARLA" "$(jq -nc --arg d "$HELENA_DRIVER" '{driverToken: $d, rating: 5}')"
 expect B13 "accepted effect: a client cannot rate a driver through a link without contract" 422 \
-  '.detail == "Só é possível avaliar um motorista com quem você tem vínculo ativo."'
+  '.detail == "Só é possível avaliar um motorista com quem você já teve um contrato em andamento."'
 
 table "V60: legacy links brought in line"
 sql "update client_driver set status = 'ACTIVE' where token = '$CARLA_HELENA'" >/dev/null
