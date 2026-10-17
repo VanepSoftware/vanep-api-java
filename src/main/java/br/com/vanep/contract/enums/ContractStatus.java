@@ -13,4 +13,7 @@ public enum ContractStatus {
   SUPERSEDED;
 
   public static final Set<ContractStatus> SIGNED_AND_NOT_ENDED = Set.of(SIGNED, ACTIVE, SUSPENDED);
+
+  public static final Set<ContractStatus> REACHED_ACTIVE =
+      Set.of(ACTIVE, SUSPENDED, ENDED, TERMINATED, SUPERSEDED);
 }

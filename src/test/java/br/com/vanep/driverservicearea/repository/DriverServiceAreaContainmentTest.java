@@ -105,7 +105,18 @@ class DriverServiceAreaContainmentTest {
     driver.setUser(user);
     driver.setBasePrice(BigDecimal.TEN);
     driver.setApprovalStatus(DriverApprovalStatus.APPROVED);
+    driver.setAvailable(true);
     return drivers.save(driver);
+  }
+
+  private DriverModel saveUnavailableDriver(String email) {
+    DriverModel driver = saveDriver(email);
+    driver.setAvailable(false);
+    return drivers.save(driver);
+  }
+
+  private List<Long> driverIdsOf(List<Object[]> matches) {
+    return matches.stream().map(match -> (Long) match[0]).distinct().toList();
   }
 
   private void giveArea(DriverModel driver, CityModel city, DistrictModel district) {
@@ -210,5 +221,29 @@ class DriverServiceAreaContainmentTest {
 
     assertThat(areas.findDriverIdsCoveringPoint(brasilia.getId(), ancestorsOf(conjuntoJ)))
         .isEmpty();
+  }
+
+  @Test
+  void aDriverNotAcceptingNewStudentsIsLeftOutOfTheMatchesCoveringAPoint() {
+    DriverModel accepting = saveDriver("aberto@vanep.com");
+    DriverModel notAccepting = saveUnavailableDriver("fechado@vanep.com");
+    giveArea(accepting, brasilia, taguatinga);
+    giveArea(notAccepting, brasilia, taguatinga);
+
+    assertThat(
+            driverIdsOf(
+                areas.findDriverMatchesCoveringPoint(brasilia.getId(), ancestorsOf(conjuntoJ))))
+        .containsExactly(accepting.getId());
+  }
+
+  @Test
+  void aDriverNotAcceptingNewStudentsIsLeftOutOfTheMatchesInTheCity() {
+    DriverModel accepting = saveDriver("aberto@vanep.com");
+    DriverModel notAccepting = saveUnavailableDriver("fechado@vanep.com");
+    giveArea(accepting, brasilia, aguasClaras);
+    giveArea(notAccepting, brasilia, null);
+
+    assertThat(driverIdsOf(areas.findDriverMatchesInCity(brasilia.getId())))
+        .containsExactly(accepting.getId());
   }
 }
