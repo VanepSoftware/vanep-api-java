@@ -20,7 +20,7 @@ driver_token() {
 }
 
 create_link() {
-  request POST /api/client-drivers "$ADMIN" "$(jq -nc --arg c "$1" --arg d "$2" '{clientToken: $c, driverToken: $d}')"
+  request POST /api/client-drivers "$ADMIN" "$(jq -nc --arg c "$1" --arg d "$2" '{clientToken: $c, driverToken: $d, origin: "CLIENT_SEARCH"}')"
   [[ $RESP_STATUS == 201 ]] || { echo "SETUP FAIL | link | HTTP $RESP_STATUS $RESP_BODY" >&2; return 1; }
   jq -r .token <<<"$RESP_BODY"
 }
@@ -72,6 +72,18 @@ restore_approval() {
 
 put_under_review() {
   sql "update driver set approval_status = 'UNDER_REVIEW', is_available = false, rejection_reason = null where token = '$1'" >/dev/null
+}
+
+link_body() {
+  jq -nc --arg c "$1" --arg d "$2" --argjson o "$3" '{clientToken: $c, driverToken: $d, origin: $o}'
+}
+
+link_origin() {
+  sql "select origin from client_driver where token = '$1'"
+}
+
+link_statuses() {
+  sql "select string_agg(token || '=' || status, ',' order by token) from client_driver where token in ($1)"
 }
 
 cleanup() {
@@ -276,6 +288,111 @@ request POST "/api/drivers/$FABIO_D/approve" "$ADMIN"
 expect V11 "approving an approved driver again" 400
 request POST /api/drivers/doesnotexist/approve "$ADMIN"
 expect V12 "approving an unknown driver" 404
+
+table "Every link has an immutable origin"
+check O1 "the seeded link and the links of the setup were created as CLIENT_SEARCH" 0 \
+  "$(sql "select count(*) from client_driver where origin <> 'CLIENT_SEARCH'")"
+request POST /api/client-drivers "$ADMIN" "$(link_body "$DIEGO_C" "$HELENA_D" '"DRIVER_INVITE"')"
+expect O2 "the admin creates a link with origin DRIVER_INVITE" 201 '.status == "PENDING" and .origin == "DRIVER_INVITE"'
+DIEGO_HELENA=$(jq -r .token <<<"$RESP_BODY")
+check O3 "the origin is stored" DRIVER_INVITE "$(link_origin "$DIEGO_HELENA")"
+request GET "/api/client-drivers/$DIEGO_HELENA" "$DIEGO"
+expect O4 "the client of the link reads its origin" 200 '.origin == "DRIVER_INVITE"'
+request GET /api/client-drivers/me "$HELENA"
+expect O5 "the driver's own list carries the origin of every link" 200 \
+  "([.[] | select(.token == \"$DIEGO_HELENA\") | .origin] == [\"DRIVER_INVITE\"]) and all(.[]; .origin != null)"
+request GET /api/client-drivers "$ADMIN"
+expect O6 "the admin's page carries the origin of every link" 200 \
+  'all(.content[]; .origin == "CLIENT_SEARCH" or .origin == "DRIVER_INVITE")'
+request POST /api/client-drivers "$ADMIN" "$(link_body "$DIEGO_C" "$FABIO_D" '"CLIENT_SEARCH"')"
+expect O7 "the admin creates a link with origin CLIENT_SEARCH" 201 '.status == "PENDING" and .origin == "CLIENT_SEARCH"'
+DIEGO_FABIO=$(jq -r .token <<<"$RESP_BODY")
+
+table "Link origin — misuse"
+LINKS_BEFORE=$(count client_driver)
+request POST /api/client-drivers "$ADMIN" "$(jq -nc --arg c "$ELENA_C" --arg d "$GUSTAVO_D" '{clientToken: $c, driverToken: $d}')"
+expect O8 "no origin" 400
+request POST /api/client-drivers "$ADMIN" "$(link_body "$ELENA_C" "$GUSTAVO_D" null)"
+expect O9 "origin null" 400
+request POST /api/client-drivers "$ADMIN" "$(link_body "$ELENA_C" "$GUSTAVO_D" '"WALK_IN"')"
+expect O10 "unknown origin" 400
+request POST /api/client-drivers "$ADMIN" "$(link_body "$ELENA_C" "$GUSTAVO_D" '"driver_invite"')"
+expect O11 "origin in lower case" 400
+request POST /api/client-drivers "$ADMIN" "$(link_body "$ELENA_C" "$GUSTAVO_D" '""')"
+expect O12 "blank origin" 400
+request POST /api/client-drivers "$ADMIN" "$(link_body "$ELENA_C" "$GUSTAVO_D" true)"
+expect O13 "origin as a boolean" 400
+request POST /api/client-drivers "$ADMIN" "$(link_body "$ELENA_C" "$GUSTAVO_D" '{"value":"DRIVER_INVITE"}')"
+expect O14 "origin as an object" 400
+request POST /api/client-drivers "$ADMIN" '{"clientToken": "x", "origin": '
+expect O15 "malformed JSON" 400
+request POST /api/client-drivers "$ELENA" "$(link_body "$ELENA_C" "$GUSTAVO_D" '"CLIENT_SEARCH"')"
+expect O16 "a client cannot create a link" 403
+request POST /api/client-drivers "$GUSTAVO" "$(link_body "$ELENA_C" "$GUSTAVO_D" '"DRIVER_INVITE"')"
+expect O17 "a driver cannot create a link" 403
+request POST /api/client-drivers "" "$(link_body "$ELENA_C" "$GUSTAVO_D" '"CLIENT_SEARCH"')"
+expect O18 "no token" 401
+request POST /api/client-drivers "not-a-jwt" "$(link_body "$ELENA_C" "$GUSTAVO_D" '"CLIENT_SEARCH"')"
+expect O19 "invalid token" 401
+check O20 "the refused creations wrote nothing" "$LINKS_BEFORE" "$(count client_driver)"
+request POST /api/client-drivers "$ADMIN" "$(link_body "$DIEGO_C" "$HELENA_D" '"CLIENT_SEARCH"')"
+expect O21 "the same pair again with the other origin" 409 '.detail == "Este cliente e este motorista já estão vinculados."'
+check O22 "the existing link keeps DRIVER_INVITE" DRIVER_INVITE "$(link_origin "$DIEGO_HELENA")"
+request PATCH "/api/client-drivers/$DIEGO_HELENA" "$ADMIN" '{"origin":"CLIENT_SEARCH"}'
+expect O23 "there is no route that writes the origin" 405
+check O24 "the origin did not change" DRIVER_INVITE "$(link_origin "$DIEGO_HELENA")"
+request DELETE "/api/client-drivers/$DIEGO_HELENA" "$ADMIN"
+expect O25 "the admin removes the link" 204
+request POST "/api/client-drivers/$DIEGO_HELENA/restore" "$ADMIN" '{"origin":"CLIENT_SEARCH"}'
+expect O26 "restoring brings it back with its origin, whatever the body says" 200 '.origin == "DRIVER_INVITE"'
+ELENA_GUSTAVO_BODY=$(link_body "$ELENA_C" "$GUSTAVO_D" '"CLIENT_SEARCH"')
+check O27 "six concurrent creations of a new pair: one wins, the rest get 409" "201 409 409 409 409 409" \
+  "$(in_parallel POST "$ADMIN" "$ELENA_GUSTAVO_BODY" /api/client-drivers /api/client-drivers /api/client-drivers \
+    /api/client-drivers /api/client-drivers /api/client-drivers)"
+check O28 "and the pair has exactly one link" 1 \
+  "$(sql "select count(*) from client_driver l join client c on c.id = l.client_id join driver d on d.id = l.driver_id where c.token = '$ELENA_C' and d.token = '$GUSTAVO_D'")"
+
+table "V61: origin and block columns (database checks)"
+BLOCKER="(select id from users where email = 'gustavo.santos@seed.vanep.com.br')"
+ON_DIEGO_GUSTAVO="where token = '$DIEGO_GUSTAVO'"
+check_sql_rejected D1 "BLOCKED without a blocker" client_driver_blocked_by_check \
+  "update client_driver set status = 'BLOCKED', blocked_at = now() $ON_DIEGO_GUSTAVO"
+check_sql_rejected D2 "BLOCKED without a block time" client_driver_blocked_at_check \
+  "update client_driver set status = 'BLOCKED', blocked_by = $BLOCKER $ON_DIEGO_GUSTAVO"
+check_sql_rejected D3 "a blocker on a link that is not BLOCKED" client_driver_blocked_by_check \
+  "update client_driver set blocked_by = $BLOCKER $ON_DIEGO_GUSTAVO"
+check_sql_rejected D4 "a block time on a link that is not BLOCKED" client_driver_blocked_at_check \
+  "update client_driver set blocked_at = now() $ON_DIEGO_GUSTAVO"
+check_sql_accepted D5 "BLOCKED with a blocker and a block time" \
+  "update client_driver set status = 'BLOCKED', blocked_by = $BLOCKER, blocked_at = now() $ON_DIEGO_GUSTAVO"
+check_sql_rejected D6 "a blocker that is not a user" client_driver_blocked_by_fkey \
+  "update client_driver set status = 'BLOCKED', blocked_by = -1, blocked_at = now() $ON_DIEGO_GUSTAVO"
+check_sql_rejected D7 "a link without origin" '"origin"' \
+  "insert into client_driver (token, client_id, driver_id, status) select 'qanoorigin', client_id, driver_id, 'PENDING' from client_driver $ON_DIEGO_GUSTAVO"
+check D8 "the checks above were rolled back" "PENDING CLIENT_SEARCH" \
+  "$(sql "select status || ' ' || origin || coalesce(blocked_by::text, '') || coalesce(blocked_at::text, '') from client_driver $ON_DIEGO_GUSTAVO")"
+check D9 "origin, blocked_by and blocked_at are documented" 3 \
+  "$(sql "select count(col_description('client_driver'::regclass, attnum)) from pg_attribute where attrelid = 'client_driver'::regclass and attname in ('origin', 'blocked_by', 'blocked_at')")"
+
+table "V61 re-applied on links blocked before the blocker existed"
+LEGACY="'$DIEGO_GUSTAVO','$BRUNO_GUSTAVO','$BRUNO_HELENA','$CARLA_GUSTAVO','$CARLA_HELENA','$DIEGO_FABIO'"
+UNBLOCKED_BEFORE=$(sql "select string_agg(token || '=' || status, ',' order by token) from client_driver where token not in ($LEGACY)")
+sql "alter table client_driver drop constraint client_driver_blocked_by_check, drop constraint client_driver_blocked_at_check,
+       drop column origin, drop column blocked_by, drop column blocked_at;
+     update client_driver set status = 'BLOCKED' where token in ($LEGACY);
+     update client_driver set deleted_at = now() where token = '$DIEGO_FABIO'" >/dev/null
+apply_migration V61
+check L1 "each legacy BLOCKED link gets the status its contracts give" \
+  "$(tr ' ' '\n' <<<"$BRUNO_GUSTAVO=ACTIVE $BRUNO_HELENA=INACTIVE $CARLA_GUSTAVO=INACTIVE $CARLA_HELENA=PENDING $DIEGO_FABIO=PENDING $DIEGO_GUSTAVO=PENDING" | LC_ALL=C sort | paste -sd ',' -)" \
+  "$(link_statuses "$LEGACY")"
+check L2 "the links that were not BLOCKED keep their status" "$UNBLOCKED_BEFORE" \
+  "$(sql "select string_agg(token || '=' || status, ',' order by token) from client_driver where token not in ($LEGACY)")"
+check L3 "every link, removed ones included, gets CLIENT_SEARCH" "0 0" \
+  "$(sql "select count(*) filter (where origin <> 'CLIENT_SEARCH') || ' ' || count(*) filter (where status = 'BLOCKED') from client_driver")"
+check_sql_rejected L4 "the checks are back" client_driver_blocked_by_check \
+  "update client_driver set status = 'BLOCKED', blocked_at = now() $ON_DIEGO_GUSTAVO"
+request GET "/api/client-drivers/$BRUNO_GUSTAVO" "$BRUNO"
+expect L5 "the API reads a link the migration brought back" 200 '.status == "ACTIVE" and .origin == "CLIENT_SEARCH"'
 
 echo
 echo "ALL PASSED: $PASSED scenarios"
