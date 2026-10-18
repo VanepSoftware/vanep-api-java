@@ -17,6 +17,7 @@ import br.com.vanep.user.service.UserService;
 import java.util.List;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -75,7 +76,16 @@ public class ClientDriverService {
     link.setClient(client);
     link.setDriver(driver);
     link.setStatus(RelationshipStatus.PENDING);
-    return mapper.toResponse(links.save(link));
+    link.setOrigin(request.origin());
+    return mapper.toResponse(insertLink(link));
+  }
+
+  ClientDriverModel insertLink(ClientDriverModel link) {
+    try {
+      return links.saveAndFlush(link);
+    } catch (DataIntegrityViolationException concurrentCreation) {
+      throw conflict("client_driver.duplicate_pair");
+    }
   }
 
   @Transactional(readOnly = true)

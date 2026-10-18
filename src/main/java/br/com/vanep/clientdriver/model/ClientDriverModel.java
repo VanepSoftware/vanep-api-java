@@ -1,8 +1,10 @@
 package br.com.vanep.clientdriver.model;
 
 import br.com.vanep.client.model.ClientModel;
+import br.com.vanep.clientdriver.enums.LinkOrigin;
 import br.com.vanep.clientdriver.enums.RelationshipStatus;
 import br.com.vanep.driver.model.DriverModel;
+import br.com.vanep.user.model.UserModel;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -48,6 +50,19 @@ public class ClientDriverModel {
   @Enumerated(EnumType.STRING)
   @Column(nullable = false, length = 16)
   private RelationshipStatus status = RelationshipStatus.PENDING;
+
+  @Enumerated(EnumType.STRING)
+  @Column(nullable = false, length = 16, updatable = false)
+  private LinkOrigin origin;
+
+  // Hibernate refuses LAZY towards a @SoftDelete entity; the blocker is one of the two parties,
+  // whose users are already loaded with the link.
+  @ManyToOne(fetch = FetchType.EAGER)
+  @JoinColumn(name = "blocked_by")
+  private UserModel blockedBy;
+
+  @Column(name = "blocked_at")
+  private Instant blockedAt;
 
   @CreationTimestamp
   @Column(name = "created_at", nullable = false, updatable = false)
