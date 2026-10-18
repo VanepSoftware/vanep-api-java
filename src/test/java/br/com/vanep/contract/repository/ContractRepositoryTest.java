@@ -7,6 +7,7 @@ import br.com.vanep.city.model.CityModel;
 import br.com.vanep.city.repository.CityRepository;
 import br.com.vanep.client.model.ClientModel;
 import br.com.vanep.client.repository.ClientRepository;
+import br.com.vanep.clientdriver.enums.LinkOrigin;
 import br.com.vanep.clientdriver.model.ClientDriverModel;
 import br.com.vanep.clientdriver.repository.ClientDriverRepository;
 import br.com.vanep.contract.enums.ContractStatus;
@@ -462,6 +463,7 @@ class ContractRepositoryTest {
     ClientDriverModel model = new ClientDriverModel();
     model.setClient(client);
     model.setDriver(driver);
+    model.setOrigin(LinkOrigin.CLIENT_SEARCH);
     return links.save(model);
   }
 
