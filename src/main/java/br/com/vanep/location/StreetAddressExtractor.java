@@ -11,6 +11,8 @@ public final class StreetAddressExtractor {
   private static final String ROUTE = "route";
   private static final String STREET_NUMBER = "street_number";
   private static final String POSTAL_CODE = "postal_code";
+  private static final List<String> SUBLOCALITIES_FROM_SHALLOW_TO_DEEP =
+      List.of("sublocality_level_1", "sublocality_level_2", "sublocality_level_3");
 
   private StreetAddressExtractor() {}
 
@@ -37,6 +39,13 @@ public final class StreetAddressExtractor {
 
   public static Optional<String> findZipCode(PlaceDetailsResponseDTO details) {
     return findLongText(details, POSTAL_CODE).map(zip -> zip.replaceAll("\\D", ""));
+  }
+
+  public static Optional<String> findNeighborhood(PlaceDetailsResponseDTO details) {
+    return SUBLOCALITIES_FROM_SHALLOW_TO_DEEP.stream()
+        .map(type -> findLongText(details, type))
+        .flatMap(text -> text.stream())
+        .findFirst();
   }
 
   private static Optional<String> findLongText(PlaceDetailsResponseDTO details, String type) {

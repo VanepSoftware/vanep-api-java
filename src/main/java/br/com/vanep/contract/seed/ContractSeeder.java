@@ -57,9 +57,12 @@ public class ContractSeeder {
       return;
     }
     DependentModel dependent =
-        dependents.findByClientId(link.getClient().getId()).stream().findFirst().orElse(null);
+        dependents.findByClientId(link.getClient().getId()).stream()
+            .filter(candidate -> candidate.isDefaultDependent())
+            .findFirst()
+            .orElse(null);
     if (dependent == null) {
-      log.info("Seed: contract seed skipped; the seeded link's client has no dependent.");
+      log.info("Seed: contract seed skipped; the seeded link's client has no default dependent.");
       return;
     }
     if (dependent.getSchoolId() == null || dependent.getAddressId() == null) {

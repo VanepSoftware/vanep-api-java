@@ -156,7 +156,6 @@ class PersonalAddressControllerTest {
         .andExpect(jsonPath("$.googlePlaceId").doesNotExist());
 
     AddressModel saved = addresses.findAll().getFirst();
-    assertThat(saved.getDistrict()).isNull();
     assertThat(saved.getGooglePlaceId()).isNull();
     assertThat(districts.count()).isZero();
     assertThat(users.findByToken(callerUid).orElseThrow().getAddressId()).isEqualTo(saved.getId());
@@ -301,11 +300,12 @@ class PersonalAddressControllerTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.neighborhood").value("Taguatinga Norte"))
         .andExpect(jsonPath("$.number").value("42"))
-        .andExpect(jsonPath("$.complement").value("Bloco B apto 101"));
+        .andExpect(jsonPath("$.complement").value("Bloco B apto 101"))
+        .andExpect(jsonPath("$.districtName").doesNotExist())
+        .andExpect(jsonPath("$.districtToken").doesNotExist());
 
     AddressModel saved = addresses.findAll().getFirst();
     assertThat(saved.getNeighborhood()).isEqualTo("Taguatinga Norte");
-    assertThat(saved.getDistrict()).isNull();
     assertThat(districts.count()).isZero();
   }
 

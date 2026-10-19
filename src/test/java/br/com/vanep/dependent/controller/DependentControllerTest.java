@@ -1,6 +1,8 @@
 package br.com.vanep.dependent.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
@@ -9,6 +11,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -25,21 +28,23 @@ import br.com.vanep.dependent.repository.DependentRepository;
 import br.com.vanep.places.client.PlacesClient;
 import br.com.vanep.school.model.SchoolModel;
 import br.com.vanep.school.repository.SchoolRepository;
-import br.com.vanep.shared.enums.SchoolShift;
 import br.com.vanep.state.model.StateModel;
 import br.com.vanep.state.repository.StateRepository;
 import br.com.vanep.user.enums.Gender;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
-import com.jayway.jsonpath.JsonPath;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.MessageSource;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor;
@@ -47,6 +52,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
@@ -67,6 +73,7 @@ class DependentControllerTest {
   @Autowired private CityRepository cities;
   @Autowired private StateRepository states;
   @Autowired private CountryRepository countries;
+  @Autowired private MessageSource messages;
 
   private MockMvc mockMvc;
 
@@ -126,7 +133,6 @@ class DependentControllerTest {
     DependentModel dependent = new DependentModel();
     dependent.setClientId(clientId);
     dependent.setName(name);
-    dependent.setShift(SchoolShift.MORNING);
     dependent.setDefaultDependent(isDefault);
     return dependents.save(dependent);
   }
@@ -236,23 +242,15 @@ class DependentControllerTest {
   }
 
   @Test
-  void createWithFullTimeShiftPersistsAndReturnsFullTime() throws Exception {
-    String body =
-        mockMvc
-            .perform(
-                post("/api/dependent")
-                    .with(ownerJwt())
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content("{\"name\":\"Lucas Souza\",\"shift\":\"FULLTIME\"}"))
-            .andExpect(status().isCreated())
-            .andExpect(jsonPath("$.shift").value("FULLTIME"))
-            .andReturn()
-            .getResponse()
-            .getContentAsString();
-    String token = JsonPath.read(body, "$.token");
-
-    assertThat(dependents.findByToken(token).orElseThrow().getShift())
-        .isEqualTo(SchoolShift.FULLTIME);
+  void createIgnoresAShiftSentAndTheResponseHasNone() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/dependent")
+                .with(ownerJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"Lucas Souza\",\"shift\":\"FULLTIME\"}"))
+        .andExpect(status().isCreated())
+        .andExpect(jsonPath("$.shift").doesNotExist());
   }
 
   @Test
@@ -322,7 +320,6 @@ class DependentControllerTest {
     assertThat(saved.getAddressId()).isNotEqualTo(home.getId());
     AddressModel stored = addresses.findById(saved.getAddressId()).orElseThrow();
     assertThat(stored.getToken()).isNotEqualTo(home.getToken());
-    assertThat(stored.getDistrict()).isNull();
     assertThat(stored.getGooglePlaceId()).isNull();
   }
 
@@ -340,7 +337,7 @@ class DependentControllerTest {
                         + "\"neighborhood\":\"Bela Vista\"}}"))
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.address.neighborhood").value("Bela Vista"))
-        .andExpect(jsonPath("$.address.district").value(nullValue()));
+        .andExpect(jsonPath("$.address.district").doesNotExist());
 
     DependentModel saved = dependents.findByClientId(ownerClientId).getFirst();
     assertThat(addresses.findById(saved.getAddressId()).orElseThrow().getNeighborhood())
@@ -957,16 +954,62 @@ class DependentControllerTest {
   }
 
   @Test
-  void patchReturns400WhenDocumentTooLong() throws Exception {
+  void patchReturns400WhenTheDocumentIsNotAValidCpfAndKeepsTheStoredOne() throws Exception {
     DependentModel own = createDependent(ownerClientId, "Own Kid", true);
+    own.setDocument("39053344705");
+    dependents.save(own);
 
     mockMvc
         .perform(
             patch("/api/dependent/" + own.getToken())
                 .with(ownerJwt())
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"document\":\"" + "1".repeat(65) + "\"}"))
+                .content("{\"document\":\"52998224724\"}"))
         .andExpect(status().isBadRequest());
+
+    assertThat(dependents.findByToken(own.getToken()).orElseThrow().getDocument())
+        .isEqualTo("39053344705");
+  }
+
+  @Test
+  void createReturns400WhenTheDocumentIsNotAValidCpfAndStoresNothing() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/dependent")
+                .with(ownerJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"Lucas\",\"document\":\"11111111111\"}"))
+        .andExpect(status().isBadRequest());
+
+    assertThat(dependents.findByClientId(ownerClientId)).isEmpty();
+  }
+
+  @Test
+  void createStoresAMaskedCpfAsDigitsOnly() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/dependent")
+                .with(ownerJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"Lucas\",\"document\":\"529.982.247-25\"}"))
+        .andExpect(status().isCreated())
+        .andExpect(jsonPath("$.document").value("52998224725"));
+  }
+
+  @Test
+  void patchNullDocumentClearsTheDocument() throws Exception {
+    DependentModel own = createDependent(ownerClientId, "Own Kid", true);
+    own.setDocument("39053344705");
+    dependents.save(own);
+
+    mockMvc
+        .perform(
+            patch("/api/dependent/" + own.getToken())
+                .with(ownerJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"document\":null}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.document").value(nullValue()));
   }
 
   @Test
@@ -1000,10 +1043,10 @@ class DependentControllerTest {
   @Test
   void patchDuplicateDocumentOnAnotherDependentReturns409() throws Exception {
     DependentModel first = createDependent(ownerClientId, "First", true);
-    first.setDocument("11111111111");
+    first.setDocument("52998224725");
     dependents.save(first);
     DependentModel second = createDependent(ownerClientId, "Second", false);
-    second.setDocument("22222222222");
+    second.setDocument("39053344705");
     dependents.save(second);
 
     mockMvc
@@ -1011,17 +1054,17 @@ class DependentControllerTest {
             patch("/api/dependent/" + second.getToken())
                 .with(ownerJwt())
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"document\":\"11111111111\"}"))
+                .content("{\"document\":\"529.982.247-25\"}"))
         .andExpect(status().isConflict());
 
     assertThat(dependents.findByToken(second.getToken()).orElseThrow().getDocument())
-        .isEqualTo("22222222222");
+        .isEqualTo("39053344705");
   }
 
   @Test
   void patchSameDocumentResentReturns200() throws Exception {
     DependentModel own = createDependent(ownerClientId, "Own Kid", true);
-    own.setDocument("11111111111");
+    own.setDocument("52998224725");
     dependents.save(own);
 
     mockMvc
@@ -1029,9 +1072,9 @@ class DependentControllerTest {
             patch("/api/dependent/" + own.getToken())
                 .with(ownerJwt())
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"document\":\"11111111111\"}"))
+                .content("{\"document\":\"52998224725\"}"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.document").value("11111111111"));
+        .andExpect(jsonPath("$.document").value("52998224725"));
   }
 
   @Test
@@ -1096,6 +1139,21 @@ class DependentControllerTest {
   }
 
   @Test
+  void deletingLeavesNoLinkToTheRemovedPickupAddress() throws Exception {
+    DependentModel own = createDependent(ownerClientId, "Own Kid", true);
+    persistPickupAddress(own, "10");
+
+    mockMvc
+        .perform(delete("/api/dependent/" + own.getToken()).with(ownerJwt()))
+        .andExpect(status().isNoContent());
+    mockMvc
+        .perform(post("/api/dependent/" + own.getToken() + "/restore").with(ownerJwt()))
+        .andExpect(status().isOk());
+
+    assertThat(dependents.findByToken(own.getToken()).orElseThrow().getAddressId()).isNull();
+  }
+
+  @Test
   void restoreReturns409ForActiveDependent() throws Exception {
     DependentModel own = createDependent(ownerClientId, "Own Kid", true);
 
@@ -1123,5 +1181,261 @@ class DependentControllerTest {
         .perform(get("/api/dependent/" + own.getToken()).with(adminJwt()))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.token").value(own.getToken()));
+  }
+
+  @Test
+  void replacingTheSchoolDaysReturnsThemMondayFirstAndGetReadsTheSame() throws Exception {
+    DependentModel own = createDependent(ownerClientId, "Own Kid", true);
+
+    mockMvc
+        .perform(
+            putSchoolDays(
+                    own,
+                    schoolDaysBody(
+                        day("FRIDAY", "MORNING"),
+                        day("TUESDAY", "FULLTIME"),
+                        day("MONDAY", "MORNING"),
+                        day("THURSDAY", "FULLTIME"),
+                        day("WEDNESDAY", "MORNING")))
+                .with(ownerJwt()))
+        .andExpect(status().isOk())
+        .andExpect(
+            jsonPath("$[*].weekday")
+                .value(contains("MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY")))
+        .andExpect(
+            jsonPath("$[*].schoolShift")
+                .value(contains("MORNING", "FULLTIME", "MORNING", "FULLTIME", "MORNING")));
+
+    mockMvc
+        .perform(get(schoolDaysPath(own)).with(ownerJwt()))
+        .andExpect(status().isOk())
+        .andExpect(
+            jsonPath("$[*].weekday")
+                .value(contains("MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY")))
+        .andExpect(
+            jsonPath("$[*].schoolShift")
+                .value(contains("MORNING", "FULLTIME", "MORNING", "FULLTIME", "MORNING")));
+  }
+
+  @Test
+  void aDependentWithoutSchoolDaysHasAnEmptyGrid() throws Exception {
+    DependentModel own = createDependent(ownerClientId, "Own Kid", true);
+
+    mockMvc
+        .perform(get(schoolDaysPath(own)).with(ownerJwt()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$").value(empty()));
+  }
+
+  @Test
+  void replacingAgainKeepsOnlyTheNewGrid() throws Exception {
+    DependentModel own = createDependent(ownerClientId, "Own Kid", true);
+    replaceSchoolDays(own, schoolDaysBody(day("MONDAY", "MORNING"), day("TUESDAY", "MORNING")));
+
+    replaceSchoolDays(own, schoolDaysBody(day("MONDAY", "AFTERNOON")));
+
+    mockMvc
+        .perform(get(schoolDaysPath(own)).with(ownerJwt()))
+        .andExpect(jsonPath("$[*].weekday").value(contains("MONDAY")))
+        .andExpect(jsonPath("$[*].schoolShift").value(contains("AFTERNOON")));
+  }
+
+  @Test
+  void anEmptyListClearsTheSchoolDays() throws Exception {
+    DependentModel own = createDependent(ownerClientId, "Own Kid", true);
+    replaceSchoolDays(own, schoolDaysBody(day("MONDAY", "MORNING")));
+
+    mockMvc
+        .perform(putSchoolDays(own, schoolDaysBody()).with(ownerJwt()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$").value(empty()));
+
+    mockMvc
+        .perform(get(schoolDaysPath(own)).with(ownerJwt()))
+        .andExpect(jsonPath("$").value(empty()));
+  }
+
+  @Test
+  void theSameWeekdayTwiceReturns400AndKeepsTheGrid() throws Exception {
+    DependentModel own = createDependent(ownerClientId, "Own Kid", true);
+    replaceSchoolDays(own, schoolDaysBody(day("FRIDAY", "NIGHT")));
+
+    mockMvc
+        .perform(
+            putSchoolDays(own, schoolDaysBody(day("MONDAY", "MORNING"), day("MONDAY", "FULLTIME")))
+                .with(ownerJwt()))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.detail").value(message("dependent.school_days.weekday_duplicate")));
+
+    expectStoredGrid(own, "FRIDAY", "NIGHT");
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "{\"days\":[{\"schoolShift\":\"MORNING\"}]}",
+        "{\"days\":[{\"weekday\":\"MONDAY\"}]}",
+        "{\"days\":[{\"weekday\":\"FUNDAY\",\"schoolShift\":\"MORNING\"}]}",
+        "{\"days\":[{\"weekday\":\"MONDAY\",\"schoolShift\":\"EVENING\"}]}",
+        "{\"days\":[null]}",
+        "{\"days\":null}",
+        "{}",
+        "{\"days\":\"MONDAY\"}",
+        "{\"days\":[{\"weekday\":\"MONDAY\",\"schoolShift\":true}]}",
+        "{\"days\":["
+      })
+  void anInvalidSchoolDaysBodyReturns400AndKeepsTheGrid(String body) throws Exception {
+    DependentModel own = createDependent(ownerClientId, "Own Kid", true);
+    replaceSchoolDays(own, schoolDaysBody(day("FRIDAY", "NIGHT")));
+
+    mockMvc.perform(putSchoolDays(own, body).with(ownerJwt())).andExpect(status().isBadRequest());
+
+    expectStoredGrid(own, "FRIDAY", "NIGHT");
+  }
+
+  @Test
+  void anotherClientCannotReadNorReplaceTheSchoolDays() throws Exception {
+    DependentModel own = createDependent(ownerClientId, "Own Kid", true);
+    replaceSchoolDays(own, schoolDaysBody(day("FRIDAY", "NIGHT")));
+
+    mockMvc.perform(get(schoolDaysPath(own)).with(otherJwt())).andExpect(status().isForbidden());
+    mockMvc
+        .perform(putSchoolDays(own, schoolDaysBody(day("MONDAY", "MORNING"))).with(otherJwt()))
+        .andExpect(status().isForbidden());
+
+    expectStoredGrid(own, "FRIDAY", "NIGHT");
+  }
+
+  @Test
+  void theAdminReadsAndReplacesTheSchoolDaysOfAnyDependent() throws Exception {
+    DependentModel own = createDependent(ownerClientId, "Own Kid", true);
+
+    mockMvc
+        .perform(putSchoolDays(own, schoolDaysBody(day("MONDAY", "MORNING"))).with(adminJwt()))
+        .andExpect(status().isOk());
+    mockMvc
+        .perform(get(schoolDaysPath(own)).with(adminJwt()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[*].weekday").value(contains("MONDAY")));
+  }
+
+  @Test
+  void theSchoolDaysRequireAuthentication() throws Exception {
+    DependentModel own = createDependent(ownerClientId, "Own Kid", true);
+
+    mockMvc.perform(get(schoolDaysPath(own))).andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(putSchoolDays(own, schoolDaysBody(day("MONDAY", "MORNING"))))
+        .andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  void readingTheSchoolDaysRequiresShowDependentAndReplacingRequiresUpdateDependent()
+      throws Exception {
+    DependentModel own = createDependent(ownerClientId, "Own Kid", true);
+    JwtRequestPostProcessor withoutDependentPermissions =
+        jwt()
+            .jwt(token -> token.subject(OWNER_EMAIL).claim("roles", List.of("ROLE_CLIENT")))
+            .authorities(new SimpleGrantedAuthority("ROLE_CLIENT"));
+
+    mockMvc
+        .perform(get(schoolDaysPath(own)).with(withoutDependentPermissions))
+        .andExpect(status().isForbidden());
+    mockMvc
+        .perform(
+            putSchoolDays(own, schoolDaysBody(day("MONDAY", "MORNING")))
+                .with(withoutDependentPermissions))
+        .andExpect(status().isForbidden());
+  }
+
+  @Test
+  void theSchoolDaysOfAnUnknownDependentAreNotFound() throws Exception {
+    mockMvc
+        .perform(get("/api/dependent/doesnotexist/school-days").with(ownerJwt()))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.code").value("dependent.not_found"));
+    mockMvc
+        .perform(
+            put("/api/dependent/doesnotexist/school-days")
+                .with(ownerJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(schoolDaysBody(day("MONDAY", "MORNING"))))
+        .andExpect(status().isNotFound());
+  }
+
+  @Test
+  void theSchoolDaysOfADeletedDependentAreNotFound() throws Exception {
+    DependentModel own = createDependent(ownerClientId, "Own Kid", true);
+    dependents.delete(own);
+
+    mockMvc.perform(get(schoolDaysPath(own)).with(ownerJwt())).andExpect(status().isNotFound());
+    mockMvc
+        .perform(putSchoolDays(own, schoolDaysBody(day("MONDAY", "MORNING"))).with(ownerJwt()))
+        .andExpect(status().isNotFound());
+  }
+
+  @Test
+  void replacingTheSchoolDaysKeepsTheOtherFields() throws Exception {
+    DependentModel own = createDependent(ownerClientId, "Own Kid", true);
+    own.setBirthDate(LocalDate.of(2016, 4, 2));
+    own.setSchoolId(persistSchool("Escola Azul").getId());
+    dependents.save(own);
+    persistPickupAddress(own, "42");
+
+    replaceSchoolDays(own, schoolDaysBody(day("MONDAY", "FULLTIME")));
+
+    mockMvc
+        .perform(get("/api/dependent/" + own.getToken()).with(ownerJwt()))
+        .andExpect(jsonPath("$.name").value("Own Kid"))
+        .andExpect(jsonPath("$.birthDate").value("2016-04-02"))
+        .andExpect(jsonPath("$.school.name").value("Escola Azul"))
+        .andExpect(jsonPath("$.address.number").value("42"));
+  }
+
+  @Test
+  void aDeletedAndRestoredDependentKeepsItsSchoolDays() throws Exception {
+    DependentModel own = createDependent(ownerClientId, "Own Kid", true);
+    replaceSchoolDays(own, schoolDaysBody(day("TUESDAY", "FULLTIME")));
+
+    mockMvc
+        .perform(delete("/api/dependent/" + own.getToken()).with(ownerJwt()))
+        .andExpect(status().isNoContent());
+    mockMvc
+        .perform(post("/api/dependent/" + own.getToken() + "/restore").with(ownerJwt()))
+        .andExpect(status().isOk());
+
+    expectStoredGrid(own, "TUESDAY", "FULLTIME");
+  }
+
+  private String schoolDaysPath(DependentModel dependent) {
+    return "/api/dependent/" + dependent.getToken() + "/school-days";
+  }
+
+  private MockHttpServletRequestBuilder putSchoolDays(DependentModel dependent, String body) {
+    return put(schoolDaysPath(dependent)).contentType(MediaType.APPLICATION_JSON).content(body);
+  }
+
+  private void replaceSchoolDays(DependentModel dependent, String body) throws Exception {
+    mockMvc.perform(putSchoolDays(dependent, body).with(ownerJwt())).andExpect(status().isOk());
+  }
+
+  private void expectStoredGrid(DependentModel dependent, String weekday, String schoolShift)
+      throws Exception {
+    mockMvc
+        .perform(get(schoolDaysPath(dependent)).with(ownerJwt()))
+        .andExpect(jsonPath("$[*].weekday").value(contains(weekday)))
+        .andExpect(jsonPath("$[*].schoolShift").value(contains(schoolShift)));
+  }
+
+  private String day(String weekday, String schoolShift) {
+    return "{\"weekday\":\"" + weekday + "\",\"schoolShift\":\"" + schoolShift + "\"}";
+  }
+
+  private String schoolDaysBody(String... days) {
+    return "{\"days\":[" + String.join(",", days) + "]}";
+  }
+
+  private String message(String key) {
+    return messages.getMessage(key, null, LocaleContextHolder.getLocale());
   }
 }

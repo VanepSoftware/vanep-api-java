@@ -14,7 +14,6 @@ public class AddressMapper {
         address.getNumber(),
         address.getComplement(),
         address.getNeighborhood(),
-        address.getDistrict() == null ? null : address.getDistrict().getName(),
         address.getCity().getToken(),
         address.getCity().getName(),
         address.getCity().getState().getUf(),

@@ -1,7 +1,6 @@
 package br.com.vanep.school.model;
 
 import br.com.vanep.city.model.CityModel;
-import br.com.vanep.district.model.DistrictModel;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -43,10 +42,6 @@ public class SchoolModel {
   @ManyToOne(fetch = FetchType.EAGER)
   @JoinColumn(name = "city_id")
   private CityModel city;
-
-  @ManyToOne(fetch = FetchType.EAGER)
-  @JoinColumn(name = "district_id")
-  private DistrictModel district;
 
   @Column(name = "address_id")
   private Long addressId;

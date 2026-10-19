@@ -66,8 +66,7 @@ class SchoolServiceTest {
   }
 
   private SchoolResponseDTO responseFor(String token) {
-    return new SchoolResponseDTO(
-        token, "Escola Teste", null, null, null, null, null, null, true, null);
+    return new SchoolResponseDTO(token, "Escola Teste", null, null, null, null, true, null);
   }
 
   private SchoolRequestDTO requestFor(String name) {
@@ -84,7 +83,6 @@ class SchoolServiceTest {
         "13015904",
         "Rua da Escola",
         "1481",
-        null,
         null,
         "Centro",
         "city-campinas",

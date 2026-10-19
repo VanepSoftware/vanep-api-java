@@ -33,6 +33,6 @@ public class SchoolResolveController {
     SchoolResolveService.Resolution resolution =
         service.resolve(SecurityHelper.requireCallerUid(authentication), request);
     return ResponseEntity.status(resolution.created() ? HttpStatus.CREATED : HttpStatus.OK)
-        .body(mapper.toResponse(resolution.school()));
+        .body(mapper.toResponse(resolution.school(), resolution.address()));
   }
 }

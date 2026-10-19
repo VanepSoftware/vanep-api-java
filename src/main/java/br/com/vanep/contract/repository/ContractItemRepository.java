@@ -21,9 +21,7 @@ public interface ContractItemRepository extends JpaRepository<ContractItemModel,
       join fetch item.dependent
       join fetch item.school school
       left join fetch school.city
-      left join fetch school.district
       join fetch item.pickupCity
-      left join fetch item.pickupDistrict
       join fetch item.schedule schedule
       left join fetch schedule.slots
       where item.contract.id in :contractIds
@@ -49,13 +47,12 @@ public interface ContractItemRepository extends JpaRepository<ContractItemModel,
         item.token, dependent.name, school.token, school.name,
         slot.leg, slot.windowStart, slot.windowEnd,
         item.pickupZipCode, item.pickupStreet, item.pickupNumber, item.pickupComplement,
-        item.pickupNeighborhood, district.name, city.token, city.name, item.pickupGooglePlaceId)
+        item.pickupNeighborhood, city.token, city.name, item.pickupGooglePlaceId)
       from ContractItemModel item
       join item.contract contract
       join item.dependent dependent
       join item.school school
       join item.pickupCity city
-      left join item.pickupDistrict district
       join item.schedule schedule
       join schedule.slots slot
       where contract.clientDriver.driver.id = :driverId

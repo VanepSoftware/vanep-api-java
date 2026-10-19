@@ -2,7 +2,6 @@ package br.com.vanep.contract.model;
 
 import br.com.vanep.city.model.CityModel;
 import br.com.vanep.dependent.model.DependentModel;
-import br.com.vanep.district.model.DistrictModel;
 import br.com.vanep.schedule.model.ScheduleModel;
 import br.com.vanep.school.model.SchoolModel;
 import jakarta.persistence.CascadeType;
@@ -70,10 +69,6 @@ public class ContractItemModel {
 
   @Column(name = "pickup_neighborhood", length = 128)
   private String pickupNeighborhood;
-
-  @ManyToOne(fetch = FetchType.EAGER)
-  @JoinColumn(name = "pickup_district_id")
-  private DistrictModel pickupDistrict;
 
   @Column(name = "pickup_google_place_id")
   private String pickupGooglePlaceId;
