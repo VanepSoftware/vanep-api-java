@@ -7,7 +7,6 @@ import static org.mockito.Mockito.when;
 import br.com.vanep.address.model.AddressModel;
 import br.com.vanep.city.model.CityModel;
 import br.com.vanep.city.repository.CityRepository;
-import br.com.vanep.district.model.DistrictModel;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -58,13 +57,11 @@ class AddressCatalogResolverServiceTest {
   @Test
   void clearsTheColumnsThatBelongToAPlaceResolvedAddress() {
     AddressModel address = new AddressModel();
-    address.setDistrict(new DistrictModel());
     address.setGooglePlaceId("place-old");
     when(cities.findByToken("city-campinas")).thenReturn(Optional.of(campinas()));
 
     service.applyCity(address, "city-campinas", "Rua", "13015904", null, null, null);
 
-    assertThat(address.getDistrict()).isNull();
     assertThat(address.getGooglePlaceId()).isNull();
   }
 

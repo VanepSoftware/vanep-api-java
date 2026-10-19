@@ -18,7 +18,6 @@ public record RoutePassengerDTO(
     String pickupNumber,
     String pickupComplement,
     String pickupNeighborhood,
-    String pickupDistrictName,
     String pickupCityToken,
     String pickupCityName,
     String pickupGooglePlaceId) {}

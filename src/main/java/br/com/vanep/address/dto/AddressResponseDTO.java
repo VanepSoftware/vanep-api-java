@@ -9,7 +9,6 @@ public record AddressResponseDTO(
     String number,
     String complement,
     String neighborhood,
-    String district,
     String cityToken,
     String cityName,
     String stateUf,
