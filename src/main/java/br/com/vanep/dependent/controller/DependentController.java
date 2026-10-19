@@ -2,6 +2,8 @@ package br.com.vanep.dependent.controller;
 
 import br.com.vanep.dependent.dto.DependentCreateDTO;
 import br.com.vanep.dependent.dto.DependentResponseDTO;
+import br.com.vanep.dependent.dto.DependentSchoolDayResponseDTO;
+import br.com.vanep.dependent.dto.DependentSchoolDaysRequestDTO;
 import br.com.vanep.dependent.dto.DependentUpdateDTO;
 import br.com.vanep.dependent.service.DependentService;
 import jakarta.validation.Valid;
@@ -15,6 +17,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -65,6 +68,22 @@ public class DependentController {
   @ResponseStatus(HttpStatus.NO_CONTENT)
   public void delete(@AuthenticationPrincipal Jwt jwt, @PathVariable String token) {
     service.delete(jwt, token);
+  }
+
+  @GetMapping("/{token}/school-days")
+  @PreAuthorize("hasAuthority('show_dependent')")
+  public List<DependentSchoolDayResponseDTO> findSchoolDays(
+      @AuthenticationPrincipal Jwt jwt, @PathVariable String token) {
+    return service.findSchoolDays(jwt, token);
+  }
+
+  @PutMapping("/{token}/school-days")
+  @PreAuthorize("hasAuthority('update_dependent')")
+  public List<DependentSchoolDayResponseDTO> replaceSchoolDays(
+      @AuthenticationPrincipal Jwt jwt,
+      @PathVariable String token,
+      @Valid @RequestBody DependentSchoolDaysRequestDTO request) {
+    return service.replaceSchoolDays(jwt, token, request);
   }
 
   @PostMapping("/{token}/restore")

@@ -86,6 +86,21 @@ link_statuses() {
   sql "select string_agg(token || '=' || status, ',' order by token) from client_driver where token in ($1)"
 }
 
+dependent_token() {
+  sql "select token from dependent where name = '$1'"
+}
+
+school_days_body() {
+  jq -nc '{days: [$ARGS.positional[] | split(":") | {weekday: .[0], schoolShift: .[1]}]}' --args "$@"
+}
+
+grid_of() {
+  sql "select coalesce(string_agg(day.weekday || ':' || day.school_shift, ',' order by array_position(
+         array['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'], day.weekday::text)), '')
+       from dependent_school_day day join dependent on dependent.id = day.dependent_id
+       where dependent.token = '$1' and day.deleted_at is null"
+}
+
 cleanup() {
   restore_approval
   restore_availability
@@ -393,6 +408,299 @@ check_sql_rejected L4 "the checks are back" client_driver_blocked_by_check \
   "update client_driver set status = 'BLOCKED', blocked_at = now() $ON_DIEGO_GUSTAVO"
 request GET "/api/client-drivers/$BRUNO_GUSTAVO" "$BRUNO"
 expect L5 "the API reads a link the migration brought back" 200 '.status == "ACTIVE" and .origin == "CLIENT_SEARCH"'
+
+table "Weekly school days of a dependent"
+LUCAS=$(dependent_token "Lucas Souza")
+MARINA=$(dependent_token "Marina Souza")
+GRID='map(.weekday + ":" + .schoolShift)'
+request GET "/api/dependent/$LUCAS/school-days" "$ANA"
+expect G1 "the seeded dependent is full time on Tuesday and Thursday, Monday first" 200 \
+  "$GRID == [\"MONDAY:MORNING\", \"TUESDAY:FULLTIME\", \"WEDNESDAY:MORNING\", \"THURSDAY:FULLTIME\", \"FRIDAY:MORNING\"]"
+request GET "/api/dependent/$MARINA/school-days" "$ANA"
+expect G2 "the other seeded dependent has mornings from Monday to Friday" 200 \
+  "$GRID == [\"MONDAY:MORNING\", \"TUESDAY:MORNING\", \"WEDNESDAY:MORNING\", \"THURSDAY:MORNING\", \"FRIDAY:MORNING\"]"
+request GET "/api/dependent/$MARINA" "$ANA"
+MARINA_BEFORE=$RESP_BODY
+request PUT "/api/dependent/$MARINA/school-days" "$ANA" "$(school_days_body FRIDAY:AFTERNOON THURSDAY:FULLTIME MONDAY:AFTERNOON)"
+expect G3 "the client replaces the grid out of order and gets it back Monday first" 200 \
+  "$GRID == [\"MONDAY:AFTERNOON\", \"THURSDAY:FULLTIME\", \"FRIDAY:AFTERNOON\"]"
+request GET "/api/dependent/$MARINA/school-days" "$ANA"
+expect G4 "reading the grid returns the replaced days" 200 \
+  "$GRID == [\"MONDAY:AFTERNOON\", \"THURSDAY:FULLTIME\", \"FRIDAY:AFTERNOON\"]"
+check G5 "the database holds only the replaced days as active" "MONDAY:AFTERNOON,THURSDAY:FULLTIME,FRIDAY:AFTERNOON" "$(grid_of "$MARINA")"
+check G6 "the five replaced days were soft-deleted, not removed" 5 \
+  "$(sql "select count(*) from dependent_school_day day join dependent on dependent.id = day.dependent_id where dependent.token = '$MARINA' and day.deleted_at is not null")"
+request GET "/api/dependent/$MARINA" "$ANA"
+check G7 "replacing the grid changed no other field of the dependent" "$MARINA_BEFORE" "$RESP_BODY"
+request PUT "/api/dependent/$MARINA/school-days" "$ANA" \
+  "$(school_days_body SUNDAY:MORNING SATURDAY:MORNING FRIDAY:NIGHT THURSDAY:NIGHT WEDNESDAY:FULLTIME TUESDAY:AFTERNOON MONDAY:MORNING)"
+expect G8 "all seven weekdays are accepted" 200 'length == 7 and .[0].weekday == "MONDAY" and .[6].weekday == "SUNDAY"'
+request GET "/api/dependent/$LUCAS/school-days" "$ADMIN"
+expect G9 "the admin reads the grid of any dependent" 200 'length == 5'
+request PUT "/api/dependent/$MARINA/school-days" "$ADMIN" "$(school_days_body MONDAY:MORNING)"
+expect G10 "the admin replaces the grid of any dependent" 200 "$GRID == [\"MONDAY:MORNING\"]"
+request PUT "/api/dependent/$MARINA/school-days" "$ANA" '{"days": []}'
+expect G11 "an empty list clears the grid" 200 'length == 0'
+request GET "/api/dependent/$MARINA/school-days" "$ANA"
+expect G12 "the cleared grid reads empty" 200 'length == 0'
+request PUT "/api/dependent/$MARINA/school-days" "$ANA" "$(school_days_body TUESDAY:NIGHT)"
+expect G13 "the client sets a grid on the dependent it is about to remove" 200
+request DELETE "/api/dependent/$MARINA" "$ANA"
+expect G14 "the client removes the dependent" 204
+request GET "/api/dependent/$MARINA/school-days" "$ANA"
+expect G15 "the grid of a removed dependent is not found" 404 '.code == "dependent.not_found"'
+request PUT "/api/dependent/$MARINA/school-days" "$ANA" "$(school_days_body MONDAY:MORNING)"
+expect G16 "nor can it be replaced" 404
+check G17 "the rows of the removed dependent stay as they were" "TUESDAY:NIGHT" "$(grid_of "$MARINA")"
+request POST "/api/dependent/$MARINA/restore" "$ANA"
+expect G18 "the client restores the dependent" 200
+request GET "/api/dependent/$MARINA/school-days" "$ANA"
+expect G19 "the restored dependent comes back with its grid" 200 "$GRID == [\"TUESDAY:NIGHT\"]"
+LUCAS_GRID_BODY=$(school_days_body MONDAY:MORNING TUESDAY:FULLTIME WEDNESDAY:MORNING THURSDAY:FULLTIME FRIDAY:MORNING)
+check G20 "six concurrent replacements of the same grid all succeed" "200 200 200 200 200 200" \
+  "$(in_parallel PUT "$ANA" "$LUCAS_GRID_BODY" /api/dependent/$LUCAS/school-days /api/dependent/$LUCAS/school-days \
+    /api/dependent/$LUCAS/school-days /api/dependent/$LUCAS/school-days /api/dependent/$LUCAS/school-days \
+    /api/dependent/$LUCAS/school-days)"
+check G21 "and leave exactly one active grid" "MONDAY:MORNING,TUESDAY:FULLTIME,WEDNESDAY:MORNING,THURSDAY:FULLTIME,FRIDAY:MORNING" \
+  "$(grid_of "$LUCAS")"
+request GET "/api/dependent/$LUCAS" "$ANA"
+expect G22 "the dependent has no single shift anymore" 200 'has("shift") | not'
+request POST /api/dependent "$ANA" "$(jq -nc '{name: "Teo Souza", shift: "FULLTIME"}')"
+expect G23 "a shift sent on creation is ignored" 201 'has("shift") | not'
+request DELETE "/api/dependent/$(jq -r .token <<<"$RESP_BODY")" "$ANA"
+expect G24 "the client removes the dependent created to check the shift" 204
+
+table "Weekly school days — misuse"
+LUCAS_GRID=$(grid_of "$LUCAS")
+MONDAY_BODY=$(school_days_body MONDAY:NIGHT)
+request GET "/api/dependent/$LUCAS/school-days" ""
+expect W1 "reading without a token" 401
+request GET "/api/dependent/$LUCAS/school-days" "not-a-jwt"
+expect W2 "reading with an invalid token" 401
+request PUT "/api/dependent/$LUCAS/school-days" "" "$MONDAY_BODY"
+expect W3 "replacing without a token" 401
+request GET "/api/dependent/$LUCAS/school-days" "$BRUNO"
+expect W4 "another client cannot read the grid" 403
+request PUT "/api/dependent/$LUCAS/school-days" "$BRUNO" "$MONDAY_BODY"
+expect W5 "another client cannot replace the grid" 403
+request GET "/api/dependent/$LUCAS/school-days" "$GUSTAVO"
+expect W6 "a driver cannot read the grid" 403
+request PUT "/api/dependent/$LUCAS/school-days" "$GUSTAVO" "$MONDAY_BODY"
+expect W7 "a driver cannot replace the grid" 403
+request GET /api/dependent/doesnotexist/school-days "$ANA"
+expect W8 "the grid of an unknown dependent" 404 '.code == "dependent.not_found"'
+request PUT /api/dependent/doesnotexist/school-days "$ANA" "$MONDAY_BODY"
+expect W9 "replacing the grid of an unknown dependent" 404
+request PUT "/api/dependent/$LUCAS/school-days" "$ANA" "$(school_days_body MONDAY:MORNING MONDAY:FULLTIME)"
+expect W10 "the same weekday twice, pt-BR message" 400 '.detail == "O mesmo dia da semana não pode aparecer duas vezes na grade escolar."'
+request PUT "/api/dependent/$LUCAS/school-days" "$ANA" \
+  "$(school_days_body MONDAY:MORNING TUESDAY:MORNING WEDNESDAY:MORNING THURSDAY:MORNING FRIDAY:MORNING SATURDAY:MORNING SUNDAY:MORNING MONDAY:NIGHT)"
+expect W11 "eight entries, one past the seven weekdays" 400
+request PUT "/api/dependent/$LUCAS/school-days" "$ANA" '{"days": [{"schoolShift": "MORNING"}]}'
+expect W12 "a day without weekday" 400
+request PUT "/api/dependent/$LUCAS/school-days" "$ANA" '{"days": [{"weekday": "MONDAY"}]}'
+expect W13 "a day without schoolShift" 400
+request PUT "/api/dependent/$LUCAS/school-days" "$ANA" "$(school_days_body FUNDAY:MORNING)"
+expect W14 "an unknown weekday" 400
+request PUT "/api/dependent/$LUCAS/school-days" "$ANA" "$(school_days_body MONDAY:EVENING)"
+expect W15 "an unknown schoolShift" 400
+request PUT "/api/dependent/$LUCAS/school-days" "$ANA" "$(school_days_body monday:MORNING)"
+expect W16 "a weekday in lower case" 400
+request PUT "/api/dependent/$LUCAS/school-days" "$ANA" '{"days": [null]}'
+expect W17 "a null day" 400
+request PUT "/api/dependent/$LUCAS/school-days" "$ANA" '{"days": null}'
+expect W18 "days null" 400
+request PUT "/api/dependent/$LUCAS/school-days" "$ANA" '{}'
+expect W19 "no days field" 400
+request PUT "/api/dependent/$LUCAS/school-days" "$ANA" '{"days": "MONDAY"}'
+expect W20 "days as a string" 400
+request PUT "/api/dependent/$LUCAS/school-days" "$ANA" '{"days": {"weekday": "MONDAY", "schoolShift": "MORNING"}}'
+expect W21 "days as an object" 400
+request PUT "/api/dependent/$LUCAS/school-days" "$ANA" '{"days": [{"weekday": "MONDAY", "schoolShift": true}]}'
+expect W22 "schoolShift as a boolean" 400
+request PUT "/api/dependent/$LUCAS/school-days" "$ANA" '{"days": [{"weekday": "MONDAY",'
+expect W23 "malformed JSON" 400
+check W24 "the refused requests left the grid unchanged" "$LUCAS_GRID" "$(grid_of "$LUCAS")"
+
+table "V62: dependent_school_day (database checks)"
+LUCAS_ID="(select id from dependent where token = '$LUCAS')"
+check_sql_rejected K1 "a second active row for the same weekday" dependent_school_day_weekday_active_key \
+  "insert into dependent_school_day (dependent_id, weekday, school_shift) values ($LUCAS_ID, 'MONDAY', 'NIGHT')"
+check_sql_accepted K2 "the same weekday once the active row is soft-deleted" \
+  "update dependent_school_day set deleted_at = now() where dependent_id = $LUCAS_ID and weekday = 'MONDAY' and deleted_at is null;
+   insert into dependent_school_day (dependent_id, weekday, school_shift) values ($LUCAS_ID, 'MONDAY', 'NIGHT')"
+check_sql_accepted K3 "the same weekday on another dependent" \
+  "insert into dependent_school_day (dependent_id, weekday, school_shift) select id, 'SATURDAY', 'MORNING' from dependent where token = '$LUCAS'
+   union all select id, 'SATURDAY', 'MORNING' from dependent where token = '$MARINA'"
+check_sql_rejected K4 "a row without school_shift" '"school_shift"' \
+  "insert into dependent_school_day (dependent_id, weekday) values ($LUCAS_ID, 'SUNDAY')"
+check_sql_rejected K5 "a row for a dependent that does not exist" dependent_school_day_dependent_id_fkey \
+  "insert into dependent_school_day (dependent_id, weekday, school_shift) values (-1, 'SUNDAY', 'MORNING')"
+check K6 "the table, weekday and school_shift are documented" 3 \
+  "$(sql "select (obj_description('dependent_school_day'::regclass, 'pg_class') is not null)::int + count(col_description('dependent_school_day'::regclass, attnum)) from pg_attribute where attrelid = 'dependent_school_day'::regclass and attname in ('weekday', 'school_shift')")"
+check K7 "the checks above were rolled back" "$LUCAS_GRID" "$(grid_of "$LUCAS")"
+check K8 "V62 dropped dependent.shift" 0 \
+  "$(sql "select count(*) from information_schema.columns where table_name = 'dependent' and column_name = 'shift'")"
+
+table "Contract readiness"
+READINESS=/api/clients/me/contract-readiness
+DEPENDENT_FIELDS='[.missing[] | select(.subject == "DEPENDENT") | .dependentToken + ":" + .field]'
+CLIENT_FIELDS='[.missing[] | select(.subject == "CLIENT") | .field]'
+request GET "$READINESS?dependentTokens=$LUCAS&dependentTokens=$MARINA" "$ANA"
+expect C1 "the seeded client misses phone and address; the restored dependent misses its address" 200 \
+  ".ready == false and $CLIENT_FIELDS == [\"PHONE\", \"ADDRESS\"] and $DEPENDENT_FIELDS == [\"$MARINA:ADDRESS\"]"
+expect_client_entries_without_token() { jq -e '[.missing[] | select(.subject == "CLIENT") | has("dependentToken")] | all(. == false)' <<<"$RESP_BODY" >/dev/null; }
+check C2 "client entries carry no dependentToken" yes "$(expect_client_entries_without_token && echo yes || echo no)"
+request GET "$READINESS?dependentTokens=$LUCAS,$MARINA" "$ANA"
+expect C3 "the tokens separated by a comma give the same answer" 200 \
+  "$DEPENDENT_FIELDS == [\"$MARINA:ADDRESS\"]"
+request GET "$READINESS?dependentTokens=$MARINA&dependentTokens=$MARINA" "$ANA"
+expect C4 "a token sent twice is checked once" 200 "$DEPENDENT_FIELDS == [\"$MARINA:ADDRESS\"]"
+request GET "$READINESS" "$ANA"
+expect C5 "without dependent tokens only the client is checked" 200 \
+  "$CLIENT_FIELDS == [\"PHONE\", \"ADDRESS\"] and $DEPENDENT_FIELDS == []"
+request PATCH "/api/dependent/$LUCAS" "$ANA" '{"birthDate": null}'
+request GET "$READINESS?dependentTokens=$LUCAS" "$ANA"
+expect C6 "clearing the birth date makes the dependent miss it" 200 "$DEPENDENT_FIELDS == [\"$LUCAS:BIRTH_DATE\"]"
+request PATCH "/api/dependent/$LUCAS" "$ANA" '{"birthDate": "2016-04-02"}'
+ANA_USER="(select id from users where email = 'ana.souza@seed.vanep.com.br')"
+sql "insert into address (token, city_id, zip_code, street, number) select 'qaanahome', city_id, zip_code, street, '99' from address where id = (select address_id from dependent where token = '$LUCAS');
+     update users set phone = '11999990000', address_id = (select id from address where token = 'qaanahome') where id = $ANA_USER" >/dev/null
+request GET "$READINESS?dependentTokens=$LUCAS" "$ANA"
+expect C7 "with phone, address and a complete dependent the client is ready" 200 '.ready == true and .missing == []'
+request PUT "/api/dependent/$LUCAS/school-days" "$ANA" '{"days": []}'
+request GET "$READINESS?dependentTokens=$LUCAS" "$ANA"
+expect C8 "clearing the grid makes the dependent miss the school days" 200 \
+  ".ready == false and $DEPENDENT_FIELDS == [\"$LUCAS:SCHOOL_DAYS\"]"
+request PUT "/api/dependent/$LUCAS/school-days" "$ANA" "$LUCAS_GRID_BODY"
+expect C9 "the client sets the grid back" 200
+request GET "$READINESS?dependentTokens=$LUCAS" "$ANA"
+expect C10 "and the dependent is ready again" 200 '.ready == true'
+
+table "Contract readiness — misuse"
+request GET "$READINESS?dependentTokens=$LUCAS" ""
+expect C11 "no token" 401
+request GET "$READINESS?dependentTokens=$LUCAS" "not-a-jwt"
+expect C12 "invalid token" 401
+request GET "$READINESS?dependentTokens=$LUCAS" "$GUSTAVO"
+expect C13 "a driver cannot ask" 403
+request GET "$READINESS" "$ADMIN"
+expect C14 "the admin is not a client" 403
+request GET "$READINESS?dependentTokens=$LUCAS" "$BRUNO"
+expect C15 "another client's dependent" 404
+request GET "$READINESS?dependentTokens=$LUCAS&dependentTokens=doesnotexist" "$ANA"
+expect C16 "an unknown token among known ones" 404
+request POST /api/dependent "$ANA" "$(jq -nc '{name: "Rafa Souza"}')"
+REMOVED_KID=$(jq -r .token <<<"$RESP_BODY")
+request DELETE "/api/dependent/$REMOVED_KID" "$ANA"
+expect C17 "the client removes a dependent" 204
+request GET "$READINESS?dependentTokens=$REMOVED_KID" "$ANA"
+expect C18 "a removed dependent" 404
+
+table "CPF of a dependent"
+DEPENDENTS_BEFORE=$(count dependent)
+request POST /api/dependent "$ANA" "$(jq -nc '{name: "Cpf Souza", document: "52998224724"}')"
+expect F1 "a CPF with wrong check digits on creation" 400
+request POST /api/dependent "$ANA" "$(jq -nc '{name: "Cpf Souza", document: "11111111111"}')"
+expect F2 "a CPF of repeated digits on creation" 400
+request POST /api/dependent "$ANA" "$(jq -nc '{name: "Cpf Souza", document: "5299822472"}')"
+expect F3 "a CPF one digit short" 400
+check F4 "the refused creations stored nothing" "$DEPENDENTS_BEFORE" "$(count dependent)"
+request POST /api/dependent "$ANA" "$(jq -nc '{name: "Cpf Souza", document: "529.982.247-25"}')"
+expect F5 "a masked CPF is stored as digits" 201 '.document == "52998224725"'
+CPF_KID=$(jq -r .token <<<"$RESP_BODY")
+request POST /api/dependent "$ANA" "$(jq -nc '{name: "Cpf Copia", document: "52998224725"}')"
+expect F6 "the same CPF without the mask is a duplicate" 409 '.detail == "Já existe um dependente cadastrado com este documento."'
+request PATCH "/api/dependent/$CPF_KID" "$ANA" '{"document": "39053344704"}'
+expect F7 "an invalid CPF on update" 400
+check F8 "the refused update kept the stored CPF" 52998224725 "$(sql "select document from dependent where token = '$CPF_KID'")"
+request PATCH "/api/dependent/$CPF_KID" "$ANA" '{"document": null}'
+expect F9 "document null clears the CPF" 200 '.document == null'
+request POST /api/dependent "$ANA" "$(jq -nc '{name: "Sem Cpf", document: ""}')"
+expect F10 "an empty document is stored as no document" 201 '.document == null'
+EMPTY_DOC_KID=$(jq -r .token <<<"$RESP_BODY")
+for kid in "$CPF_KID" "$EMPTY_DOC_KID"; do request DELETE "/api/dependent/$kid" "$ANA"; done
+expect F11 "the client removes the dependents created to check the CPF" 204
+
+table "School address on resolve (D21)"
+NO_DISTRICT='(has("district") | not)'
+NO_DISTRICT_FIELDS='(has("districtName") | not) and (has("districtToken") | not)'
+request POST /api/schools/resolve "$ANA" '{"placeId": "sp-escola-bandeirantes"}'
+expect N1 "a new school gets the address of its place" 201 \
+  ".address.street == \"Rua Estela\" and .address.number == \"268\" and .address.zipCode == \"04011001\"
+   and .address.neighborhood == \"Vila Mariana\" and .address.cityName == \"São Paulo\" and (.address | $NO_DISTRICT)"
+BANDEIRANTES=$(jq -r .token <<<"$RESP_BODY")
+BANDEIRANTES_ADDRESS=$(jq -r .address.token <<<"$RESP_BODY")
+request POST /api/schools/resolve "$ANA" '{"placeId": "df-escola-objetivo"}'
+expect N2 "a place with no route takes its deepest subdivision as the street and its shallowest sublocality as the neighborhood, and the school has no districtName nor districtToken" 201 \
+  ".address.street == \"QI 21\" and .address.neighborhood == \"Taguatinga Norte\" and .address.zipCode == \"72145450\" and $NO_DISTRICT_FIELDS"
+request POST /api/schools/resolve "$ANA" '{"placeId": "sp-escola-bandeirantes"}'
+expect N3 "resolving the school again keeps its address" 200 \
+  ".token == \"$BANDEIRANTES\" and .address.token == \"$BANDEIRANTES_ADDRESS\""
+check N4 "no second address was stored for the school" 1 \
+  "$(sql "select count(*) from address where google_place_id = (select google_place_id from school where token = '$BANDEIRANTES')")"
+sql "update address set deleted_at = now() where token = '$BANDEIRANTES_ADDRESS';
+     update school set address_id = null, google_place_id = 'sp-escola-bandeirantes' where token = '$BANDEIRANTES'" >/dev/null
+request POST /api/schools/resolve "$ANA" '{"placeId": "sp-escola-bandeirantes", "sessionToken": "qa-session"}'
+expect N5 "a known school without an address is completed on resolve" 200 \
+  ".token == \"$BANDEIRANTES\" and .address.street == \"Rua Estela\" and .address.token != \"$BANDEIRANTES_ADDRESS\""
+check N6 "the school now points to the new address" "$(jq -r .address.token <<<"$RESP_BODY")" \
+  "$(sql "select address.token from school join address on address.id = school.address_id where school.token = '$BANDEIRANTES'")"
+request POST /api/dependent "$ANA" "$(jq -nc --arg s "$BANDEIRANTES" '{name: "Escola Souza", schoolToken: $s}')"
+expect N7 "the dependent's school comes with its address" 201 \
+  ".school.token == \"$BANDEIRANTES\" and .school.address.street == \"Rua Estela\" and .school.address.neighborhood == \"Vila Mariana\""
+SCHOOL_KID=$(jq -r .token <<<"$RESP_BODY")
+request GET /api/dependent "$ANA"
+expect N8 "the dependent list carries the school address" 200 \
+  "any(.[]; .token == \"$SCHOOL_KID\" and .school.address.street == \"Rua Estela\")"
+request DELETE "/api/dependent/$SCHOOL_KID" "$ANA"
+expect N9 "the client removes the dependent created for the school" 204
+
+table "Neighborhood instead of district (D20)"
+request GET "/api/dependent/$LUCAS" "$ANA"
+expect N10 "the dependent address has a neighborhood and no district" 200 \
+  ".address.neighborhood == \"Centro\" and (.address | $NO_DISTRICT)"
+request GET /api/user/me/address "$ANA"
+expect N11 "the personal address has no districtName nor districtToken" 200 \
+  "has(\"neighborhood\") and $NO_DISTRICT_FIELDS"
+SEED_CONTRACT=$(sql "select contract.token from contract join contract_item item on item.contract_id = contract.id order by contract.id limit 1")
+request GET "/api/contracts/$SEED_CONTRACT" "$ADMIN"
+expect N12 "the contract item shows the pickup neighborhood and no pickupDistrictName" 200 \
+  '.items[0].pickupNeighborhood == "Centro" and (.items[0] | has("pickupDistrictName") | not)'
+check N13 "V63 removed address.district_id, contract_item.pickup_district_id and school.district_id" 0 \
+  "$(sql "select count(*) from information_schema.columns where (table_name, column_name) in (('address', 'district_id'), ('contract_item', 'pickup_district_id'), ('school', 'district_id'))")"
+request GET "/api/dependent/$LUCAS" "$ANA"
+expect N14 "the seeded school comes with an address of its own, in its city" 200 \
+  '.school.address.street == "Rua Vergueiro" and .school.address.neighborhood == "Liberdade"
+   and .school.address.cityName == "São Paulo" and .school.address.token != .address.token'
+
+table "V63 re-applied on rows that pointed to a district"
+SEED_ITEM_NEIGHBORHOOD=$(sql "select pickup_neighborhood from contract_item where id = (select min(id) from contract_item)")
+sql "alter table address add column district_id bigint references district (id);
+     alter table contract_item add column pickup_district_id bigint references district (id);
+     alter table school add column district_id bigint references district (id);
+     insert into district (token, city_id, name, normalized_name) select 'qadistrict', city_id, 'Setor L Norte', 'setor l norte' from address where token = '$BANDEIRANTES_ADDRESS';
+     insert into address (token, city_id, street, district_id) select 'qaaddrnull', city_id, 'Rua Sem Bairro', (select id from district where token = 'qadistrict') from address where token = '$BANDEIRANTES_ADDRESS';
+     insert into address (token, city_id, street, neighborhood, district_id) select 'qaaddrkeep', city_id, 'Rua Com Bairro', 'Centro', (select id from district where token = 'qadistrict') from address where token = '$BANDEIRANTES_ADDRESS';
+     insert into address (token, city_id, street) select 'qaaddrschool', city_id, 'Rua da Escola' from address where token = '$BANDEIRANTES_ADDRESS';
+     insert into school (token, name, city_id, address_id, district_id) select 'qaschool', 'Escola QA', city_id, id, (select id from district where token = 'qadistrict') from address where token = 'qaaddrschool';
+     update contract_item set pickup_neighborhood = null, pickup_district_id = (select id from district where token = 'qadistrict') where id = (select min(id) from contract_item)" >/dev/null
+apply_migration V63
+check H1 "an address without a neighborhood takes the name of its district" "Setor L Norte" \
+  "$(sql "select neighborhood from address where token = 'qaaddrnull'")"
+check H2 "an address with a neighborhood keeps it" Centro "$(sql "select neighborhood from address where token = 'qaaddrkeep'")"
+check H3 "a contract item without a pickup neighborhood takes the name of its district" "Setor L Norte" \
+  "$(sql "select pickup_neighborhood from contract_item where id = (select min(id) from contract_item)")"
+check H4 "a school address without a neighborhood takes the name of the school's district" "Setor L Norte" \
+  "$(sql "select neighborhood from address where token = 'qaaddrschool'")"
+check H5 "the three columns are gone again" 0 \
+  "$(sql "select count(*) from information_schema.columns where (table_name, column_name) in (('address', 'district_id'), ('contract_item', 'pickup_district_id'), ('school', 'district_id'))")"
+sql "update contract_item set pickup_neighborhood = '$SEED_ITEM_NEIGHBORHOOD' where id = (select min(id) from contract_item);
+     delete from school where token = 'qaschool';
+     delete from address where token in ('qaaddrnull', 'qaaddrkeep', 'qaaddrschool');
+     delete from district where token = 'qadistrict'" >/dev/null
+request GET "/api/contracts/$SEED_CONTRACT" "$ADMIN"
+expect H6 "the API reads the contract after the migration ran again" 200 '.items[0].pickupNeighborhood == "Centro"'
 
 echo
 echo "ALL PASSED: $PASSED scenarios"

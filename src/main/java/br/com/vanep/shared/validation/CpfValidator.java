@@ -1,4 +1,4 @@
-package br.com.vanep.auth.validation;
+package br.com.vanep.shared.validation;
 
 public final class CpfValidator {
 

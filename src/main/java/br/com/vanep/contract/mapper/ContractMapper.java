@@ -51,7 +51,6 @@ public class ContractMapper {
         item.getPickupNumber(),
         item.getPickupComplement(),
         item.getPickupNeighborhood(),
-        item.getPickupDistrict() == null ? null : item.getPickupDistrict().getName(),
         item.getPickupCity().getToken(),
         item.getPickupCity().getName(),
         item.getMonthlyAmount(),

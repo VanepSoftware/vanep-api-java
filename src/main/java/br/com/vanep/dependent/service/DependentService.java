@@ -7,13 +7,18 @@ import br.com.vanep.client.repository.ClientRepository;
 import br.com.vanep.dependent.dto.DependentCreateDTO;
 import br.com.vanep.dependent.dto.DependentResponseDTO;
 import br.com.vanep.dependent.dto.DependentSchoolDTO;
+import br.com.vanep.dependent.dto.DependentSchoolDayRequestDTO;
+import br.com.vanep.dependent.dto.DependentSchoolDayResponseDTO;
+import br.com.vanep.dependent.dto.DependentSchoolDaysRequestDTO;
 import br.com.vanep.dependent.dto.DependentUpdateDTO;
 import br.com.vanep.dependent.mapper.DependentMapper;
 import br.com.vanep.dependent.model.DependentModel;
+import br.com.vanep.dependent.model.DependentSchoolDayModel;
 import br.com.vanep.dependent.repository.DependentRepository;
+import br.com.vanep.dependent.repository.DependentSchoolDayRepository;
 import br.com.vanep.school.model.SchoolModel;
 import br.com.vanep.school.repository.SchoolRepository;
-import br.com.vanep.shared.enums.SchoolShift;
+import br.com.vanep.shared.validation.CpfValidator;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
 import java.util.Collection;
@@ -22,6 +27,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.openapitools.jackson.nullable.JsonNullable;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
@@ -36,6 +42,7 @@ import org.springframework.web.server.ResponseStatusException;
 public class DependentService {
 
   private final DependentRepository dependents;
+  private final DependentSchoolDayRepository schoolDays;
   private final ClientRepository clients;
   private final SchoolRepository schools;
   private final UserRepository users;
@@ -45,6 +52,7 @@ public class DependentService {
 
   public DependentService(
       DependentRepository dependents,
+      DependentSchoolDayRepository schoolDays,
       ClientRepository clients,
       SchoolRepository schools,
       UserRepository users,
@@ -52,6 +60,7 @@ public class DependentService {
       AddressService addressService,
       MessageSource messages) {
     this.dependents = dependents;
+    this.schoolDays = schoolDays;
     this.clients = clients;
     this.schools = schools;
     this.users = users;
@@ -67,9 +76,11 @@ public class DependentService {
   @Transactional
   public DependentResponseDTO create(Jwt jwt, DependentCreateDTO dto) {
     Long clientId = resolveClientIdForCreate(jwt, dto);
-    assertDocumentAvailable(dto.getDocument(), null);
+    String document = normalizeDocument(dto.getDocument());
+    assertDocumentAvailable(document, null);
 
     DependentModel model = mapper.toModel(dto, clientId);
+    model.setDocument(document);
     applySchoolOnCreate(dto.getSchoolToken(), model);
     applyDefaultOnCreate(model, dto, clientId);
 
@@ -116,6 +127,9 @@ public class DependentService {
     Long clientId = model.getClientId();
 
     addressService.clearForDependent(model.getId());
+    // Hibernate drops pending updates of an entity it is about to delete, so the cleared
+    // address_id is written first; otherwise the restored dependent points to a removed address.
+    dependents.flush();
     dependents.delete(model);
     dependents.flush();
     promoteDefaultAfterDelete(clientId, wasDefault);
@@ -136,6 +150,38 @@ public class DependentService {
     return toResponse(restored);
   }
 
+  @Transactional(readOnly = true)
+  public List<DependentSchoolDayResponseDTO> findSchoolDays(Jwt jwt, String token) {
+    DependentModel dependent = findActiveForAccess(jwt, token);
+    return mapper.toSchoolDayResponses(schoolDays.findByDependentId(dependent.getId()));
+  }
+
+  @Transactional
+  public List<DependentSchoolDayResponseDTO> replaceSchoolDays(
+      Jwt jwt, String token, DependentSchoolDaysRequestDTO request) {
+    DependentModel dependent = lockActiveForAccess(jwt, token);
+    ensureDistinctWeekdays(request.days());
+
+    schoolDays.deleteAll(schoolDays.findByDependentId(dependent.getId()));
+    // Soft deletes run after inserts on flush; flushing first frees the weekdays held by the
+    // partial unique index.
+    schoolDays.flush();
+    List<DependentSchoolDayModel> replaced =
+        schoolDays.saveAll(
+            request.days().stream()
+                .map(day -> mapper.toSchoolDayModel(dependent.getId(), day))
+                .toList());
+    return mapper.toSchoolDayResponses(replaced);
+  }
+
+  private void ensureDistinctWeekdays(List<DependentSchoolDayRequestDTO> days) {
+    long distinctWeekdays = days.stream().map(day -> day.weekday()).distinct().count();
+    if (distinctWeekdays < days.size()) {
+      throw new ResponseStatusException(
+          HttpStatus.BAD_REQUEST, message("dependent.school_days.weekday_duplicate"));
+    }
+  }
+
   private void applyScalarMerge(DependentUpdateDTO dto, DependentModel model) {
     applyName(dto.name(), model);
     applyNullable(dto.birthDate(), model::setBirthDate);
@@ -144,7 +190,6 @@ public class DependentService {
     applyNullable(dto.phone(), model::setPhone);
     applyNullable(dto.email(), model::setEmail);
     applyIsSelf(dto.isSelf(), model);
-    applyRequiredShift(dto.shift(), model);
     applyDefaultFlag(dto.isDefault(), model);
     applySchoolTokenMerge(dto.schoolToken(), model);
   }
@@ -178,11 +223,15 @@ public class DependentService {
     if (!documentField.isPresent()) {
       return;
     }
-    String document = documentField.get();
+    String document = normalizeDocument(documentField.get());
     if (document != null && !Objects.equals(document, model.getDocument())) {
       assertDocumentAvailable(document, model.getToken());
     }
     model.setDocument(document);
+  }
+
+  private String normalizeDocument(String document) {
+    return StringUtils.hasText(document) ? CpfValidator.normalize(document) : null;
   }
 
   private void applyIsSelf(JsonNullable<Boolean> field, DependentModel model) {
@@ -194,17 +243,6 @@ public class DependentService {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, message("dependent.field.null"));
     }
     model.setSelf(value);
-  }
-
-  private void applyRequiredShift(JsonNullable<SchoolShift> shiftField, DependentModel model) {
-    if (!shiftField.isPresent()) {
-      return;
-    }
-    SchoolShift shift = shiftField.get();
-    if (shift == null) {
-      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, message("dependent.field.null"));
-    }
-    model.setShift(shift);
   }
 
   private void applyDefaultFlag(JsonNullable<Boolean> isDefaultField, DependentModel model) {
@@ -260,6 +298,14 @@ public class DependentService {
     return model;
   }
 
+  // Two replacements of the same grid would otherwise insert the same weekdays at once and break
+  // the partial unique index; the lock makes the later one wait and replace the earlier one.
+  private DependentModel lockActiveForAccess(Jwt jwt, String token) {
+    DependentModel model = dependents.lockByToken(token).orElseThrow(this::notFound);
+    assertOwnership(jwt, model.getClientId());
+    return model;
+  }
+
   private DependentModel requireById(Long id) {
     return dependents.findById(id).orElseThrow(this::notFound);
   }
@@ -276,30 +322,41 @@ public class DependentService {
     Map<Long, String> clientTokens = clientTokensById(models);
     Map<Long, SchoolModel> schoolsById = schoolsById(models);
     Map<Long, AddressResponseDTO> addresses =
-        addressService.toResponsesByIds(
-            models.stream()
-                .map(dependent -> dependent.getAddressId())
-                .filter(Objects::nonNull)
-                .distinct()
-                .toList());
+        addressService.toResponsesByIds(addressIdsOf(models, schoolsById.values()));
     return models.stream()
         .map(
             model ->
                 mapper.toResponse(
                     model,
                     clientTokens.get(model.getClientId()),
-                    schoolDtoFor(model, schoolsById),
-                    model.getAddressId() == null ? null : addresses.get(model.getAddressId())))
+                    schoolDtoFor(model, schoolsById, addresses),
+                    addressOf(model.getAddressId(), addresses)))
         .toList();
   }
 
+  static List<Long> addressIdsOf(List<DependentModel> models, Collection<SchoolModel> schools) {
+    return Stream.concat(
+            models.stream().map(dependent -> dependent.getAddressId()),
+            schools.stream().map(school -> school.getAddressId()))
+        .filter(Objects::nonNull)
+        .distinct()
+        .toList();
+  }
+
+  static AddressResponseDTO addressOf(Long addressId, Map<Long, AddressResponseDTO> addresses) {
+    return addressId == null ? null : addresses.get(addressId);
+  }
+
   private DependentSchoolDTO schoolDtoFor(
-      DependentModel model, Map<Long, SchoolModel> schoolsById) {
+      DependentModel model,
+      Map<Long, SchoolModel> schoolsById,
+      Map<Long, AddressResponseDTO> addresses) {
     Long schoolId = model.getSchoolId();
     if (schoolId == null) {
       return null;
     }
-    return toSchoolDto(schoolsById.get(schoolId));
+    SchoolModel school = schoolsById.get(schoolId);
+    return school == null ? null : toSchoolDto(school, addressOf(school.getAddressId(), addresses));
   }
 
   private Map<Long, String> clientTokensById(List<DependentModel> models) {
@@ -333,14 +390,14 @@ public class DependentService {
     if (schoolId == null) {
       return null;
     }
-    return schools.findById(schoolId).map(this::toSchoolDto).orElse(null);
+    return schools
+        .findById(schoolId)
+        .map(school -> toSchoolDto(school, addressService.toResponseOrNull(school.getAddressId())))
+        .orElse(null);
   }
 
-  private DependentSchoolDTO toSchoolDto(SchoolModel school) {
-    if (school == null) {
-      return null;
-    }
-    return new DependentSchoolDTO(school.getToken(), school.getName());
+  private DependentSchoolDTO toSchoolDto(SchoolModel school, AddressResponseDTO address) {
+    return new DependentSchoolDTO(school.getToken(), school.getName(), address);
   }
 
   private void promoteDefaultAfterDelete(Long clientId, boolean wasDefault) {

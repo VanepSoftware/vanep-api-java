@@ -2,6 +2,7 @@ package br.com.vanep.dependent.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.nullable;
@@ -10,6 +11,7 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import br.com.vanep.address.dto.AddressResponseDTO;
@@ -20,16 +22,22 @@ import br.com.vanep.client.repository.ClientRepository;
 import br.com.vanep.dependent.dto.DependentCreateDTO;
 import br.com.vanep.dependent.dto.DependentResponseDTO;
 import br.com.vanep.dependent.dto.DependentSchoolDTO;
+import br.com.vanep.dependent.dto.DependentSchoolDayRequestDTO;
+import br.com.vanep.dependent.dto.DependentSchoolDayResponseDTO;
+import br.com.vanep.dependent.dto.DependentSchoolDaysRequestDTO;
 import br.com.vanep.dependent.dto.DependentUpdateDTO;
 import br.com.vanep.dependent.mapper.DependentMapper;
 import br.com.vanep.dependent.model.DependentModel;
+import br.com.vanep.dependent.model.DependentSchoolDayModel;
 import br.com.vanep.dependent.repository.DependentRepository;
+import br.com.vanep.dependent.repository.DependentSchoolDayRepository;
 import br.com.vanep.school.model.SchoolModel;
 import br.com.vanep.school.repository.SchoolRepository;
 import br.com.vanep.shared.enums.SchoolShift;
 import br.com.vanep.user.enums.Gender;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
@@ -37,6 +45,8 @@ import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -57,6 +67,7 @@ class DependentServiceTest {
   private static final String SCHOOL_NAME = "Escola Teste";
 
   @Mock private DependentRepository dependents;
+  @Mock private DependentSchoolDayRepository schoolDays;
   @Mock private ClientRepository clients;
   @Mock private SchoolRepository schools;
   @Mock private UserRepository users;
@@ -64,12 +75,15 @@ class DependentServiceTest {
   @Mock private AddressService addressService;
   @Mock private MessageSource messages;
 
+  @Captor private ArgumentCaptor<List<DependentSchoolDayModel>> savedDays;
+
   private DependentService service;
 
   @BeforeEach
   void setUp() {
     service =
-        new DependentService(dependents, clients, schools, users, mapper, addressService, messages);
+        new DependentService(
+            dependents, schoolDays, clients, schools, users, mapper, addressService, messages);
     lenient().when(messages.getMessage(any(), any(), any())).thenAnswer(inv -> inv.getArgument(0));
   }
 
@@ -128,7 +142,6 @@ class DependentServiceTest {
         JsonNullable.undefined(),
         JsonNullable.undefined(),
         JsonNullable.undefined(),
-        JsonNullable.undefined(),
         schoolToken);
   }
 
@@ -144,7 +157,6 @@ class DependentServiceTest {
         "kid@vanep.com",
         false,
         false,
-        SchoolShift.MORNING,
         null,
         address,
         null,
@@ -157,7 +169,6 @@ class DependentServiceTest {
         "13015904",
         "Rua Barão de Jaguara",
         "1481",
-        null,
         null,
         "Centro",
         "city-campinas",
@@ -182,7 +193,6 @@ class DependentServiceTest {
     model.setEmail("kid@vanep.com");
     model.setBirthDate(LocalDate.of(2015, 3, 20));
     model.setDocument("11111111111");
-    model.setShift(SchoolShift.MORNING);
     model.setDefaultDependent(isDefault);
     return model;
   }
@@ -196,27 +206,15 @@ class DependentServiceTest {
       JsonNullable<String> email,
       JsonNullable<Boolean> isSelf,
       JsonNullable<Boolean> isDefault,
-      JsonNullable<SchoolShift> shift,
       JsonNullable<DependentAddressRequestDTO> address,
       JsonNullable<String> schoolToken) {
     return new DependentUpdateDTO(
-        name,
-        birthDate,
-        gender,
-        document,
-        phone,
-        email,
-        isSelf,
-        isDefault,
-        shift,
-        address,
-        schoolToken);
+        name, birthDate, gender, document, phone, email, isSelf, isDefault, address, schoolToken);
   }
 
   private DependentUpdateDTO nameOnly(String name) {
     return patch(
         JsonNullable.of(name),
-        JsonNullable.undefined(),
         JsonNullable.undefined(),
         JsonNullable.undefined(),
         JsonNullable.undefined(),
@@ -328,7 +326,7 @@ class DependentServiceTest {
 
     assertThat(model.getSchoolId()).isEqualTo(SCHOOL_ID);
     verify(mapper)
-        .toResponse(model, "ctok", new DependentSchoolDTO(SCHOOL_TOKEN, SCHOOL_NAME), null);
+        .toResponse(model, "ctok", new DependentSchoolDTO(SCHOOL_TOKEN, SCHOOL_NAME, null), null);
   }
 
   @Test
@@ -470,7 +468,6 @@ class DependentServiceTest {
             JsonNullable.undefined(),
             JsonNullable.undefined(),
             JsonNullable.undefined(),
-            JsonNullable.undefined(),
             JsonNullable.undefined()));
 
     assertThat(model.getPhone()).isNull();
@@ -492,7 +489,6 @@ class DependentServiceTest {
         clientJwt(),
         TOKEN,
         patch(
-            JsonNullable.undefined(),
             JsonNullable.undefined(),
             JsonNullable.undefined(),
             JsonNullable.undefined(),
@@ -524,7 +520,6 @@ class DependentServiceTest {
         clientJwt(),
         TOKEN,
         patch(
-            JsonNullable.undefined(),
             JsonNullable.undefined(),
             JsonNullable.undefined(),
             JsonNullable.undefined(),
@@ -650,8 +645,78 @@ class DependentServiceTest {
     verify(schools).findAllById(List.of(SCHOOL_ID, 8L));
     verify(schools, never()).findById(any());
     verify(mapper)
-        .toResponse(first, "ctok", new DependentSchoolDTO(SCHOOL_TOKEN, SCHOOL_NAME), null);
-    verify(mapper).toResponse(second, "ctok", new DependentSchoolDTO("school-b", "Escola B"), null);
+        .toResponse(first, "ctok", new DependentSchoolDTO(SCHOOL_TOKEN, SCHOOL_NAME, null), null);
+    verify(mapper)
+        .toResponse(second, "ctok", new DependentSchoolDTO("school-b", "Escola B", null), null);
+  }
+
+  @Test
+  void listReadsTheDependentAndSchoolAddressesInOneQuery() {
+    DependentModel first = dependent(true);
+    first.setSchoolId(SCHOOL_ID);
+    first.setAddressId(10L);
+    SchoolModel firstSchool = school();
+    firstSchool.setAddressId(20L);
+    ClientModel client = new ClientModel();
+    client.setId(CLIENT_ID);
+    client.setToken("ctok");
+    AddressResponseDTO home = addressResponse();
+    AddressResponseDTO schoolAddress = schoolAddressResponse();
+
+    stubOwnershipResolution();
+    when(dependents.findByClientId(CLIENT_ID)).thenReturn(List.of(first));
+    when(clients.findAllById(List.of(CLIENT_ID))).thenReturn(List.of(client));
+    when(schools.findAllById(List.of(SCHOOL_ID))).thenReturn(List.of(firstSchool));
+    when(addressService.toResponsesByIds(List.of(10L, 20L)))
+        .thenReturn(Map.of(10L, home, 20L, schoolAddress));
+    when(mapper.toResponse(any(), eq("ctok"), any(), nullable(AddressResponseDTO.class)))
+        .thenReturn(response(home));
+
+    service.list(clientJwt());
+
+    verify(addressService).toResponsesByIds(List.of(10L, 20L));
+    verify(addressService, never()).toResponseOrNull(any());
+    verify(mapper)
+        .toResponse(
+            first, "ctok", new DependentSchoolDTO(SCHOOL_TOKEN, SCHOOL_NAME, schoolAddress), home);
+  }
+
+  @Test
+  void readsTheSchoolAddressOfOneDependent() {
+    DependentModel model = dependent(true);
+    model.setSchoolId(SCHOOL_ID);
+    SchoolModel linked = school();
+    linked.setAddressId(20L);
+
+    stubOwnershipResolution();
+    stubResponseMapping();
+    when(dependents.findByToken(TOKEN)).thenReturn(Optional.of(model));
+    when(schools.findById(SCHOOL_ID)).thenReturn(Optional.of(linked));
+    when(addressService.toResponseOrNull(20L)).thenReturn(schoolAddressResponse());
+
+    service.getByToken(clientJwt(), TOKEN);
+
+    verify(mapper)
+        .toResponse(
+            model,
+            "ctok",
+            new DependentSchoolDTO(SCHOOL_TOKEN, SCHOOL_NAME, schoolAddressResponse()),
+            null);
+  }
+
+  private AddressResponseDTO schoolAddressResponse() {
+    return new AddressResponseDTO(
+        "school-addr",
+        "72145450",
+        "QI 21",
+        null,
+        null,
+        "Taguatinga Norte",
+        "city-brasilia",
+        "Brasília",
+        "DF",
+        true,
+        null);
   }
 
   @Test
@@ -704,7 +769,6 @@ class DependentServiceTest {
                         JsonNullable.undefined(),
                         JsonNullable.of(null),
                         JsonNullable.undefined(),
-                        JsonNullable.undefined(),
                         JsonNullable.undefined())))
         .isInstanceOf(ResponseStatusException.class)
         .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
@@ -737,7 +801,6 @@ class DependentServiceTest {
             JsonNullable.undefined(),
             JsonNullable.of(true),
             JsonNullable.undefined(),
-            JsonNullable.undefined(),
             JsonNullable.undefined()));
 
     assertThat(model.isDefaultDependent()).isTrue();
@@ -763,7 +826,6 @@ class DependentServiceTest {
                         JsonNullable.undefined(),
                         JsonNullable.undefined(),
                         JsonNullable.of("11111111111"),
-                        JsonNullable.undefined(),
                         JsonNullable.undefined(),
                         JsonNullable.undefined(),
                         JsonNullable.undefined(),
@@ -799,10 +861,158 @@ class DependentServiceTest {
             JsonNullable.undefined(),
             JsonNullable.undefined(),
             JsonNullable.undefined(),
-            JsonNullable.undefined(),
             JsonNullable.undefined()));
 
     assertThat(model.getDocument()).isEqualTo("11111111111");
     verify(dependents, never()).existsByDocumentAndTokenNot(any(), any());
+  }
+
+  @Test
+  void readsTheSchoolDaysOfAnOwnDependent() {
+    stubOwnershipResolution();
+    List<DependentSchoolDayModel> stored =
+        List.of(schoolDay(DayOfWeek.MONDAY, SchoolShift.MORNING));
+    List<DependentSchoolDayResponseDTO> days =
+        List.of(new DependentSchoolDayResponseDTO(DayOfWeek.MONDAY, SchoolShift.MORNING));
+    when(dependents.findByToken(TOKEN)).thenReturn(Optional.of(dependent(true)));
+    when(schoolDays.findByDependentId(DEPENDENT_ID)).thenReturn(stored);
+    when(mapper.toSchoolDayResponses(stored)).thenReturn(days);
+
+    assertThat(service.findSchoolDays(clientJwt(), TOKEN)).isEqualTo(days);
+  }
+
+  @Test
+  void anotherClientCannotReadTheSchoolDays() {
+    stubOwnershipResolution();
+    DependentModel othersDependent = dependent(true);
+    othersDependent.setClientId(999L);
+    when(dependents.findByToken(TOKEN)).thenReturn(Optional.of(othersDependent));
+
+    assertThatThrownBy(() -> service.findSchoolDays(clientJwt(), TOKEN))
+        .isInstanceOf(ResponseStatusException.class)
+        .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+        .isEqualTo(HttpStatus.FORBIDDEN);
+    verifyNoInteractions(schoolDays);
+  }
+
+  @Test
+  void replacingTheSchoolDaysRemovesTheOldOnesBeforeSavingTheNewOnes() {
+    stubOwnershipResolution();
+    stubSchoolDayMapping();
+    List<DependentSchoolDayModel> old = List.of(schoolDay(DayOfWeek.MONDAY, SchoolShift.MORNING));
+    when(dependents.lockByToken(TOKEN)).thenReturn(Optional.of(dependent(true)));
+    when(schoolDays.findByDependentId(DEPENDENT_ID)).thenReturn(old);
+
+    service.replaceSchoolDays(
+        clientJwt(),
+        TOKEN,
+        schoolDaysRequest(
+            new DependentSchoolDayRequestDTO(DayOfWeek.TUESDAY, SchoolShift.FULLTIME),
+            new DependentSchoolDayRequestDTO(DayOfWeek.MONDAY, SchoolShift.AFTERNOON)));
+
+    InOrder order = inOrder(schoolDays);
+    order.verify(schoolDays).deleteAll(old);
+    order.verify(schoolDays).flush();
+    order.verify(schoolDays).saveAll(savedDays.capture());
+    assertThat(savedDays.getValue())
+        .extracting(
+            day -> day.getDependentId(), day -> day.getWeekday(), day -> day.getSchoolShift())
+        .containsExactly(
+            tuple(DEPENDENT_ID, DayOfWeek.TUESDAY, SchoolShift.FULLTIME),
+            tuple(DEPENDENT_ID, DayOfWeek.MONDAY, SchoolShift.AFTERNOON));
+  }
+
+  @Test
+  void anEmptyListClearsTheSchoolDays() {
+    stubOwnershipResolution();
+    List<DependentSchoolDayModel> old = List.of(schoolDay(DayOfWeek.MONDAY, SchoolShift.MORNING));
+    when(dependents.lockByToken(TOKEN)).thenReturn(Optional.of(dependent(true)));
+    when(schoolDays.findByDependentId(DEPENDENT_ID)).thenReturn(old);
+
+    service.replaceSchoolDays(clientJwt(), TOKEN, schoolDaysRequest());
+
+    verify(schoolDays).deleteAll(old);
+    verify(schoolDays).saveAll(savedDays.capture());
+    assertThat(savedDays.getValue()).isEmpty();
+  }
+
+  @Test
+  void theSameWeekdayTwiceIsRefusedAndTheGridIsUnchanged() {
+    stubOwnershipResolution();
+    when(dependents.lockByToken(TOKEN)).thenReturn(Optional.of(dependent(true)));
+
+    assertThatThrownBy(
+            () ->
+                service.replaceSchoolDays(
+                    clientJwt(),
+                    TOKEN,
+                    schoolDaysRequest(
+                        new DependentSchoolDayRequestDTO(DayOfWeek.MONDAY, SchoolShift.MORNING),
+                        new DependentSchoolDayRequestDTO(DayOfWeek.MONDAY, SchoolShift.FULLTIME))))
+        .isInstanceOfSatisfying(
+            ResponseStatusException.class,
+            e -> {
+              assertThat(e.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+              assertThat(e.getReason()).isEqualTo("dependent.school_days.weekday_duplicate");
+            });
+    verifyNoInteractions(schoolDays);
+  }
+
+  @Test
+  void anotherClientCannotReplaceTheSchoolDays() {
+    stubOwnershipResolution();
+    DependentModel othersDependent = dependent(true);
+    othersDependent.setClientId(999L);
+    when(dependents.lockByToken(TOKEN)).thenReturn(Optional.of(othersDependent));
+
+    assertThatThrownBy(
+            () ->
+                service.replaceSchoolDays(
+                    clientJwt(),
+                    TOKEN,
+                    schoolDaysRequest(
+                        new DependentSchoolDayRequestDTO(DayOfWeek.MONDAY, SchoolShift.MORNING))))
+        .isInstanceOf(ResponseStatusException.class)
+        .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+        .isEqualTo(HttpStatus.FORBIDDEN);
+    verifyNoInteractions(schoolDays);
+  }
+
+  @Test
+  void anUnknownDependentHasNoSchoolDaysToReplace() {
+    when(dependents.lockByToken("ghost")).thenReturn(Optional.empty());
+
+    assertThatThrownBy(
+            () ->
+                service.replaceSchoolDays(
+                    clientJwt(),
+                    "ghost",
+                    schoolDaysRequest(
+                        new DependentSchoolDayRequestDTO(DayOfWeek.MONDAY, SchoolShift.MORNING))))
+        .isInstanceOf(ResponseStatusException.class)
+        .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+        .isEqualTo(HttpStatus.NOT_FOUND);
+    verifyNoInteractions(schoolDays);
+  }
+
+  private DependentSchoolDaysRequestDTO schoolDaysRequest(DependentSchoolDayRequestDTO... days) {
+    return new DependentSchoolDaysRequestDTO(List.of(days));
+  }
+
+  private DependentSchoolDayModel schoolDay(DayOfWeek weekday, SchoolShift schoolShift) {
+    DependentSchoolDayModel day = new DependentSchoolDayModel();
+    day.setDependentId(DEPENDENT_ID);
+    day.setWeekday(weekday);
+    day.setSchoolShift(schoolShift);
+    return day;
+  }
+
+  private void stubSchoolDayMapping() {
+    when(mapper.toSchoolDayModel(eq(DEPENDENT_ID), any()))
+        .thenAnswer(
+            call -> {
+              DependentSchoolDayRequestDTO day = call.getArgument(1);
+              return schoolDay(day.weekday(), day.schoolShift());
+            });
   }
 }
