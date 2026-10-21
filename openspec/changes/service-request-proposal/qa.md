@@ -1,6 +1,6 @@
 # QA — service-request-proposal (constitution rule 55)
 
-Latest run: on the stack tip, `VAN-30/13-pickup-time-and-price`, which contains this branch: every scenario below passed there (see the `qa.md` of PR 13 for the date and the counts). This file keeps the scenarios of PRs 1 to 3.
+Latest run: on the stack tip, `VAN-30/13-pickup-time-and-price`, which contains this branch: every scenario below passed there (see the `qa.md` of PR 13 for the date and the counts). This file keeps the scenarios of PRs 1 to 4.
 
 ## How to run
 
@@ -47,6 +47,8 @@ Tokens come from the mobile password grant (`urn:vanep:params:oauth:grant-type:p
 For the origin scenarios (O1 to O28), the admin creates Diego – Helena as `DRIVER_INVITE`, Diego – Fabio as `CLIENT_SEARCH` and Elena – Gustavo through six concurrent requests. The last block (L1 to L5) rebuilds the schema as it was before `V61`: it drops the three columns and both checks, marks six links `BLOCKED` with no blocker (Diego – Fabio also removed), and runs the `V61` file again.
 
 For the school days scenarios (G1 to G24, W1 to W24, K1 to K8), Ana's two seeded dependents come complete from the seed (valid CPF, birth date, gender, school, pickup address and grid): Lucas is full time on Tuesday and Thursday and in the morning on the other weekdays, Marina in the morning from Monday to Friday. Bruno is the other client and Gustavo the driver of the misuse block.
+
+For the `V64` scenarios (Q1 to Q15), every insert runs inside a transaction that is rolled back. The requests use Diego – Gustavo and Bruno – Helena, and the items take Lucas's school and the city of his pickup address, with a snapshot built from his name and birth date. The checks are SQL against the tables.
 
 For the approval scenarios (V1 to V12), Fabio is put back `UNDER_REVIEW` with `is_available = false` by SQL, as a driver who just finished the onboarding. The cleanup restores every seeded driver to `APPROVED` and available.
 
@@ -259,6 +261,25 @@ For the approval scenarios (V1 to V12), Fabio is put back `UNDER_REVIEW` with `i
 | K6 | the table, weekday and school_shift are documented | 3 | PASS |
 | K7 | the checks above were rolled back | MONDAY:MORNING,TUESDAY:FULLTIME,WEDNESDAY:MORNING,THURSDAY:FULLTIME,FRIDAY:MORNING | PASS |
 | K8 | V62 dropped dependent.shift | 0 | PASS |
+
+### V64: service_request tables (database checks)
+| id | scenario | expected | result |
+|---|---|---|---|
+| Q1 | a second OPEN request of the same pair | rejected by service_request_client_driver_open_key | PASS |
+| Q2 | an OPEN request while the pair has an ANSWERED one | rejected by service_request_client_driver_open_key | PASS |
+| Q3 | an OPEN request after an EXPIRED one of the same pair | accepted | PASS |
+| Q4 | OPEN requests of two different pairs | accepted | PASS |
+| Q5 | a repeated token | rejected by service_request_token_key | PASS |
+| Q6 | the same weekday twice in one item | rejected by service_request_day_weekday_key | PASS |
+| Q7 | a day with neither outbound nor return | rejected by service_request_day_leg_check | PASS |
+| Q8 | a day with only the outbound and a day with only the return | accepted | PASS |
+| Q9 | the item keeps no district id | 0 | PASS |
+| Q10 | an item for a dependent that does not exist | rejected by service_request_item_dependent_id_fkey | PASS |
+| Q11 | the overdue sweep reads the partial index | yes | PASS |
+| Q12 | the tables, the status and the copied and per-day columns are documented | 8 | PASS |
+| Q13 | the checks above were rolled back | 1 | PASS |
+| Q14 | the negotiation tables have no deleted_at | 0 | PASS |
+| Q15 | a snapshot without the dependent | rejected by service_request_item_snapshot_check | PASS |
 
 ### Contract readiness
 | id | scenario | expected | result |
