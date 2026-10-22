@@ -372,7 +372,7 @@ class DependentServiceTest {
     remaining.setToken("other");
 
     stubOwnershipResolution();
-    when(dependents.findByToken(TOKEN)).thenReturn(Optional.of(toDelete));
+    when(dependents.lockByToken(TOKEN)).thenReturn(Optional.of(toDelete));
     when(dependents.findByClientId(CLIENT_ID)).thenReturn(List.of(remaining));
 
     service.delete(clientJwt(), TOKEN);
@@ -390,7 +390,7 @@ class DependentServiceTest {
     DependentModel second = dependent(false);
 
     stubOwnershipResolution();
-    when(dependents.findByToken(TOKEN)).thenReturn(Optional.of(toDelete));
+    when(dependents.lockByToken(TOKEN)).thenReturn(Optional.of(toDelete));
     when(dependents.findByClientId(CLIENT_ID)).thenReturn(List.of(first, second));
 
     service.delete(clientJwt(), TOKEN);
@@ -431,7 +431,7 @@ class DependentServiceTest {
 
     stubOwnershipResolution();
     stubResponseMapping();
-    when(dependents.findByToken(TOKEN)).thenReturn(Optional.of(model));
+    when(dependents.lockByToken(TOKEN)).thenReturn(Optional.of(model));
     when(dependents.save(model)).thenReturn(model);
     when(addressService.toResponseOrNull(10L)).thenReturn(addressResponse());
 
@@ -452,7 +452,7 @@ class DependentServiceTest {
 
     stubOwnershipResolution();
     stubResponseMapping();
-    when(dependents.findByToken(TOKEN)).thenReturn(Optional.of(model));
+    when(dependents.lockByToken(TOKEN)).thenReturn(Optional.of(model));
     when(dependents.save(model)).thenReturn(model);
 
     service.update(
@@ -481,7 +481,7 @@ class DependentServiceTest {
 
     stubOwnershipResolution();
     stubResponseMapping();
-    when(dependents.findByToken(TOKEN)).thenReturn(Optional.of(model));
+    when(dependents.lockByToken(TOKEN)).thenReturn(Optional.of(model));
     when(dependents.save(model)).thenReturn(model);
     when(dependents.findById(DEPENDENT_ID)).thenReturn(Optional.of(model));
 
@@ -511,7 +511,7 @@ class DependentServiceTest {
 
     stubOwnershipResolution();
     stubResponseMapping();
-    when(dependents.findByToken(TOKEN)).thenReturn(Optional.of(model));
+    when(dependents.lockByToken(TOKEN)).thenReturn(Optional.of(model));
     when(dependents.save(model)).thenReturn(model);
     when(addressService.upsertForDependent(DEPENDENT_ID, request)).thenReturn(addressResponse());
     when(dependents.findById(DEPENDENT_ID)).thenReturn(Optional.of(model));
@@ -541,7 +541,7 @@ class DependentServiceTest {
 
     stubOwnershipResolution();
     stubResponseMapping();
-    when(dependents.findByToken(TOKEN)).thenReturn(Optional.of(model));
+    when(dependents.lockByToken(TOKEN)).thenReturn(Optional.of(model));
     when(schools.findByToken(SCHOOL_TOKEN)).thenReturn(Optional.of(linked));
     when(schools.findById(SCHOOL_ID)).thenReturn(Optional.of(linked));
     when(dependents.save(model)).thenReturn(model);
@@ -558,7 +558,7 @@ class DependentServiceTest {
 
     stubOwnershipResolution();
     stubResponseMapping();
-    when(dependents.findByToken(TOKEN)).thenReturn(Optional.of(model));
+    when(dependents.lockByToken(TOKEN)).thenReturn(Optional.of(model));
     when(dependents.save(model)).thenReturn(model);
 
     service.update(clientJwt(), TOKEN, schoolOnly(JsonNullable.of(null)));
@@ -575,7 +575,7 @@ class DependentServiceTest {
 
     stubOwnershipResolution();
     stubResponseMapping();
-    when(dependents.findByToken(TOKEN)).thenReturn(Optional.of(model));
+    when(dependents.lockByToken(TOKEN)).thenReturn(Optional.of(model));
     when(schools.findById(SCHOOL_ID)).thenReturn(Optional.of(linked));
     when(dependents.save(model)).thenReturn(model);
 
@@ -590,7 +590,7 @@ class DependentServiceTest {
     DependentModel model = dependent(true);
 
     stubOwnershipResolution();
-    when(dependents.findByToken(TOKEN)).thenReturn(Optional.of(model));
+    when(dependents.lockByToken(TOKEN)).thenReturn(Optional.of(model));
     when(schools.findByToken("missing-tok")).thenReturn(Optional.empty());
 
     assertThatThrownBy(
@@ -607,7 +607,7 @@ class DependentServiceTest {
     model.setSchoolId(SCHOOL_ID);
 
     stubOwnershipResolution();
-    when(dependents.findByToken(TOKEN)).thenReturn(Optional.of(model));
+    when(dependents.lockByToken(TOKEN)).thenReturn(Optional.of(model));
 
     assertThatThrownBy(() -> service.update(clientJwt(), TOKEN, schoolOnly(JsonNullable.of(""))))
         .isInstanceOf(ResponseStatusException.class)
@@ -724,7 +724,7 @@ class DependentServiceTest {
     DependentModel model = dependent(true);
 
     stubOwnershipResolution();
-    when(dependents.findByToken(TOKEN)).thenReturn(Optional.of(model));
+    when(dependents.lockByToken(TOKEN)).thenReturn(Optional.of(model));
 
     assertThatThrownBy(() -> service.update(clientJwt(), TOKEN, nameOnly("")))
         .isInstanceOf(ResponseStatusException.class)
@@ -739,7 +739,7 @@ class DependentServiceTest {
     DependentModel model = dependent(true);
 
     stubOwnershipResolution();
-    when(dependents.findByToken(TOKEN)).thenReturn(Optional.of(model));
+    when(dependents.lockByToken(TOKEN)).thenReturn(Optional.of(model));
 
     assertThatThrownBy(() -> service.update(clientJwt(), TOKEN, nameOnly(null)))
         .isInstanceOf(ResponseStatusException.class)
@@ -752,7 +752,7 @@ class DependentServiceTest {
     DependentModel model = dependent(true);
 
     stubOwnershipResolution();
-    when(dependents.findByToken(TOKEN)).thenReturn(Optional.of(model));
+    when(dependents.lockByToken(TOKEN)).thenReturn(Optional.of(model));
 
     assertThatThrownBy(
             () ->
@@ -784,7 +784,7 @@ class DependentServiceTest {
 
     stubOwnershipResolution();
     stubResponseMapping();
-    when(dependents.findByToken(TOKEN)).thenReturn(Optional.of(model));
+    when(dependents.lockByToken(TOKEN)).thenReturn(Optional.of(model));
     when(dependents.findByClientId(CLIENT_ID)).thenReturn(List.of(previousDefault, model));
     when(dependents.save(any(DependentModel.class))).thenReturn(model);
 
@@ -813,7 +813,7 @@ class DependentServiceTest {
     model.setDocument("22222222222");
 
     stubOwnershipResolution();
-    when(dependents.findByToken(TOKEN)).thenReturn(Optional.of(model));
+    when(dependents.lockByToken(TOKEN)).thenReturn(Optional.of(model));
     when(dependents.existsByDocumentAndTokenNot("11111111111", TOKEN)).thenReturn(true);
 
     assertThatThrownBy(
@@ -845,7 +845,7 @@ class DependentServiceTest {
 
     stubOwnershipResolution();
     stubResponseMapping();
-    when(dependents.findByToken(TOKEN)).thenReturn(Optional.of(model));
+    when(dependents.lockByToken(TOKEN)).thenReturn(Optional.of(model));
     when(dependents.save(model)).thenReturn(model);
 
     service.update(
@@ -993,6 +993,163 @@ class DependentServiceTest {
         .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
         .isEqualTo(HttpStatus.NOT_FOUND);
     verifyNoInteractions(schoolDays);
+  }
+
+  @Test
+  void removalLocksTheDependentBeforeCheckingItsContractsAndNegotiations() {
+    DependentModel model = dependent(false);
+    stubOwnershipResolution();
+    when(dependents.lockByToken(TOKEN)).thenReturn(Optional.of(model));
+
+    service.delete(clientJwt(), TOKEN);
+
+    InOrder order = inOrder(dependents);
+    order.verify(dependents).lockByToken(TOKEN);
+    order.verify(dependents).existsInOpenContract(DEPENDENT_ID);
+    order.verify(dependents).existsInOpenServiceRequest(DEPENDENT_ID);
+    order.verify(dependents).delete(model);
+  }
+
+  @Test
+  void aDependentInAnOpenServiceRequestIsNotRemoved() {
+    stubOwnershipResolution();
+    when(dependents.lockByToken(TOKEN)).thenReturn(Optional.of(dependent(false)));
+    when(dependents.existsInOpenServiceRequest(DEPENDENT_ID)).thenReturn(true);
+
+    assertLocked(() -> service.delete(clientJwt(), TOKEN), "dependent.open_negotiation");
+    verify(dependents, never()).delete(any());
+    verifyNoInteractions(addressService);
+  }
+
+  @Test
+  void aDependentWithAContractInProgressIsNotRemoved() {
+    stubOwnershipResolution();
+    when(dependents.lockByToken(TOKEN)).thenReturn(Optional.of(dependent(false)));
+    when(dependents.existsInOpenContract(DEPENDENT_ID)).thenReturn(true);
+
+    assertLocked(() -> service.delete(clientJwt(), TOKEN), "dependent.open_contract");
+    verify(dependents, never()).delete(any());
+    verifyNoInteractions(addressService);
+  }
+
+  @Test
+  void theAdminIsLockedOutByTheContractToo() {
+    when(dependents.lockByToken(TOKEN)).thenReturn(Optional.of(dependent(false)));
+    when(dependents.existsInOpenContract(DEPENDENT_ID)).thenReturn(true);
+
+    assertLocked(() -> service.delete(adminJwt(), TOKEN), "dependent.open_contract");
+    verify(dependents, never()).delete(any());
+  }
+
+  @Test
+  void underAContractTheSchoolCannotChange() {
+    DependentModel model = dependent(true);
+    model.setSchoolId(SCHOOL_ID);
+    stubOwnershipResolution();
+    when(dependents.lockByToken(TOKEN)).thenReturn(Optional.of(model));
+    when(dependents.existsInOpenContract(DEPENDENT_ID)).thenReturn(true);
+
+    assertLocked(
+        () -> service.update(clientJwt(), TOKEN, schoolOnly(JsonNullable.of("other-school"))),
+        "dependent.open_contract");
+    assertThat(model.getSchoolId()).isEqualTo(SCHOOL_ID);
+    verify(dependents, never()).save(any());
+    verifyNoInteractions(schools);
+  }
+
+  @Test
+  void underAContractTheAddressCannotChangeNorBeCleared() {
+    stubOwnershipResolution();
+    when(dependents.lockByToken(TOKEN)).thenReturn(Optional.of(dependent(true)));
+    when(dependents.existsInOpenContract(DEPENDENT_ID)).thenReturn(true);
+
+    assertLocked(
+        () -> service.update(clientJwt(), TOKEN, addressOnly(JsonNullable.of(addressRequest()))),
+        "dependent.open_contract");
+    assertLocked(
+        () -> service.update(clientJwt(), TOKEN, addressOnly(JsonNullable.of(null))),
+        "dependent.open_contract");
+    verify(dependents, never()).save(any());
+    verifyNoInteractions(addressService);
+  }
+
+  @Test
+  void underAContractTheNameStillChangesWithoutLookingAtTheContract() {
+    DependentModel model = dependent(true);
+    stubOwnershipResolution();
+    stubResponseMapping();
+    when(dependents.lockByToken(TOKEN)).thenReturn(Optional.of(model));
+    when(dependents.save(model)).thenReturn(model);
+
+    service.update(clientJwt(), TOKEN, nameOnly("Lucas Souza"));
+
+    assertThat(model.getName()).isEqualTo("Lucas Souza");
+    verify(dependents, never()).existsInOpenContract(any());
+  }
+
+  @Test
+  void underAContractTheSchoolDaysCannotBeReplaced() {
+    stubOwnershipResolution();
+    when(dependents.lockByToken(TOKEN)).thenReturn(Optional.of(dependent(true)));
+    when(dependents.existsInOpenContract(DEPENDENT_ID)).thenReturn(true);
+
+    assertLocked(
+        () ->
+            service.replaceSchoolDays(
+                clientJwt(),
+                TOKEN,
+                schoolDaysRequest(
+                    new DependentSchoolDayRequestDTO(DayOfWeek.MONDAY, SchoolShift.MORNING))),
+        "dependent.open_contract");
+    verifyNoInteractions(schoolDays);
+  }
+
+  @Test
+  void restoringIsNeverLocked() {
+    DependentModel restored = dependent(false);
+    stubOwnershipResolution();
+    stubResponseMapping();
+    when(dependents.findByToken(TOKEN))
+        .thenReturn(Optional.empty())
+        .thenReturn(Optional.of(restored));
+    when(dependents.findClientIdOfDeletedByToken(TOKEN)).thenReturn(Optional.of(CLIENT_ID));
+
+    service.restore(clientJwt(), TOKEN);
+
+    verify(dependents).restoreByToken(TOKEN);
+    verify(dependents, never()).existsInOpenContract(any());
+    verify(dependents, never()).existsInOpenServiceRequest(any());
+  }
+
+  private void assertLocked(Runnable call, String key) {
+    assertThatThrownBy(() -> call.run())
+        .isInstanceOfSatisfying(
+            ResponseStatusException.class,
+            e -> {
+              assertThat(e.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
+              assertThat(e.getReason()).isEqualTo(key);
+              assertThat(e.getBody().getProperties()).containsEntry("code", key);
+            });
+  }
+
+  private Jwt adminJwt() {
+    Jwt jwt = mock(Jwt.class);
+    lenient().when(jwt.getClaim("roles")).thenReturn(List.of("ROLE_ADMIN"));
+    return jwt;
+  }
+
+  private DependentUpdateDTO addressOnly(JsonNullable<DependentAddressRequestDTO> address) {
+    return patch(
+        JsonNullable.undefined(),
+        JsonNullable.undefined(),
+        JsonNullable.undefined(),
+        JsonNullable.undefined(),
+        JsonNullable.undefined(),
+        JsonNullable.undefined(),
+        JsonNullable.undefined(),
+        JsonNullable.undefined(),
+        address,
+        JsonNullable.undefined());
   }
 
   private DependentSchoolDaysRequestDTO schoolDaysRequest(DependentSchoolDayRequestDTO... days) {

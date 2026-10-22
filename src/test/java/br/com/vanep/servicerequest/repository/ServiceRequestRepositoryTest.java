@@ -429,6 +429,36 @@ class ServiceRequestRepositoryTest {
     assertThat(reread.getStatus()).isEqualTo(ServiceRequestStatus.WITHDRAWN);
   }
 
+  @Test
+  void declineWritesTheReasonWithTheStatusOnlyFromAnExpectedStatus() {
+    ServiceRequestModel saved = saveRequest(link, ServiceRequestStatus.OPEN);
+
+    Integer fromAnswered =
+        transactions.execute(
+            status ->
+                requests.updateStatusWithDeclineReason(
+                    saved.getId(),
+                    Set.of(ServiceRequestStatus.ANSWERED),
+                    ServiceRequestStatus.DECLINED,
+                    "Sem vaga"));
+    ServiceRequestModel reread =
+        transactions.execute(
+            status -> {
+              requests.updateStatusWithDeclineReason(
+                  saved.getId(),
+                  Set.of(ServiceRequestStatus.OPEN),
+                  ServiceRequestStatus.DECLINED,
+                  "Sem vaga");
+              return requests
+                  .findByTokenAndClientId(saved.getToken(), client.getId())
+                  .orElseThrow();
+            });
+
+    assertThat(fromAnswered).isZero();
+    assertThat(reread.getStatus()).isEqualTo(ServiceRequestStatus.DECLINED);
+    assertThat(reread.getDeclineReason()).isEqualTo("Sem vaga");
+  }
+
   private ServiceRequestStatus statusOf(ServiceRequestModel request) {
     return requests
         .findByTokenAndClientId(request.getToken(), client.getId())

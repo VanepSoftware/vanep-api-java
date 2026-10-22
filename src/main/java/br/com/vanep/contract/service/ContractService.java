@@ -190,7 +190,7 @@ public class ContractService {
   ContractItemModel createItem(ClientDriverModel link, ContractItemRequestDTO request) {
     DependentModel dependent =
         dependents
-            .findByToken(request.dependentToken())
+            .lockByToken(request.dependentToken())
             .orElseThrow(() -> notFound("dependent.not_found"));
     if (!link.getClient().getId().equals(dependent.getClientId())) {
       throw unprocessableEntity("contract.item.dependent_not_in_link");

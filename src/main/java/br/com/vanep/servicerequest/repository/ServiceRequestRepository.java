@@ -122,4 +122,18 @@ public interface ServiceRequestRepository extends JpaRepository<ServiceRequestMo
       where request.id = :id and request.status in :from
       """)
   int updateStatus(Long id, Collection<ServiceRequestStatus> from, ServiceRequestStatus to);
+
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query(
+      """
+      update ServiceRequestModel request
+      set request.status = :to, request.declineReason = :declineReason,
+        request.updatedAt = instant
+      where request.id = :id and request.status in :from
+      """)
+  int updateStatusWithDeclineReason(
+      Long id,
+      Collection<ServiceRequestStatus> from,
+      ServiceRequestStatus to,
+      String declineReason);
 }
