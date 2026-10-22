@@ -1,11 +1,13 @@
 package br.com.vanep.clientdriver.repository;
 
 import br.com.vanep.clientdriver.model.ClientDriverModel;
+import jakarta.persistence.LockModeType;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -21,6 +23,14 @@ public interface ClientDriverRepository extends JpaRepository<ClientDriverModel,
       where client.id = :clientId and driver.id = :driverId
       """)
   Optional<ClientDriverModel> findByPair(Long clientId, Long driverId);
+
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query(
+      """
+      select link from ClientDriverModel link
+      where link.client.id = :clientId and link.driver.id = :driverId
+      """)
+  Optional<ClientDriverModel> lockByPair(Long clientId, Long driverId);
 
   @Query(
       """

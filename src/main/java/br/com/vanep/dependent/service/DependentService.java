@@ -109,7 +109,10 @@ public class DependentService {
 
   @Transactional
   public DependentResponseDTO update(Jwt jwt, String token, DependentUpdateDTO dto) {
-    DependentModel model = findActiveForAccess(jwt, token);
+    DependentModel model = lockActiveForAccess(jwt, token);
+    if (dto.schoolToken().isPresent() || dto.address().isPresent()) {
+      ensureNoOpenContract(model);
+    }
     applyScalarMerge(dto, model);
 
     DependentModel saved = dependents.save(model);
@@ -122,7 +125,9 @@ public class DependentService {
 
   @Transactional
   public void delete(Jwt jwt, String token) {
-    DependentModel model = findActiveForAccess(jwt, token);
+    DependentModel model = lockActiveForAccess(jwt, token);
+    ensureNoOpenContract(model);
+    ensureNoOpenNegotiation(model);
     boolean wasDefault = model.isDefaultDependent();
     Long clientId = model.getClientId();
 
@@ -160,6 +165,7 @@ public class DependentService {
   public List<DependentSchoolDayResponseDTO> replaceSchoolDays(
       Jwt jwt, String token, DependentSchoolDaysRequestDTO request) {
     DependentModel dependent = lockActiveForAccess(jwt, token);
+    ensureNoOpenContract(dependent);
     ensureDistinctWeekdays(request.days());
 
     schoolDays.deleteAll(schoolDays.findByDependentId(dependent.getId()));
@@ -172,6 +178,18 @@ public class DependentService {
                 .map(day -> mapper.toSchoolDayModel(dependent.getId(), day))
                 .toList());
     return mapper.toSchoolDayResponses(replaced);
+  }
+
+  void ensureNoOpenContract(DependentModel dependent) {
+    if (dependents.existsInOpenContract(dependent.getId())) {
+      throw unprocessableContent("dependent.open_contract");
+    }
+  }
+
+  void ensureNoOpenNegotiation(DependentModel dependent) {
+    if (dependents.existsInOpenServiceRequest(dependent.getId())) {
+      throw unprocessableContent("dependent.open_negotiation");
+    }
   }
 
   private void ensureDistinctWeekdays(List<DependentSchoolDayRequestDTO> days) {
@@ -298,8 +316,8 @@ public class DependentService {
     return model;
   }
 
-  // Two replacements of the same grid would otherwise insert the same weekdays at once and break
-  // the partial unique index; the lock makes the later one wait and replace the earlier one.
+  // The row lock orders these writes against new requests and contracts for the dependent, and
+  // two grid replacements against each other's inserts on the partial unique index.
   private DependentModel lockActiveForAccess(Jwt jwt, String token) {
     DependentModel model = dependents.lockByToken(token).orElseThrow(this::notFound);
     assertOwnership(jwt, model.getClientId());
@@ -498,6 +516,13 @@ public class DependentService {
       return values.stream().anyMatch(role -> "ROLE_ADMIN".equals(role.toString()));
     }
     return false;
+  }
+
+  private ResponseStatusException unprocessableContent(String key) {
+    ResponseStatusException exception =
+        new ResponseStatusException(HttpStatus.UNPROCESSABLE_CONTENT, message(key));
+    exception.getBody().setProperty("code", key);
+    return exception;
   }
 
   private ResponseStatusException notFound() {

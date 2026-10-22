@@ -6,6 +6,7 @@ import br.com.vanep.contractreadiness.dto.ContractReadinessDependentDTO;
 import br.com.vanep.contractreadiness.dto.ContractReadinessMissingDTO;
 import br.com.vanep.contractreadiness.dto.ContractReadinessResponseDTO;
 import br.com.vanep.dependent.model.DependentModel;
+import br.com.vanep.dependent.model.DependentSchoolDayModel;
 import br.com.vanep.dependent.repository.DependentRepository;
 import br.com.vanep.dependent.repository.DependentSchoolDayRepository;
 import br.com.vanep.user.enums.UserType;
@@ -58,6 +59,15 @@ public class ContractReadinessService {
     return new ContractReadinessResponseDTO(missing.isEmpty(), missing);
   }
 
+  public boolean isReady(
+      UserModel caller,
+      List<DependentModel> dependents,
+      List<DependentSchoolDayModel> dependentSchoolDays) {
+    return policy
+        .findMissing(toClientData(caller), toDependentData(dependents, dependentSchoolDays))
+        .isEmpty();
+  }
+
   private ContractReadinessClientDTO toClientData(UserModel caller) {
     return new ContractReadinessClientDTO(
         caller.getDocument(), caller.getPhone(), caller.getAddressId());
@@ -69,10 +79,16 @@ public class ContractReadinessService {
       return List.of();
     }
     List<DependentModel> chosen = requireOwnDependents(caller, tokens);
+    return toDependentData(
+        chosen,
+        schoolDays.findByDependentIdIn(
+            chosen.stream().map(dependent -> dependent.getId()).toList()));
+  }
+
+  private List<ContractReadinessDependentDTO> toDependentData(
+      List<DependentModel> chosen, List<DependentSchoolDayModel> dependentSchoolDays) {
     Map<Long, List<DayOfWeek>> weekdaysByDependent =
-        schoolDays
-            .findByDependentIdIn(chosen.stream().map(dependent -> dependent.getId()).toList())
-            .stream()
+        dependentSchoolDays.stream()
             .collect(
                 Collectors.groupingBy(
                     day -> day.getDependentId(),
