@@ -109,16 +109,16 @@
 > Depends on: PR 4 | Parallel with: —
 > Order: test → migration → enum → policy → model → repository
 
-- [ ] 5.1 Criar branch `VAN-30/5-proposal-schema` de dentro da branch do PR 4
-- [ ] 5.2 Testes de repositório: proposta com itens, agendas e ajustes, relida fora da transação com a foto do veículo; a foto sobrevive a editar, remover e restaurar o veículo; cadeia de uma solicitação em ordem de versão; proposta `SENT` de um par; busca por token dentro do cliente e dentro do motorista; `SENT` vencidas por `valid_until`; escrita condicional de status (muda uma linha de `SENT`, zero de outro status)
-- [ ] 5.3 Testes da `ProposalTransitionPolicy`: só sai de `SENT`, para os cinco destinos; terminais não saem; um teste por par
-- [ ] 5.4 Migration `V65__create_proposal_tables.sql` com as colunas, os `CHECK`s e os índices do Migration Plan do `design.md`; comments (imutável, nova versão substitui; a foto do veículo; `resulting_contract_id` da fase 3; `source_contract_id` da fase 8; menus provisórios até a revisão jurídica)
-- [ ] 5.5 Enums em `proposal.enums`: `ProposalStatus` (`SENT`, `ACCEPTED`, `SUPERSEDED`, `DECLINED`, `EXPIRED`, `WITHDRAWN`), `ProposalAdjustmentPolicy`, `ProposalCancellationPolicy`, `ProposalAdjustmentField` (D6, D7); e a `ProposalTransitionPolicy` pura
-- [ ] 5.6 `ProposalModel` (termos com `updatable = false`; `vehicleId`, `parentProposalId`, `sourceContractId` e `resultingContractId` como colunas simples; a foto do veículo como `record`, D19), `ProposalItemModel` (`dependentId` como coluna simples; agenda como `@OneToOne` para `ScheduleModel` com `cascade = ALL`, como o `contract_item`), `ProposalAdjustmentModel`
-- [ ] 5.7 `ProposalRepository` e `ProposalAdjustmentRepository` com as consultas do 5.2 (regra 17)
-- [ ] 5.8 Acrescentar as três tabelas ao `clean.sql` na ordem de FK
-- [ ] 5.9 `make lint` + `./mvnw verify -B`
-- [ ] 5.10 QA da regra 55, por SQL: segunda `SENT` do par recusada; versão repetida na solicitação recusada; `ACCEPTED` sem `accepted_at` recusado e o inverso; `resulting_contract_id` repetido recusado; ajuste sem valor e sem nota recusado; foto sem o veículo recusada; cada faixa numérica no limite aceita e um passo além recusada
+- [x] 5.1 Criar branch `VAN-30/5-proposal-schema` de dentro da branch do PR 4
+- [x] 5.2 Testes de repositório: proposta com itens, agendas e ajustes, relida fora da transação com a foto do veículo; a foto sobrevive a editar, remover e restaurar o veículo; cadeia de uma solicitação em ordem de versão; proposta `SENT` de um par; busca por token dentro do cliente e dentro do motorista; `SENT` vencidas por `valid_until`; escrita condicional de status (muda uma linha de `SENT`, zero de outro status)
+- [x] 5.3 Testes da `ProposalTransitionPolicy`: só sai de `SENT`, para os cinco destinos; terminais não saem; um teste por par
+- [x] 5.4 Migration `V65__create_proposal_tables.sql` com as colunas, os `CHECK`s e os índices do Migration Plan do `design.md`; comments (imutável, nova versão substitui; a foto do veículo; `resulting_contract_id` da fase 3; `source_contract_id` da fase 8; menus provisórios até a revisão jurídica)
+- [x] 5.5 Enums em `proposal.enums`: `ProposalStatus` (`SENT`, `ACCEPTED`, `SUPERSEDED`, `DECLINED`, `EXPIRED`, `WITHDRAWN`), `ProposalAdjustmentPolicy`, `ProposalCancellationPolicy`, `ProposalAdjustmentField` (D6, D7); e a `ProposalTransitionPolicy` pura
+- [x] 5.6 `ProposalModel` (termos com `updatable = false`; `vehicleId`, `parentProposalId`, `sourceContractId` e `resultingContractId` como colunas simples; a foto do veículo como `record`, D19), `ProposalItemModel` (`dependentId` como coluna simples; agenda como `@OneToOne` para `ScheduleModel` com `cascade = ALL`, como o `contract_item`), `ProposalAdjustmentModel`
+- [x] 5.7 `ProposalRepository` e `ProposalAdjustmentRepository` com as consultas do 5.2 (regra 17)
+- [x] 5.8 Acrescentar as três tabelas ao `clean.sql` na ordem de FK
+- [x] 5.9 `make lint` + `./mvnw verify -B`
+- [x] 5.10 QA da regra 55, por SQL: segunda `SENT` do par recusada; versão repetida na solicitação recusada; `ACCEPTED` sem `accepted_at` recusado e o inverso; `resulting_contract_id` repetido recusado; ajuste sem valor e sem nota recusado; foto sem o veículo recusada; cada faixa numérica no limite aceita e um passo além recusada
 
 ## 6. PR 6 — Serviço da solicitação e prontidão
 

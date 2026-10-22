@@ -1,6 +1,6 @@
 # QA — service-request-proposal (constitution rule 55)
 
-Latest run: on the stack tip, `VAN-30/13-pickup-time-and-price`, which contains this branch: every scenario below passed there (see the `qa.md` of PR 13 for the date and the counts). This file keeps the scenarios of PRs 1 to 4.
+Latest run: on the stack tip, `VAN-30/13-pickup-time-and-price`, which contains this branch: every scenario below passed there (see the `qa.md` of PR 13 for the date and the counts). This file keeps the scenarios of PRs 1 to 5.
 
 ## How to run
 
@@ -49,6 +49,8 @@ For the origin scenarios (O1 to O28), the admin creates Diego – Helena as `DRI
 For the school days scenarios (G1 to G24, W1 to W24, K1 to K8), Ana's two seeded dependents come complete from the seed (valid CPF, birth date, gender, school, pickup address and grid): Lucas is full time on Tuesday and Thursday and in the morning on the other weekdays, Marina in the morning from Monday to Friday. Bruno is the other client and Gustavo the driver of the misuse block.
 
 For the `V64` scenarios (Q1 to Q15), every insert runs inside a transaction that is rolled back. The requests use Diego – Gustavo and Bruno – Helena, and the items take Lucas's school and the city of his pickup address, with a snapshot built from his name and birth date. The checks are SQL against the tables.
+
+For the `V65` scenarios (P1 to P27), each check runs in a rolled-back transaction that first inserts the requests it needs (Diego – Gustavo `ANSWERED`, Bruno – Helena) and a `SENT` version 1 on Diego – Gustavo; the vehicle is the first seeded one, with its plate and capacity in the snapshot and the resulting contract the seeded one. P10 walks every numeric range to both of its limits on the same proposal; P11 to P18 go one step beyond each. P23 sets the pair index aside inside its transaction: with an empty table the planner has no reason to prefer one `SENT` index over the other.
 
 For the approval scenarios (V1 to V12), Fabio is put back `UNDER_REVIEW` with `is_available = false` by SQL, as a driver who just finished the onboarding. The cleanup restores every seeded driver to `APPROVED` and available.
 
@@ -280,6 +282,36 @@ For the approval scenarios (V1 to V12), Fabio is put back `UNDER_REVIEW` with `i
 | Q13 | the checks above were rolled back | 1 | PASS |
 | Q14 | the negotiation tables have no deleted_at | 0 | PASS |
 | Q15 | a snapshot without the dependent | rejected by service_request_item_snapshot_check | PASS |
+
+### V65: proposal tables (database checks)
+| id | scenario | expected | result |
+|---|---|---|---|
+| P1 | a second SENT proposal of the same pair | rejected by proposal_client_driver_sent_key | PASS |
+| P2 | a SENT version after a SUPERSEDED one of the same request | accepted | PASS |
+| P3 | SENT proposals of two different pairs | accepted | PASS |
+| P4 | a repeated version in the same request | rejected by proposal_request_version_key | PASS |
+| P5 | ACCEPTED without accepted_at | rejected by proposal_accepted_at_check | PASS |
+| P6 | accepted_at on a SENT proposal | rejected by proposal_accepted_at_check | PASS |
+| P7 | ACCEPTED with accepted_at | accepted | PASS |
+| P8 | a resulting contract on a proposal that is not ACCEPTED | rejected by proposal_resulting_contract_check | PASS |
+| P9 | the same resulting contract on two proposals | rejected by proposal_resulting_contract_key | PASS |
+| P10 | every numeric range at its limits | accepted | PASS |
+| P11 | version 0 | rejected by proposal_version_check | PASS |
+| P12 | installments 0 | rejected by proposal_installments_check | PASS |
+| P13 | installments 13 | rejected by proposal_installments_check | PASS |
+| P14 | due day 0 | rejected by proposal_due_day_check | PASS |
+| P15 | due day 29 | rejected by proposal_due_day_check | PASS |
+| P16 | total amount 0 | rejected by proposal_total_amount_check | PASS |
+| P17 | enrollment fee -0.01 | rejected by proposal_enrollment_fee_check | PASS |
+| P18 | ends_on equal to starts_on | rejected by proposal_period_check | PASS |
+| P20 | two items on the same schedule | rejected by proposal_item_schedule_id_key | PASS |
+| P21 | an adjustment with neither value nor note | rejected by proposal_adjustment_content_check | PASS |
+| P22 | an adjustment with only a value and one with only a note | accepted | PASS |
+| P23 | the overdue sweep can read the partial index on valid_until | yes | PASS |
+| P24 | the tables, the status, the snapshot, both contract links and both menus are documented | 10 | PASS |
+| P25 | the checks above were rolled back | 1 | PASS |
+| P26 | the proposal tables have no deleted_at | 0 | PASS |
+| P27 | a snapshot without the vehicle | rejected by proposal_snapshot_check | PASS |
 
 ### Contract readiness
 | id | scenario | expected | result |
