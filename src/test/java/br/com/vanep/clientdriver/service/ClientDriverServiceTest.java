@@ -77,6 +77,7 @@ class ClientDriverServiceTest {
     when(clients.findByToken("cli")).thenReturn(Optional.of(maria));
     when(drivers.findByToken("drv")).thenReturn(Optional.of(carlos));
     when(links.findByPair(anyLong(), anyLong())).thenReturn(Optional.empty());
+    when(links.lockByPair(anyLong(), anyLong())).thenReturn(Optional.empty());
     when(links.saveAndFlush(any())).thenAnswer(call -> call.getArgument(0));
     when(mapper.toResponse(any())).thenAnswer(call -> response(call.getArgument(0)));
   }
@@ -91,6 +92,41 @@ class ClientDriverServiceTest {
     assertThat(saved.getValue().getOrigin()).isEqualTo(origin);
     assertThat(saved.getValue().getClient()).isSameAs(maria);
     assertThat(saved.getValue().getDriver()).isSameAs(carlos);
+  }
+
+  @Test
+  void theFirstRequestOfAPairCreatesAPendingLinkFromTheSearch() {
+    ClientDriverModel link = service.findOrCreateForRequest(maria, carlos);
+
+    verify(links).saveAndFlush(saved.capture());
+    assertThat(link).isSameAs(saved.getValue());
+    assertThat(link.getStatus()).isEqualTo(RelationshipStatus.PENDING);
+    assertThat(link.getOrigin()).isEqualTo(LinkOrigin.CLIENT_SEARCH);
+    assertThat(link.getClient()).isSameAs(maria);
+    assertThat(link.getDriver()).isSameAs(carlos);
+  }
+
+  @Test
+  void aRequestOfAnExistingPairReusesTheLinkAndKeepsItsOrigin() {
+    ClientDriverModel invited = link(RelationshipStatus.INACTIVE);
+    invited.setOrigin(LinkOrigin.DRIVER_INVITE);
+    when(links.lockByPair(1L, 2L)).thenReturn(Optional.of(invited));
+
+    ClientDriverModel link = service.findOrCreateForRequest(maria, carlos);
+
+    assertThat(link).isSameAs(invited);
+    assertThat(link.getOrigin()).isEqualTo(LinkOrigin.DRIVER_INVITE);
+    assertThat(link.getStatus()).isEqualTo(RelationshipStatus.INACTIVE);
+    verify(links, never()).saveAndFlush(any());
+  }
+
+  @Test
+  void aConcurrentFirstRequestReachesTheCallerAsTheIndexViolation() {
+    when(links.saveAndFlush(any()))
+        .thenThrow(new DataIntegrityViolationException("client_driver_pair_active_key"));
+
+    assertThatThrownBy(() -> service.findOrCreateForRequest(maria, carlos))
+        .isInstanceOf(DataIntegrityViolationException.class);
   }
 
   @Test

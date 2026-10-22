@@ -16,12 +16,14 @@ import br.com.vanep.user.repository.UserRepository;
 import jakarta.persistence.EntityManagerFactory;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.jdbc.Sql;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -33,6 +35,7 @@ class ClientDriverRepositoryTest {
   @Autowired private DriverRepository drivers;
   @Autowired private UserRepository users;
   @Autowired private EntityManagerFactory entityManagerFactory;
+  @Autowired private TransactionTemplate transactions;
 
   private ClientModel maria;
   private DriverModel carlos;
@@ -51,6 +54,20 @@ class ClientDriverRepositoryTest {
         .get()
         .extracting(link -> link.getId())
         .isEqualTo(saved.getId());
+  }
+
+  @Test
+  void locksTheLinkOfThePairOnly() {
+    ClientDriverModel saved = repository.save(newLink(maria, carlos));
+    DriverModel helena = createDriver("helena@vanep.com", "15350946056");
+
+    Optional<ClientDriverModel> locked =
+        transactions.execute(status -> repository.lockByPair(maria.getId(), carlos.getId()));
+    Optional<ClientDriverModel> other =
+        transactions.execute(status -> repository.lockByPair(maria.getId(), helena.getId()));
+
+    assertThat(locked).get().extracting(link -> link.getId()).isEqualTo(saved.getId());
+    assertThat(other).isEmpty();
   }
 
   @Test

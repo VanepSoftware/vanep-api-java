@@ -74,8 +74,8 @@ cleanup() {
 trap cleanup EXIT
 
 echo "== setup"
-[[ $(count client_driver) == 1 && $(count contract) -le 1 && $(count dependent) == 2 ]] || {
-  echo "SETUP FAIL | needs a database seeded on an empty schema (one link, two dependents)" >&2
+[[ $(count client_driver) == 2 && $(count contract) -le 1 && $(count dependent) == 2 ]] || {
+  echo "SETUP FAIL | needs a database seeded on an empty schema (the seed link and the seeded request's link, two dependents)" >&2
   exit 1
 }
 ADMIN=$(login "$ADMIN_EMAIL")
@@ -254,7 +254,10 @@ request GET /api/clients/me "$BRUNO"
 BRUNO_CLIENT=$(jq -r .token <<<"$RESP_BODY")
 request GET /api/clients/me "$CARLA"
 CARLA_CLIENT=$(jq -r .token <<<"$RESP_BODY")
-ANA_GUSTAVO=$(create_link "$ANA_CLIENT" "$GUSTAVO_DRIVER")
+# The seeded service request (service-request-proposal) already links Ana to Gustavo, PENDING.
+ANA_GUSTAVO=$(sql "select l.token from client_driver l join client c on c.id = l.client_id join driver d on d.id = l.driver_id
+                   where c.token = '$ANA_CLIENT' and d.token = '$GUSTAVO_DRIVER'")
+[[ -n $ANA_GUSTAVO ]] || { echo "SETUP FAIL | the seeded service request did not link Ana to Gustavo" >&2; exit 1; }
 ANA_HELENA=$(create_link "$ANA_CLIENT" "$HELENA_DRIVER")
 BRUNO_HELENA=$(create_link "$BRUNO_CLIENT" "$HELENA_DRIVER")
 BRUNO_GUSTAVO=$(create_link "$BRUNO_CLIENT" "$GUSTAVO_DRIVER")
@@ -533,10 +536,18 @@ expect R20 "restoring a contract whose slots were taken meanwhile" 409 '.detail 
 check R21 "the contract stays deleted" 1 "$(sql "select count(*) from contract where token = '$MARINA_OUTBOUND' and deleted_at is not null")"
 
 table "Pickup address is a copy"
-request PATCH "/api/dependent/$MARINA" "$ANA" "$(jq -nc --argjson a "$(address "Rua B" 20)" '{address: $a}')"
-expect A1 "the client moves the dependent to Rua B, 20" 200 '.address.street == "Rua B"'
+MOVE_TO_RUA_B=$(jq -nc --argjson a "$(address "Rua B" 20)" '{address: $a}')
+request PATCH "/api/dependent/$MARINA" "$ANA" "$MOVE_TO_RUA_B"
+expect A1 "a dependent with a contract in progress does not move (D17 of service-request-proposal)" 422 \
+  '.detail == "Este dependente tem um contrato em andamento: ele não pode ser removido nem mudar de escola, endereço ou grade escolar."'
+for contract in $(sql "select distinct c.token from contract c join contract_item i on i.contract_id = c.id join dependent d on d.id = i.dependent_id
+                       where d.token = '$MARINA' and c.deleted_at is null and c.status in ('ACTIVE', 'SUSPENDED')"); do
+  end_contract "$contract"
+done
+request PATCH "/api/dependent/$MARINA" "$ANA" "$MOVE_TO_RUA_B"
+expect A2 "once those contracts end, the client moves the dependent to Rua B, 20" 200 '.address.street == "Rua B"'
 request GET "/api/client-drivers/$ANA_HELENA/contracts" "$ANA"
-expect A2 "the contracts still pick up at Rua das Acácias, 250" 200 '[.[].items[].pickupStreet] | unique == ["Rua das Acácias"]'
+expect A3 "the contracts still pick up at Rua das Acácias, 250" 200 '[.[].items[].pickupStreet] | unique == ["Rua das Acácias"]'
 
 table "Concurrent creates on one link"
 PARALLEL_DIR="$(mktemp -d)"
