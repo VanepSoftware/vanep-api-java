@@ -1298,5 +1298,445 @@ sql "update service_request set status = 'CONVERTED' where token = '$GUSTAVO_REQ
 request POST "$DRIVER_SR/$GUSTAVO_REQUEST/decline" "$GUSTAVO"
 expect J17 "declining a CONVERTED request" 409 "$NOT_OPEN"
 check J18 "it stays CONVERTED" CONVERTED "$(request_status "$GUSTAVO_REQUEST")"
+p_item() {
+  jq -nc --arg d "$1" --argjson s "$P_SLOTS" '{dependentToken: $d, monthlyAmount: 420.00, slots: $s}'
+}
+
+p_body() {
+  local vehicle=$1
+  shift
+  jq -nc --arg v "$vehicle" --arg s "$START" --arg e "$P_END" \
+    '{startsOn: $s, endsOn: $e, totalAmount: 4200.00, installments: 10, dueDay: 5, enrollmentFee: 100.00,
+      adjustmentPolicy: "NONE", cancellationPolicy: "NOTICE_30_DAYS", vehicleToken: $v, message: "Saio às 6h20",
+      items: [$ARGS.positional[] | fromjson]}' --args "$@"
+}
+
+send_proposal() {
+  request POST "$DRIVER_SR/$2/proposals" "$1" "$3"
+  [[ $RESP_STATUS == 201 ]] || { echo "SETUP FAIL | send a proposal | HTTP $RESP_STATUS $RESP_BODY" >&2; return 1; }
+  jq -r .token <<<"$RESP_BODY"
+}
+
+adjustments_of() {
+  sql "select count(*) from proposal_adjustment where proposal_id = (select id from proposal where token = '$1')"
+}
+
+link_contracts() {
+  sql "select count(contract.id) || ' ' || min(link.status) from client_driver link left join contract on contract.client_driver_id = link.id
+       where link.id = (select client_driver_id from service_request where token = '$1')"
+}
+
+proposal_status() {
+  sql "select status from proposal where token = '$1'"
+}
+
+chain_rows() {
+  sql "select (select count(*) from proposal) || ' ' || (select count(*) from proposal_adjustment) || ' '
+         || string_agg(proposal.status, ',' order by proposal.version) || ' ' || min(request.status)
+       from proposal join service_request request on request.id = proposal.service_request_id where request.token = '$1'"
+}
+
+proposal_route_statuses() {
+  local token=$1 route body codes=()
+  shift
+  for route in "$@"; do
+    body=""
+    if [[ $route == "POST $DRIVER_SR/"* ]]; then body=$P_BODY; fi
+    if [[ $route == *"/adjustments" ]]; then body=$PRICE_ADJUSTMENT; fi
+    request "${route%% *}" "${route#* }" "$token" "$body"
+    codes+=("$RESP_STATUS")
+  done
+  echo "${codes[*]}"
+}
+
+expect_bad_proposal() {
+  request POST "$DRIVER_SR/$G_REQ/proposals" "$GUSTAVO" "$3"
+  expect "$1" "$2" "${4:-400}" "${5-}"
+}
+
+expect_bad_adjustment() {
+  request POST "$CLIENT_P/$G_P4/adjustments" "$ANA" "$3"
+  expect "$1" "$2" "${4:-400}" "${5-}"
+}
+
+# Runs two requests of different callers at the same moment and prints their statuses in order.
+race() {
+  local dir first second
+  dir="$(mktemp -d)"
+  curl -s -o /dev/null -w '%{http_code}' -X POST "$BASE_URL$1" -H "Authorization: Bearer $2" \
+    -H "Content-Type: application/json" ${3:+--data-binary "$3"} >"$dir/first" &
+  curl -s -o /dev/null -w '%{http_code}' -X POST "$BASE_URL$4" -H "Authorization: Bearer $5" \
+    -H "Content-Type: application/json" ${6:+--data-binary "$6"} >"$dir/second" &
+  wait
+  first=$(cat "$dir/first")
+  second=$(cat "$dir/second")
+  rm -rf "$dir"
+  echo "$first $second"
+}
+
+CLIENT_P=/api/clients/me/proposals
+DRIVER_P=/api/drivers/me/proposals
+NOT_CURRENT='.detail == "Esta proposta não é mais a versão atual."'
+NOT_OPEN_FOR_PROPOSALS='.detail == "Esta solicitação não está mais aberta para propostas."'
+STALE='.detail == "Algo na solicitação ou na proposta mudou desde o envio. Peça uma nova versão ao motorista."'
+VEHICLE_NOT_FOUND='.detail == "Veículo não encontrado."'
+MISMATCH='.detail == "A proposta precisa de um item para cada dependente da solicitação."'
+PRICE_ADJUSTMENT='{"field": "PRICE", "suggestedValue": "320,00"}'
+GUSTAVO_VAN=$(sql "select token from vehicle where plate = 'VAN2B34'")
+FABIO_VAN=$(sql "select token from vehicle where plate = 'VAN1A23'")
+HELENA_VAN=$(sql "select token from vehicle where plate = 'VAN3C45'")
+P_END=$(sql "select (current_date + 7 + interval '10 months' - interval '1 day')::date")
+TWELVE_MONTHS=$(sql "select (current_date + 7 + interval '12 months')::date")
+TWELVE_MONTHS_AND_A_DAY=$(sql "select (current_date + 7 + interval '12 months' + interval '1 day')::date")
+P_SLOTS=$(jq -nc '[("MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY") as $d
+  | {weekday: $d, leg: "OUTBOUND", shift: "MORNING", windowStart: "06:40"},
+    {weekday: $d, leg: "RETURN", shift: "AFTERNOON", windowStart: "12:10"}]')
+LUCAS_ITEM=$(p_item "$LUCAS")
+P_BODY=$(p_body "$GUSTAVO_VAN" "$LUCAS_ITEM")
+for open in $(sql "select request.token from service_request request join client_driver link on link.id = request.client_driver_id
+                   where link.client_id = (select id from client where token = '$ANA_C') and request.status = 'OPEN'"); do
+  request POST "$CLIENT_SR/$open/withdraw" "$ANA"
+done
+
+table "Proposals over HTTP — driver"
+G_REQ=$(send_request "$(sr_body "$GUSTAVO_D" "" "$LUCAS_WEEK")")
+request POST "$DRIVER_SR/$G_REQ/proposals" "$GUSTAVO" "$P_BODY"
+expect X1 "Gustavo sends the first version" 201 \
+  ".version == 1 and .status == \"SENT\" and .serviceRequestToken == \"$G_REQ\" and .startsOn == \"$START\" and .endsOn == \"$P_END\"
+   and .totalAmount == 4200 and .installments == 10 and .dueDay == 5 and .enrollmentFee == 100
+   and .adjustmentPolicy == \"NONE\" and .cancellationPolicy == \"NOTICE_30_DAYS\" and .message == \"Saio às 6h20\"
+   and .vehicle == {plate: \"VAN2B34\", brand: \"Renault\", model: \"Master Minibus\", manufactureYear: 2020, color: \"Prata\", capacity: 16}
+   and (.items | length) == 1 and .items[0].dependentToken == \"$LUCAS\" and .items[0].dependentFirstName == \"Lucas\"
+   and .items[0].dependentName == null and .items[0].monthlyAmount == 420 and (.items[0].slots | length) == 10
+   and (.items[0].slots[1] | .weekday == \"MONDAY\" and .leg == \"RETURN\" and .shift == \"AFTERNOON\"
+     and (.windowStart | startswith(\"12:10\")) and .windowEnd == null)
+   and .adjustments == [] and .acceptedAt == null and (has(\"id\") | not)"
+G_P1=$(jq -r .token <<<"$RESP_BODY")
+check X2 "the driver's view has no surname" "" "$(grep -o Souza <<<"$RESP_BODY" | sort -u || true)"
+check X3 "valid for 7 days by default, and the request is ANSWERED" "7 ANSWERED" \
+  "$(sql "select round(extract(epoch from valid_until - created_at) / 86400) from proposal where token = '$G_P1'") $(request_status "$G_REQ")"
+request POST "$DRIVER_SR/$G_REQ/proposals" "$GUSTAVO" \
+  "$(jq -c --arg e "$TWELVE_MONTHS" '.endsOn = $e | .installments = 1 | .dueDay = 1 | .validDays = 1' <<<"$P_BODY")"
+expect X4 "a second version for exactly twelve months, at the lower limits (1 installment, due day 1, 1 day)" 201 \
+  ".version == 2 and .endsOn == \"$TWELVE_MONTHS\" and .installments == 1 and .dueDay == 1"
+G_P2=$(jq -r .token <<<"$RESP_BODY")
+check X5 "version 2 points to version 1, now SUPERSEDED, and is valid for one day" "$G_P1 SUPERSEDED 1" \
+  "$(sql "select parent.token || ' ' || parent.status || ' ' || round(extract(epoch from child.valid_until - child.created_at) / 86400)
+          from proposal child join proposal parent on parent.id = child.parent_proposal_id where child.token = '$G_P2'")"
+request GET "$DRIVER_SR/$G_REQ/proposals" "$GUSTAVO"
+expect X6 "Gustavo lists the chain, oldest first" 200 \
+  "map(.token) == [\"$G_P1\", \"$G_P2\"] and map(.status) == [\"SUPERSEDED\", \"SENT\"]"
+request GET "$DRIVER_P/$G_P2" "$GUSTAVO"
+expect X7 "Gustavo reads version 2" 200 ".token == \"$G_P2\" and .status == \"SENT\" and .validUntil != null"
+request POST "$DRIVER_P/$G_P2/withdraw" "$GUSTAVO"
+expect X8 "Gustavo withdraws version 2 to correct the offer" 200 '.status == "WITHDRAWN"'
+check X9 "the request is OPEN again, for 72 hours" "OPEN 72" \
+  "$(sql "select status || ' ' || round(extract(epoch from expires_at - now()) / 3600) from service_request where token = '$G_REQ'")"
+request POST "$DRIVER_P/$G_P2/withdraw" "$GUSTAVO"
+expect X10 "withdrawing it again" 409 "$NOT_CURRENT"
+request POST "$DRIVER_SR/$G_REQ/proposals" "$GUSTAVO" "$(jq -c '.enrollmentFee = 0 | del(.message)' <<<"$P_BODY")"
+expect X11 "the next version after the withdrawal, with a zero enrollment fee and no message" 201 \
+  '.version == 3 and .enrollmentFee == 0 and .message == null'
+G_P3=$(jq -r .token <<<"$RESP_BODY")
+check X12 "version 3 points to the withdrawn version 2, which stays WITHDRAWN" "$G_P2 WITHDRAWN ANSWERED" \
+  "$(sql "select parent.token || ' ' || parent.status from proposal child join proposal parent on parent.id = child.parent_proposal_id
+          where child.token = '$G_P3'") $(request_status "$G_REQ")"
+request POST "$DRIVER_SR/$FABIO_REQUEST/proposals" "$FABIO" "$(p_body "$FABIO_VAN" "$LUCAS_ITEM")"
+expect X13 "a proposal for a request the driver declined" 409 "$NOT_OPEN_FOR_PROPOSALS"
+H_REQ=$(send_request "$(sr_body "$HELENA_D" "" "$LUCAS_WEEK")")
+sql "update service_request set expires_at = now() - interval '1 minute' where token = '$H_REQ'" >/dev/null
+request POST "$DRIVER_SR/$H_REQ/proposals" "$HELENA" "$(p_body "$HELENA_VAN" "$LUCAS_ITEM")"
+expect X14 "a proposal for an OPEN request past its deadline, before the sweep" 409 "$NOT_OPEN_FOR_PROPOSALS"
+check X15 "nothing was sent and the request is still OPEN" "0 OPEN" \
+  "$(sql "select count(*) from proposal where service_request_id = (select id from service_request where token = '$H_REQ')") $(request_status "$H_REQ")"
+sql "update service_request set expires_at = now() + interval '72 hours' where token = '$H_REQ'" >/dev/null
+
+table "Proposals over HTTP — misuse"
+P_DRIVER_ROUTES=("POST $DRIVER_SR/$G_REQ/proposals" "GET $DRIVER_SR/$G_REQ/proposals" "GET $DRIVER_P/$G_P3"
+  "POST $DRIVER_P/$G_P3/withdraw")
+P_CLIENT_ROUTES=("GET $CLIENT_SR/$G_REQ/proposals" "GET $CLIENT_P/$G_P3" "POST $CLIENT_P/$G_P3/accept"
+  "POST $CLIENT_P/$G_P3/decline" "POST $CLIENT_P/$G_P3/adjustments")
+G_ROWS=$(chain_rows "$G_REQ")
+check B1 "the nine routes without a token" "401 401 401 401 401 401 401 401 401" \
+  "$(proposal_route_statuses "" "${P_DRIVER_ROUTES[@]}" "${P_CLIENT_ROUTES[@]}")"
+check B2 "the nine routes with an invalid token" "401 401 401 401 401 401 401 401 401" \
+  "$(proposal_route_statuses not-a-jwt "${P_DRIVER_ROUTES[@]}" "${P_CLIENT_ROUTES[@]}")"
+check B3 "the admin on both surfaces" "403 403 403 403 403 403 403 403 403" \
+  "$(proposal_route_statuses "$ADMIN" "${P_DRIVER_ROUTES[@]}" "${P_CLIENT_ROUTES[@]}")"
+check B4 "the client on the driver routes" "403 403 403 403" "$(proposal_route_statuses "$ANA" "${P_DRIVER_ROUTES[@]}")"
+check B5 "the driver on the client routes" "403 403 403 403 403" "$(proposal_route_statuses "$GUSTAVO" "${P_CLIENT_ROUTES[@]}")"
+check B6 "another driver: the request and the proposal are not found" "404 404 404 404" \
+  "$(proposal_route_statuses "$FABIO" "${P_DRIVER_ROUTES[@]}")"
+check B7 "another client: the request and the proposal are not found" "404 404 404 404 404" \
+  "$(proposal_route_statuses "$BRUNO" "${P_CLIENT_ROUTES[@]}")"
+request GET "$CLIENT_P/$G_P3" "$BRUNO"
+expect B8 "another client's proposal, with its message" 404 '.detail == "Proposta não encontrada."'
+request GET "$DRIVER_P/unknown" "$GUSTAVO"
+expect B9 "an unknown proposal" 404 '.detail == "Proposta não encontrada."'
+request POST "$DRIVER_SR/unknown/proposals" "$GUSTAVO" "$P_BODY"
+expect B10 "a proposal for an unknown request" 404 '.detail == "Solicitação não encontrada."'
+check B11 "no route changed the chain" "$G_ROWS" "$(chain_rows "$G_REQ")"
+expect_bad_proposal B12 "without startsOn" "$(jq -c 'del(.startsOn)' <<<"$P_BODY")"
+expect_bad_proposal B13 "startsOn yesterday" "$(jq -c --arg y "$YESTERDAY" '.startsOn = $y' <<<"$P_BODY")"
+expect_bad_proposal B14 "startsOn that is not a date" "$(jq -c '.startsOn = "amanhã"' <<<"$P_BODY")"
+expect_bad_proposal B15 "without endsOn" "$(jq -c 'del(.endsOn)' <<<"$P_BODY")"
+expect_bad_proposal B16 "totalAmount zero" "$(jq -c '.totalAmount = 0' <<<"$P_BODY")"
+expect_bad_proposal B17 "a negative totalAmount" "$(jq -c '.totalAmount = -1' <<<"$P_BODY")"
+expect_bad_proposal B18 "totalAmount with three decimals" "$(jq -c '.totalAmount = 4200.001' <<<"$P_BODY")"
+expect_bad_proposal B19 "totalAmount as text" "$(jq -c '.totalAmount = "caro"' <<<"$P_BODY")"
+expect_bad_proposal B20 "zero installments" "$(jq -c '.installments = 0' <<<"$P_BODY")"
+expect_bad_proposal B21 "13 installments" "$(jq -c '.installments = 13' <<<"$P_BODY")"
+expect_bad_proposal B22 "installments as text" "$(jq -c '.installments = "dez"' <<<"$P_BODY")"
+expect_bad_proposal B23 "due day 0" "$(jq -c '.dueDay = 0' <<<"$P_BODY")"
+expect_bad_proposal B24 "due day 29" "$(jq -c '.dueDay = 29' <<<"$P_BODY")"
+expect_bad_proposal B25 "a negative enrollment fee" "$(jq -c '.enrollmentFee = -1' <<<"$P_BODY")"
+expect_bad_proposal B26 "an adjustment policy that does not exist" "$(jq -c '.adjustmentPolicy = "ALWAYS"' <<<"$P_BODY")"
+expect_bad_proposal B27 "without cancellationPolicy" "$(jq -c 'del(.cancellationPolicy)' <<<"$P_BODY")"
+expect_bad_proposal B28 "without vehicleToken" "$(jq -c 'del(.vehicleToken)' <<<"$P_BODY")"
+expect_bad_proposal B29 "a blank vehicleToken" "$(jq -c '.vehicleToken = "  "' <<<"$P_BODY")"
+expect_bad_proposal B30 "validDays 0" "$(jq -c '.validDays = 0' <<<"$P_BODY")"
+expect_bad_proposal B31 "validDays 8" "$(jq -c '.validDays = 8' <<<"$P_BODY")"
+expect_bad_proposal B32 "a message with 1001 characters" "$(jq -c '.message = ("a" * 1001)' <<<"$P_BODY")"
+expect_bad_proposal B33 "an empty item list" "$(jq -c '.items = []' <<<"$P_BODY")"
+expect_bad_proposal B34 "without items" "$(jq -c 'del(.items)' <<<"$P_BODY")"
+expect_bad_proposal B35 "items that are not a list" "$(jq -c '.items = "Lucas"' <<<"$P_BODY")"
+expect_bad_proposal B36 "a monthly amount of zero" "$(jq -c '.items[0].monthlyAmount = 0' <<<"$P_BODY")"
+expect_bad_proposal B37 "an item without dependentToken" "$(jq -c 'del(.items[0].dependentToken)' <<<"$P_BODY")"
+expect_bad_proposal B38 "an item with no slots" "$(jq -c '.items[0].slots = []' <<<"$P_BODY")"
+expect_bad_proposal B39 "a slot without windowStart" "$(jq -c 'del(.items[0].slots[0].windowStart)' <<<"$P_BODY")"
+expect_bad_proposal B40 "a shift that does not exist" "$(jq -c '.items[0].slots[0].shift = "MADRUGADA"' <<<"$P_BODY")"
+expect_bad_proposal B41 "a weekday that does not exist" "$(jq -c '.items[0].slots[0].weekday = "SEGUNDA"' <<<"$P_BODY")"
+expect_bad_proposal B42 "a time that is not a time" "$(jq -c '.items[0].slots[0].windowStart = "6h40"' <<<"$P_BODY")"
+expect_bad_proposal B43 "the same weekday and leg twice" \
+  "$(jq -c '.items[0].slots[1] = .items[0].slots[0]' <<<"$P_BODY")" 400 \
+  '.detail == "O mesmo dia e trecho não pode aparecer duas vezes na agenda."'
+expect_bad_proposal B44 "a window that ends before it starts" \
+  "$(jq -c '.items[0].slots[0].windowEnd = "06:00"' <<<"$P_BODY")" 400 \
+  '.detail == "O fim da janela deve ser posterior ao início."'
+expect_bad_proposal B45 "malformed JSON" '{"totalAmount": '
+request POST "$DRIVER_SR/$G_REQ/proposals" "$GUSTAVO"
+expect B46 "no body" 400
+expect_bad_proposal B47 "endsOn on startsOn" "$(jq -c --arg s "$START" '.endsOn = $s' <<<"$P_BODY")" 422 \
+  '.detail == "A data de término deve ser posterior à data de início."'
+expect_bad_proposal B48 "endsOn before startsOn" "$(jq -c --arg s "$(sql "select current_date + 6")" '.endsOn = $s' <<<"$P_BODY")" 422 \
+  '.detail == "A data de término deve ser posterior à data de início."'
+expect_bad_proposal B49 "twelve months and one day" "$(jq -c --arg e "$TWELVE_MONTHS_AND_A_DAY" '.endsOn = $e' <<<"$P_BODY")" 422 \
+  '.detail == "O período da proposta não pode passar de doze meses."'
+expect_bad_proposal B50 "one item too many: Lucas twice" "$(jq -c '.items += .items' <<<"$P_BODY")" 422 "$MISMATCH"
+expect_bad_proposal B51 "an item for an unknown dependent instead of Lucas" "$(jq -c '.items[0].dependentToken = "unknown"' <<<"$P_BODY")" 422 "$MISMATCH"
+expect_bad_proposal B52 "the vehicle of another driver" "$(jq -c --arg v "$HELENA_VAN" '.vehicleToken = $v' <<<"$P_BODY")" 404 "$VEHICLE_NOT_FOUND"
+expect_bad_proposal B53 "an unknown vehicle" "$(jq -c '.vehicleToken = "unknown"' <<<"$P_BODY")" 404 "$VEHICLE_NOT_FOUND"
+sql "update vehicle set is_active = false where token = '$GUSTAVO_VAN'" >/dev/null
+expect_bad_proposal B54 "an inactive vehicle of his own" "$P_BODY" 404 "$VEHICLE_NOT_FOUND"
+sql "update vehicle set is_active = true where token = '$GUSTAVO_VAN'" >/dev/null
+check B55 "no refusal sent a version or touched the chain" "$G_ROWS" "$(chain_rows "$G_REQ")"
+request POST "$DRIVER_SR/$G_REQ/proposals" "$GUSTAVO" \
+  "$(jq -c '.installments = 12 | .dueDay = 28 | .validDays = 7 | .message = ("a" * 1000)' <<<"$P_BODY")"
+expect B56 "every field at its upper limit (12 installments, due day 28, 7 days, 1000 characters)" 201 \
+  '.version == 4 and .installments == 12 and .dueDay == 28 and (.message | length) == 1000'
+G_P4=$(jq -r .token <<<"$RESP_BODY")
+request POST /api/dependent "$ANA" "$(jq -nc --arg s "$SEED_SCHOOL" --arg c "$SEED_CITY" '{name: "Nina Souza", birthDate: "2017-03-02",
+  schoolToken: $s, address: {cityToken: $c, street: "Rua das Flores", number: "30", zipCode: "01001000", neighborhood: "Centro"}}')"
+[[ $RESP_STATUS == 201 ]] || { echo "SETUP FAIL | create Nina | HTTP $RESP_STATUS $RESP_BODY" >&2; exit 1; }
+NINA=$(jq -r .token <<<"$RESP_BODY")
+request PUT "/api/dependent/$NINA/school-days" "$ANA" \
+  "$(school_days_body MONDAY:MORNING TUESDAY:MORNING WEDNESDAY:MORNING THURSDAY:MORNING FRIDAY:MORNING)"
+[[ $RESP_STATUS == 200 ]] || { echo "SETUP FAIL | Nina's grid | HTTP $RESP_STATUS $RESP_BODY" >&2; exit 1; }
+NINA_ITEM=$(p_item "$NINA")
+F_REQ=$(send_request "$(sr_body "$FABIO_D" "" "$LUCAS_WEEK" "$(sr_item "$NINA" "${WEEK[@]}")")")
+request POST "$DRIVER_SR/$F_REQ/proposals" "$FABIO" "$(p_body "$FABIO_VAN" "$LUCAS_ITEM")"
+expect B57 "one item too few: only Lucas for Lucas and Nina" 422 "$MISMATCH"
+request POST "$DRIVER_SR/$G_REQ/proposals" "$GUSTAVO" "$(p_body "$GUSTAVO_VAN" "$LUCAS_ITEM" "$NINA_ITEM")"
+expect B58 "an item for Nina, who is not in Gustavo's request" 422 "$MISMATCH"
+sql "update dependent set deleted_at = now() where token = '$NINA'" >/dev/null
+request POST "$DRIVER_SR/$F_REQ/proposals" "$FABIO" "$(p_body "$FABIO_VAN" "$LUCAS_ITEM" "$NINA_ITEM")"
+expect B59 "a dependent of the request removed since (set by SQL: the API refuses it during a negotiation)" 422 \
+  '.detail == "Um dependente desta solicitação não está mais cadastrado."'
+sql "update dependent set deleted_at = null where token = '$NINA'" >/dev/null
+check B60 "Fabio's request has no proposal and is still OPEN" "0 OPEN" \
+  "$(sql "select count(*) from proposal where service_request_id = (select id from service_request where token = '$F_REQ')") $(request_status "$F_REQ")"
+check B61 "a proposal cannot be edited or removed on either surface" "405 405 405 405 405 405" \
+  "$(for route in "PATCH $CLIENT_P/$G_P4 $ANA" "PUT $CLIENT_P/$G_P4 $ANA" "DELETE $CLIENT_P/$G_P4 $ANA" \
+       "PATCH $DRIVER_P/$G_P4 $GUSTAVO" "PUT $DRIVER_P/$G_P4 $GUSTAVO" "DELETE $DRIVER_P/$G_P4 $GUSTAVO"; do
+       read -r method path token <<<"$route"
+       request "$method" "$path" "$token" '{"totalAmount": 1}'
+       printf '%s ' "$RESP_STATUS"
+     done | sed 's/ $//')"
+
+table "Proposals over HTTP — client"
+request GET "$CLIENT_SR/$G_REQ/proposals" "$ANA"
+expect Y1 "Ana lists the four versions, oldest first, with Lucas's full name" 200 \
+  "map(.version) == [1, 2, 3, 4] and map(.status) == [\"SUPERSEDED\", \"WITHDRAWN\", \"SUPERSEDED\", \"SENT\"]
+   and all(.[]; .items[0].dependentName == \"Lucas Souza\" and .items[0].dependentFirstName == \"Lucas\")"
+request GET "$CLIENT_P/$G_P4" "$ANA"
+expect Y2 "Ana reads the current version, with the vehicle it was sent with" 200 \
+  ".token == \"$G_P4\" and .status == \"SENT\" and .vehicle.plate == \"VAN2B34\" and .items[0].dependentName == \"Lucas Souza\""
+request POST "$CLIENT_P/$G_P4/adjustments" "$ANA" "$PRICE_ADJUSTMENT"
+expect Y3 "Ana asks to lower the price" 201 \
+  '.status == "SENT" and (.adjustments | length) == 1 and .adjustments[0].field == "PRICE"
+   and .adjustments[0].suggestedValue == "320,00" and .adjustments[0].note == null and .adjustments[0].createdAt != null'
+request POST "$CLIENT_P/$G_P4/adjustments" "$ANA" '{"field": "SCHEDULE", "note": "  Pode buscar às 6h50?  "}'
+expect Y4 "and for another time, with a note only" 201 \
+  '(.adjustments | map(.field)) == ["PRICE", "SCHEDULE"] and .adjustments[1].note == "Pode buscar às 6h50?" and .adjustments[1].suggestedValue == null'
+request GET "$CLIENT_SR?status=ANSWERED" "$ANA"
+expect Y39 "Ana's list carries version 4 as the request's current proposal, with an adjustment pending" 200 \
+  "any(.content[]; .token == \"$G_REQ\" and .currentProposal.token == \"$G_P4\" and .currentProposal.version == 4
+     and .currentProposal.hasPendingAdjustment == true)"
+request GET "$DRIVER_SR?status=ANSWERED" "$GUSTAVO"
+expect Y40 "and so does Gustavo's" 200 \
+  "any(.content[]; .token == \"$G_REQ\" and .currentProposal.token == \"$G_P4\" and .currentProposal.hasPendingAdjustment == true)"
+expect_bad_adjustment Y5 "without field" '{"suggestedValue": "320,00"}'
+expect_bad_adjustment Y6 "a field that does not exist" '{"field": "COLOR", "note": "Outra cor"}'
+expect_bad_adjustment Y7 "a field that is an object" '{"field": {"name": "PRICE"}, "note": "x"}'
+expect_bad_adjustment Y8 "a suggested value with 101 characters" "$(jq -nc '{field: "PRICE", suggestedValue: ("1" * 101)}')"
+expect_bad_adjustment Y9 "a note with 501 characters" "$(jq -nc '{field: "OTHER", note: ("a" * 501)}')"
+expect_bad_adjustment Y10 "malformed JSON" '{"field": '
+request POST "$CLIENT_P/$G_P4/adjustments" "$ANA"
+expect Y11 "no body" 400
+EMPTY_ADJUSTMENT='.detail == "Diga o que você gostaria de mudar: um valor sugerido, uma observação ou os dois."'
+expect_bad_adjustment Y12 "neither a value nor a note" '{"field": "PRICE"}' 422 "$EMPTY_ADJUSTMENT"
+expect_bad_adjustment Y13 "a blank value and a blank note" '{"field": "PRICE", "suggestedValue": " ", "note": "  "}' 422 "$EMPTY_ADJUSTMENT"
+check Y14 "the refusals saved no adjustment" 2 "$(adjustments_of "$G_P4")"
+request POST "$CLIENT_P/$G_P4/adjustments" "$ANA" "$(jq -nc '{field: "PRICE", suggestedValue: ("1" * 100)}')"
+expect Y15 "a suggested value with exactly 100 characters" 201 '(.adjustments[2].suggestedValue | length) == 100'
+request POST "$CLIENT_P/$G_P4/adjustments" "$ANA" "$(jq -nc '{field: "OTHER", note: ("a" * 500)}')"
+expect Y16 "a note with exactly 500 characters" 201 '(.adjustments[3].note | length) == 500 and .status == "SENT"'
+request GET "$DRIVER_P/$G_P4" "$GUSTAVO"
+expect Y17 "Gustavo sees the four adjustments, in order" 200 \
+  '(.adjustments | map(.field)) == ["PRICE", "SCHEDULE", "PRICE", "OTHER"] and .status == "SENT"'
+DRIVER_SENT_VIEW=$RESP_BODY
+request POST "$CLIENT_P/$G_P1/accept" "$ANA"
+expect Y18 "accepting version 1, superseded" 409 "$NOT_CURRENT"
+request POST "$CLIENT_P/$G_P2/decline" "$ANA"
+expect Y19 "declining version 2, withdrawn" 409 "$NOT_CURRENT"
+request POST "$CLIENT_P/$G_P3/adjustments" "$ANA" "$PRICE_ADJUSTMENT"
+expect Y20 "asking to adjust version 3, superseded" 409 "$NOT_CURRENT"
+request POST "$CLIENT_P/$G_P4/decline" "$ANA" "$(jq -nc '{reason: ("a" * 501)}')"
+expect Y21 "a decline reason with 501 characters" 400
+request POST "$CLIENT_P/$G_P4/decline" "$ANA" '{"reason": {"text": "x"}}'
+expect Y22 "a decline reason that is not text" 400
+check Y23 "the old versions and the current one did not change" "SUPERSEDED,WITHDRAWN,SUPERSEDED,SENT ANSWERED 4" \
+  "$(chain_rows "$G_REQ" | cut -d' ' -f3-) $(adjustments_of "$G_P4")"
+request GET "$CLIENT_P/$G_P4" "$ANA"
+CLIENT_SENT_VIEW=$RESP_BODY
+G_LINK=$(link_contracts "$G_REQ")
+request POST "$CLIENT_P/$G_P4/accept" "$ANA"
+expect Y24 "Ana accepts version 4" 200 '.status == "ACCEPTED" and .acceptedAt != null'
+check Y25 "the request is CONVERTED, no contract was created and the link status did not change" \
+  "CONVERTED $G_LINK" "$(request_status "$G_REQ") $(link_contracts "$G_REQ")"
+request GET "$CLIENT_SR/$G_REQ" "$ANA"
+expect Y41 "the CONVERTED request carries the accepted version, with nothing pending" 200 \
+  ".status == \"CONVERTED\" and .currentProposal.token == \"$G_P4\" and .currentProposal.status == \"ACCEPTED\"
+   and .currentProposal.hasPendingAdjustment == false"
+UNCHANGED='del(.status, .acceptedAt, .updatedAt)'
+request GET "$CLIENT_P/$G_P4" "$ANA"
+check Y26 "Ana reads the accepted proposal exactly as it was sent" "$(jq -S "$UNCHANGED" <<<"$CLIENT_SENT_VIEW")" \
+  "$(jq -S "$UNCHANGED" <<<"$RESP_BODY")"
+request GET "$DRIVER_P/$G_P4" "$GUSTAVO"
+check Y27 "and so does Gustavo" "$(jq -S "$UNCHANGED" <<<"$DRIVER_SENT_VIEW")" "$(jq -S "$UNCHANGED" <<<"$RESP_BODY")"
+check Y28 "accept, decline, adjustment and withdrawal after the accept" "409 409 409 409" \
+  "$(for route in "$CLIENT_P/$G_P4/accept $ANA" "$CLIENT_P/$G_P4/decline $ANA" "$CLIENT_P/$G_P4/adjustments $ANA" \
+       "$DRIVER_P/$G_P4/withdraw $GUSTAVO"; do
+       read -r path token <<<"$route"
+       if [[ $path == *"/adjustments" ]]; then request POST "$path" "$token" "$PRICE_ADJUSTMENT"; else request POST "$path" "$token"; fi
+       printf '%s ' "$RESP_STATUS"
+     done | sed 's/ $//')"
+request POST "$DRIVER_SR/$G_REQ/proposals" "$GUSTAVO" "$P_BODY"
+expect Y29 "a new version for the converted request" 409 "$NOT_OPEN_FOR_PROPOSALS"
+F_P1=$(send_proposal "$FABIO" "$F_REQ" "$(p_body "$FABIO_VAN" "$LUCAS_ITEM" "$NINA_ITEM")")
+request GET "$CLIENT_P/$F_P1" "$ANA"
+expect Y30 "Fabio's proposal for both siblings" 200 '(.items | map(.dependentName)) == ["Lucas Souza", "Nina Souza"]'
+request GET "$DRIVER_P/$F_P1" "$FABIO"
+expect Y31 "Fabio sees them by first name only" 200 \
+  '(.items | map(.dependentFirstName)) == ["Lucas", "Nina"] and all(.items[]; .dependentName == null)'
+request POST "$CLIENT_P/$F_P1/decline" "$ANA" '{"reason": "  Caro demais  "}'
+expect Y32 "Ana declines it with a reason" 200 '.status == "DECLINED" and .declineReason == "Caro demais"'
+check Y33 "the request is WITHDRAWN" WITHDRAWN "$(request_status "$F_REQ")"
+request GET "$CLIENT_SR/$F_REQ" "$ANA"
+expect Y42 "and has no current proposal" 200 '.status == "WITHDRAWN" and .currentProposal == null'
+request GET "$DRIVER_P/$F_P1" "$FABIO"
+expect Y34 "Fabio reads it declined, with the reason" 200 '.status == "DECLINED" and .declineReason == "Caro demais"'
+request POST "$DRIVER_SR/$F_REQ/proposals" "$FABIO" "$(p_body "$FABIO_VAN" "$LUCAS_ITEM" "$NINA_ITEM")"
+expect Y35 "a new version after the decline" 409 "$NOT_OPEN_FOR_PROPOSALS"
+H_P1=$(send_proposal "$HELENA" "$H_REQ" "$(p_body "$HELENA_VAN" "$LUCAS_ITEM")")
+sql "update proposal set valid_until = now() - interval '1 minute' where token = '$H_P1'" >/dev/null
+request POST "$CLIENT_P/$H_P1/accept" "$ANA"
+expect Y36 "accepting a proposal past its validity, before the sweep" 409 '.detail == "Esta proposta venceu."'
+check Y37 "it is still SENT and the request ANSWERED" "SENT ANSWERED" "$(proposal_status "$H_P1") $(request_status "$H_REQ")"
+request POST "$DRIVER_P/$H_P1/withdraw" "$HELENA"
+expect Y38 "Helena withdraws it" 200 '.status == "WITHDRAWN"'
+request GET "$CLIENT_SR/$H_REQ" "$ANA"
+expect Y43 "the request the withdrawal reopened has no current proposal either" 200 '.status == "OPEN" and .currentProposal == null'
+H_START=$(sql "select current_date + 8")
+request POST "$DRIVER_SR/$H_REQ/proposals" "$HELENA" \
+  "$(p_body "$HELENA_VAN" "$LUCAS_ITEM" | jq -c --arg s "$H_START" '.totalAmount = 1000.00 | .installments = 3 | .startsOn = $s')"
+expect Y44 "Helena sends 1,000.00 in three installments, starting a day after the desired date: each installment is 333.33, the cents truncated" 201 \
+  ".totalAmount == 1000 and .installments == 3 and .installmentAmount == 333.33 and .startsOn == \"$H_START\""
+H_ROUNDING=$(jq -r .token <<<"$RESP_BODY")
+request GET "$CLIENT_SR?status=ANSWERED" "$ANA"
+expect Y45 "and Ana's list shows the same installment and the start Helena proposed, not the one Ana asked for" 200 \
+  "any(.content[]; .token == \"$H_REQ\" and .currentProposal.token == \"$H_ROUNDING\" and .currentProposal.installmentAmount == 333.33
+     and .currentProposal.startsOn == \"$H_START\" and .desiredStartDate == \"$START\")"
+request GET "$CLIENT_SR?status=OPEN,ANSWERED" "$ANA"
+expect Y46 "the open tab (OPEN and ANSWERED) in one call: a summary on every ANSWERED request, none on the OPEN ones" 200 \
+  '(.content | length) > 0 and any(.content[]; .status == "ANSWERED")
+   and all(.content[]; (.status == "OPEN" and .currentProposal == null) or (.status == "ANSWERED" and .currentProposal.status == "SENT"))'
+request POST "$DRIVER_P/$H_ROUNDING/withdraw" "$HELENA"
+expect Y47 "Helena withdraws it, and the request is OPEN again" 200 '.status == "WITHDRAWN"'
+
+table "Proposals over HTTP — races and the re-check on accept"
+H_P2=$(send_proposal "$HELENA" "$H_REQ" "$(p_body "$HELENA_VAN" "$LUCAS_ITEM")")
+request GET "/api/vehicles/$HELENA_VAN" "$HELENA"
+HELENA_VAN_BODY=$(jq -c '{plate, brand, model, manufactureYear, color, capacity}' <<<"$RESP_BODY")
+request PUT "/api/vehicles/$HELENA_VAN" "$HELENA" "$(jq -c '.plate = "VAN9Z99"' <<<"$HELENA_VAN_BODY")"
+expect Z1 "Helena changes the plate of the offered van" 200 '.plate == "VAN9Z99"'
+request POST "$CLIENT_P/$H_P2/accept" "$ANA"
+expect Z2 "Ana accepts after the plate changed" 409 "$STALE"
+request GET "$CLIENT_P/$H_P2" "$ANA"
+expect Z3 "the proposal is still SENT and shows the plate it was sent with" 200 '.status == "SENT" and .vehicle.plate == "VAN3C45"'
+request PUT "/api/vehicles/$HELENA_VAN" "$HELENA" "$HELENA_VAN_BODY"
+[[ $RESP_STATUS == 200 ]] || { echo "SETUP FAIL | restore Helena's plate | HTTP $RESP_STATUS $RESP_BODY" >&2; exit 1; }
+request POST "$CLIENT_P/$H_P2/decline" "$ANA" "$(jq -nc '{reason: ("a" * 500)}')"
+expect Z4 "Ana declines it with a reason of exactly 500 characters" 200 '.status == "DECLINED" and (.declineReason | length) == 500'
+F_REQ=$(send_request "$(sr_body "$FABIO_D" "" "$LUCAS_WEEK")")
+F_P2=$(send_proposal "$FABIO" "$F_REQ" "$(p_body "$FABIO_VAN" "$LUCAS_ITEM")")
+LUCAS_ADDRESS=$(sql "select json_build_object('cityToken', city.token, 'street', address.street, 'number', address.number,
+                       'zipCode', address.zip_code, 'neighborhood', address.neighborhood)
+                     from dependent join address on address.id = dependent.address_id join city on city.id = address.city_id
+                     where dependent.token = '$LUCAS'")
+request PATCH "/api/dependent/$LUCAS" "$ANA" "$(jq -c '{address: (.neighborhood = "Vila Mariana")}' <<<"$LUCAS_ADDRESS")"
+expect Z5 "the family moves Lucas to another neighborhood after the proposal" 200
+request POST "$CLIENT_P/$F_P2/accept" "$ANA"
+expect Z6 "Ana accepts after the move" 409 "$STALE"
+check Z7 "the proposal stays SENT and the request ANSWERED" "SENT ANSWERED" "$(proposal_status "$F_P2") $(request_status "$F_REQ")"
+request PATCH "/api/dependent/$LUCAS" "$ANA" "$(jq -c '{address: .}' <<<"$LUCAS_ADDRESS")"
+[[ $RESP_STATUS == 200 ]] || { echo "SETUP FAIL | move Lucas back | HTTP $RESP_STATUS $RESP_BODY" >&2; exit 1; }
+LUCAS_PERSONAL=$(sql "select json_build_object('name', name, 'phone', phone, 'birthDate', birth_date) from dependent where token = '$LUCAS'")
+request PATCH "/api/dependent/$LUCAS" "$ANA" \
+  "$(jq -c '{name: "Lucas Souza Prado", phone: "11988887777", birthDate: (.birthDate | split("-") | .[2] = (if .[2] == "02" then "03" else "02" end) | join("-"))}' <<<"$LUCAS_PERSONAL")"
+expect Z8 "Ana corrects Lucas's name, phone and birth date" 200 '.name == "Lucas Souza Prado"'
+check Z9 "two accepts at once after the correction: one 200, one 409" "200 409" \
+  "$(in_parallel POST "$ANA" "" "$CLIENT_P/$F_P2/accept" "$CLIENT_P/$F_P2/accept")"
+check Z10 "the corrected name did not block it: ACCEPTED, the request CONVERTED" "ACCEPTED CONVERTED" \
+  "$(proposal_status "$F_P2") $(request_status "$F_REQ")"
+G_REQ=$(send_request "$(sr_body "$GUSTAVO_D" "" "$LUCAS_WEEK")")
+send_proposal "$GUSTAVO" "$G_REQ" "$P_BODY" >/dev/null
+check Z11 "two new versions at once: one 201, one 409" "201 409" \
+  "$(in_parallel POST "$GUSTAVO" "$P_BODY" "$DRIVER_SR/$G_REQ/proposals" "$DRIVER_SR/$G_REQ/proposals")"
+check Z12 "the pair has a single SENT proposal, version 2" "1 2" \
+  "$(sql "select count(*) || ' ' || max(version) filter (where status = 'SENT') from proposal
+          where client_driver_id = (select client_driver_id from service_request where token = '$G_REQ') and status = 'SENT'")"
+G_CURRENT=$(sql "select token from proposal where status = 'SENT'
+                 and service_request_id = (select id from service_request where token = '$G_REQ')")
+RACE=$(race "$CLIENT_P/$G_CURRENT/accept" "$ANA" "" "$DRIVER_SR/$G_REQ/proposals" "$GUSTAVO" "$P_BODY")
+check Z13 "Ana accepts while Gustavo sends a new version: exactly one wins, the other gets 409" "ok" \
+  "$([[ $RACE == "200 409" || $RACE == "409 201" ]] && echo ok || echo "$RACE")"
+if [[ $RACE == "200 409" ]]; then RACE_WINNER="ACCEPTED CONVERTED"; else RACE_WINNER="SENT ANSWERED"; fi
+check Z14 "never an ACCEPTED and a SENT proposal for the request" "1 $RACE_WINNER" \
+  "$(sql "select count(*) || ' ' || min(proposal.status) || ' ' || min(request.status) from proposal
+          join service_request request on request.id = proposal.service_request_id
+          where request.token = '$G_REQ' and proposal.status in ('ACCEPTED', 'SENT')")"
+request PATCH "/api/dependent/$LUCAS" "$ANA" "$LUCAS_PERSONAL"
+[[ $RESP_STATUS == 200 ]] || { echo "SETUP FAIL | restore Lucas's name, phone and birth date | HTTP $RESP_STATUS $RESP_BODY" >&2; exit 1; }
 echo
 echo "ALL PASSED: $PASSED scenarios"
