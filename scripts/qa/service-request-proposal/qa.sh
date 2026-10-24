@@ -954,5 +954,307 @@ expect T17 "the ended contract stays readable, without the removed dependent's i
   '.status == "ENDED" and .items == []'
 request DELETE "/api/dependent/$MARINA" "$BRUNO"
 expect T18 "another client still cannot remove the dependent" 403
+create_qa_driver() {
+  sql "insert into users (token, type, name, email, document, verified, terms_accepted_at)
+         values ('qauser$1', 'DRIVER', '$2', 'qa.$1@qa.vanep.com.br', 'qa$1', true, now());
+       insert into driver (token, user_id, base_price, approval_status, is_available)
+         select 'qadriver$1', id, 150, 'APPROVED', true from users where token = 'qauser$1'" >/dev/null
+  echo "qadriver$1"
+}
+
+sr_item() {
+  local dependent=$1
+  shift
+  jq -nc --arg d "$dependent" '{dependentToken: $d, days: [$ARGS.positional[] | split(":")
+    | {weekday: .[0], needsOutbound: (.[1] == "1"), needsReturn: (.[2] == "1")}]}' --args "$@"
+}
+
+sr_body() {
+  local driver=$1 notes=$2
+  shift 2
+  jq -nc --arg d "$driver" --arg n "$notes" --arg s "$START" \
+    '{driverToken: $d, desiredStartDate: $s, notes: $n, items: [$ARGS.positional[] | fromjson]}' --args "$@"
+}
+
+request_rows() {
+  sql "select (select count(*) from service_request) || ' ' || (select count(*) from client_driver)"
+}
+
+pair_links() {
+  sql "select count(*) from client_driver link join client on client.id = link.client_id
+       join driver on driver.id = link.driver_id where client.token = '$1' and driver.token = '$2'"
+}
+
+request_status() {
+  sql "select status from service_request where token = '$1'"
+}
+
+route_statuses() {
+  local token=$1 route body codes=()
+  for route in "${SR_ROUTES[@]}"; do
+    body=""
+    if [[ $route == "POST $CLIENT_SR" ]]; then body=$VALID_BODY; fi
+    request "${route%% *}" "${route#* }" "$token" "$body"
+    codes+=("$RESP_STATUS")
+  done
+  echo "${codes[*]}"
+}
+
+send_request() {
+  request POST "$CLIENT_SR" "$ANA" "$1"
+  [[ $RESP_STATUS == 201 ]] || { echo "SETUP FAIL | send a request | HTTP $RESP_STATUS $RESP_BODY" >&2; return 1; }
+  jq -r .token <<<"$RESP_BODY"
+}
+
+CLIENT_SR=/api/clients/me/service-requests
+DRIVER_SR=/api/drivers/me/service-requests
+START=$(sql "select current_date + 7")
+YESTERDAY=$(sql "select (now() at time zone 'America/Sao_Paulo')::date - 1")
+IGOR_D=$(create_qa_driver igor "Igor Prado")
+JULIA_D=$(create_qa_driver julia "Julia Ramos")
+KAIO_D=$(create_qa_driver kaio "Kaio Melo")
+LARA_D=$(create_qa_driver lara "Lara Pires")
+WEEK=(MONDAY:1:1 TUESDAY:1:1 WEDNESDAY:1:1 THURSDAY:1:1 FRIDAY:1:1)
+LUCAS_WEEK=$(sr_item "$LUCAS" "${WEEK[@]}")
+VALID_BODY=$(sr_body "$IGOR_D" "Portão azul" "$LUCAS_WEEK")
+SR_ROUTES=("POST $CLIENT_SR" "GET $CLIENT_SR" "GET $CLIENT_SR/$SEED_REQUEST" "POST $CLIENT_SR/$SEED_REQUEST/withdraw"
+  "GET $DRIVER_SR" "GET $DRIVER_SR/$SEED_REQUEST" "POST $DRIVER_SR/$SEED_REQUEST/decline")
+NOT_OPEN='.detail == "Esta solicitação não está mais em aberto."'
+NOT_READY='.detail == "Faltam dados que o contrato vai precisar. Complete o seu cadastro e o dos dependentes antes de pedir orçamento."'
+
+table "Service requests over HTTP — misuse"
+ROWS_BEFORE=$(request_rows)
+check U1 "the seven routes without a token" "401 401 401 401 401 401 401" "$(route_statuses "")"
+check U2 "the seven routes with an invalid token" "401 401 401 401 401 401 401" "$(route_statuses not-a-jwt)"
+check U3 "the admin on both surfaces" "403 403 403 403 403 403 403" "$(route_statuses "$ADMIN")"
+check U4 "a driver: the client routes are forbidden, another driver's request is not found" \
+  "403 403 403 403 200 404 404" "$(route_statuses "$FABIO")"
+check U5 "another client: Lucas and Ana's request are not found, the driver routes are forbidden" \
+  "404 200 404 404 403 403 403" "$(route_statuses "$BRUNO")"
+expect_bad_body() {
+  request POST "$CLIENT_SR" "$ANA" "$3"
+  expect "$1" "$2" 400 "${4-}"
+}
+expect_bad_body U6 "without driverToken" "$(jq -c 'del(.driverToken)' <<<"$VALID_BODY")"
+expect_bad_body U7 "a blank driverToken" "$(jq -c '.driverToken = "  "' <<<"$VALID_BODY")"
+expect_bad_body U8 "without desiredStartDate" "$(jq -c 'del(.desiredStartDate)' <<<"$VALID_BODY")"
+expect_bad_body U9 "desiredStartDate yesterday" "$(jq -c --arg y "$YESTERDAY" '.desiredStartDate = $y' <<<"$VALID_BODY")"
+expect_bad_body U10 "desiredStartDate that is not a date" "$(jq -c '.desiredStartDate = "amanhã"' <<<"$VALID_BODY")"
+expect_bad_body U11 "notes with 1001 characters" "$(jq -c '.notes = ("a" * 1001)' <<<"$VALID_BODY")"
+expect_bad_body U12 "an empty item list" "$(jq -c '.items = []' <<<"$VALID_BODY")"
+expect_bad_body U13 "without items" "$(jq -c 'del(.items)' <<<"$VALID_BODY")"
+expect_bad_body U14 "items that are not a list" "$(jq -c '.items = "Lucas"' <<<"$VALID_BODY")"
+expect_bad_body U15 "an item with no days" "$(jq -c '.items[0].days = []' <<<"$VALID_BODY")"
+expect_bad_body U16 "a blank dependentToken" "$(jq -c '.items[0].dependentToken = ""' <<<"$VALID_BODY")"
+expect_bad_body U17 "a day without needsReturn" "$(jq -c 'del(.items[0].days[0].needsReturn)' <<<"$VALID_BODY")"
+expect_bad_body U18 "needsOutbound that is not a boolean" "$(jq -c '.items[0].days[0].needsOutbound = "sim"' <<<"$VALID_BODY")"
+expect_bad_body U19 "a weekday that does not exist" "$(jq -c '.items[0].days[0].weekday = "SEGUNDA"' <<<"$VALID_BODY")"
+expect_bad_body U20 "malformed JSON" '{"driverToken": '
+expect_bad_body U21 "the same dependent twice" "$(sr_body "$IGOR_D" "" "$LUCAS_WEEK" "$LUCAS_WEEK")" \
+  '.detail == "O mesmo dependente não pode aparecer duas vezes na solicitação."'
+expect_bad_body U22 "the same weekday twice in one item" "$(sr_body "$IGOR_D" "" "$(sr_item "$LUCAS" MONDAY:1:1 MONDAY:1:0)")" \
+  '.detail == "O mesmo dia da semana não pode aparecer duas vezes para um dependente."'
+expect_bad_body U23 "a day that needs no van" "$(sr_body "$IGOR_D" "" "$(sr_item "$LUCAS" MONDAY:0:0)")" \
+  '.detail == "Cada dia pedido precisa da ida, da volta ou das duas."'
+check U24 "nothing above created a request or a link, and the seeded request is still OPEN" \
+  "$ROWS_BEFORE OPEN" "$(request_rows) $(request_status "$SEED_REQUEST")"
+
+request POST "$CLIENT_SR" "$ANA" "$(sr_body unknown "" "$LUCAS_WEEK")"
+expect U25 "an unknown driver" 404 '.detail == "Motorista não encontrado."'
+put_under_review "$LARA_D"
+request POST "$CLIENT_SR" "$ANA" "$(sr_body "$LARA_D" "" "$LUCAS_WEEK")"
+expect U26 "a driver under review" 404 '.detail == "Motorista não encontrado."'
+sql "update driver set approval_status = 'APPROVED', is_available = false where token = '$LARA_D'" >/dev/null
+request POST "$CLIENT_SR" "$ANA" "$(sr_body "$LARA_D" "" "$LUCAS_WEEK")"
+expect U27 "a driver not taking new students" 422 '.detail == "Este motorista não está aceitando novos alunos no momento."'
+restore_availability
+request POST "$CLIENT_SR" "$ANA" "$(sr_body "$IGOR_D" "" "$(sr_item unknown MONDAY:1:1)")"
+expect U28 "an unknown dependent" 404 '.detail == "Dependente não encontrado."'
+request POST /api/dependent "$BRUNO" '{"name": "Davi Lima"}'
+DAVI=$(jq -r .token <<<"$RESP_BODY")
+request POST "$CLIENT_SR" "$ANA" "$(sr_body "$IGOR_D" "" "$(sr_item "$DAVI" MONDAY:1:1)")"
+expect U29 "another client's dependent" 404 '.detail == "Dependente não encontrado."'
+request POST "$CLIENT_SR" "$BRUNO" "$(sr_body "$IGOR_D" "" "$(sr_item "$DAVI" MONDAY:1:1)")"
+expect U30 "a client without phone and address" 422 "$NOT_READY"
+request POST "$CLIENT_SR" "$ANA" "$(sr_body "$IGOR_D" "" "$(sr_item "$MARINA" MONDAY:1:1)")"
+expect U31 "a dependent without address" 422 "$NOT_READY"
+request POST "$CLIENT_SR" "$ANA" "$(sr_body "$IGOR_D" "" "$(sr_item "$LUCAS" MONDAY:1:1 SATURDAY:1:1)")"
+expect U32 "a day without school" 422 '.detail == "Um dos dias pedidos não está na grade escolar do dependente."'
+sql "update client_driver set status = 'BLOCKED', blocked_at = now(),
+       blocked_by = (select user_id from driver where token = '$FABIO_D') where token = '$ANA_FABIO'" >/dev/null
+request POST "$CLIENT_SR" "$ANA" "$(sr_body "$FABIO_D" "" "$LUCAS_WEEK")"
+expect U33 "a blocked link" 422 '.detail == "Este motorista não pode receber solicitações suas."'
+sql "update client_driver set status = 'INACTIVE', blocked_at = null, blocked_by = null where token = '$ANA_FABIO'" >/dev/null
+insert_contract "$ANA_FABIO" ACTIVE qasrhttpcontract
+request POST "$CLIENT_SR" "$ANA" "$(sr_body "$FABIO_D" "" "$LUCAS_WEEK")"
+expect U34 "a pair with an ACTIVE contract" 422 '.detail == "Você já tem um contrato em andamento com este motorista."'
+sql "update contract set status = 'ENDED' where token = 'qasrhttpcontract'" >/dev/null
+check U35 "no refusal created a request or a link" "$ROWS_BEFORE" "$(request_rows)"
+
+table "Service requests over HTTP — client"
+request PUT "/api/dependent/$LUCAS/school-days" "$ANA" \
+  "$(school_days_body MONDAY:MORNING TUESDAY:FULLTIME WEDNESDAY:MORNING THURSDAY:FULLTIME FRIDAY:MORNING)"
+expect E1 "Lucas is full time on Tuesday and Thursday" 200
+request PATCH "/api/dependent/$MARINA" "$ANA" "$(jq -nc --arg c "$SEED_CITY" \
+  '{address: {cityToken: $c, street: "Rua das Flores", number: "20", zipCode: "01001000", neighborhood: "Vila Mariana"}}')"
+expect E2 "Marina gets an address" 200
+request PUT "/api/dependent/$MARINA/school-days" "$ANA" \
+  "$(school_days_body MONDAY:MORNING TUESDAY:MORNING WEDNESDAY:MORNING THURSDAY:MORNING FRIDAY:MORNING)"
+expect E3 "and mornings from Monday to Friday" 200
+MARINA_BIRTH=$(sql "select birth_date from dependent where token = '$MARINA'")
+LINKS_BEFORE=$(count client_driver)
+request POST "$CLIENT_SR" "$ANA" "$(sr_body "$HELENA_D" "Portão azul" "$LUCAS_WEEK" "$(sr_item "$MARINA" "${WEEK[@]}")")"
+expect E4 "two siblings, Monday to Friday, both ways" 201 \
+  ".status == \"OPEN\" and .driverToken == \"$HELENA_D\" and .notes == \"Portão azul\" and (.items | length) == 2
+   and all(.items[]; (.days | length) == 5) and (.items | map(.dependentName)) == [\"Lucas Souza\", \"Marina Souza\"]
+   and .items[1].dependentBirthDate == \"$MARINA_BIRTH\" and .items[1].pickupNeighborhood == \"Vila Mariana\"
+   and .items[0].schoolName == \"Escola Municipal Seed\" and .items[0].pickupStateUf == \"SP\" and (has(\"id\") | not)"
+SIBLINGS=$(jq -r .token <<<"$RESP_BODY")
+check E5 "it expires 72 hours after it was sent, on a new PENDING link from the search" \
+  "72 PENDING CLIENT_SEARCH $((LINKS_BEFORE + 1))" \
+  "$(sql "select round(extract(epoch from request.expires_at - request.created_at) / 3600) || ' ' || link.status || ' ' || link.origin
+          from service_request request join client_driver link on link.id = request.client_driver_id
+          where request.token = '$SIBLINGS'") $(count client_driver)"
+request POST "$CLIENT_SR" "$ANA" "$(sr_body "$FABIO_D" "" "$(sr_item "$LUCAS" "${WEEK[@]:0:2}" WEDNESDAY:1:0 "${WEEK[@]:3}")")"
+expect E6 "full time on some days only, no return on Wednesday" 201 \
+  '(.items[0].days | map(.weekday + ":" + .schoolShift + ":" + (.needsOutbound | tostring) + ":" + (.needsReturn | tostring)))
+   == ["MONDAY:MORNING:true:true", "TUESDAY:FULLTIME:true:true", "WEDNESDAY:MORNING:true:false",
+       "THURSDAY:FULLTIME:true:true", "FRIDAY:MORNING:true:true"]'
+FABIO_REQUEST=$(jq -r .token <<<"$RESP_BODY")
+check E7 "the ended pair's link is reused, with its origin" "$ANA_FABIO CLIENT_SEARCH $((LINKS_BEFORE + 1))" \
+  "$(jq -r .clientDriverToken <<<"$RESP_BODY") $(link_origin "$ANA_FABIO") $(count client_driver)"
+request PUT "/api/dependent/$LUCAS/school-days" "$ANA" \
+  "$(school_days_body MONDAY:MORNING TUESDAY:FULLTIME WEDNESDAY:MORNING THURSDAY:MORNING FRIDAY:MORNING)"
+request GET "$CLIENT_SR/$FABIO_REQUEST" "$ANA"
+expect E8 "editing the grid does not change the request: Thursday is still full time" 200 \
+  '.items[0].days[3] | .weekday == "THURSDAY" and .schoolShift == "FULLTIME"'
+OTHER_SCHOOL=$(sql "select token from school where name <> 'Escola Municipal Seed' and deleted_at is null order by id limit 1")
+request PATCH "/api/dependent/$LUCAS" "$ANA" "$(jq -nc --arg s "$OTHER_SCHOOL" '{schoolToken: $s}')"
+[[ $RESP_STATUS == 200 ]] || { echo "SETUP FAIL | change Lucas's school | HTTP $RESP_STATUS $RESP_BODY" >&2; exit 1; }
+request GET "$CLIENT_SR/$FABIO_REQUEST" "$ANA"
+expect E9 "editing the dependent does not change the request: the school it was sent with" 200 \
+  '.items[0].schoolName == "Escola Municipal Seed"'
+request PATCH "/api/dependent/$LUCAS" "$ANA" "$(jq -nc --arg s "$SEED_SCHOOL" '{schoolToken: $s}')"
+request POST "$CLIENT_SR" "$ANA" "$(sr_body "$IGOR_D" "$(printf 'a%.0s' $(seq 1000))" "$LUCAS_WEEK")"
+expect E10 "notes with exactly 1000 characters" 201 '(.notes | length) == 1000'
+IGOR_REQUEST=$(jq -r .token <<<"$RESP_BODY")
+sql "update service_request set status = 'ANSWERED' where token = '$SEED_REQUEST'" >/dev/null
+ROWS_BEFORE=$(request_rows)
+request POST "$CLIENT_SR" "$ANA" "$(sr_body "$GUSTAVO_D" "" "$LUCAS_WEEK")"
+expect E11 "a second request to a driver whose request is ANSWERED" 409 \
+  '.detail == "Você já tem uma solicitação em aberto com este motorista."'
+check E12 "nothing was created" "$ROWS_BEFORE" "$(request_rows)"
+sql "update service_request set status = 'OPEN' where token = '$SEED_REQUEST'" >/dev/null
+request POST "$CLIENT_SR" "$ANA" "$(sr_body "$JULIA_D" "" "$LUCAS_WEEK")"
+expect E13 "the fifth open request" 201 '.status == "OPEN"'
+JULIA_REQUEST=$(jq -r .token <<<"$RESP_BODY")
+request POST "$CLIENT_SR" "$ANA" "$(sr_body "$KAIO_D" "" "$LUCAS_WEEK")"
+expect E14 "the sixth open request" 422 \
+  '.detail == "Você já tem cinco solicitações em aberto. Aguarde uma resposta ou retire uma delas."'
+check E15 "the refused request left no link" 0 "$(pair_links "$ANA_C" "$KAIO_D")"
+ANA_TOTAL=$(sql "select count(*) from service_request request join client_driver link on link.id = request.client_driver_id
+                 where link.client_id = (select id from client where token = '$ANA_C')")
+request GET "$CLIENT_SR" "$ANA"
+expect E16 "the list shows every request of Ana, newest first" 200 \
+  ".totalElements == $ANA_TOTAL and .content[0].token == \"$JULIA_REQUEST\""
+request GET "$CLIENT_SR?status=OPEN" "$ANA"
+expect E17 "filtered by OPEN" 200 '.totalElements == 5 and all(.content[]; .status == "OPEN")'
+request GET "$CLIENT_SR?size=2&page=1" "$ANA"
+expect E18 "paginated" 200 '(.content | length) == 2 and .size == 2 and .number == 1'
+request GET "$CLIENT_SR?status=PENDING" "$ANA"
+expect E19 "a status that does not exist" 400
+request GET "$CLIENT_SR/$SIBLINGS" "$ANA"
+expect E20 "reads one of her requests" 200 ".token == \"$SIBLINGS\" and .status == \"OPEN\""
+request GET "$CLIENT_SR/unknown" "$ANA"
+expect E21 "an unknown token" 404 '.detail == "Solicitação não encontrada."'
+request POST "$CLIENT_SR/$SIBLINGS/withdraw" "$ANA"
+expect E22 "withdraws the request for the two siblings" 200 '.status == "WITHDRAWN"'
+request POST "$CLIENT_SR/$SIBLINGS/withdraw" "$ANA"
+expect E23 "withdrawing it again" 409 "$NOT_OPEN"
+request DELETE "/api/dependent/$MARINA" "$ANA"
+expect E24 "Marina is removed after the request closed" 204
+request GET "$CLIENT_SR/$SIBLINGS" "$ANA"
+expect E25 "Ana still reads both items, Marina with the name and birth date she was sent with" 200 \
+  "(.items | map(.dependentName)) == [\"Lucas Souza\", \"Marina Souza\"] and .items[1].dependentBirthDate == \"$MARINA_BIRTH\""
+request GET "$DRIVER_SR/$SIBLINGS" "$HELENA"
+expect E26 "and so does Helena" 200 '(.items | map(.dependentFirstName)) == ["Lucas", "Marina"]'
+sql "update service_request set status = 'ANSWERED' where token = '$IGOR_REQUEST'; $(insert_proposal qahttpp1 "$IGOR_REQUEST" SENT 1)" >/dev/null
+request POST "$CLIENT_SR/$IGOR_REQUEST/withdraw" "$ANA"
+expect E27 "withdraws a request while a proposal is waiting" 200 '.status == "WITHDRAWN"'
+check E28 "the proposal is DECLINED" DECLINED "$(sql "select status from proposal where token = 'qahttpp1'")"
+sql "update service_request set expires_at = now() - interval '1 minute' where token = '$JULIA_REQUEST'" >/dev/null
+request POST "$CLIENT_SR/$JULIA_REQUEST/withdraw" "$ANA"
+expect E29 "an OPEN request past its deadline, before the sweep" 409 "$NOT_OPEN"
+check E30 "it was not withdrawn" OPEN "$(request_status "$JULIA_REQUEST")"
+sql "update service_request set expires_at = now() + interval '72 hours' where token = '$JULIA_REQUEST'" >/dev/null
+check E31 "two requests to the same new driver at once: one 201, one 409" "201 409" \
+  "$(in_parallel POST "$ANA" "$(sr_body "$KAIO_D" "" "$LUCAS_WEEK")" "$CLIENT_SR" "$CLIENT_SR")"
+check E32 "one link and one request for the pair" "1 1" \
+  "$(pair_links "$ANA_C" "$KAIO_D") $(sql "select count(*) from service_request request join client_driver link on link.id = request.client_driver_id
+       where link.driver_id = (select id from driver where token = '$KAIO_D')")"
+ANA_OPEN_OR_WITHDRAWN=$(sql "select count(*) from service_request request join client_driver link on link.id = request.client_driver_id
+                          where link.client_id = (select id from client where token = '$ANA_C') and request.status in ('OPEN', 'WITHDRAWN')")
+request GET "$CLIENT_SR?status=OPEN,WITHDRAWN" "$ANA"
+expect E33 "filtered by two statuses, comma-separated" 200 \
+  ".totalElements == $ANA_OPEN_OR_WITHDRAWN and all(.content[]; .status == \"OPEN\" or .status == \"WITHDRAWN\")"
+request GET "$CLIENT_SR?status=OPEN&status=WITHDRAWN" "$ANA"
+expect E34 "and with the parameter repeated" 200 ".totalElements == $ANA_OPEN_OR_WITHDRAWN"
+request GET "$CLIENT_SR?status=OPEN,PENDING" "$ANA"
+expect E35 "a list with a status that does not exist" 400
+ANA_RATINGS=$(sql "select coalesce(json_object_agg(request.token, driver.rating), '{}') from service_request request
+                    join client_driver link on link.id = request.client_driver_id join driver on driver.id = link.driver_id
+                    where link.client_id = (select id from client where token = '$ANA_C')")
+request GET "$CLIENT_SR?size=100" "$ANA"
+expect E36 "every request in Ana's list carries its driver's rating, as stored" 200 \
+  "any(.content[]; .driverRating != null) and all(.content[]; .driverRating == ($ANA_RATINGS)[.token])"
+request GET "$CLIENT_SR/$SIBLINGS" "$ANA"
+expect E37 "and so does the detail" 200 ".driverRating == ($ANA_RATINGS)[\"$SIBLINGS\"]"
+
+table "Service requests over HTTP — driver"
+LUCAS_AGE=$(sql "select extract(year from age(current_date, birth_date))::int from dependent where token = '$LUCAS'")
+request GET "$DRIVER_SR?status=OPEN" "$FABIO"
+expect J1 "Fabio lists his OPEN requests" 200 ".totalElements == 1 and .content[0].token == \"$FABIO_REQUEST\""
+request GET "$DRIVER_SR/$FABIO_REQUEST" "$FABIO"
+expect J2 "Fabio reads the client's first name and the dependent's first name and age" 200 \
+  ".clientFirstName == \"Ana\" and .items[0].dependentFirstName == \"Lucas\" and .items[0].dependentAge == $LUCAS_AGE
+   and .items[0].schoolName == \"Escola Municipal Seed\" and .items[0].pickupCityName == \"São Paulo\"
+   and .items[0].pickupNeighborhood == \"Centro\" and (.items[0].days | length) == 5 and .expiresAt != null
+   and ([paths | last | strings] | map(select(IN(\"dependentName\", \"dependentBirthDate\", \"street\", \"zipCode\",
+     \"googlePlaceId\", \"document\", \"phone\", \"email\", \"driverName\"))) | length) == 0"
+LEAKS="Souza|$(sql "select concat_ws('|', dependent.birth_date, address.street, address.zip_code, users.document, users.phone, users.email)
+                  from dependent join address on address.id = dependent.address_id join client on client.id = dependent.client_id
+                  join users on users.id = client.user_id where dependent.token = '$LUCAS'")"
+check J3 "the response has no surname, birth date, street, zip code, document, phone or e-mail" "" \
+  "$(grep -oE "$LEAKS" <<<"$RESP_BODY" | sort -u | paste -sd, - || true)"
+request GET "$DRIVER_SR/$FABIO_REQUEST" "$GUSTAVO"
+expect J4 "another driver's request" 404 '.detail == "Solicitação não encontrada."'
+request POST "$DRIVER_SR/$FABIO_REQUEST/decline" "$FABIO" "$(jq -nc '{reason: ("a" * 501)}')"
+expect J5 "a reason with 501 characters" 400
+request POST "$DRIVER_SR/$FABIO_REQUEST/decline" "$FABIO" '{"reason": {"text": "x"}}'
+expect J6 "a reason that is not text" 400
+request POST "$DRIVER_SR/$FABIO_REQUEST/decline" "$FABIO" '{"reason": '
+expect J7 "malformed JSON" 400
+check J8 "the request is still OPEN" OPEN "$(request_status "$FABIO_REQUEST")"
+request POST "$DRIVER_SR/$FABIO_REQUEST/decline" "$FABIO" '{"reason": "  Sem vaga  "}'
+expect J9 "Fabio declines with a reason" 200 '.status == "DECLINED" and .declineReason == "Sem vaga"'
+request GET "$CLIENT_SR/$FABIO_REQUEST" "$ANA"
+expect J10 "Ana reads it declined, with the reason" 200 '.status == "DECLINED" and .declineReason == "Sem vaga"'
+request POST "$DRIVER_SR/$FABIO_REQUEST/decline" "$FABIO"
+expect J11 "declining it again" 409 "$NOT_OPEN"
+request POST "$DRIVER_SR/$SEED_REQUEST/decline" "$GUSTAVO" "$(jq -nc '{reason: ("a" * 500)}')"
+expect J12 "a reason with exactly 500 characters" 200 '.status == "DECLINED" and (.declineReason | length) == 500'
+HELENA_REQUEST=$(send_request "$(sr_body "$HELENA_D" "" "$LUCAS_WEEK")")
+request POST "$DRIVER_SR/$HELENA_REQUEST/decline" "$HELENA"
+expect J13 "Helena declines without a body" 200 '.status == "DECLINED" and .declineReason == null'
+HELENA_REQUEST=$(send_request "$(sr_body "$HELENA_D" "" "$LUCAS_WEEK")")
+sql "update service_request set status = 'ANSWERED' where token = '$HELENA_REQUEST'; $(insert_proposal qahttpp2 "$HELENA_REQUEST" SENT 1)" >/dev/null
+request POST "$DRIVER_SR/$HELENA_REQUEST/decline" "$HELENA"
+expect J14 "Helena declines while her proposal is waiting" 200 '.status == "DECLINED"'
+check J15 "her proposal is WITHDRAWN" WITHDRAWN "$(sql "select status from proposal where token = 'qahttpp2'")"
+GUSTAVO_REQUEST=$(send_request "$(sr_body "$GUSTAVO_D" "" "$LUCAS_WEEK")")
+sql "update service_request set status = 'CONVERTED' where token = '$GUSTAVO_REQUEST'" >/dev/null
+request POST "$DRIVER_SR/$GUSTAVO_REQUEST/decline" "$GUSTAVO"
+expect J16 "declining a CONVERTED request" 409 "$NOT_OPEN"
+check J17 "it stays CONVERTED" CONVERTED "$(request_status "$GUSTAVO_REQUEST")"
 echo
 echo "ALL PASSED: $PASSED scenarios"
