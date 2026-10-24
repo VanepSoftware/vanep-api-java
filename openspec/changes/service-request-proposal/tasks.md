@@ -146,11 +146,11 @@
 > Depends on: PR 6 | Parallel with: —
 > Order: test → controller
 
-- [ ] 7.1 Criar branch `VAN-30/7-request-http` de dentro da branch do PR 6
-- [ ] 7.2 Testes slice (`MockMvc` + segurança) de cada rota da tabela do spec: sem token → 401, tipo errado → 403, token de outro → 404, corpo inválido (campo faltando, lista vazia, data passada, JSON de tipo errado e malformado) → 400, e o caminho feliz com o status e o corpo; o filtro com dois status (separados por vírgula e com o parâmetro repetido) e com um status inexistente → 400
-- [ ] 7.3 `ClientServiceRequestController` (`/api/clients/me/service-requests`), `DriverServiceRequestController` (`/api/drivers/me/service-requests`), finos (regra 7), com `@PreAuthorize("isAuthenticated()")` e o `status` das listas como conjunto
-- [ ] 7.4 `make lint` + `./mvnw verify -B`
-- [ ] 7.5 QA da regra 55: cada cenário do spec `service-request` para cliente e motorista do seed, inclusive o envio recusado por prontidão; mau uso da regra 55 (sem token, token inválido, outro cliente, outro motorista, admin, campos faltando e em branco, tipos errados, JSON malformado, `notes` com 1000 e 1001 caracteres, cinco e seis abertas, token desconhecido, filtro por dois status e por um inexistente, nota do motorista na lista e no detalhe do cliente); duas solicitações do mesmo par em paralelo → uma 201 e uma 409, e um vínculo só; uma recusada não deixa linha nem vínculo
+- [x] 7.1 Criar branch `VAN-30/7-request-http` de dentro da branch do PR 6
+- [x] 7.2 Testes slice (`MockMvc` + segurança) de cada rota da tabela do spec: sem token → 401, tipo errado → 403, token de outro → 404, corpo inválido (campo faltando, lista vazia, data passada, JSON de tipo errado e malformado) → 400, e o caminho feliz com o status e o corpo; o filtro com dois status (separados por vírgula e com o parâmetro repetido) e com um status inexistente → 400
+- [x] 7.3 `ClientServiceRequestController` (`/api/clients/me/service-requests`), `DriverServiceRequestController` (`/api/drivers/me/service-requests`), finos (regra 7), com `@PreAuthorize("isAuthenticated()")` e o `status` das listas como conjunto
+- [x] 7.4 `make lint` + `./mvnw verify -B`
+- [x] 7.5 QA da regra 55: cada cenário do spec `service-request` para cliente e motorista do seed, inclusive o envio recusado por prontidão; mau uso da regra 55 (sem token, token inválido, outro cliente, outro motorista, admin, campos faltando e em branco, tipos errados, JSON malformado, `notes` com 1000 e 1001 caracteres, cinco e seis abertas, token desconhecido, filtro por dois status e por um inexistente, nota do motorista na lista e no detalhe do cliente); duas solicitações do mesmo par em paralelo → uma 201 e uma 409, e um vínculo só; uma recusada não deixa linha nem vínculo
 
 ## 8. PR 8 — Serviço da proposta
 
