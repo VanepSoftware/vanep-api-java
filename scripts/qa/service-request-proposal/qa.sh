@@ -864,8 +864,8 @@ check_sql_rejected P27 "a snapshot without the vehicle" proposal_snapshot_check 
 
 table "Seeded service request"
 SEED_REQUEST=$(sql "select token from service_request where token not like 'qa%' order by id limit 1")
-check S1 "the seed sent one OPEN request from Ana to Gustavo, on a PENDING link from the search" \
-  "OPEN PENDING CLIENT_SEARCH" \
+check S1 "the seed sent one request from Ana to Gustavo, answered by the seeded proposal, on a PENDING link from the search" \
+  "ANSWERED PENDING CLIENT_SEARCH" \
   "$(sql "select request.status || ' ' || link.status || ' ' || link.origin from service_request request
           join client_driver link on link.id = request.client_driver_id join driver on driver.id = link.driver_id
           where request.token = '$SEED_REQUEST' and driver.token = '$GUSTAVO_D'")"
@@ -890,6 +890,46 @@ check S5 "it expires 72 hours after it was sent" 72 \
 request DELETE "/api/dependent/$LUCAS" "$ANA"
 expect S6 "Lucas is not removed while the seeded request is open" 422 \
   '.code == "dependent.open_negotiation" and .detail == "Este dependente está numa solicitação de orçamento em aberto. Retire a solicitação antes de removê-lo."'
+SEED_PROPOSAL="(select proposal.id from proposal join service_request request on request.id = proposal.service_request_id
+                where request.token = '$SEED_REQUEST')"
+check S7 "the seed answered it with one SENT version 1, without a parent, on the same link" \
+  "1 SENT 1 true true" \
+  "$(sql "select count(*) || ' ' || min(proposal.status) || ' ' || min(proposal.version) || ' '
+            || bool_and(proposal.parent_proposal_id is null) || ' ' || bool_and(proposal.client_driver_id = request.client_driver_id)
+          from proposal join service_request request on request.id = proposal.service_request_id where request.token = '$SEED_REQUEST'")"
+check S8 "it offers Gustavo's van, copied with its plate and capacity" \
+  "VAN2B34 true true" \
+  "$(sql "select proposal.snapshot->'vehicle'->>'plate' || ' ' || (vehicle.plate = proposal.snapshot->'vehicle'->>'plate') || ' '
+            || ((proposal.snapshot->'vehicle'->>'capacity')::int = vehicle.capacity)
+          from proposal join vehicle on vehicle.id = proposal.vehicle_id where proposal.id = $SEED_PROPOSAL")"
+check S9 "one item for Lucas, with the schedule built from the requested grid" \
+  "1 10 MONDAY:OUTBOUND:06:40,MONDAY:RETURN:12:10,TUESDAY:OUTBOUND:06:40,TUESDAY:RETURN:17:20" \
+  "$(sql "select count(distinct item.id) || ' ' || count(slot.id) || ' ' || string_agg(slot.weekday || ':' || slot.leg || ':' || to_char(slot.window_start, 'HH24:MI'), ','
+            order by array_position(array['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY'], slot.weekday::text), slot.leg)
+            filter (where slot.weekday in ('MONDAY', 'TUESDAY'))
+          from proposal_item item join schedule_slot slot on slot.schedule_id = item.schedule_id
+          where item.proposal_id = $SEED_PROPOSAL and item.dependent_id = (select id from dependent where token = '$LUCAS')")"
+check S10 "valid for seven days, ten installments of the item's monthly amount" \
+  "7 10 4200.00 420.00" \
+  "$(sql "select round(extract(epoch from proposal.valid_until - proposal.created_at) / 86400) || ' ' || proposal.installments || ' '
+            || proposal.total_amount || ' ' || item.monthly_amount
+          from proposal join proposal_item item on item.proposal_id = proposal.id where proposal.id = $SEED_PROPOSAL")"
+check S11 "the period starts on the desired start and stays within twelve months" "true true" \
+  "$(sql "select (proposal.starts_on = request.desired_start_date) || ' ' || (proposal.ends_on <= proposal.starts_on + interval '12 months')
+          from proposal join service_request request on request.id = proposal.service_request_id where proposal.id = $SEED_PROPOSAL")"
+check S12 "no contract came from it, and the link did not change" "0 PENDING" \
+  "$(sql "select count(contract.id) || ' ' || min(link.status) from proposal join client_driver link on link.id = proposal.client_driver_id
+          left join contract on contract.client_driver_id = link.id where proposal.id = $SEED_PROPOSAL")"
+SEED_PROPOSAL_TOKEN=$(sql "select token from proposal where id = $SEED_PROPOSAL")
+SEED_STARTS_ON=$(sql "select starts_on from proposal where id = $SEED_PROPOSAL")
+SEED_SUMMARY="(.token == \"$SEED_PROPOSAL_TOKEN\" and .version == 1 and .status == \"SENT\" and .totalAmount == 4200
+               and .installments == 10 and .installmentAmount == 420 and .validUntil != null
+               and .startsOn == \"$SEED_STARTS_ON\" and .hasPendingAdjustment == false)"
+request GET "/api/clients/me/service-requests?status=ANSWERED" "$ANA"
+expect S13 "Ana's list carries the seeded proposal as the request's current one: ten installments of 420.00, no adjustment pending" 200 \
+  ".totalElements == 1 and .content[0].token == \"$SEED_REQUEST\" and (.content[0].currentProposal | $SEED_SUMMARY)"
+request GET "/api/drivers/me/service-requests/$SEED_REQUEST" "$GUSTAVO"
+expect S14 "Gustavo reads the same summary in the detail" 200 "(.currentProposal | $SEED_SUMMARY)"
 
 table "Dependent locks (D17)"
 ANA_C=$(client_token ana.souza)
@@ -1056,8 +1096,8 @@ expect_bad_body U22 "the same weekday twice in one item" "$(sr_body "$IGOR_D" ""
   '.detail == "O mesmo dia da semana não pode aparecer duas vezes para um dependente."'
 expect_bad_body U23 "a day that needs no van" "$(sr_body "$IGOR_D" "" "$(sr_item "$LUCAS" MONDAY:0:0)")" \
   '.detail == "Cada dia pedido precisa da ida, da volta ou das duas."'
-check U24 "nothing above created a request or a link, and the seeded request is still OPEN" \
-  "$ROWS_BEFORE OPEN" "$(request_rows) $(request_status "$SEED_REQUEST")"
+check U24 "nothing above created a request or a link, and the seeded request is still ANSWERED" \
+  "$ROWS_BEFORE ANSWERED" "$(request_rows) $(request_status "$SEED_REQUEST")"
 
 request POST "$CLIENT_SR" "$ANA" "$(sr_body unknown "" "$LUCAS_WEEK")"
 expect U25 "an unknown driver" 404 '.detail == "Motorista não encontrado."'
@@ -1138,13 +1178,11 @@ request PATCH "/api/dependent/$LUCAS" "$ANA" "$(jq -nc --arg s "$SEED_SCHOOL" '{
 request POST "$CLIENT_SR" "$ANA" "$(sr_body "$IGOR_D" "$(printf 'a%.0s' $(seq 1000))" "$LUCAS_WEEK")"
 expect E10 "notes with exactly 1000 characters" 201 '(.notes | length) == 1000'
 IGOR_REQUEST=$(jq -r .token <<<"$RESP_BODY")
-sql "update service_request set status = 'ANSWERED' where token = '$SEED_REQUEST'" >/dev/null
 ROWS_BEFORE=$(request_rows)
 request POST "$CLIENT_SR" "$ANA" "$(sr_body "$GUSTAVO_D" "" "$LUCAS_WEEK")"
-expect E11 "a second request to a driver whose request is ANSWERED" 409 \
+expect E11 "a second request to a driver whose request is ANSWERED (the seeded one)" 409 \
   '.detail == "Você já tem uma solicitação em aberto com este motorista."'
 check E12 "nothing was created" "$ROWS_BEFORE" "$(request_rows)"
-sql "update service_request set status = 'OPEN' where token = '$SEED_REQUEST'" >/dev/null
 request POST "$CLIENT_SR" "$ANA" "$(sr_body "$JULIA_D" "" "$LUCAS_WEEK")"
 expect E13 "the fifth open request" 201 '.status == "OPEN"'
 JULIA_REQUEST=$(jq -r .token <<<"$RESP_BODY")
@@ -1157,8 +1195,11 @@ ANA_TOTAL=$(sql "select count(*) from service_request request join client_driver
 request GET "$CLIENT_SR" "$ANA"
 expect E16 "the list shows every request of Ana, newest first" 200 \
   ".totalElements == $ANA_TOTAL and .content[0].token == \"$JULIA_REQUEST\""
+ANA_OPEN=$(sql "select count(*) from service_request request join client_driver link on link.id = request.client_driver_id
+                where link.client_id = (select id from client where token = '$ANA_C') and request.status = 'OPEN'")
 request GET "$CLIENT_SR?status=OPEN" "$ANA"
-expect E17 "filtered by OPEN" 200 '.totalElements == 5 and all(.content[]; .status == "OPEN")'
+expect E17 "filtered by OPEN (the seeded one is ANSWERED)" 200 \
+  ".totalElements == $ANA_OPEN and .totalElements == 4 and all(.content[]; .status == \"OPEN\")"
 request GET "$CLIENT_SR?size=2&page=1" "$ANA"
 expect E18 "paginated" 200 '(.content | length) == 2 and .size == 2 and .number == 1'
 request GET "$CLIENT_SR?status=PENDING" "$ANA"
@@ -1242,19 +1283,20 @@ expect J10 "Ana reads it declined, with the reason" 200 '.status == "DECLINED" a
 request POST "$DRIVER_SR/$FABIO_REQUEST/decline" "$FABIO"
 expect J11 "declining it again" 409 "$NOT_OPEN"
 request POST "$DRIVER_SR/$SEED_REQUEST/decline" "$GUSTAVO" "$(jq -nc '{reason: ("a" * 500)}')"
-expect J12 "a reason with exactly 500 characters" 200 '.status == "DECLINED" and (.declineReason | length) == 500'
+expect J12 "a reason with exactly 500 characters, on the seeded request" 200 '.status == "DECLINED" and (.declineReason | length) == 500'
+check J13 "the seeded proposal is WITHDRAWN with it" WITHDRAWN "$(sql "select status from proposal where id = $SEED_PROPOSAL")"
 HELENA_REQUEST=$(send_request "$(sr_body "$HELENA_D" "" "$LUCAS_WEEK")")
 request POST "$DRIVER_SR/$HELENA_REQUEST/decline" "$HELENA"
-expect J13 "Helena declines without a body" 200 '.status == "DECLINED" and .declineReason == null'
+expect J14 "Helena declines without a body" 200 '.status == "DECLINED" and .declineReason == null'
 HELENA_REQUEST=$(send_request "$(sr_body "$HELENA_D" "" "$LUCAS_WEEK")")
 sql "update service_request set status = 'ANSWERED' where token = '$HELENA_REQUEST'; $(insert_proposal qahttpp2 "$HELENA_REQUEST" SENT 1)" >/dev/null
 request POST "$DRIVER_SR/$HELENA_REQUEST/decline" "$HELENA"
-expect J14 "Helena declines while her proposal is waiting" 200 '.status == "DECLINED"'
-check J15 "her proposal is WITHDRAWN" WITHDRAWN "$(sql "select status from proposal where token = 'qahttpp2'")"
+expect J15 "Helena declines while her proposal is waiting" 200 '.status == "DECLINED"'
+check J16 "her proposal is WITHDRAWN" WITHDRAWN "$(sql "select status from proposal where token = 'qahttpp2'")"
 GUSTAVO_REQUEST=$(send_request "$(sr_body "$GUSTAVO_D" "" "$LUCAS_WEEK")")
 sql "update service_request set status = 'CONVERTED' where token = '$GUSTAVO_REQUEST'" >/dev/null
 request POST "$DRIVER_SR/$GUSTAVO_REQUEST/decline" "$GUSTAVO"
-expect J16 "declining a CONVERTED request" 409 "$NOT_OPEN"
-check J17 "it stays CONVERTED" CONVERTED "$(request_status "$GUSTAVO_REQUEST")"
+expect J17 "declining a CONVERTED request" 409 "$NOT_OPEN"
+check J18 "it stays CONVERTED" CONVERTED "$(request_status "$GUSTAVO_REQUEST")"
 echo
 echo "ALL PASSED: $PASSED scenarios"

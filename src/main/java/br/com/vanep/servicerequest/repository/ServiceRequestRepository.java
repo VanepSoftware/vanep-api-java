@@ -127,6 +127,30 @@ public interface ServiceRequestRepository extends JpaRepository<ServiceRequestMo
   @Query(
       """
       update ServiceRequestModel request
+      set request.status = br.com.vanep.servicerequest.enums.ServiceRequestStatus.ANSWERED,
+        request.updatedAt = instant
+      where request.id = :id
+        and (request.status = br.com.vanep.servicerequest.enums.ServiceRequestStatus.ANSWERED
+          or (request.status = br.com.vanep.servicerequest.enums.ServiceRequestStatus.OPEN
+            and request.expiresAt > :now))
+      """)
+  int answer(Long id, Instant now);
+
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query(
+      """
+      update ServiceRequestModel request
+      set request.status = br.com.vanep.servicerequest.enums.ServiceRequestStatus.OPEN,
+        request.expiresAt = :expiresAt, request.updatedAt = instant
+      where request.id = :id
+        and request.status = br.com.vanep.servicerequest.enums.ServiceRequestStatus.ANSWERED
+      """)
+  int reopen(Long id, Instant expiresAt);
+
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query(
+      """
+      update ServiceRequestModel request
       set request.status = :to, request.declineReason = :declineReason,
         request.updatedAt = instant
       where request.id = :id and request.status in :from

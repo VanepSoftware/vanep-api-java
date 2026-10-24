@@ -241,6 +241,61 @@ class ProposalRepositoryTest {
   }
 
   @Test
+  void findsTheCurrentProposalOfSeveralRequestsInOneCall() {
+    ServiceRequestModel answered = saveRequest(link, ServiceRequestStatus.ANSWERED);
+    proposals.save(
+        newProposal(
+            answered, 1, ProposalStatus.SUPERSEDED, newItem(lucas, "350.00", RouteLeg.OUTBOUND)));
+    ProposalModel sent =
+        proposals.save(
+            newProposal(
+                answered, 2, ProposalStatus.SENT, newItem(lucas, "330.00", RouteLeg.OUTBOUND)));
+    adjustments.save(newAdjustment(sent, ProposalAdjustmentField.PRICE, "320,00", null));
+    ClientDriverModel convertedPair =
+        createLink(client, createDriver("second@vanep.com", "52998224725"));
+    ServiceRequestModel converted = saveRequest(convertedPair, ServiceRequestStatus.CONVERTED);
+    ProposalModel accepted =
+        proposals.save(
+            newProposal(
+                converted,
+                1,
+                ProposalStatus.ACCEPTED,
+                newItem(lucas, "350.00", RouteLeg.OUTBOUND)));
+    ClientDriverModel declinedPair =
+        createLink(client, createDriver("third@vanep.com", "39053344705"));
+    ServiceRequestModel declined = saveRequest(declinedPair, ServiceRequestStatus.WITHDRAWN);
+    proposals.save(
+        newProposal(
+            declined, 1, ProposalStatus.DECLINED, newItem(lucas, "350.00", RouteLeg.OUTBOUND)));
+
+    List<ProposalRepository.CurrentProposalRow> rows =
+        proposals.findCurrentByServiceRequestIdIn(
+            List.of(answered.getId(), converted.getId(), declined.getId()));
+
+    assertThat(rows)
+        .extracting(
+            row -> row.getServiceRequestId(),
+            row -> row.getToken(),
+            row -> row.getVersion(),
+            row -> row.getStatus(),
+            row -> row.getTotalAmount().toPlainString(),
+            row -> row.getInstallments(),
+            row -> row.getHasAdjustments())
+        .containsExactlyInAnyOrder(
+            tuple(answered.getId(), sent.getToken(), 2, ProposalStatus.SENT, "4200.00", 12, true),
+            tuple(
+                converted.getId(),
+                accepted.getToken(),
+                1,
+                ProposalStatus.ACCEPTED,
+                "4200.00",
+                12,
+                false));
+    assertThat(rows)
+        .allMatch(row -> row.getValidUntil() != null && row.getStartsOn().equals(STARTS_ON));
+  }
+
+  @Test
   void findsTheSentProposalOfAPair() {
     ServiceRequestModel request = saveRequest(link, ServiceRequestStatus.ANSWERED);
     proposals.save(
@@ -329,6 +384,84 @@ class ProposalRepositoryTest {
                 List.of(first.getId(), second.getId())))
         .extracting(adjustment -> adjustment.getProposalId())
         .containsExactly(first.getId(), second.getId());
+  }
+
+  @Test
+  void findsTheLatestVersionOfARequest() {
+    ServiceRequestModel request = saveRequest(link, ServiceRequestStatus.ANSWERED);
+    proposals.save(
+        newProposal(
+            request, 1, ProposalStatus.SUPERSEDED, newItem(lucas, "350.00", RouteLeg.OUTBOUND)));
+    ProposalModel second =
+        proposals.save(
+            newProposal(
+                request, 2, ProposalStatus.WITHDRAWN, newItem(lucas, "340.00", RouteLeg.OUTBOUND)));
+
+    assertThat(proposals.findTopByServiceRequestIdOrderByVersionDesc(request.getId()))
+        .get()
+        .extracting(proposal -> proposal.getId())
+        .isEqualTo(second.getId());
+    assertThat(
+            proposals.findTopByServiceRequestIdOrderByVersionDesc(
+                saveRequest(
+                        createLink(client, createDriver("new@vanep.com", "52998224725")),
+                        ServiceRequestStatus.OPEN)
+                    .getId()))
+        .isEmpty();
+  }
+
+  @Test
+  void acceptsOnlyASentProposalStillValidAndStampsTheAcceptance() {
+    ProposalModel valid = saveSentProposal(link);
+    ProposalModel overdue =
+        saveSentProposal(
+            createLink(client, createDriver("overdue@vanep.com", "52998224725")),
+            Instant.now().minusSeconds(60));
+    Instant now = Instant.now().truncatedTo(ChronoUnit.SECONDS);
+
+    Integer accepted = transactions.execute(status -> proposals.accept(valid.getId(), now));
+    Integer late = transactions.execute(status -> proposals.accept(overdue.getId(), now));
+    Integer again = transactions.execute(status -> proposals.accept(valid.getId(), now));
+    ProposalModel reread =
+        proposals.findByTokenAndClientId(valid.getToken(), client.getId()).orElseThrow();
+
+    assertThat(accepted).isEqualTo(1);
+    assertThat(late).isZero();
+    assertThat(again).isZero();
+    assertThat(reread.getStatus()).isEqualTo(ProposalStatus.ACCEPTED);
+    assertThat(reread.getAcceptedAt()).isEqualTo(now);
+    assertThat(statusOf(overdue)).isEqualTo(ProposalStatus.SENT);
+  }
+
+  @Test
+  void declinesOnlyASentProposalWithTheReason() {
+    ProposalModel saved = saveSentProposal(link);
+
+    Integer declined =
+        transactions.execute(status -> proposals.decline(saved.getId(), "Caro demais"));
+    Integer again = transactions.execute(status -> proposals.decline(saved.getId(), "De novo"));
+    ProposalModel reread =
+        proposals.findByTokenAndClientId(saved.getToken(), client.getId()).orElseThrow();
+
+    assertThat(declined).isEqualTo(1);
+    assertThat(again).isZero();
+    assertThat(reread.getStatus()).isEqualTo(ProposalStatus.DECLINED);
+    assertThat(reread.getDeclineReason()).isEqualTo("Caro demais");
+  }
+
+  @Test
+  void touchesOnlyASentProposal() {
+    ProposalModel saved = saveSentProposal(link);
+
+    Integer whileSent = transactions.execute(status -> proposals.touchSent(saved.getId()));
+    transactions.execute(
+        status ->
+            proposals.updateStatus(saved.getId(), ProposalStatus.SENT, ProposalStatus.EXPIRED));
+    Integer afterExpired = transactions.execute(status -> proposals.touchSent(saved.getId()));
+
+    assertThat(whileSent).isEqualTo(1);
+    assertThat(afterExpired).isZero();
+    assertThat(statusOf(saved)).isEqualTo(ProposalStatus.EXPIRED);
   }
 
   private ProposalStatus statusOf(ProposalModel proposal) {

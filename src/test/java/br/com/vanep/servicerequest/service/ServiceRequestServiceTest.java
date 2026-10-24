@@ -32,9 +32,12 @@ import br.com.vanep.dependent.repository.DependentRepository;
 import br.com.vanep.dependent.repository.DependentSchoolDayRepository;
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
+import br.com.vanep.proposal.dto.ProposalSummaryResponseDTO;
 import br.com.vanep.proposal.enums.ProposalStatus;
+import br.com.vanep.proposal.mapper.ProposalMapper;
 import br.com.vanep.proposal.model.ProposalModel;
 import br.com.vanep.proposal.repository.ProposalRepository;
+import br.com.vanep.schedule.mapper.ScheduleMapper;
 import br.com.vanep.school.model.SchoolModel;
 import br.com.vanep.school.repository.SchoolRepository;
 import br.com.vanep.servicerequest.dto.ServiceRequestClientResponseDTO;
@@ -54,6 +57,7 @@ import br.com.vanep.state.model.StateModel;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.service.UserService;
+import java.math.BigDecimal;
 import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.Instant;
@@ -138,6 +142,7 @@ class ServiceRequestServiceTest {
             new ServiceRequestItemsPolicy(),
             new ServiceRequestTransitionPolicy(),
             new ServiceRequestMapper(),
+            new ProposalMapper(new ScheduleMapper(), new ServiceRequestMapper()),
             messages);
     when(messages.getMessage(anyString(), any(), any())).thenAnswer(call -> call.getArgument(0));
 
@@ -562,7 +567,37 @@ class ServiceRequestServiceTest {
     assertThat(page.getContent())
         .extracting(response -> response.status())
         .containsExactly(ServiceRequestStatus.OPEN, ServiceRequestStatus.EXPIRED);
+    assertThat(page.getContent()).allMatch(response -> response.currentProposal() == null);
     verify(dependents).findTokensByIdIn(List.of(21L));
+    verify(proposals, never()).findCurrentByServiceRequestIdIn(any());
+  }
+
+  @Test
+  void theListCarriesTheCurrentProposalOfAnsweredRequestsFromOneQuery() {
+    ServiceRequestModel open = storedRequest(ServiceRequestStatus.OPEN);
+    ServiceRequestModel answered = storedRequest(ServiceRequestStatus.ANSWERED);
+    answered.setId(61L);
+    Pageable pageable = PageRequest.of(0, 20);
+    when(requests.findPageByDriverIdAndStatusIn(
+            20L, EnumSet.allOf(ServiceRequestStatus.class), pageable))
+        .thenReturn(new PageImpl<>(List.of(open, answered), pageable, 2));
+    when(requests.findWithItemsByIdIn(List.of(60L, 61L))).thenReturn(List.of(open, answered));
+    when(proposals.findCurrentByServiceRequestIdIn(List.of(61L)))
+        .thenReturn(
+            List.of(
+                new SummaryRow(
+                    61L, "proposal", 2, ProposalStatus.SENT, new BigDecimal("1000.00"), 3, true)));
+
+    Page<ServiceRequestDriverResponseDTO> page =
+        service.findPageForDriver(CARLOS_UID, null, pageable);
+
+    assertThat(page.getContent().getFirst().currentProposal()).isNull();
+    ProposalSummaryResponseDTO current = page.getContent().get(1).currentProposal();
+    assertThat(current.token()).isEqualTo("proposal");
+    assertThat(current.version()).isEqualTo(2);
+    assertThat(current.installmentAmount()).isEqualByComparingTo("333.33");
+    assertThat(current.startsOn()).isEqualTo(LocalDate.of(2027, 2, 1));
+    assertThat(current.hasPendingAdjustment()).isTrue();
   }
 
   @Test
@@ -816,6 +851,61 @@ class ServiceRequestServiceTest {
       days.add(day);
     }
     return days;
+  }
+
+  private record SummaryRow(
+      Long serviceRequestId,
+      String token,
+      Integer version,
+      ProposalStatus status,
+      BigDecimal totalAmount,
+      Integer installments,
+      boolean hasAdjustments)
+      implements ProposalRepository.CurrentProposalRow {
+    @Override
+    public Long getServiceRequestId() {
+      return serviceRequestId;
+    }
+
+    @Override
+    public String getToken() {
+      return token;
+    }
+
+    @Override
+    public Integer getVersion() {
+      return version;
+    }
+
+    @Override
+    public ProposalStatus getStatus() {
+      return status;
+    }
+
+    @Override
+    public BigDecimal getTotalAmount() {
+      return totalAmount;
+    }
+
+    @Override
+    public Integer getInstallments() {
+      return installments;
+    }
+
+    @Override
+    public Instant getValidUntil() {
+      return Instant.parse("2026-11-01T12:00:00Z");
+    }
+
+    @Override
+    public LocalDate getStartsOn() {
+      return LocalDate.of(2027, 2, 1);
+    }
+
+    @Override
+    public boolean getHasAdjustments() {
+      return hasAdjustments;
+    }
   }
 
   private record TokenRow(Long id, String token) implements DependentRepository.IdAndToken {
