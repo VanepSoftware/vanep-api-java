@@ -1,5 +1,6 @@
 package br.com.vanep.servicerequest.dto;
 
+import br.com.vanep.proposal.dto.ProposalSummaryResponseDTO;
 import br.com.vanep.servicerequest.enums.ServiceRequestStatus;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -14,6 +15,7 @@ public record ServiceRequestDriverResponseDTO(
     String notes,
     String declineReason,
     Instant expiresAt,
+    ProposalSummaryResponseDTO currentProposal,
     List<ServiceRequestDriverItemResponseDTO> items,
     Instant createdAt,
     Instant updatedAt) {}

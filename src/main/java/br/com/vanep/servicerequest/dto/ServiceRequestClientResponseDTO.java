@@ -1,5 +1,6 @@
 package br.com.vanep.servicerequest.dto;
 
+import br.com.vanep.proposal.dto.ProposalSummaryResponseDTO;
 import br.com.vanep.servicerequest.enums.ServiceRequestStatus;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -17,6 +18,7 @@ public record ServiceRequestClientResponseDTO(
     String notes,
     String declineReason,
     Instant expiresAt,
+    ProposalSummaryResponseDTO currentProposal,
     List<ServiceRequestClientItemResponseDTO> items,
     Instant createdAt,
     Instant updatedAt) {}

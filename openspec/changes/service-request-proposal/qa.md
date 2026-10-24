@@ -1,6 +1,6 @@
 # QA — service-request-proposal (constitution rule 55)
 
-Latest run: on the stack tip, `VAN-30/13-pickup-time-and-price`, which contains this branch: every scenario below passed there (see the `qa.md` of PR 13 for the date and the counts). This file keeps the scenarios of PRs 1 to 7.
+Latest run: on the stack tip, `VAN-30/13-pickup-time-and-price`, which contains this branch: every scenario below passed there (see the `qa.md` of PR 13 for the date and the counts). This file keeps the scenarios of PRs 1 to 8.
 
 ## How to run
 
@@ -55,6 +55,8 @@ The seed gives Ana a phone and a personal address (PR 6), so that her service re
 For the `V64` scenarios (Q1 to Q15), every insert runs inside a transaction that is rolled back. The requests use Diego – Gustavo and Bruno – Helena, and the items take Lucas's school and the city of his pickup address, with a snapshot built from his name and birth date. The checks are SQL against the tables.
 
 For the `V65` scenarios (P1 to P27), each check runs in a rolled-back transaction that first inserts the requests it needs (Diego – Gustavo `ANSWERED`, Bruno – Helena) and a `SENT` version 1 on Diego – Gustavo; the vehicle is the first seeded one, with its plate and capacity in the snapshot and the resulting contract the seeded one. P10 walks every numeric range to both of its limits on the same proposal; P11 to P18 go one step beyond each. P23 sets the pair index aside inside its transaction: with an empty table the planner has no reason to prefer one `SENT` index over the other.
+
+For the seeded request (S1 to S14), SQL reads the request the seed sent at startup through `ServiceRequestService` (Lucas, Monday to Friday, round trip, to Gustavo) and the proposal Gustavo answered it with through `ProposalService` (PR 8): his van, one item for Lucas with a slot per requested leg, the way back at 12:10 on mornings and 17:20 on full-time days. The request is therefore `ANSWERED` from startup. S3 compares its days with the grid Lucas had at startup, which the G scenarios changed since. S13 and S14 read the same proposal through the request routes, as the request's current proposal: Ana's list filtered by `ANSWERED` and Gustavo's detail.
 
 For the dependent locks (T1 to T18), Ana creates Rafa Souza; SQL gives him Lucas's school and a pickup address of his own, and the API his grid. T2 to T4 use a request inserted by SQL on Ana – Fabio, `OPEN` and then `ANSWERED`, set `WITHDRAWN` before the contract. T5 is a real `POST /api/contracts` by the admin on the same link, whose seeded contract already ended.
 
@@ -403,6 +405,14 @@ For the approval scenarios (V1 to V12), Fabio is put back `UNDER_REVIEW` with `i
 | S4 | every seeded day asks for the way to school and back | t | PASS |
 | S5 | it expires 72 hours after it was sent | 72 | PASS |
 | S6 | Lucas is not removed while the seeded request is open | 422 | PASS |
+| S7 | the seed answered it with one SENT version 1, without a parent, on the same link | 1 SENT 1 true true | PASS |
+| S8 | it offers Gustavo's van, copied with its plate and capacity | VAN2B34 true true | PASS |
+| S9 | one item for Lucas, with the schedule built from the requested grid | 1 10 MONDAY:OUTBOUND:06:40,MONDAY:RETURN:12:10,TUESDAY:OUTBOUND:06:40,TUESDAY:RETURN:17:20 | PASS |
+| S10 | valid for seven days, ten installments of 420.00 | 7 10 4200.00 | PASS |
+| S11 | the period starts on the desired start and stays within twelve months | true true | PASS |
+| S12 | no contract came from it, and the link did not change | 0 PENDING | PASS |
+| S13 | Ana's list carries the seeded proposal as the request's current one: ten installments of 420.00, no adjustment pending | 200 | PASS |
+| S14 | Gustavo reads the same summary in the detail | 200 | PASS |
 
 ### Dependent locks (D17)
 | id | scenario | expected | result |
@@ -526,10 +536,11 @@ For the approval scenarios (V1 to V12), Fabio is put back `UNDER_REVIEW` with `i
 | J15 | Helena declines while her proposal is waiting | 200 | PASS |
 | J16 | her proposal is WITHDRAWN | WITHDRAWN | PASS |
 | J17 | declining a CONVERTED request | 409 | PASS |
+| J18 | it stays CONVERTED | CONVERTED | PASS |
 
 ### Regression: contract-core
 
-`scripts/qa/contract-core/qa.sh`, now sourcing `scripts/qa/lib.sh`, passed 269/269 against `main` before this change and 267/267 against this branch. Its B13 now expects the new message (`driver_rating.link.never_contracted`): the scenario is the same (a link without contract cannot rate), and only the text changed in PR 1. Since PR 2, every link it creates sends `origin`, and V39 blocks its link with a blocker and a block time, as the `V61` checks require. Since PR 3 the seeded dependents carry a school grid, which no `contract-core` scenario reads, and `V62` drops `dependent.shift`: S19 to S21, which tested that field, are gone, S25 checks only `trip.shift`, and S22 re-applies `V56` with the column added back for the duration, because `V56` comments it. `V63` drops `address.district_id`, `contract_item.pickup_district_id` and `school.district_id`, and no `contract-core` scenario reads these columns, `pickupDistrictName` or the school's `districtName`. Since PR 6 the seed sends a service request from Ana to Gustavo, which creates that link: the setup accepts the second seeded link and reuses it as Ana – Gustavo instead of creating it. A1 used to move Marina while she had contracts in progress, which D17 now refuses: A1 checks the refusal, the script ends her `ACTIVE` contracts through the admin, and A2 and A3 move her and check that the contracts still pick up at the old address.
+`scripts/qa/contract-core/qa.sh`, now sourcing `scripts/qa/lib.sh`, passed 269/269 against `main` before this change and 267/267 against this branch. Its B13 now expects the new message (`driver_rating.link.never_contracted`): the scenario is the same (a link without contract cannot rate), and only the text changed in PR 1. Since PR 2, every link it creates sends `origin`, and V39 blocks its link with a blocker and a block time, as the `V61` checks require. Since PR 3 the seeded dependents carry a school grid, which no `contract-core` scenario reads, and `V62` drops `dependent.shift`: S19 to S21, which tested that field, are gone, S25 checks only `trip.shift`, and S22 re-applies `V56` with the column added back for the duration, because `V56` comments it. `V63` drops `address.district_id`, `contract_item.pickup_district_id` and `school.district_id`, and no `contract-core` scenario reads these columns, `pickupDistrictName` or the school's `districtName`. Since PR 6 the seed sends a service request from Ana to Gustavo, which creates that link: the setup accepts the second seeded link and reuses it as Ana – Gustavo instead of creating it. A1 used to move Marina while she had contracts in progress, which D17 now refuses: A1 checks the refusal, the script ends her `ACTIVE` contracts through the admin, and A2 and A3 move her and check that the contracts still pick up at the old address. Since PR 8 the total must cover one cent per installment: L4 sends 0.12 in twelve, and L6 checks that 0.11 is refused with its pt-BR message.
 
 ## Behaviors worth knowing
 

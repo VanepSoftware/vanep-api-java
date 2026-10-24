@@ -2,6 +2,7 @@ package br.com.vanep.servicerequest.mapper;
 
 import br.com.vanep.address.model.AddressModel;
 import br.com.vanep.dependent.model.DependentModel;
+import br.com.vanep.proposal.dto.ProposalSummaryResponseDTO;
 import br.com.vanep.school.model.SchoolModel;
 import br.com.vanep.servicerequest.dto.ServiceRequestClientItemResponseDTO;
 import br.com.vanep.servicerequest.dto.ServiceRequestClientResponseDTO;
@@ -57,7 +58,9 @@ public class ServiceRequestMapper {
   }
 
   public ServiceRequestClientResponseDTO toClientResponse(
-      ServiceRequestModel request, Map<Long, String> dependentTokens) {
+      ServiceRequestModel request,
+      Map<Long, String> dependentTokens,
+      ProposalSummaryResponseDTO currentProposal) {
     return new ServiceRequestClientResponseDTO(
         request.getToken(),
         request.getClientDriver().getToken(),
@@ -69,6 +72,7 @@ public class ServiceRequestMapper {
         request.getNotes(),
         request.getDeclineReason(),
         request.getExpiresAt(),
+        currentProposal,
         itemsInOrder(request).stream()
             .map(item -> toClientItemResponse(item, dependentTokens))
             .toList(),
@@ -77,7 +81,10 @@ public class ServiceRequestMapper {
   }
 
   public ServiceRequestDriverResponseDTO toDriverResponse(
-      ServiceRequestModel request, Map<Long, String> dependentTokens, LocalDate today) {
+      ServiceRequestModel request,
+      Map<Long, String> dependentTokens,
+      LocalDate today,
+      ProposalSummaryResponseDTO currentProposal) {
     return new ServiceRequestDriverResponseDTO(
         request.getToken(),
         request.getClientDriver().getToken(),
@@ -87,6 +94,7 @@ public class ServiceRequestMapper {
         request.getNotes(),
         request.getDeclineReason(),
         request.getExpiresAt(),
+        currentProposal,
         itemsInOrder(request).stream()
             .map(item -> toDriverItemResponse(item, dependentTokens, today))
             .toList(),
@@ -139,7 +147,7 @@ public class ServiceRequestMapper {
         .toList();
   }
 
-  String firstNameOf(String name) {
+  public String firstNameOf(String name) {
     return name.strip().split("\\s+", 2)[0];
   }
 
