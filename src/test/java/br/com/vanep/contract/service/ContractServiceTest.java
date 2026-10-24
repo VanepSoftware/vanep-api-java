@@ -311,6 +311,23 @@ class ContractServiceTest {
   }
 
   @Test
+  void aTotalBelowOneCentPerInstallmentIsRefusedWithTheTermsPolicyKey() {
+    assertRefused(
+        () ->
+            service.create(
+                new ContractCreateRequestDTO(
+                    "link",
+                    STARTS_ON,
+                    ENDS_ON,
+                    new BigDecimal("0.11"),
+                    12,
+                    5,
+                    List.of(item("lucas", outbound())))),
+        "422",
+        "contract.installments.below_one_cent");
+  }
+
+  @Test
   void endingAnActiveContractDeactivatesTheLink() {
     ContractModel contract = contract(ContractStatus.ACTIVE);
     link.setStatus(RelationshipStatus.ACTIVE);
