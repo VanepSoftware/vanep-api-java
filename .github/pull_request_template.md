@@ -1,6 +1,9 @@
 # [VAN-XX] Feature | Change Request | Bug — <short title>
 
-<!-- VAN-XX is the Linear issue identifier. -->
+<!--
+VAN-XX is the Genwork task key (board prefix + task number).
+Genwork links the PR to the task and moves it on the board when the title or the branch contains the key.
+-->
 
 ## Description
 

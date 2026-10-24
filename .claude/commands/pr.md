@@ -6,7 +6,7 @@ Please generate a comprehensive Pull Request description that follows the struct
 
 1. **Analyze the changes**: Compare the current branch against the `main` branch to understand what was modified, added, or removed. Ignore merge commits, use git diff to see what are the real changes.
 
-2. **Generate the PR title**: Format as `[VAN-XX] Feature | Change Request | Bug — <short title>`, where `VAN-XX` is the Linear issue identifier (ask me for it if it is not obvious from the branch name or the commit messages).
+2. **Generate the PR title**: Format as `[VAN-XX] Feature | Change Request | Bug — <short title>`, where `VAN-XX` is the Genwork task key (board prefix + task number; ask me for it if it is not obvious from the branch name or the commit messages). Genwork links the PR to the task through this key, so it must appear in the title.
 
 3. **Write a clear description**: 
    - Explain what the PR does and why

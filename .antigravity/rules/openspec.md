@@ -68,4 +68,4 @@ This file outlines the workspace-specific rules, coding standards, and execution
 *   **Spotless Formatting:** Always format Java code using Spotless before creating PRs. Use `make lint-fix` or `./mvnw spotless:apply`.
 *   **Error Messages:** Write user-facing validation and error messages in Portuguese (pt-BR). Use English keys resolved through `MessageSource` properties (`messages_pt_BR.properties`).
 *   **Code Identifiers & Comments:** Write all class, variable, method, package names, logs, comments, and internal constants in **English**.
-*   **Commits & PRs:** Write commit messages and PR descriptions in Portuguese (pt-BR). Link PRs to their respective issues.
+*   **Commits & PRs:** Write commit messages and PR descriptions in Portuguese (pt-BR). Put the Genwork task key (`VAN-N`) in the PR title and branch so Genwork links the PR to its task.
