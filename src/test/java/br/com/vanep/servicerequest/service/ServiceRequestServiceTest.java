@@ -80,11 +80,14 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.context.MessageSource;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Limit;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
+import org.springframework.transaction.support.TransactionCallback;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.server.ResponseStatusException;
 
 @ExtendWith(MockitoExtension.class)
@@ -110,6 +113,7 @@ class ServiceRequestServiceTest {
   @Mock private DependentSchoolDayRepository schoolDays;
   @Mock private SchoolRepository schools;
   @Mock private AddressRepository addresses;
+  @Mock private TransactionTemplate transactions;
   @Mock private MessageSource messages;
 
   @Captor private ArgumentCaptor<ServiceRequestModel> savedRequest;
@@ -143,8 +147,11 @@ class ServiceRequestServiceTest {
             new ServiceRequestTransitionPolicy(),
             new ServiceRequestMapper(),
             new ProposalMapper(new ScheduleMapper(), new ServiceRequestMapper()),
+            transactions,
             messages);
     when(messages.getMessage(anyString(), any(), any())).thenAnswer(call -> call.getArgument(0));
+    when(transactions.execute(any()))
+        .thenAnswer(call -> call.<TransactionCallback<?>>getArgument(0).doInTransaction(null));
 
     anaUser = user(1L, "Ana Souza", UserType.CLIENT);
     ana = new ClientModel();
@@ -738,6 +745,86 @@ class ServiceRequestServiceTest {
         HttpStatus.CONFLICT,
         "service_request.not_open");
     verifyNoInteractions(proposals);
+  }
+
+  @Test
+  void closingThePairsNegotiationClosesTheOpenRequestAndItsSentProposal() {
+    ServiceRequestModel answered = storedRequest(ServiceRequestStatus.ANSWERED);
+    when(requests.findByClientDriverIdAndStatusIn(40L, ServiceRequestStatus.OPEN_STATUSES))
+        .thenReturn(Optional.of(answered));
+    when(requests.updateStatus(
+            60L, ServiceRequestStatus.OPEN_STATUSES, ServiceRequestStatus.WITHDRAWN))
+        .thenReturn(1);
+    ProposalModel sent = new ProposalModel();
+    sent.setId(90L);
+    when(proposals.findByClientDriverIdAndStatus(40L, ProposalStatus.SENT))
+        .thenReturn(Optional.of(sent));
+
+    service.closeOpenRequestOf(link, ServiceRequestStatus.WITHDRAWN, ProposalStatus.DECLINED);
+
+    verify(requests)
+        .updateStatus(60L, ServiceRequestStatus.OPEN_STATUSES, ServiceRequestStatus.WITHDRAWN);
+    verify(proposals).updateStatus(90L, ProposalStatus.SENT, ProposalStatus.DECLINED);
+  }
+
+  @Test
+  void closingAPairWithoutAnOpenRequestChangesNothing() {
+    service.closeOpenRequestOf(link, ServiceRequestStatus.DECLINED, ProposalStatus.WITHDRAWN);
+
+    verify(requests, never()).updateStatus(any(), any(), any());
+    verifyNoInteractions(proposals);
+  }
+
+  @Test
+  void aRequestClosedMeanwhileLeavesTheProposalsAlone() {
+    when(requests.findByClientDriverIdAndStatusIn(40L, ServiceRequestStatus.OPEN_STATUSES))
+        .thenReturn(Optional.of(storedRequest(ServiceRequestStatus.OPEN)));
+    when(requests.updateStatus(any(), any(), any())).thenReturn(0);
+
+    service.closeOpenRequestOf(link, ServiceRequestStatus.DECLINED, ProposalStatus.WITHDRAWN);
+
+    verifyNoInteractions(proposals);
+  }
+
+  @Test
+  void expiresTheOverdueRequestsFoundUpToTheLimit() {
+    Instant now = Instant.now();
+    when(requests.findOverdueOpenIds(now, Limit.of(2))).thenReturn(List.of(60L, 61L));
+    when(requests.expire(60L, now)).thenReturn(1);
+    when(requests.expire(61L, now)).thenReturn(1);
+
+    assertThat(service.expireOverdue(now, 2)).isEqualTo(2);
+  }
+
+  @Test
+  void aRequestThatChangedBeforeItsWriteIsSkipped() {
+    Instant now = Instant.now();
+    when(requests.findOverdueOpenIds(now, Limit.of(200))).thenReturn(List.of(60L, 61L));
+    when(requests.expire(60L, now)).thenReturn(0);
+    when(requests.expire(61L, now)).thenReturn(1);
+
+    assertThat(service.expireOverdue(now, 200)).isEqualTo(1);
+    verify(requests).expire(61L, now);
+  }
+
+  @Test
+  void aRequestThatFailsUnexpectedlyIsSkippedAndTheNextOneExpires() {
+    Instant now = Instant.now();
+    when(requests.findOverdueOpenIds(now, Limit.of(200))).thenReturn(List.of(60L, 61L));
+    when(requests.expire(60L, now)).thenThrow(new DataIntegrityViolationException("broken row"));
+    when(requests.expire(61L, now)).thenReturn(1);
+
+    assertThat(service.expireOverdue(now, 200)).isEqualTo(1);
+    verify(requests).expire(61L, now);
+  }
+
+  @Test
+  void nothingOverdueExpiresNothing() {
+    Instant now = Instant.now();
+    when(requests.findOverdueOpenIds(now, Limit.of(200))).thenReturn(List.of());
+
+    assertThat(service.expireOverdue(now, 200)).isZero();
+    verify(requests, never()).expire(any(), any());
   }
 
   private void assertNothingWritten() {

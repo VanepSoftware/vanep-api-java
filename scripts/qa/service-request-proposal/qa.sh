@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Manual QA for the service-request-proposal change (constitution rule 55).
 # Runs against a live API backed by a THROWAWAY database seeded on an empty schema, with Google
-# Places pointed at places-stub.py: it inserts contracts directly, backdates links and flips driver
-# availability. See qa.md next to the change.
+# Places pointed at places-stub.py and the expiry sweep off (EXPIRY_SWEEP_ENABLED=false): it
+# inserts contracts directly, backdates links, flips driver availability and moves deadlines into
+# the past. sweep.sh covers the sweep itself. See qa.md next to the change.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -1359,7 +1360,6 @@ expect_bad_adjustment() {
   expect "$1" "$2" "${4:-400}" "${5-}"
 }
 
-# Runs two requests of different callers at the same moment and prints their statuses in order.
 race() {
   local dir first second
   dir="$(mktemp -d)"
@@ -1738,5 +1738,142 @@ check Z14 "never an ACCEPTED and a SENT proposal for the request" "1 $RACE_WINNE
           where request.token = '$G_REQ' and proposal.status in ('ACCEPTED', 'SENT')")"
 request PATCH "/api/dependent/$LUCAS" "$ANA" "$LUCAS_PERSONAL"
 [[ $RESP_STATUS == 200 ]] || { echo "SETUP FAIL | restore Lucas's name, phone and birth date | HTTP $RESP_STATUS $RESP_BODY" >&2; exit 1; }
+link_of() {
+  sql "select link.token from client_driver link join client on client.id = link.client_id
+       join driver on driver.id = link.driver_id where client.token = '$1' and driver.token = '$2'"
+}
+
+link_state() {
+  sql "select link.status || ' ' || coalesce((select users.type from users where users.id = link.blocked_by), '-') || ' '
+         || (link.blocked_at is not null)::text::char from client_driver link where link.token = '$1'"
+}
+
+block_route_statuses() {
+  local token=$1 codes=() path
+  for path in "/api/client-drivers/$2/block" "/api/client-drivers/$2/unblock"; do
+    request POST "$path" "$token"
+    codes+=("$RESP_STATUS")
+  done
+  echo "${codes[*]}"
+}
+
+open_negotiation() {
+  local request proposal
+  request=$(send_request "$(sr_body "$2" "" "$LUCAS_WEEK")")
+  proposal=$(send_proposal "$1" "$request" "$(p_body "$3" "$LUCAS_ITEM")")
+  echo "$request $proposal"
+}
+
+open_requests_on() {
+  sql "select count(*) from service_request request join client_driver link on link.id = request.client_driver_id
+       where link.token = '$1' and request.status in ('OPEN', 'ANSWERED')"
+}
+
+request_against_block() {
+  local round codes
+  for round in $(seq 1 10); do
+    codes=$(race "$CLIENT_SR" "$ANA" "$(sr_body "$HELENA_D" "" "$LUCAS_WEEK")" \
+      "/api/client-drivers/$ANA_HELENA/block" "$HELENA" "")
+    echo "$codes $(open_requests_on "$ANA_HELENA")"
+    request POST "/api/client-drivers/$ANA_HELENA/unblock" "$HELENA"
+    [[ $RESP_STATUS == 200 ]] || { echo "SETUP FAIL | unblock Ana – Helena | HTTP $RESP_STATUS $RESP_BODY" >&2; return 1; }
+  done | sort -u
+}
+
+BLOCKED_BY_YOU='.detail == "Este motorista não pode receber solicitações suas."'
+ALREADY_BLOCKED='.detail == "Este vínculo já está bloqueado."'
+NOT_BLOCKED='.detail == "Este vínculo não está bloqueado."'
+ANA_HELENA=$(link_of "$ANA_C" "$HELENA_D")
+ANA_FABIO_LINK=$(link_of "$ANA_C" "$FABIO_D")
+ANA_KAIO=$(link_of "$ANA_C" "$KAIO_D")
+
+table "Block with an owner (client-driver-block)"
+check BL1 "block and unblock without a token" "401 401" "$(block_route_statuses "" "$ANA_HELENA")"
+check BL2 "with an invalid token" "401 401" "$(block_route_statuses not-a-jwt "$ANA_HELENA")"
+check BL3 "the admin is not a party" "403 403" "$(block_route_statuses "$ADMIN" "$ANA_HELENA")"
+check BL4 "a client outside the link" "403 403" "$(block_route_statuses "$CARLA" "$ANA_HELENA")"
+check BL5 "a driver outside the link" "403 403" "$(block_route_statuses "$GUSTAVO" "$ANA_HELENA")"
+check BL6 "an unknown link" "403 403" "$(block_route_statuses "$ANA" unknown)"
+check BL7 "the link did not change" "PENDING - f" "$(link_state "$ANA_HELENA")"
+NEGOTIATION=$(open_negotiation "$HELENA" "$HELENA_D" "$HELENA_VAN")
+read -r H_NEG_REQ H_NEG_P <<<"$NEGOTIATION"
+request POST "/api/client-drivers/$ANA_HELENA/block" "$ANA"
+expect BL8 "Ana blocks Helena during a negotiation" 200 \
+  ".token == \"$ANA_HELENA\" and .status == \"BLOCKED\" and .blockedBy == \"CLIENT\""
+check BL9 "the blocker and the time are stored, the request is WITHDRAWN and the proposal DECLINED" \
+  "BLOCKED CLIENT t WITHDRAWN DECLINED" \
+  "$(link_state "$ANA_HELENA") $(request_status "$H_NEG_REQ") $(proposal_status "$H_NEG_P")"
+request GET "/api/client-drivers/$ANA_HELENA" "$HELENA"
+expect BL10 "Helena reads that the client blocked" 200 '.status == "BLOCKED" and .blockedBy == "CLIENT"'
+ROWS_BEFORE=$(request_rows)
+request POST "$CLIENT_SR" "$ANA" "$(sr_body "$HELENA_D" "" "$LUCAS_WEEK")"
+expect BL11 "Ana asks Helena for a quote while she blocks her" 422 "$BLOCKED_BY_YOU"
+check BL12 "no request was created" "$ROWS_BEFORE" "$(request_rows)"
+request POST "/api/client-drivers/$ANA_HELENA/unblock" "$HELENA"
+expect BL13 "Helena, who was blocked, tries to unblock" 403 '.detail == "Só quem bloqueou pode desbloquear."'
+request POST "/api/client-drivers/$ANA_HELENA/block" "$HELENA"
+expect BL14 "Helena blocks the blocked link" 409 "$ALREADY_BLOCKED"
+request POST "/api/client-drivers/$ANA_HELENA/block" "$ANA"
+expect BL15 "Ana blocks it again" 409 "$ALREADY_BLOCKED"
+check BL16 "the link is still blocked by Ana" "BLOCKED CLIENT t" "$(link_state "$ANA_HELENA")"
+request POST "/api/client-drivers/$ANA_HELENA/unblock" "$ANA"
+expect BL17 "Ana unblocks a link with no contract" 200 '.status == "PENDING" and .blockedBy == null'
+check BL18 "the blocker and the time are cleared" "PENDING - f" "$(link_state "$ANA_HELENA")"
+request POST "/api/client-drivers/$ANA_HELENA/unblock" "$ANA"
+expect BL19 "unblocking it again" 409 "$NOT_BLOCKED"
+NEGOTIATION=$(open_negotiation "$FABIO" "$FABIO_D" "$FABIO_VAN")
+read -r F_NEG_REQ F_NEG_P <<<"$NEGOTIATION"
+request POST "/api/client-drivers/$ANA_FABIO_LINK/block" "$FABIO"
+expect BL20 "Fabio blocks Ana during a negotiation" 200 '.status == "BLOCKED" and .blockedBy == "DRIVER"'
+check BL21 "the request is DECLINED, the proposal WITHDRAWN and the accepted one untouched" \
+  "BLOCKED DRIVER t DECLINED WITHDRAWN ACCEPTED" \
+  "$(link_state "$ANA_FABIO_LINK") $(request_status "$F_NEG_REQ") $(proposal_status "$F_NEG_P") $(proposal_status "$F_P2")"
+request POST "$CLIENT_SR" "$ANA" "$(sr_body "$FABIO_D" "" "$LUCAS_WEEK")"
+expect BL22 "Ana asks Fabio, who blocked her, for a quote: the same message" 422 "$BLOCKED_BY_YOU"
+request POST "/api/client-drivers/$ANA_FABIO_LINK/unblock" "$ANA"
+expect BL23 "Ana cannot lift Fabio's block" 403 '.detail == "Só quem bloqueou pode desbloquear."'
+request POST "/api/client-drivers/$ANA_FABIO_LINK/unblock" "$FABIO"
+expect BL24 "Fabio unblocks; the link had only ended contracts" 200 '.status == "INACTIVE" and .blockedBy == null'
+KAIO_OPEN=$(send_request "$(sr_body "$KAIO_D" "" "$LUCAS_WEEK")")
+request POST "/api/client-drivers/$ANA_KAIO/block" "$ANA"
+expect BL25 "Ana blocks a driver whose request is still OPEN" 200 '.blockedBy == "CLIENT"'
+check BL26 "the OPEN request is WITHDRAWN" WITHDRAWN "$(request_status "$KAIO_OPEN")"
+request POST "/api/client-drivers/$ANA_KAIO/unblock" "$ANA"
+expect BL27 "and unblocks it" 200 '.status == "PENDING"'
+request POST "/api/client-drivers/$BRUNO_GUSTAVO/block" "$BRUNO"
+expect BL28 "Bruno blocks a link with an ACTIVE contract" 422 \
+  '.detail == "Há um contrato em andamento com esta pessoa. Ele termina pelo contrato, não por bloqueio."'
+request POST "/api/client-drivers/$BRUNO_GUSTAVO/block" "$GUSTAVO"
+expect BL29 "and so does Gustavo" 422
+check BL30 "the link stays ACTIVE with no blocker" "ACTIVE - f" "$(link_state "$BRUNO_GUSTAVO")"
+check BL31 "three blocks at once by the same party: one 200, two 409" "200 409 409" \
+  "$(in_parallel POST "$ANA" "" "/api/client-drivers/$ANA_HELENA/block" "/api/client-drivers/$ANA_HELENA/block" \
+     "/api/client-drivers/$ANA_HELENA/block")"
+request POST "/api/client-drivers/$ANA_HELENA/unblock" "$ANA"
+[[ $RESP_STATUS == 200 ]] || { echo "SETUP FAIL | unblock Ana – Helena | HTTP $RESP_STATUS $RESP_BODY" >&2; exit 1; }
+NEGOTIATION=$(open_negotiation "$HELENA" "$HELENA_D" "$HELENA_VAN")
+read -r H_NEG_REQ H_NEG_P <<<"$NEGOTIATION"
+RACE=$(race "/api/client-drivers/$ANA_HELENA/block" "$ANA" "" "/api/client-drivers/$ANA_HELENA/block" "$HELENA" "")
+check BL32 "Ana and Helena block each other at once: exactly one wins" "ok" \
+  "$([[ $RACE == "200 409" || $RACE == "409 200" ]] && echo ok || echo "$RACE")"
+if [[ $RACE == "200 409" ]]; then RACE_WINNER="CLIENT WITHDRAWN DECLINED"; else RACE_WINNER="DRIVER DECLINED WITHDRAWN"; fi
+check BL33 "the negotiation was closed once, with the statuses of the side that won" "$RACE_WINNER" \
+  "$(link_state "$ANA_HELENA" | cut -d' ' -f2) $(request_status "$H_NEG_REQ") $(proposal_status "$H_NEG_P")"
+if [[ $RACE == "200 409" ]]; then BLOCKER=$ANA; else BLOCKER=$HELENA; fi
+request POST "/api/client-drivers/$ANA_HELENA/unblock" "$BLOCKER"
+expect BL34 "the winner unblocks" 200 '.status == "PENDING"'
+ROUNDS=$(request_against_block)
+check BL35 "ten rounds of Ana asking Helena for a quote while Helena blocks her: every block gets 200, and the request is refused or closed by it" "" \
+  "$(grep -vxE '(422|201) 200 0' <<<"$ROUNDS" | paste -sd, - || true)"
+
+table "Expiry sweep turned off (EXPIRY_SWEEP_ENABLED=false)"
+IDLE_REQ=$(send_request "$(sr_body "$KAIO_D" "" "$LUCAS_WEEK")")
+NEGOTIATION=$(open_negotiation "$HELENA" "$HELENA_D" "$HELENA_VAN")
+read -r IDLE_P_REQ IDLE_P <<<"$NEGOTIATION"
+sql "update service_request set expires_at = now() - interval '1 minute' where token = '$IDLE_REQ';
+     update proposal set valid_until = now() - interval '1 minute' where token = '$IDLE_P'" >/dev/null
+sleep 70
+check OFF1 "70 seconds later, past more than one interval, nothing expired on its own" "OPEN SENT ANSWERED" \
+  "$(request_status "$IDLE_REQ") $(proposal_status "$IDLE_P") $(request_status "$IDLE_P_REQ")"
 echo
 echo "ALL PASSED: $PASSED scenarios"

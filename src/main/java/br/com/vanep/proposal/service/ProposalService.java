@@ -42,17 +42,23 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Limit;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.util.StringUtils;
 import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class ProposalService {
+
+  private static final Logger log = LoggerFactory.getLogger(ProposalService.class);
 
   static final int DEFAULT_VALID_DAYS = 7;
 
@@ -70,6 +76,7 @@ public class ProposalService {
   private final ContractTermsPolicy termsPolicy;
   private final ProposalAcceptancePolicy acceptancePolicy;
   private final ProposalMapper mapper;
+  private final TransactionTemplate transactions;
   private final MessageSource messages;
 
   public ProposalService(
@@ -87,6 +94,7 @@ public class ProposalService {
       ContractTermsPolicy termsPolicy,
       ProposalAcceptancePolicy acceptancePolicy,
       ProposalMapper mapper,
+      TransactionTemplate transactions,
       MessageSource messages) {
     this.proposals = proposals;
     this.adjustments = adjustments;
@@ -102,6 +110,7 @@ public class ProposalService {
     this.termsPolicy = termsPolicy;
     this.acceptancePolicy = acceptancePolicy;
     this.mapper = mapper;
+    this.transactions = transactions;
     this.messages = messages;
   }
 
@@ -237,8 +246,34 @@ public class ProposalService {
     return toDriverResponse(requireOfDriver(driver, token));
   }
 
-  // Public for the expiry sweep, which closes an overdue proposal the same way.
-  public void closeAndReopenRequest(ProposalModel proposal, ProposalStatus closedAs, Instant now) {
+  public int expireOverdue(Instant now, int limit) {
+    int expired = 0;
+    for (Long id : proposals.findOverdueSentIds(now, Limit.of(limit))) {
+      if (expire(id, now)) {
+        expired++;
+      }
+    }
+    return expired;
+  }
+
+  // A failing row is logged and retried next round, so it never holds back the rows behind it.
+  boolean expire(Long id, Instant now) {
+    try {
+      transactions.executeWithoutResult(
+          status ->
+              closeAndReopenRequest(
+                  proposals.findById(id).orElseThrow(), ProposalStatus.EXPIRED, now));
+      return true;
+    } catch (ResponseStatusException changedMeanwhile) {
+      log.debug("Proposal {} changed before it expired; skipped.", id);
+      return false;
+    } catch (RuntimeException unexpected) {
+      log.warn("Proposal {} failed to expire; retried next round.", id, unexpected);
+      return false;
+    }
+  }
+
+  void closeAndReopenRequest(ProposalModel proposal, ProposalStatus closedAs, Instant now) {
     ensureChanged(
         requests.reopen(
             proposal.getServiceRequest().getId(), now.plus(ServiceRequestService.ANSWER_WINDOW)),
