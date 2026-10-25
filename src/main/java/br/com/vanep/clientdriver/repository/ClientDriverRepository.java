@@ -2,6 +2,7 @@ package br.com.vanep.clientdriver.repository;
 
 import br.com.vanep.clientdriver.model.ClientDriverModel;
 import jakarta.persistence.LockModeType;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
@@ -102,4 +103,31 @@ public interface ClientDriverRepository extends JpaRepository<ClientDriverModel,
           "SELECT u.token FROM client_driver cd JOIN driver d ON cd.driver_id = d.id JOIN users u ON d.user_id = u.id WHERE cd.token = :token",
       nativeQuery = true)
   Optional<String> findDriverUserTokenByLinkToken(@Param("token") String token);
+
+  // Native: an HQL assignment to blockedBy, whose target is soft-deletable, makes Hibernate 7
+  // join the users table and write the parameter into the link's id.
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query(
+      value =
+          """
+          update client_driver
+          set status = 'BLOCKED', blocked_by = :blockerId, blocked_at = :now,
+            updated_at = current_timestamp
+          where id = :id and status <> 'BLOCKED' and deleted_at is null
+          """,
+      nativeQuery = true)
+  int block(@Param("id") Long id, @Param("blockerId") Long blockerId, @Param("now") Instant now);
+
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query(
+      value =
+          """
+          update client_driver
+          set status = :status, blocked_by = null, blocked_at = null,
+            updated_at = current_timestamp
+          where id = :id and status = 'BLOCKED' and blocked_by = :blockerId and deleted_at is null
+          """,
+      nativeQuery = true)
+  int unblock(
+      @Param("id") Long id, @Param("blockerId") Long blockerId, @Param("status") String status);
 }
