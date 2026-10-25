@@ -47,6 +47,7 @@ import br.com.vanep.servicerequest.dto.ServiceRequestDeclineRequestDTO;
 import br.com.vanep.servicerequest.dto.ServiceRequestDriverResponseDTO;
 import br.com.vanep.servicerequest.dto.ServiceRequestItemRequestDTO;
 import br.com.vanep.servicerequest.enums.ServiceRequestStatus;
+import br.com.vanep.servicerequest.event.ServiceRequestEvent;
 import br.com.vanep.servicerequest.mapper.ServiceRequestMapper;
 import br.com.vanep.servicerequest.model.ServiceRequestDayModel;
 import br.com.vanep.servicerequest.model.ServiceRequestItemModel;
@@ -78,6 +79,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.MessageSource;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Limit;
@@ -114,6 +116,7 @@ class ServiceRequestServiceTest {
   @Mock private SchoolRepository schools;
   @Mock private AddressRepository addresses;
   @Mock private TransactionTemplate transactions;
+  @Mock private ApplicationEventPublisher events;
   @Mock private MessageSource messages;
 
   @Captor private ArgumentCaptor<ServiceRequestModel> savedRequest;
@@ -148,12 +151,14 @@ class ServiceRequestServiceTest {
             new ServiceRequestMapper(),
             new ProposalMapper(new ScheduleMapper(), new ServiceRequestMapper()),
             transactions,
+            events,
             messages);
     when(messages.getMessage(anyString(), any(), any())).thenAnswer(call -> call.getArgument(0));
     when(transactions.execute(any()))
         .thenAnswer(call -> call.<TransactionCallback<?>>getArgument(0).doInTransaction(null));
 
     anaUser = user(1L, "Ana Souza", UserType.CLIENT);
+    anaUser.setToken(ANA_UID);
     ana = new ClientModel();
     ana.setId(10L);
     ana.setToken("ana");
@@ -162,6 +167,7 @@ class ServiceRequestServiceTest {
     when(clients.findByUserId(1L)).thenReturn(Optional.of(ana));
 
     UserModel carlosUser = user(2L, "Carlos Pereira", UserType.DRIVER);
+    carlosUser.setToken(CARLOS_UID);
     carlos = new DriverModel();
     carlos.setId(20L);
     carlos.setToken("carlos");
@@ -827,8 +833,37 @@ class ServiceRequestServiceTest {
     verify(requests, never()).expire(any(), any());
   }
 
+  @Test
+  void aSentRequestIsPublishedForTheDriver() {
+    service.send(ANA_UID, request(item("lucas", mondayRoundTrip())));
+
+    verify(events).publishEvent(new ServiceRequestEvent.Sent("request", CARLOS_UID));
+  }
+
+  @Test
+  void aDeclinedRequestIsPublishedForTheClient() {
+    when(requests.findByTokenAndDriverId("request", 20L))
+        .thenReturn(Optional.of(storedRequest(ServiceRequestStatus.OPEN)));
+    when(requests.updateStatusWithDeclineReason(any(), any(), any(), any())).thenReturn(1);
+
+    service.decline(CARLOS_UID, "request", null);
+
+    verify(events).publishEvent(new ServiceRequestEvent.Declined("request", ANA_UID));
+  }
+
+  @Test
+  void aWithdrawnRequestIsNotPublished() {
+    when(requests.findByTokenAndClientId("request", 10L))
+        .thenReturn(Optional.of(storedRequest(ServiceRequestStatus.OPEN)));
+    when(requests.updateStatus(any(), any(), any())).thenReturn(1);
+
+    service.withdraw(ANA_UID, "request");
+
+    verifyNoInteractions(events);
+  }
+
   private void assertNothingWritten() {
-    verifyNoInteractions(linkService);
+    verifyNoInteractions(linkService, events);
     verify(requests, never()).saveAndFlush(any());
   }
 
