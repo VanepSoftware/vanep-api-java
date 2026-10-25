@@ -206,13 +206,13 @@
 > Depends on: PR 10 | Parallel with: —
 > Order: test → evento → serviço → templates → mensagens
 
-- [ ] 11.1 Criar branch `VAN-30/11-email` de dentro da branch do PR 10
-- [ ] 11.2 Testes: cada evento da tabela do spec `negotiation-email` gera um envio ao destinatário certo (`MailService` mockado); nenhum envio para expiração, retirada e bloqueio; com o `@TransactionalEventListener`, um envio que falha no serviço (409) não manda e-mail; o e-mail ao motorista tem o primeiro nome do dependente, lido da foto, e não tem o sobrenome; falha do `MailService` não derruba a requisição
-- [ ] 11.3 Records de evento publicados pelo `ServiceRequestService` e pelo `ProposalService` (só tokens), com `ApplicationEventPublisher`
-- [ ] 11.4 `NegotiationEmailService` com `@TransactionalEventListener(phase = AFTER_COMMIT)` (D14)
-- [ ] 11.5 Templates em `src/main/resources/templates/email/` (um por evento, no padrão do `driver-approved`) e os assuntos como chaves nos dois `messages*.properties`
-- [ ] 11.6 `make lint` + `./mvnw verify -B`
-- [ ] 11.7 QA da regra 55 com o envio desligado (`VANEP_MAIL_ENABLED=false`, que registra o e-mail no log): cada evento aparece uma vez no log com o destinatário certo; uma requisição recusada não aparece; o log do e-mail ao motorista não tem o sobrenome do dependente
+- [x] 11.1 Criar branch `VAN-30/11-email` de dentro da branch do PR 10
+- [x] 11.2 Testes: cada evento da tabela do spec `negotiation-email` gera um envio ao destinatário certo (`MailService` mockado); nenhum envio para expiração, retirada e bloqueio; com o `@TransactionalEventListener`, um envio que falha no serviço (409) não manda e-mail; o e-mail ao motorista tem o primeiro nome do dependente, lido da foto, e não tem o sobrenome; falha do `MailService` não derruba a requisição
+- [x] 11.3 Records de evento publicados pelo `ServiceRequestService` e pelo `ProposalService` (só tokens), com `ApplicationEventPublisher`
+- [x] 11.4 `NegotiationEmailService` com `@TransactionalEventListener(phase = AFTER_COMMIT)` (D14)
+- [x] 11.5 Templates em `src/main/resources/templates/email/` (um por evento, no padrão do `driver-approved`) e os assuntos como chaves nos dois `messages*.properties`
+- [x] 11.6 `make lint` + `./mvnw verify -B`
+- [x] 11.7 QA da regra 55 com o envio desligado (`VANEP_MAIL_ENABLED=false`, que registra o e-mail no log): cada evento aparece uma vez no log com o destinatário certo; uma requisição recusada não aparece; o log do e-mail ao motorista não tem o sobrenome do dependente
 
 ## 12. PR 12 — A solicitação abre a conversa
 

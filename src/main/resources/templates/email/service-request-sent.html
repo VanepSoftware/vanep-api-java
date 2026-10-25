@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+  <head>
+    <meta charset="utf-8" />
+  </head>
+  <body style="font-family: Arial, Helvetica, sans-serif; color: #111">
+    <h2>Nova solicitação de orçamento</h2>
+    <p th:text="'Olá, ' + ${name} + '!'">Olá!</p>
+    <p th:text="${clientFirstName} + ' pediu um orçamento de transporte escolar para ' + ${dependents} + '.'">
+      Pedido de orçamento.
+    </p>
+    <p th:text="'Início desejado: ' + ${desiredStartDate} + '.'">Início desejado.</p>
+    <p th:text="'Responda até ' + ${expiresAt} + ', com uma proposta ou recusando o pedido.'">
+      Prazo para responder.
+    </p>
+    <p>Acesse o aplicativo Vanep para ver a solicitação.</p>
+    <p style="color: #666; font-size: 12px">
+      Equipe Vanep.
+    </p>
+  </body>
+</html>

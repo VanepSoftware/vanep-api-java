@@ -17,6 +17,7 @@ import br.com.vanep.proposal.dto.ProposalDeclineRequestDTO;
 import br.com.vanep.proposal.dto.ProposalItemRequestDTO;
 import br.com.vanep.proposal.dto.ProposalResponseDTO;
 import br.com.vanep.proposal.enums.ProposalStatus;
+import br.com.vanep.proposal.event.ProposalEvent;
 import br.com.vanep.proposal.mapper.ProposalMapper;
 import br.com.vanep.proposal.model.ProposalAdjustmentModel;
 import br.com.vanep.proposal.model.ProposalModel;
@@ -44,6 +45,7 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -78,6 +80,7 @@ public class ProposalService {
   private final ProposalSlotsPolicy slotsPolicy;
   private final ProposalMapper mapper;
   private final TransactionTemplate transactions;
+  private final ApplicationEventPublisher events;
   private final MessageSource messages;
 
   public ProposalService(
@@ -97,6 +100,7 @@ public class ProposalService {
       ProposalSlotsPolicy slotsPolicy,
       ProposalMapper mapper,
       TransactionTemplate transactions,
+      ApplicationEventPublisher events,
       MessageSource messages) {
     this.proposals = proposals;
     this.adjustments = adjustments;
@@ -114,6 +118,7 @@ public class ProposalService {
     this.slotsPolicy = slotsPolicy;
     this.mapper = mapper;
     this.transactions = transactions;
+    this.events = events;
     this.messages = messages;
   }
 
@@ -144,6 +149,9 @@ public class ProposalService {
                 "proposal.sent_conflict"));
     ProposalModel draft = newProposal(body, request, vehicle, latest, requestedIds, now);
     ProposalModel saved = keepingOneSentPerPair(() -> proposals.saveAndFlush(draft));
+    events.publishEvent(
+        new ProposalEvent.Sent(
+            saved.getToken(), request.getClientDriver().getClient().getUser().getToken()));
     return toDriverResponse(requireOfDriver(driver, saved.getToken()));
   }
 
@@ -211,6 +219,7 @@ public class ProposalService {
             ServiceRequestStatus.CONVERTED),
         "proposal.not_current");
     ensureChanged(proposals.accept(proposal.getId(), now), "proposal.not_current");
+    events.publishEvent(new ProposalEvent.Accepted(token, driverUidOf(proposal)));
     return toClientResponse(requireOfClient(client, token));
   }
 
@@ -228,6 +237,7 @@ public class ProposalService {
             ServiceRequestStatus.WITHDRAWN),
         "proposal.not_current");
     ensureChanged(proposals.decline(proposal.getId(), reasonOf(body)), "proposal.not_current");
+    events.publishEvent(new ProposalEvent.Declined(token, driverUidOf(proposal)));
     return toClientResponse(requireOfClient(client, token));
   }
 
@@ -243,6 +253,7 @@ public class ProposalService {
 
     ensureChanged(proposals.touchSent(proposal.getId()), "proposal.not_current");
     adjustments.save(mapper.toAdjustmentModel(proposal.getId(), body));
+    events.publishEvent(new ProposalEvent.AdjustmentRequested(token, driverUidOf(proposal)));
     return toClientResponse(requireOfClient(client, token));
   }
 
@@ -435,6 +446,10 @@ public class ProposalService {
     if (changedRows == 0) {
       throw conflict(key);
     }
+  }
+
+  String driverUidOf(ProposalModel proposal) {
+    return proposal.getClientDriver().getDriver().getUser().getToken();
   }
 
   String reasonOf(ProposalDeclineRequestDTO body) {
