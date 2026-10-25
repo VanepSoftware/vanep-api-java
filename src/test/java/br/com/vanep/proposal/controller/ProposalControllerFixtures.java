@@ -23,7 +23,7 @@ import java.util.Map;
 import java.util.stream.Stream;
 import org.springframework.context.ApplicationContext;
 
-class ProposalControllerFixtures {
+public class ProposalControllerFixtures {
 
   private static final LocalTime OUTBOUND_WINDOW_START = LocalTime.of(6, 40);
   private static final LocalTime RETURN_WINDOW_START = LocalTime.of(12, 10);
@@ -31,12 +31,12 @@ class ProposalControllerFixtures {
   private final VehicleRepository vehicles;
   private final ProposalService service;
 
-  ProposalControllerFixtures(ApplicationContext context) {
+  public ProposalControllerFixtures(ApplicationContext context) {
     vehicles = context.getBean(VehicleRepository.class);
     service = context.getBean(ProposalService.class);
   }
 
-  VehicleModel createVehicle(DriverModel driver, String plate) {
+  public VehicleModel createVehicle(DriverModel driver, String plate) {
     VehicleModel vehicle = new VehicleModel();
     vehicle.setDriver(driver);
     vehicle.setPlate(plate);
@@ -48,7 +48,7 @@ class ProposalControllerFixtures {
     return vehicles.save(vehicle);
   }
 
-  String sendProposal(
+  public String sendProposal(
       DriverModel driver, String requestToken, VehicleModel vehicle, DependentModel... offered) {
     List<ProposalItemRequestDTO> items =
         Stream.of(offered)
