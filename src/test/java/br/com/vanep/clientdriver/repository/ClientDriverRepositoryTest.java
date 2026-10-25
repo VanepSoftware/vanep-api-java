@@ -147,6 +147,51 @@ class ClientDriverRepositoryTest {
   }
 
   @Test
+  void blocksALinkOnlyWhileItIsNotBlocked() {
+    ClientDriverModel saved = repository.save(newLink(maria, carlos));
+    Instant blockedAt = Instant.parse("2026-10-17T12:00:00Z");
+
+    Integer first =
+        transactions.execute(
+            status -> repository.block(saved.getId(), maria.getUser().getId(), blockedAt));
+    Integer second =
+        transactions.execute(
+            status -> repository.block(saved.getId(), carlos.getUser().getId(), Instant.now()));
+
+    ClientDriverModel reread = repository.findByToken(saved.getToken()).orElseThrow();
+    assertThat(first).isEqualTo(1);
+    assertThat(second).isZero();
+    assertThat(reread.getStatus()).isEqualTo(RelationshipStatus.BLOCKED);
+    assertThat(reread.getBlockedBy().getId()).isEqualTo(maria.getUser().getId());
+    assertThat(reread.getBlockedAt()).isEqualTo(blockedAt);
+  }
+
+  @Test
+  void unblocksALinkOnlyForItsBlocker() {
+    ClientDriverModel saved = repository.save(newLink(maria, carlos));
+    transactions.execute(
+        status -> repository.block(saved.getId(), carlos.getUser().getId(), Instant.now()));
+
+    Integer byTheBlockedParty =
+        transactions.execute(
+            status -> repository.unblock(saved.getId(), maria.getUser().getId(), "PENDING"));
+    Integer byTheBlocker =
+        transactions.execute(
+            status -> repository.unblock(saved.getId(), carlos.getUser().getId(), "INACTIVE"));
+    Integer again =
+        transactions.execute(
+            status -> repository.unblock(saved.getId(), carlos.getUser().getId(), "PENDING"));
+
+    ClientDriverModel reread = repository.findByToken(saved.getToken()).orElseThrow();
+    assertThat(byTheBlockedParty).isZero();
+    assertThat(byTheBlocker).isEqualTo(1);
+    assertThat(again).isZero();
+    assertThat(reread.getStatus()).isEqualTo(RelationshipStatus.INACTIVE);
+    assertThat(reread.getBlockedBy()).isNull();
+    assertThat(reread.getBlockedAt()).isNull();
+  }
+
+  @Test
   void listsBlockedLinksInOneStatementWhoeverBlockedThem() {
     SqlStatementCounter counter = new SqlStatementCounter(entityManagerFactory);
     for (int index = 1; index <= 3; index++) {

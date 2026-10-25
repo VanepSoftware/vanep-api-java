@@ -102,7 +102,7 @@ public class ServiceRequestControllerFixtures {
     return drivers.save(driver);
   }
 
-  UserModel createAdmin(String email, String document) {
+  public UserModel createAdmin(String email, String document) {
     return createUser(UserType.ADMIN, "Admin", email, document);
   }
 
