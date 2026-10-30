@@ -766,5 +766,91 @@ check_sql_rejected Q15 "a snapshot without the dependent" service_request_item_s
      '{\"version\": 1, \"school\": {}, \"pickup\": {}}'
    from service_request request, dependent join address on address.id = dependent.address_id
    where request.token = 'qasr1' and dependent.token = '$LUCAS'"
+table "V65: proposal tables (database checks)"
+insert_proposal() {
+  echo "insert into proposal (token, client_driver_id, service_request_id, version, status, valid_until, starts_on, ends_on,
+          total_amount, installments, due_day, adjustment_policy, cancellation_policy, vehicle_id, snapshot)
+        select '$1', request.client_driver_id, request.id, $4, '$3', now() + interval '7 days', date '2027-02-01',
+          date '2027-12-17', 4200, 12, 5, 'NONE', 'NOTICE_30_DAYS', vehicle.id,
+          jsonb_build_object('version', 1, 'vehicle', jsonb_build_object('plate', vehicle.plate, 'capacity', vehicle.capacity))
+        from service_request request, (select * from vehicle order by id limit 1) vehicle where request.token = '$2'"
+}
+insert_proposal_item() {
+  echo "insert into schedule default values;
+        insert into proposal_item (proposal_id, dependent_id, monthly_amount, schedule_id)
+        select proposal.id, (select id from dependent where token = '$LUCAS'), $2, (select max(id) from schedule)
+        from proposal where token = '$1'"
+}
+insert_adjustment() {
+  echo "insert into proposal_adjustment (proposal_id, field, suggested_value, note)
+        select id, 'PRICE', $2, $3 from proposal where token = '$1'"
+}
+ANSWERED_REQUEST="$(insert_request qasr1 "$DIEGO_GUSTAVO" ANSWERED)"
+OTHER_REQUEST="$(insert_request qasr2 "$BRUNO_HELENA" CONVERTED)"
+SENT_PROPOSAL="$ANSWERED_REQUEST; $(insert_proposal qap1 qasr1 SENT 1)"
+on_qap1() { echo "update proposal set $1 where token = 'qap1'"; }
+PROPOSALS_BEFORE=$(count proposal)
+check_sql_rejected P1 "a second SENT proposal of the same pair" proposal_client_driver_sent_key \
+  "$SENT_PROPOSAL; $(insert_proposal qap2 qasr1 SENT 2)"
+check_sql_accepted P2 "a SENT version after a SUPERSEDED one of the same request" \
+  "$ANSWERED_REQUEST; $(insert_proposal qap1 qasr1 SUPERSEDED 1); $(insert_proposal qap2 qasr1 SENT 2)"
+check_sql_accepted P3 "SENT proposals of two different pairs" \
+  "$SENT_PROPOSAL; $(insert_request qasr2 "$BRUNO_HELENA" ANSWERED); $(insert_proposal qap2 qasr2 SENT 1)"
+check_sql_rejected P4 "a repeated version in the same request" proposal_request_version_key \
+  "$ANSWERED_REQUEST; $(insert_proposal qap1 qasr1 SUPERSEDED 1); $(insert_proposal qap2 qasr1 SENT 1)"
+check_sql_rejected P5 "ACCEPTED without accepted_at" proposal_accepted_at_check \
+  "$ANSWERED_REQUEST; $(insert_proposal qap1 qasr1 ACCEPTED 1)"
+check_sql_rejected P6 "accepted_at on a SENT proposal" proposal_accepted_at_check \
+  "$SENT_PROPOSAL; $(on_qap1 "accepted_at = now()")"
+check_sql_accepted P7 "ACCEPTED with accepted_at" \
+  "$SENT_PROPOSAL; $(on_qap1 "status = 'ACCEPTED', accepted_at = now()")"
+check_sql_rejected P8 "a resulting contract on a proposal that is not ACCEPTED" proposal_resulting_contract_check \
+  "$SENT_PROPOSAL; $(on_qap1 "resulting_contract_id = (select min(id) from contract)")"
+check_sql_rejected P9 "the same resulting contract on two proposals" proposal_resulting_contract_key \
+  "$SENT_PROPOSAL; $(on_qap1 "status = 'ACCEPTED', accepted_at = now(), resulting_contract_id = (select min(id) from contract)");
+   $OTHER_REQUEST; $(insert_proposal qap2 qasr2 SENT 1);
+   update proposal set status = 'ACCEPTED', accepted_at = now(), resulting_contract_id = (select min(id) from contract) where token = 'qap2'"
+check_sql_accepted P10 "every numeric range at its limits" \
+  "$SENT_PROPOSAL; $(insert_proposal_item qap1 0.01);
+   $(on_qap1 "installments = 1, due_day = 1"); $(on_qap1 "installments = 12, due_day = 28");
+   $(on_qap1 "total_amount = 0.01, enrollment_fee = 0, ends_on = starts_on + 1")"
+check_sql_rejected P11 "version 0" proposal_version_check "$ANSWERED_REQUEST; $(insert_proposal qap1 qasr1 SENT 0)"
+check_sql_rejected P12 "installments 0" proposal_installments_check "$SENT_PROPOSAL; $(on_qap1 "installments = 0")"
+check_sql_rejected P13 "installments 13" proposal_installments_check "$SENT_PROPOSAL; $(on_qap1 "installments = 13")"
+check_sql_rejected P14 "due day 0" proposal_due_day_check "$SENT_PROPOSAL; $(on_qap1 "due_day = 0")"
+check_sql_rejected P15 "due day 29" proposal_due_day_check "$SENT_PROPOSAL; $(on_qap1 "due_day = 29")"
+check_sql_rejected P16 "total amount 0" proposal_total_amount_check "$SENT_PROPOSAL; $(on_qap1 "total_amount = 0")"
+check_sql_rejected P17 "enrollment fee -0.01" proposal_enrollment_fee_check "$SENT_PROPOSAL; $(on_qap1 "enrollment_fee = -0.01")"
+check_sql_rejected P18 "ends_on equal to starts_on" proposal_period_check "$SENT_PROPOSAL; $(on_qap1 "ends_on = starts_on")"
+check_sql_rejected P19 "monthly amount 0" proposal_item_monthly_amount_check "$SENT_PROPOSAL; $(insert_proposal_item qap1 0)"
+check_sql_rejected P20 "two items on the same schedule" proposal_item_schedule_id_key \
+  "$SENT_PROPOSAL; $(insert_proposal_item qap1 350);
+   insert into proposal_item (proposal_id, dependent_id, monthly_amount, schedule_id)
+   select proposal_id, dependent_id, 300, schedule_id from proposal_item where proposal_id = (select id from proposal where token = 'qap1')"
+check_sql_rejected P21 "an adjustment with neither value nor note" proposal_adjustment_content_check \
+  "$SENT_PROPOSAL; $(insert_adjustment qap1 null null)"
+check_sql_accepted P22 "an adjustment with only a value and one with only a note" \
+  "$SENT_PROPOSAL; $(insert_adjustment qap1 "'320,00'" null); $(insert_adjustment qap1 null "'Só ida às quartas'")"
+# The empty table gives the planner no reason to prefer one SENT index over the other, so the
+# pair index is set aside inside a rolled-back transaction.
+check P23 "the overdue sweep can read the partial index on valid_until" yes \
+  "$(docker exec -i "$QA_DB_CONTAINER" psql -U "$QA_DB_USER" -d "$QA_DB_NAME" -Atq <<<"begin; set local enable_seqscan = off;
+       drop index proposal_client_driver_sent_key;
+       explain select id from proposal where status = 'SENT' and valid_until <= now() order by valid_until, id; rollback;" \
+       | grep -q "Index Scan using proposal_sent_valid_until_idx" && echo yes || echo no)"
+check P24 "the tables, the status, the snapshot, both contract links and both menus are documented" 10 \
+  "$(sql "select (select count(*) from unnest(array['proposal', 'proposal_item', 'proposal_adjustment']) name
+                  where obj_description(name::regclass, 'pg_class') is not null)
+             + (select count(*) from unnest(array['status', 'snapshot', 'adjustment_policy', 'cancellation_policy',
+                  'source_contract_id', 'resulting_contract_id']) col
+                where col_description('proposal'::regclass, (select attnum from pg_attribute
+                  where attrelid = 'proposal'::regclass and attname = col)) is not null)
+             + (select count(*) from pg_attribute where attrelid = 'proposal_adjustment'::regclass
+                  and attname = 'suggested_value' and col_description(attrelid, attnum) is not null)")"
+check P25 "the checks above were rolled back" "$PROPOSALS_BEFORE" "$(count proposal)"
+check P26 "the proposal tables have no deleted_at" 0 \
+  "$(sql "select count(*) from information_schema.columns where table_name like 'proposal%' and column_name = 'deleted_at'")"
+check_sql_rejected P27 "a snapshot without the vehicle" proposal_snapshot_check \
+  "$SENT_PROPOSAL; $(on_qap1 "snapshot = snapshot - 'vehicle'")"
 echo
 echo "ALL PASSED: $PASSED scenarios"
