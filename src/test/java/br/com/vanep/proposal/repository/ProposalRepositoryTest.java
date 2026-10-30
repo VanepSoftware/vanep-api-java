@@ -54,6 +54,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.domain.Limit;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.jdbc.Sql;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -341,7 +342,25 @@ class ProposalRepositoryTest {
     declined.setValidUntil(now.minusSeconds(60));
     proposals.save(declined);
 
-    assertThat(proposals.findOverdueSentIds(now)).containsExactly(overdue.getId(), dueNow.getId());
+    assertThat(proposals.findOverdueSentIds(now, Limit.unlimited()))
+        .containsExactly(overdue.getId(), dueNow.getId());
+  }
+
+  @Test
+  void findsTheOldestOverdueProposalsFirstUpToTheLimit() {
+    Instant now = Instant.now().truncatedTo(ChronoUnit.MICROS);
+    saveSentProposal(link, now.minusSeconds(60));
+    ProposalModel oldest =
+        saveSentProposal(
+            createLink(client, createDriver("second@vanep.com", "52998224725")),
+            now.minusSeconds(180));
+    ProposalModel second =
+        saveSentProposal(
+            createLink(client, createDriver("third@vanep.com", "39053344705")),
+            now.minusSeconds(120));
+
+    assertThat(proposals.findOverdueSentIds(now, Limit.of(2)))
+        .containsExactly(oldest.getId(), second.getId());
   }
 
   @Test

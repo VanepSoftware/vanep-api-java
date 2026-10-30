@@ -3,6 +3,7 @@ package br.com.vanep.clientdriver.controller;
 import br.com.vanep.auth.security.SecurityHelper;
 import br.com.vanep.clientdriver.dto.ClientDriverCreateRequestDTO;
 import br.com.vanep.clientdriver.dto.ClientDriverResponseDTO;
+import br.com.vanep.clientdriver.service.ClientDriverBlockService;
 import br.com.vanep.clientdriver.service.ClientDriverService;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -26,9 +27,12 @@ import org.springframework.web.bind.annotation.RestController;
 public class ClientDriverController {
 
   private final ClientDriverService service;
+  private final ClientDriverBlockService blockService;
 
-  public ClientDriverController(ClientDriverService service) {
+  public ClientDriverController(
+      ClientDriverService service, ClientDriverBlockService blockService) {
     this.service = service;
+    this.blockService = blockService;
   }
 
   @PostMapping
@@ -68,5 +72,18 @@ public class ClientDriverController {
   @PreAuthorize("hasAuthority('restore_client_driver')")
   public ClientDriverResponseDTO restore(@PathVariable String token) {
     return service.restore(token);
+  }
+
+  @PostMapping("/{token}/block")
+  @PreAuthorize("@sec.isClientDriverLinkParty(#token, authentication)")
+  public ClientDriverResponseDTO block(Authentication authentication, @PathVariable String token) {
+    return blockService.block(SecurityHelper.requireCallerUid(authentication), token);
+  }
+
+  @PostMapping("/{token}/unblock")
+  @PreAuthorize("@sec.isClientDriverLinkParty(#token, authentication)")
+  public ClientDriverResponseDTO unblock(
+      Authentication authentication, @PathVariable String token) {
+    return blockService.unblock(SecurityHelper.requireCallerUid(authentication), token);
   }
 }

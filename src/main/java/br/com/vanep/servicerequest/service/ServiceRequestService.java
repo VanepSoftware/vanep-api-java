@@ -51,19 +51,25 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Limit;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.util.StringUtils;
 import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class ServiceRequestService {
+
+  private static final Logger log = LoggerFactory.getLogger(ServiceRequestService.class);
 
   public static final Duration ANSWER_WINDOW = Duration.ofHours(72);
   static final int OPEN_LIMIT_PER_CLIENT = 5;
@@ -87,6 +93,7 @@ public class ServiceRequestService {
   private final ServiceRequestTransitionPolicy transitionPolicy;
   private final ServiceRequestMapper mapper;
   private final ProposalMapper proposalMapper;
+  private final TransactionTemplate transactions;
   private final MessageSource messages;
 
   public ServiceRequestService(
@@ -106,6 +113,7 @@ public class ServiceRequestService {
       ServiceRequestTransitionPolicy transitionPolicy,
       ServiceRequestMapper mapper,
       ProposalMapper proposalMapper,
+      TransactionTemplate transactions,
       MessageSource messages) {
     this.requests = requests;
     this.proposals = proposals;
@@ -123,6 +131,7 @@ public class ServiceRequestService {
     this.transitionPolicy = transitionPolicy;
     this.mapper = mapper;
     this.proposalMapper = proposalMapper;
+    this.transactions = transactions;
     this.messages = messages;
   }
 
@@ -215,6 +224,39 @@ public class ServiceRequestService {
             request.getId(), Set.of(from), ServiceRequestStatus.DECLINED, reasonOf(body)));
     closeSentProposalIfAnswered(from, request, ProposalStatus.WITHDRAWN);
     return toDriverResponse(requireOfDriver(driver, token));
+  }
+
+  public void closeOpenRequestOf(
+      ClientDriverModel link, ServiceRequestStatus closedAs, ProposalStatus proposalClosedAs) {
+    requests
+        .findByClientDriverIdAndStatusIn(link.getId(), ServiceRequestStatus.OPEN_STATUSES)
+        .ifPresent(
+            open -> {
+              if (requests.updateStatus(open.getId(), ServiceRequestStatus.OPEN_STATUSES, closedAs)
+                  > 0) {
+                closeSentProposalOf(link, proposalClosedAs);
+              }
+            });
+  }
+
+  public int expireOverdue(Instant now, int limit) {
+    int expired = 0;
+    for (Long id : requests.findOverdueOpenIds(now, Limit.of(limit))) {
+      if (expire(id, now)) {
+        expired++;
+      }
+    }
+    return expired;
+  }
+
+  // A failing row is logged and retried next round, so it never holds back the rows behind it.
+  boolean expire(Long id, Instant now) {
+    try {
+      return transactions.execute(status -> requests.expire(id, now)) > 0;
+    } catch (RuntimeException unexpected) {
+      log.warn("Service request {} failed to expire; retried next round.", id, unexpected);
+      return false;
+    }
   }
 
   void ensureValidItems(List<ServiceRequestItemRequestDTO> items) {
@@ -378,11 +420,14 @@ public class ServiceRequestService {
 
   void closeSentProposalIfAnswered(
       ServiceRequestStatus from, ServiceRequestModel request, ProposalStatus closedAs) {
-    if (from != ServiceRequestStatus.ANSWERED) {
-      return;
+    if (from == ServiceRequestStatus.ANSWERED) {
+      closeSentProposalOf(request.getClientDriver(), closedAs);
     }
+  }
+
+  void closeSentProposalOf(ClientDriverModel link, ProposalStatus closedAs) {
     proposals
-        .findByClientDriverIdAndStatus(request.getClientDriver().getId(), ProposalStatus.SENT)
+        .findByClientDriverIdAndStatus(link.getId(), ProposalStatus.SENT)
         .ifPresent(
             proposal -> proposals.updateStatus(proposal.getId(), ProposalStatus.SENT, closedAs));
   }

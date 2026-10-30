@@ -311,6 +311,7 @@ class ClientDriverServiceTest {
         link.getDriver().getUser().getName(),
         link.getStatus(),
         link.getOrigin(),
+        null,
         link.getCreatedAt(),
         link.getUpdatedAt());
   }

@@ -6,6 +6,7 @@ import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Limit;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -112,7 +113,19 @@ public interface ServiceRequestRepository extends JpaRepository<ServiceRequestMo
         and request.expiresAt <= :now
       order by request.expiresAt, request.id
       """)
-  List<Long> findOverdueOpenIds(Instant now);
+  List<Long> findOverdueOpenIds(Instant now, Limit limit);
+
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query(
+      """
+      update ServiceRequestModel request
+      set request.status = br.com.vanep.servicerequest.enums.ServiceRequestStatus.EXPIRED,
+        request.updatedAt = instant
+      where request.id = :id
+        and request.status = br.com.vanep.servicerequest.enums.ServiceRequestStatus.OPEN
+        and request.expiresAt <= :now
+      """)
+  int expire(Long id, Instant now);
 
   @Modifying(flushAutomatically = true, clearAutomatically = true)
   @Query(

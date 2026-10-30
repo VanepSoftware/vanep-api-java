@@ -8,6 +8,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -54,6 +55,7 @@ import br.com.vanep.servicerequest.model.ServiceRequestDayModel;
 import br.com.vanep.servicerequest.model.ServiceRequestItemModel;
 import br.com.vanep.servicerequest.model.ServiceRequestModel;
 import br.com.vanep.servicerequest.repository.ServiceRequestRepository;
+import br.com.vanep.servicerequest.service.ServiceRequestService;
 import br.com.vanep.shared.enums.OperationShift;
 import br.com.vanep.shared.enums.RouteLeg;
 import br.com.vanep.shared.enums.SchoolShift;
@@ -73,6 +75,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Consumer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -84,7 +87,10 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.context.MessageSource;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Limit;
 import org.springframework.http.HttpStatus;
+import org.springframework.transaction.TransactionStatus;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.server.ResponseStatusException;
 
 @ExtendWith(MockitoExtension.class)
@@ -106,6 +112,7 @@ class ProposalServiceTest {
   @Mock private AddressRepository addresses;
   @Mock private VehicleRepository vehicles;
   @Mock private ScheduleRepository scheduleRepository;
+  @Mock private TransactionTemplate transactions;
   @Mock private MessageSource messages;
 
   @Captor private ArgumentCaptor<ProposalModel> savedProposal;
@@ -140,8 +147,16 @@ class ProposalServiceTest {
             new ContractTermsPolicy(),
             new ProposalAcceptancePolicy(),
             new ProposalMapper(new ScheduleMapper(), new ServiceRequestMapper()),
+            transactions,
             messages);
     when(messages.getMessage(anyString(), any(), any())).thenAnswer(call -> call.getArgument(0));
+    doAnswer(
+            call -> {
+              call.<Consumer<TransactionStatus>>getArgument(0).accept(null);
+              return null;
+            })
+        .when(transactions)
+        .executeWithoutResult(any());
 
     UserModel anaUser = user(1L, "Ana Souza", UserType.CLIENT);
     ClientModel ana = new ClientModel();
@@ -845,6 +860,60 @@ class ProposalServiceTest {
 
     expectRefusal(
         () -> service.withdraw(CARLOS_UID, "sent"), HttpStatus.CONFLICT, "proposal.not_current");
+    verify(proposals, never()).updateStatus(anyLong(), any(), any());
+  }
+
+  @Test
+  void expiresTheOverdueProposalsAndReopensTheirRequests() {
+    Instant now = Instant.now();
+    when(proposals.findOverdueSentIds(now, Limit.of(200))).thenReturn(List.of(71L));
+    when(proposals.findById(71L)).thenReturn(Optional.of(sent));
+
+    int expired = service.expireOverdue(now, 200);
+
+    assertThat(expired).isEqualTo(1);
+    verify(requests).reopen(50L, now.plus(ServiceRequestService.ANSWER_WINDOW));
+    verify(proposals).updateStatus(71L, ProposalStatus.SENT, ProposalStatus.EXPIRED);
+  }
+
+  @Test
+  void aProposalThatChangedBeforeItsWriteIsSkippedAndTheNextOneExpires() {
+    Instant now = Instant.now();
+    ProposalModel acceptedMeanwhile = existingProposal(80L, 1, ProposalStatus.SENT);
+    when(proposals.findOverdueSentIds(now, Limit.of(2))).thenReturn(List.of(80L, 71L));
+    when(proposals.findById(80L)).thenReturn(Optional.of(acceptedMeanwhile));
+    when(proposals.findById(71L)).thenReturn(Optional.of(sent));
+    when(proposals.updateStatus(80L, ProposalStatus.SENT, ProposalStatus.EXPIRED)).thenReturn(0);
+
+    int expired = service.expireOverdue(now, 2);
+
+    assertThat(expired).isEqualTo(1);
+    verify(proposals).updateStatus(71L, ProposalStatus.SENT, ProposalStatus.EXPIRED);
+  }
+
+  @Test
+  void aProposalThatFailsUnexpectedlyIsSkippedAndTheNextOneExpires() {
+    Instant now = Instant.now();
+    ProposalModel broken = existingProposal(80L, 1, ProposalStatus.SENT);
+    when(proposals.findOverdueSentIds(now, Limit.of(2))).thenReturn(List.of(80L, 71L));
+    when(proposals.findById(80L)).thenReturn(Optional.of(broken));
+    when(proposals.findById(71L)).thenReturn(Optional.of(sent));
+    when(proposals.updateStatus(80L, ProposalStatus.SENT, ProposalStatus.EXPIRED))
+        .thenThrow(new DataIntegrityViolationException("broken row"));
+
+    int expired = service.expireOverdue(now, 2);
+
+    assertThat(expired).isEqualTo(1);
+    verify(proposals).updateStatus(71L, ProposalStatus.SENT, ProposalStatus.EXPIRED);
+  }
+
+  @Test
+  void nothingOverdueExpiresNothing() {
+    Instant now = Instant.now();
+    when(proposals.findOverdueSentIds(now, Limit.of(200))).thenReturn(List.of());
+
+    assertThat(service.expireOverdue(now, 200)).isZero();
+    verify(requests, never()).reopen(any(), any());
     verify(proposals, never()).updateStatus(anyLong(), any(), any());
   }
 

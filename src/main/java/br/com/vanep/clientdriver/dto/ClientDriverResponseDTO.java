@@ -1,6 +1,7 @@
 package br.com.vanep.clientdriver.dto;
 
 import br.com.vanep.clientdriver.enums.LinkOrigin;
+import br.com.vanep.clientdriver.enums.LinkParty;
 import br.com.vanep.clientdriver.enums.RelationshipStatus;
 import java.time.Instant;
 
@@ -12,5 +13,6 @@ public record ClientDriverResponseDTO(
     String driverName,
     RelationshipStatus status,
     LinkOrigin origin,
+    LinkParty blockedBy,
     Instant createdAt,
     Instant updatedAt) {}
