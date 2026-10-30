@@ -154,6 +154,19 @@ class ContractReadinessServiceTest {
     verifyNoInteractions(dependents);
   }
 
+  @Test
+  void theServiceRequestChecksTheDependentsAndGridsItAlreadyLoaded() {
+    DependentModel lucas = dependent(21L, "lucas", LocalDate.of(2016, 4, 2), 7L, 9L);
+
+    assertThat(service.isReady(ana, List.of(lucas), List.of(schoolDay(21L, DayOfWeek.MONDAY))))
+        .isTrue();
+    assertThat(service.isReady(ana, List.of(lucas), List.of())).isFalse();
+    ana.setPhone(null);
+    assertThat(service.isReady(ana, List.of(lucas), List.of(schoolDay(21L, DayOfWeek.MONDAY))))
+        .isFalse();
+    verifyNoInteractions(dependents, schoolDays);
+  }
+
   private DependentModel dependent(
       Long id, String token, LocalDate birthDate, Long schoolId, Long addressId) {
     DependentModel dependent = new DependentModel();

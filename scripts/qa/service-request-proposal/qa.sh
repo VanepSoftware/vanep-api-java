@@ -109,8 +109,9 @@ cleanup() {
 trap cleanup EXIT
 
 echo "== setup"
-[[ $(count client_driver) == 1 && $(count contract) -le 1 && $(count driver_service_area) == 0 ]] || {
-  echo "SETUP FAIL | needs a database seeded on an empty schema (one link, no service areas)" >&2
+[[ $(count client_driver) == 2 && $(count contract) -le 1 && $(count service_request) == 1 \
+  && $(count driver_service_area) == 0 ]] || {
+  echo "SETUP FAIL | needs a database seeded on an empty schema (the seed link, the seeded request and its link, no service areas)" >&2
   exit 1
 }
 ADMIN=$(login "$ADMIN_EMAIL")
@@ -122,6 +123,12 @@ ANA=$(login ana.souza@seed.vanep.com.br)
 FABIO=$(login fabio.teixeira@seed.vanep.com.br)
 GUSTAVO=$(login gustavo.santos@seed.vanep.com.br)
 HELENA=$(login helena.costa@seed.vanep.com.br)
+# The seeded contract would lock Lucas (D17); the grid and readiness scenarios below edit him.
+SEED_CONTRACT=$(sql "select token from contract where status = 'ACTIVE' and deleted_at is null limit 1")
+if [[ -n $SEED_CONTRACT ]]; then
+  request PATCH "/api/contracts/$SEED_CONTRACT" "$ADMIN" '{"status":"ENDED"}'
+  [[ $RESP_STATUS == 200 ]] || { echo "SETUP FAIL | end the seeded contract | HTTP $RESP_STATUS $RESP_BODY" >&2; exit 1; }
+fi
 
 BRUNO_C=$(client_token bruno.lima)
 CARLA_C=$(client_token carla.nunes)
@@ -546,6 +553,9 @@ table "Contract readiness"
 READINESS=/api/clients/me/contract-readiness
 DEPENDENT_FIELDS='[.missing[] | select(.subject == "DEPENDENT") | .dependentToken + ":" + .field]'
 CLIENT_FIELDS='[.missing[] | select(.subject == "CLIENT") | .field]'
+ANA_USER="(select id from users where email = 'ana.souza@seed.vanep.com.br')"
+# The seed makes Ana ready to ask for a quote; these scenarios start from a client without phone and address.
+sql "update users set phone = null, address_id = null where id = $ANA_USER" >/dev/null
 request GET "$READINESS?dependentTokens=$LUCAS&dependentTokens=$MARINA" "$ANA"
 expect C1 "the seeded client misses phone and address; the restored dependent misses its address" 200 \
   ".ready == false and $CLIENT_FIELDS == [\"PHONE\", \"ADDRESS\"] and $DEPENDENT_FIELDS == [\"$MARINA:ADDRESS\"]"
@@ -563,7 +573,6 @@ request PATCH "/api/dependent/$LUCAS" "$ANA" '{"birthDate": null}'
 request GET "$READINESS?dependentTokens=$LUCAS" "$ANA"
 expect C6 "clearing the birth date makes the dependent miss it" 200 "$DEPENDENT_FIELDS == [\"$LUCAS:BIRTH_DATE\"]"
 request PATCH "/api/dependent/$LUCAS" "$ANA" '{"birthDate": "2016-04-02"}'
-ANA_USER="(select id from users where email = 'ana.souza@seed.vanep.com.br')"
 sql "insert into address (token, city_id, zip_code, street, number) select 'qaanahome', city_id, zip_code, street, '99' from address where id = (select address_id from dependent where token = '$LUCAS');
      update users set phone = '11999990000', address_id = (select id from address where token = 'qaanahome') where id = $ANA_USER" >/dev/null
 request GET "$READINESS?dependentTokens=$LUCAS" "$ANA"
@@ -712,7 +721,7 @@ insert_item() {
   echo "insert into service_request_item (service_request_id, dependent_id, school_id, pickup_city_id, snapshot)
         select request.id, dependent.id, dependent.school_id, address.city_id, $QA_SNAPSHOT
         from service_request request, dependent join address on address.id = dependent.address_id
-        where request.token = '$1' and dependent.token = '$LUCAS'"
+        where request.token = '$1' and dependent.token = '${2:-$LUCAS}'"
 }
 QA_SNAPSHOT="jsonb_build_object('version', 1, 'dependent', jsonb_build_object('name', dependent.name,
   'birthDate', dependent.birth_date), 'school', jsonb_build_object('name', 'QA'), 'pickup', jsonb_build_object('cityName', 'QA'))"
@@ -852,5 +861,98 @@ check P26 "the proposal tables have no deleted_at" 0 \
   "$(sql "select count(*) from information_schema.columns where table_name like 'proposal%' and column_name = 'deleted_at'")"
 check_sql_rejected P27 "a snapshot without the vehicle" proposal_snapshot_check \
   "$SENT_PROPOSAL; $(on_qap1 "snapshot = snapshot - 'vehicle'")"
+
+table "Seeded service request"
+SEED_REQUEST=$(sql "select token from service_request where token not like 'qa%' order by id limit 1")
+check S1 "the seed sent one OPEN request from Ana to Gustavo, on a PENDING link from the search" \
+  "OPEN PENDING CLIENT_SEARCH" \
+  "$(sql "select request.status || ' ' || link.status || ' ' || link.origin from service_request request
+          join client_driver link on link.id = request.client_driver_id join driver on driver.id = link.driver_id
+          where request.token = '$SEED_REQUEST' and driver.token = '$GUSTAVO_D'")"
+check S2 "its item copies Lucas, his school, his city and his neighborhood" \
+  "Lucas Souza|2016-04-02|Escola Municipal Seed|São Paulo|SP|Centro" \
+  "$(sql "select concat_ws('|', snapshot->'dependent'->>'name', snapshot->'dependent'->>'birthDate', snapshot->'school'->>'name',
+            snapshot->'pickup'->>'cityName', snapshot->'pickup'->>'stateUf', coalesce(snapshot->'pickup'->>'neighborhood', ''))
+          from service_request_item item join service_request request on request.id = item.service_request_id
+          where request.token = '$SEED_REQUEST'")"
+check S3 "the days keep the grid of the sending time, although the grid changed since" \
+  "MONDAY:MORNING,TUESDAY:FULLTIME,WEDNESDAY:MORNING,THURSDAY:FULLTIME,FRIDAY:MORNING" \
+  "$(sql "select string_agg(day.weekday || ':' || day.school_shift, ',' order by array_position(
+            array['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'], day.weekday::text))
+          from service_request_day day join service_request_item item on item.id = day.service_request_item_id
+          join service_request request on request.id = item.service_request_id where request.token = '$SEED_REQUEST'")"
+check S4 "every seeded day asks for the way to school and back" t \
+  "$(sql "select bool_and(day.needs_outbound and day.needs_return) from service_request_day day
+          join service_request_item item on item.id = day.service_request_item_id
+          join service_request request on request.id = item.service_request_id where request.token = '$SEED_REQUEST'")"
+check S5 "it expires 72 hours after it was sent" 72 \
+  "$(sql "select round(extract(epoch from expires_at - created_at) / 3600) from service_request where token = '$SEED_REQUEST'")"
+request DELETE "/api/dependent/$LUCAS" "$ANA"
+expect S6 "Lucas is not removed while the seeded request is open" 422 \
+  '.code == "dependent.open_negotiation" and .detail == "Este dependente está numa solicitação de orçamento em aberto. Retire a solicitação antes de removê-lo."'
+
+table "Dependent locks (D17)"
+ANA_C=$(client_token ana.souza)
+ANA_FABIO=$(sql "select link.token from client_driver link join client on client.id = link.client_id join driver on driver.id = link.driver_id
+                 where client.token = '$ANA_C' and driver.token = '$FABIO_D'")
+SEED_SCHOOL=$(sql "select token from school where name = 'Escola Municipal Seed' order by id limit 1")
+SEED_CITY=$(sql "select token from city where ibge_code = '3550308'")
+OPEN_CONTRACT_DETAIL="Este dependente tem um contrato em andamento: ele não pode ser removido nem mudar de escola, endereço ou grade escolar."
+request POST /api/dependent "$ANA" "$(jq -nc '{name: "Rafa Souza", birthDate: "2018-05-10"}')"
+RAFA=$(jq -r .token <<<"$RESP_BODY")
+sql "insert into address (token, city_id, zip_code, street, number)
+       select 'qarafahome', city_id, zip_code, street, '12' from address where id = (select address_id from dependent where token = '$LUCAS');
+     update dependent set school_id = (select school_id from dependent where token = '$LUCAS'),
+       address_id = (select id from address where token = 'qarafahome') where token = '$RAFA'" >/dev/null
+request PUT "/api/dependent/$RAFA/school-days" "$ANA" "$(school_days_body MONDAY:MORNING TUESDAY:MORNING)"
+expect T1 "a new dependent gets school, address and grid" 200
+sql "$(insert_request qalock "$ANA_FABIO" OPEN); $(insert_item qalock "$RAFA"); $(insert_day qalock MONDAY true true)" >/dev/null
+request DELETE "/api/dependent/$RAFA" "$ANA"
+expect T2 "a dependent in an OPEN request is not removed" 422 \
+  '.code == "dependent.open_negotiation" and .detail == "Este dependente está numa solicitação de orçamento em aberto. Retire a solicitação antes de removê-lo."'
+request PUT "/api/dependent/$RAFA/school-days" "$ANA" "$(school_days_body MONDAY:MORNING TUESDAY:FULLTIME)"
+expect T3 "during the negotiation the grid still changes (the accept re-checks it)" 200
+sql "update service_request set status = 'ANSWERED' where token = 'qalock'" >/dev/null
+request DELETE "/api/dependent/$RAFA" "$ANA"
+expect T4 "a dependent in an ANSWERED request is not removed" 422 '.code == "dependent.open_negotiation"'
+sql "update service_request set status = 'WITHDRAWN' where token = 'qalock'" >/dev/null
+RAFA_GRID=$(grid_of "$RAFA")
+request POST /api/contracts "$ADMIN" "$(jq -nc --arg l "$ANA_FABIO" --arg d "$RAFA" '{clientDriverToken: $l, startsOn: "2027-02-01",
+  endsOn: "2027-12-17", totalAmount: 3500, installments: 10, dueDay: 5, items: [{dependentToken: $d, monthlyAmount: 350,
+  slots: [{weekday: "MONDAY", leg: "OUTBOUND", shift: "MORNING", windowStart: "06:40"}]}]}')"
+expect T5 "after the request is withdrawn, the admin contracts the dependent" 201 '.status == "ACTIVE"'
+RAFA_CONTRACT=$(jq -r .token <<<"$RESP_BODY")
+request DELETE "/api/dependent/$RAFA" "$ANA"
+expect T6 "a dependent with an ACTIVE contract is not removed" 422 \
+  ".code == \"dependent.open_contract\" and .detail == \"$OPEN_CONTRACT_DETAIL\""
+request DELETE "/api/dependent/$RAFA" "$ADMIN"
+expect T7 "not even by the admin" 422 '.code == "dependent.open_contract"'
+request PATCH "/api/dependent/$RAFA" "$ANA" "$(jq -nc --arg s "$SEED_SCHOOL" '{schoolToken: $s}')"
+expect T8 "the school is locked, even resent with its current value" 422 '.code == "dependent.open_contract"'
+request PATCH "/api/dependent/$RAFA" "$ANA" "$(jq -nc --arg c "$SEED_CITY" \
+  '{address: {cityToken: $c, street: "Rua Nova", number: "1", zipCode: "01001000", neighborhood: "Centro"}}')"
+expect T9 "the address is locked" 422 '.code == "dependent.open_contract"'
+request PATCH "/api/dependent/$RAFA" "$ANA" '{"address": null}'
+expect T10 "clearing the address is locked too" 422 '.code == "dependent.open_contract"'
+request PUT "/api/dependent/$RAFA/school-days" "$ANA" "$(school_days_body MONDAY:AFTERNOON)"
+expect T11 "the grid is locked" 422 '.code == "dependent.open_contract"'
+request PATCH "/api/dependent/$RAFA" "$ANA" '{"name": "Rafael Souza"}'
+expect T12 "the name still changes" 200 '.name == "Rafael Souza"'
+check T13 "the dependent kept its school, address and grid, and was not removed" \
+  "t t t $RAFA_GRID" \
+  "$(sql "select (school_id = (select school_id from dependent where token = '$LUCAS'))::text::char || ' ' ||
+            (address_id = (select id from address where token = 'qarafahome'))::text::char || ' ' || (deleted_at is null)::text::char
+          from dependent where token = '$RAFA'") $(grid_of "$RAFA")"
+request GET "/api/contracts/$RAFA_CONTRACT" "$ADMIN"
+expect T14 "the contract still lists the dependent's item" 200 ".items | map(.dependentToken) == [\"$RAFA\"]"
+request PATCH "/api/contracts/$RAFA_CONTRACT" "$ADMIN" '{"status":"ENDED"}'
+expect T15 "the contract ends" 200 '.status == "ENDED"'
+check T16 "two removals at once after the contract ended: one 204, one 404" "204 404" \
+  "$(in_parallel DELETE "$ANA" "" "/api/dependent/$RAFA" "/api/dependent/$RAFA")"
+request GET "/api/contracts/$RAFA_CONTRACT" "$ADMIN"
+expect T17 "the ended contract stays readable, without the removed dependent's item until phase 3 (R14)" 200 \
+  '.status == "ENDED" and .items == []'
+request DELETE "/api/dependent/$MARINA" "$BRUNO"
+expect T18 "another client still cannot remove the dependent" 403
 echo
 echo "ALL PASSED: $PASSED scenarios"
