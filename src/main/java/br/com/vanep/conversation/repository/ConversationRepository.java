@@ -1,6 +1,7 @@
 package br.com.vanep.conversation.repository;
 
 import br.com.vanep.conversation.model.ConversationModel;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -68,4 +69,22 @@ public interface ConversationRepository extends JpaRepository<ConversationModel,
       where conversation.token = :token
       """)
   Optional<String> findDriverUserTokenByToken(String token);
+
+  @Query(
+      """
+      select conversation.client.id as clientId, conversation.driver.id as driverId,
+             conversation.token as token
+      from ConversationModel conversation
+      where conversation.client.id in :clientIds and conversation.driver.id in :driverIds
+      """)
+  List<PairToken> findTokensByClientIdInAndDriverIdIn(
+      Collection<Long> clientIds, Collection<Long> driverIds);
+
+  interface PairToken {
+    Long getClientId();
+
+    Long getDriverId();
+
+    String getToken();
+  }
 }

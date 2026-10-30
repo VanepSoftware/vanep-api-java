@@ -9,6 +9,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -26,6 +27,8 @@ import br.com.vanep.clientdriver.service.ClientDriverService;
 import br.com.vanep.contract.enums.ContractStatus;
 import br.com.vanep.contract.repository.ContractRepository;
 import br.com.vanep.contractreadiness.service.ContractReadinessService;
+import br.com.vanep.conversation.model.ConversationModel;
+import br.com.vanep.conversation.service.ConversationService;
 import br.com.vanep.dependent.model.DependentModel;
 import br.com.vanep.dependent.model.DependentSchoolDayModel;
 import br.com.vanep.dependent.repository.DependentRepository;
@@ -67,6 +70,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
@@ -75,6 +79,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -98,6 +103,8 @@ class ServiceRequestServiceTest {
 
   private static final String ANA_UID = "ana-uid";
   private static final String CARLOS_UID = "carlos-uid";
+  private static final ConversationService.Pair ANA_AND_CARLOS =
+      new ConversationService.Pair(10L, 20L);
   private static final LocalDate DESIRED_START = LocalDate.now().plusMonths(1);
   private static final LocalDate LUCAS_BIRTH_DATE = LocalDate.of(2016, 4, 2);
   private static final List<DayOfWeek> MONDAY_TO_FRIDAY =
@@ -106,6 +113,7 @@ class ServiceRequestServiceTest {
   @Mock private ServiceRequestRepository requests;
   @Mock private ProposalRepository proposals;
   @Mock private ClientDriverService linkService;
+  @Mock private ConversationService conversationService;
   @Mock private ContractRepository contracts;
   @Mock private ContractReadinessService readiness;
   @Mock private UserService users;
@@ -137,6 +145,7 @@ class ServiceRequestServiceTest {
             requests,
             proposals,
             linkService,
+            conversationService,
             contracts,
             readiness,
             users,
@@ -184,6 +193,11 @@ class ServiceRequestServiceTest {
     link.setDriver(carlos);
     link.setStatus(RelationshipStatus.PENDING);
     when(linkService.findOrCreateForRequest(ana, carlos)).thenReturn(link);
+    ConversationModel conversation = new ConversationModel();
+    conversation.setToken("conversation");
+    when(conversationService.findOrCreateForRequest(ana, carlos)).thenReturn(conversation);
+    when(conversationService.findTokensOfPairs(Set.of(ANA_AND_CARLOS)))
+        .thenReturn(Map.of(ANA_AND_CARLOS, "conversation"));
     when(contracts.findStatusesByClientDriverId(40L)).thenReturn(List.of());
     when(requests.findByClientDriverIdAndStatusIn(40L, ServiceRequestStatus.OPEN_STATUSES))
         .thenReturn(Optional.empty());
@@ -246,6 +260,7 @@ class ServiceRequestServiceTest {
     assertThat(response.expiresAt())
         .isCloseTo(before.plus(Duration.ofHours(72)), within(5, ChronoUnit.SECONDS));
     assertThat(response.clientDriverToken()).isEqualTo("link");
+    assertThat(response.conversationToken()).isEqualTo("conversation");
     assertThat(response.items())
         .extracting(item -> item.dependentToken(), item -> item.days().size())
         .containsExactly(tuple("lucas", 5), tuple("marina", 5));
@@ -253,6 +268,15 @@ class ServiceRequestServiceTest {
     assertThat(savedRequest.getValue().getClientDriver()).isSameAs(link);
     assertThat(savedRequest.getValue().getDesiredStartDate()).isEqualTo(DESIRED_START);
     assertThat(savedRequest.getValue().getNotes()).isEqualTo("Portão azul");
+  }
+
+  @Test
+  void theRequestOpensTheConversationOnlyAfterItIsStored() {
+    service.send(ANA_UID, request(item("lucas", mondayRoundTrip())));
+
+    InOrder order = inOrder(requests, conversationService);
+    order.verify(requests).saveAndFlush(any());
+    order.verify(conversationService).findOrCreateForRequest(ana, carlos);
   }
 
   @Test
@@ -423,6 +447,7 @@ class ServiceRequestServiceTest {
         HttpStatus.CONFLICT,
         "service_request.open_exists");
     verify(requests, never()).saveAndFlush(any());
+    verifyNoInteractions(conversationService);
   }
 
   @Test
@@ -435,6 +460,7 @@ class ServiceRequestServiceTest {
         () -> service.send(ANA_UID, request(item("lucas", mondayRoundTrip()))),
         HttpStatus.CONFLICT,
         "service_request.open_exists");
+    verifyNoInteractions(conversationService);
   }
 
   @Test
@@ -524,6 +550,7 @@ class ServiceRequestServiceTest {
 
     ServiceRequestClientResponseDTO response = service.findForClient(ANA_UID, "request");
 
+    assertThat(response.conversationToken()).isEqualTo("conversation");
     assertThat(response.items())
         .extracting(item -> item.dependentToken(), item -> item.dependentName())
         .containsExactly(tuple("lucas", "Lucas Souza"));
@@ -548,6 +575,7 @@ class ServiceRequestServiceTest {
     ServiceRequestDriverResponseDTO response = service.findForDriver(CARLOS_UID, "request");
 
     assertThat(response.clientFirstName()).isEqualTo("Ana");
+    assertThat(response.conversationToken()).isEqualTo("conversation");
     assertThat(response.items())
         .extracting(item -> item.dependentToken(), item -> item.dependentFirstName())
         .containsExactly(tuple("lucas", "Lucas"));
@@ -575,13 +603,17 @@ class ServiceRequestServiceTest {
     when(requests.findWithItemsByIdIn(List.of(60L, 61L))).thenReturn(List.of(second, first));
     when(dependents.findTokensByIdIn(List.of(21L))).thenReturn(List.of(new TokenRow(21L, "lucas")));
 
-    Page<ServiceRequestClientResponseDTO> page = service.findPageForClient(ANA_UID, null, pageable);
+    Page<ServiceRequestClientResponseDTO> page =
+        service.findPageForClient(ANA_UID, null, null, pageable);
 
     assertThat(page.getContent())
         .extracting(response -> response.status())
         .containsExactly(ServiceRequestStatus.OPEN, ServiceRequestStatus.EXPIRED);
     assertThat(page.getContent()).allMatch(response -> response.currentProposal() == null);
+    assertThat(page.getContent())
+        .allMatch(response -> "conversation".equals(response.conversationToken()));
     verify(dependents).findTokensByIdIn(List.of(21L));
+    verify(conversationService).findTokensOfPairs(Set.of(ANA_AND_CARLOS));
     verify(proposals, never()).findCurrentByServiceRequestIdIn(any());
   }
 
@@ -602,9 +634,11 @@ class ServiceRequestServiceTest {
                     61L, "proposal", 2, ProposalStatus.SENT, new BigDecimal("1000.00"), 3, true)));
 
     Page<ServiceRequestDriverResponseDTO> page =
-        service.findPageForDriver(CARLOS_UID, null, pageable);
+        service.findPageForDriver(CARLOS_UID, null, null, pageable);
 
     assertThat(page.getContent().getFirst().currentProposal()).isNull();
+    assertThat(page.getContent())
+        .allMatch(response -> "conversation".equals(response.conversationToken()));
     ProposalSummaryResponseDTO current = page.getContent().get(1).currentProposal();
     assertThat(current.token()).isEqualTo("proposal");
     assertThat(current.version()).isEqualTo(2);
@@ -621,9 +655,12 @@ class ServiceRequestServiceTest {
     when(requests.findPageByDriverIdAndStatusIn(anyLong(), any(), eq(pageable)))
         .thenReturn(Page.empty(pageable));
 
-    service.findPageForClient(ANA_UID, Set.of(ServiceRequestStatus.ANSWERED), pageable);
+    service.findPageForClient(ANA_UID, Set.of(ServiceRequestStatus.ANSWERED), null, pageable);
     service.findPageForDriver(
-        CARLOS_UID, Set.of(ServiceRequestStatus.OPEN, ServiceRequestStatus.ANSWERED), pageable);
+        CARLOS_UID,
+        Set.of(ServiceRequestStatus.OPEN, ServiceRequestStatus.ANSWERED),
+        null,
+        pageable);
 
     verify(requests)
         .findPageByClientIdAndStatusIn(10L, Set.of(ServiceRequestStatus.ANSWERED), pageable);
@@ -639,10 +676,76 @@ class ServiceRequestServiceTest {
     when(requests.findPageByClientIdAndStatusIn(anyLong(), any(), eq(pageable)))
         .thenReturn(Page.empty(pageable));
 
-    service.findPageForClient(ANA_UID, Set.of(), pageable);
+    service.findPageForClient(ANA_UID, Set.of(), null, pageable);
 
     verify(requests)
         .findPageByClientIdAndStatusIn(10L, EnumSet.allOf(ServiceRequestStatus.class), pageable);
+  }
+
+  @Test
+  void aRequestWhosePairHasNoConversationReadsWithoutOne() {
+    when(requests.findByTokenAndClientId("request", 10L))
+        .thenReturn(Optional.of(storedRequest(ServiceRequestStatus.OPEN)));
+    when(conversationService.findTokensOfPairs(Set.of(ANA_AND_CARLOS))).thenReturn(Map.of());
+
+    assertThat(service.findForClient(ANA_UID, "request").conversationToken()).isNull();
+  }
+
+  @Test
+  void anEmptyPageLooksUpNoConversation() {
+    Pageable pageable = PageRequest.of(0, 20);
+    when(requests.findPageByClientIdAndStatusIn(
+            10L, EnumSet.allOf(ServiceRequestStatus.class), pageable))
+        .thenReturn(Page.empty(pageable));
+
+    assertThat(service.findPageForClient(ANA_UID, null, null, pageable)).isEmpty();
+    verifyNoInteractions(conversationService);
+  }
+
+  @Test
+  void theConversationFilterListsOnlyTheRequestsOfThatPairForEachParty() {
+    Pageable pageable = PageRequest.of(0, 20);
+    when(conversationService.findPairByToken("conversation"))
+        .thenReturn(Optional.of(ANA_AND_CARLOS));
+    when(requests.findPageByPairAndStatusIn(anyLong(), anyLong(), any(), eq(pageable)))
+        .thenReturn(Page.empty(pageable));
+
+    service.findPageForClient(ANA_UID, null, "conversation", pageable);
+    service.findPageForDriver(
+        CARLOS_UID, Set.of(ServiceRequestStatus.OPEN), "conversation", pageable);
+
+    verify(requests)
+        .findPageByPairAndStatusIn(10L, 20L, EnumSet.allOf(ServiceRequestStatus.class), pageable);
+    verify(requests)
+        .findPageByPairAndStatusIn(10L, 20L, Set.of(ServiceRequestStatus.OPEN), pageable);
+    verify(requests, never()).findPageByClientIdAndStatusIn(any(), any(), any());
+    verify(requests, never()).findPageByDriverIdAndStatusIn(any(), any(), any());
+  }
+
+  @Test
+  void theConversationOfAnotherPairListsNothing() {
+    Pageable pageable = PageRequest.of(0, 20);
+    when(conversationService.findPairByToken("bruno-and-carlos"))
+        .thenReturn(Optional.of(new ConversationService.Pair(11L, 20L)));
+    when(conversationService.findPairByToken("ana-and-helena"))
+        .thenReturn(Optional.of(new ConversationService.Pair(10L, 21L)));
+
+    assertThat(service.findPageForClient(ANA_UID, null, "bruno-and-carlos", pageable)).isEmpty();
+    assertThat(service.findPageForDriver(CARLOS_UID, null, "ana-and-helena", pageable)).isEmpty();
+    verify(requests, never()).findPageByPairAndStatusIn(any(), any(), any(), any());
+  }
+
+  @Test
+  void anUnknownConversationListsNothing() {
+    Pageable pageable = PageRequest.of(0, 20);
+    when(conversationService.findPairByToken("unknown")).thenReturn(Optional.empty());
+
+    Page<ServiceRequestClientResponseDTO> page =
+        service.findPageForClient(ANA_UID, null, "unknown", pageable);
+
+    assertThat(page).isEmpty();
+    assertThat(page.getTotalElements()).isZero();
+    verify(requests, never()).findPageByPairAndStatusIn(any(), any(), any(), any());
   }
 
   @Test
@@ -863,7 +966,7 @@ class ServiceRequestServiceTest {
   }
 
   private void assertNothingWritten() {
-    verifyNoInteractions(linkService, events);
+    verifyNoInteractions(linkService, conversationService, events);
     verify(requests, never()).saveAndFlush(any());
   }
 

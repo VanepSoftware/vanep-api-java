@@ -296,6 +296,36 @@ class ServiceRequestRepositoryTest {
   }
 
   @Test
+  void pagesTheRequestsOfAPairFilteredByStatus() {
+    ServiceRequestModel withdrawn = saveRequest(link, ServiceRequestStatus.WITHDRAWN);
+    ServiceRequestModel open = saveRequest(link, ServiceRequestStatus.OPEN);
+    saveRequest(
+        createLink(client, createDriver("second@vanep.com", "52998224725")),
+        ServiceRequestStatus.OPEN);
+    saveRequest(
+        createLink(createClient("other@vanep.com", "20000000002"), driver),
+        ServiceRequestStatus.OPEN);
+
+    Page<ServiceRequestModel> all =
+        requests.findPageByPairAndStatusIn(
+            client.getId(), driver.getId(), ANY_STATUS, PageRequest.of(0, 10));
+    Page<ServiceRequestModel> openOnly =
+        requests.findPageByPairAndStatusIn(
+            client.getId(),
+            driver.getId(),
+            ServiceRequestStatus.OPEN_STATUSES,
+            PageRequest.of(0, 10));
+
+    assertThat(all.getContent())
+        .extracting(request -> request.getToken())
+        .containsExactly(open.getToken(), withdrawn.getToken());
+    assertThat(all.getTotalElements()).isEqualTo(2);
+    assertThat(openOnly.getContent())
+        .extracting(request -> request.getToken())
+        .containsExactly(open.getToken());
+  }
+
+  @Test
   void loadsTheItemsAndDaysOfAPageInOneCall() {
     ServiceRequestModel first = saveRequest(link, ServiceRequestStatus.EXPIRED);
     ServiceRequestModel second =

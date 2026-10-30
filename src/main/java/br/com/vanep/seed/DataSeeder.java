@@ -222,7 +222,6 @@ public class DataSeeder implements ApplicationRunner {
             PermissionEnum.crudFor("dependents").stream(),
             Stream.of(
                 PermissionEnum.CREATE_DRIVER_RATING.value(),
-                PermissionEnum.CREATE_CONVERSATION.value(),
                 PermissionEnum.LIST_CLIENT_CONVERSATIONS.value()))
         .toList();
   }

@@ -2,6 +2,7 @@ package br.com.vanep.conversation.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.entry;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
@@ -10,7 +11,6 @@ import static org.mockito.Mockito.when;
 
 import br.com.vanep.client.model.ClientModel;
 import br.com.vanep.client.repository.ClientRepository;
-import br.com.vanep.conversation.dto.ConversationCreateRequestDTO;
 import br.com.vanep.conversation.dto.ConversationMessageCreateRequestDTO;
 import br.com.vanep.conversation.dto.ConversationMessageResponseDTO;
 import br.com.vanep.conversation.enums.ConversationParticipant;
@@ -26,7 +26,9 @@ import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.service.UserService;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -37,7 +39,6 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.MessageSource;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -92,61 +93,67 @@ class ConversationServiceTest {
     when(users.requireByToken("carlos-uid")).thenReturn(carlos.getUser());
     when(clients.findByUserId(10L)).thenReturn(Optional.of(maria));
     when(drivers.findByUserId(20L)).thenReturn(Optional.of(carlos));
-    when(drivers.findSearchableByToken("carlos-token")).thenReturn(Optional.of(carlos));
     when(conversations.findByToken("conversation-token")).thenReturn(Optional.of(conversation));
   }
 
   @Test
-  void opensANewConversationWhenThePairHasNone() {
+  void aRequestOpensTheConversationOfAPairThatHasNone() {
     when(conversations.findByPair(1L, 2L)).thenReturn(Optional.empty());
     when(conversations.saveAndFlush(any())).thenReturn(conversation);
 
-    ConversationService.OpenedConversation opened =
-        service.openConversation("maria-uid", new ConversationCreateRequestDTO("carlos-token"));
+    ConversationModel opened = service.findOrCreateForRequest(maria, carlos);
 
-    assertThat(opened.created()).isTrue();
-    assertThat(opened.conversation().token()).isEqualTo("conversation-token");
+    assertThat(opened).isSameAs(conversation);
+    ArgumentCaptor<ConversationModel> saved = ArgumentCaptor.forClass(ConversationModel.class);
+    verify(conversations).saveAndFlush(saved.capture());
+    assertThat(saved.getValue().getClient()).isSameAs(maria);
+    assertThat(saved.getValue().getDriver()).isSameAs(carlos);
   }
 
   @Test
-  void resumesTheExistingConversationOfThePair() {
+  void aRequestKeepsTheConversationThePairAlreadyHas() {
     when(conversations.findByPair(1L, 2L)).thenReturn(Optional.of(conversation));
 
-    ConversationService.OpenedConversation opened =
-        service.openConversation("maria-uid", new ConversationCreateRequestDTO("carlos-token"));
-
-    assertThat(opened.created()).isFalse();
-    assertThat(opened.conversation().token()).isEqualTo("conversation-token");
+    assertThat(service.findOrCreateForRequest(maria, carlos)).isSameAs(conversation);
     verify(conversations, never()).saveAndFlush(any());
   }
 
   @Test
-  void resumesTheConversationCreatedByAConcurrentOpen() {
-    when(conversations.findByPair(1L, 2L))
-        .thenReturn(Optional.empty())
-        .thenReturn(Optional.of(conversation));
-    when(conversations.saveAndFlush(any()))
-        .thenThrow(new DataIntegrityViolationException("conversation_pair_active_key"));
+  void findsTheConversationTokensOfOnlyTheAskedPairsInOneQuery() {
+    when(conversations.findTokensByClientIdInAndDriverIdIn(Set.of(1L, 3L), Set.of(2L, 4L)))
+        .thenReturn(
+            List.of(
+                new PairTokenRow(1L, 2L, "maria-carlos"),
+                new PairTokenRow(1L, 4L, "maria-helena"),
+                new PairTokenRow(3L, 4L, "bruno-helena")));
 
-    ConversationService.OpenedConversation opened =
-        service.openConversation("maria-uid", new ConversationCreateRequestDTO("carlos-token"));
+    Map<ConversationService.Pair, String> tokens =
+        service.findTokensOfPairs(
+            Set.of(new ConversationService.Pair(1L, 2L), new ConversationService.Pair(3L, 4L)));
 
-    assertThat(opened.created()).isFalse();
-    assertThat(opened.conversation().token()).isEqualTo("conversation-token");
+    assertThat(tokens)
+        .containsOnly(
+            entry(new ConversationService.Pair(1L, 2L), "maria-carlos"),
+            entry(new ConversationService.Pair(3L, 4L), "bruno-helena"));
   }
 
   @Test
-  void refusesADriverThatIsNotSearchable() {
-    when(drivers.findSearchableByToken("hidden")).thenReturn(Optional.empty());
+  void noPairsNeedNoQuery() {
+    assertThat(service.findTokensOfPairs(Set.of())).isEmpty();
+    verify(conversations, never()).findTokensByClientIdInAndDriverIdIn(any(), any());
+  }
 
-    assertThatThrownBy(
-            () -> service.openConversation("maria-uid", new ConversationCreateRequestDTO("hidden")))
-        .isInstanceOfSatisfying(
-            ResponseStatusException.class,
-            error -> {
-              assertThat(error.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
-              assertThat(error.getReason()).isEqualTo("conversation.driver.not_found");
-            });
+  @Test
+  void findsThePairOfAConversation() {
+    assertThat(service.findPairByToken("conversation-token"))
+        .contains(new ConversationService.Pair(1L, 2L));
+  }
+
+  @Test
+  void anUnknownConversationHasNoPair() {
+    when(conversations.findByToken("unknown")).thenReturn(Optional.empty());
+
+    assertThat(service.findPairByToken("unknown")).isEmpty();
   }
 
   @Test
@@ -241,6 +248,24 @@ class ConversationServiceTest {
   private ConversationMessageModel withToken(ConversationMessageModel message) {
     message.setToken("message-token");
     return message;
+  }
+
+  private record PairTokenRow(Long clientId, Long driverId, String token)
+      implements ConversationRepository.PairToken {
+    @Override
+    public Long getClientId() {
+      return clientId;
+    }
+
+    @Override
+    public Long getDriverId() {
+      return driverId;
+    }
+
+    @Override
+    public String getToken() {
+      return token;
+    }
   }
 
   private UserModel user(Long id, String token, String name) {

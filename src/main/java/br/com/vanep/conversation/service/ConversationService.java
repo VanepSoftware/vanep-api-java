@@ -2,7 +2,6 @@ package br.com.vanep.conversation.service;
 
 import br.com.vanep.client.model.ClientModel;
 import br.com.vanep.client.repository.ClientRepository;
-import br.com.vanep.conversation.dto.ConversationCreateRequestDTO;
 import br.com.vanep.conversation.dto.ConversationMessageCreateRequestDTO;
 import br.com.vanep.conversation.dto.ConversationMessageResponseDTO;
 import br.com.vanep.conversation.dto.ConversationResponseDTO;
@@ -19,10 +18,13 @@ import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.service.UserService;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -34,7 +36,7 @@ import org.springframework.web.server.ResponseStatusException;
 @Service
 public class ConversationService {
 
-  public record OpenedConversation(ConversationResponseDTO conversation, boolean created) {}
+  public record Pair(Long clientId, Long driverId) {}
 
   private final ConversationRepository conversations;
   private final ConversationMessageRepository messages;
@@ -64,34 +66,42 @@ public class ConversationService {
     this.messageSource = messageSource;
   }
 
-  // Not transactional on purpose: when a concurrent open wins the unique index, the
-  // failed insert must not abort the transaction that re-reads the winner.
-  public OpenedConversation openConversation(
-      String callerUid, ConversationCreateRequestDTO request) {
-    ClientModel client = requireCallerClient(callerUid);
-    DriverModel driver =
-        drivers
-            .findSearchableByToken(request.driverToken())
-            .orElseThrow(() -> notFound("conversation.driver.not_found"));
+  // Concurrent requests of the pair already serialize on its link, so this insert never races.
+  @Transactional
+  public ConversationModel findOrCreateForRequest(ClientModel client, DriverModel driver) {
     return conversations
         .findByPair(client.getId(), driver.getId())
-        .map(existing -> new OpenedConversation(mapper.toResponse(existing), false))
-        .orElseGet(() -> createConversation(client, driver));
+        .orElseGet(() -> conversations.saveAndFlush(newConversation(client, driver)));
   }
 
-  OpenedConversation createConversation(ClientModel client, DriverModel driver) {
+  ConversationModel newConversation(ClientModel client, DriverModel driver) {
     ConversationModel conversation = new ConversationModel();
     conversation.setClient(client);
     conversation.setDriver(driver);
-    try {
-      return new OpenedConversation(
-          mapper.toResponse(conversations.saveAndFlush(conversation)), true);
-    } catch (DataIntegrityViolationException concurrentOpen) {
-      return conversations
-          .findByPair(client.getId(), driver.getId())
-          .map(existing -> new OpenedConversation(mapper.toResponse(existing), false))
-          .orElseThrow(() -> concurrentOpen);
+    return conversation;
+  }
+
+  @Transactional(readOnly = true)
+  public Optional<Pair> findPairByToken(String token) {
+    return conversations
+        .findByToken(token)
+        .map(
+            conversation ->
+                new Pair(conversation.getClient().getId(), conversation.getDriver().getId()));
+  }
+
+  @Transactional(readOnly = true)
+  public Map<Pair, String> findTokensOfPairs(Set<Pair> pairs) {
+    if (pairs.isEmpty()) {
+      return Map.of();
     }
+    Set<Long> clientIds = pairs.stream().map(pair -> pair.clientId()).collect(Collectors.toSet());
+    Set<Long> driverIds = pairs.stream().map(pair -> pair.driverId()).collect(Collectors.toSet());
+    return conversations.findTokensByClientIdInAndDriverIdIn(clientIds, driverIds).stream()
+        .filter(row -> pairs.contains(new Pair(row.getClientId(), row.getDriverId())))
+        .collect(
+            Collectors.toMap(
+                row -> new Pair(row.getClientId(), row.getDriverId()), row -> row.getToken()));
   }
 
   @Transactional(readOnly = true)
@@ -146,13 +156,6 @@ public class ConversationService {
     return callerUid.equals(conversation.getClient().getUser().getToken())
         ? ConversationParticipant.CLIENT
         : ConversationParticipant.DRIVER;
-  }
-
-  ClientModel requireCallerClient(String callerUid) {
-    UserModel caller = users.requireByToken(callerUid);
-    return clients
-        .findByUserId(caller.getId())
-        .orElseThrow(() -> notFound("conversation.client.not_found"));
   }
 
   ConversationModel requireConversation(String token) {
