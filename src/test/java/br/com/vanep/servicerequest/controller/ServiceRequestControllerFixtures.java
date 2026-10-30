@@ -38,9 +38,9 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors;
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor;
 
-class ServiceRequestControllerFixtures {
+public class ServiceRequestControllerFixtures {
 
-  static final List<DayOfWeek> WEEKDAYS =
+  public static final List<DayOfWeek> WEEKDAYS =
       List.of(
           DayOfWeek.MONDAY,
           DayOfWeek.TUESDAY,
@@ -63,7 +63,7 @@ class ServiceRequestControllerFixtures {
   final CityModel city;
   final SchoolModel school;
 
-  ServiceRequestControllerFixtures(ApplicationContext context) {
+  public ServiceRequestControllerFixtures(ApplicationContext context) {
     users = context.getBean(UserRepository.class);
     clients = context.getBean(ClientRepository.class);
     drivers = context.getBean(DriverRepository.class);
@@ -79,12 +79,12 @@ class ServiceRequestControllerFixtures {
     school = createSchool();
   }
 
-  static JwtRequestPostProcessor as(UserModel user) {
+  public static JwtRequestPostProcessor as(UserModel user) {
     return SecurityMockMvcRequestPostProcessors.jwt()
         .jwt(token -> token.claim("uid", user.getToken()).subject(user.getEmail()));
   }
 
-  ClientModel createReadyClient(String name, String email, String document) {
+  public ClientModel createReadyClient(String name, String email, String document) {
     UserModel user = createUser(UserType.CLIENT, name, email, document);
     user.setPhone("19999990000");
     user.setAddressId(createAddress("Rua da Cliente", "Centro").getId());
@@ -93,7 +93,7 @@ class ServiceRequestControllerFixtures {
     return clients.save(client);
   }
 
-  DriverModel createAvailableDriver(String name, String email, String document) {
+  public DriverModel createAvailableDriver(String name, String email, String document) {
     DriverModel driver = new DriverModel();
     driver.setUser(createUser(UserType.DRIVER, name, email, document));
     driver.setBasePrice(new BigDecimal("100.00"));
@@ -106,7 +106,7 @@ class ServiceRequestControllerFixtures {
     return createUser(UserType.ADMIN, "Admin", email, document);
   }
 
-  DependentModel createDependentGoingEveryWeekday(
+  public DependentModel createDependentGoingEveryWeekday(
       ClientModel client, String name, LocalDate birthDate) {
     return createDependent(client, name, birthDate, weekday -> SchoolShift.MORNING);
   }
@@ -133,7 +133,7 @@ class ServiceRequestControllerFixtures {
     return dependent;
   }
 
-  String sendRequest(ClientModel client, DriverModel driver, DependentModel... chosen) {
+  public String sendRequest(ClientModel client, DriverModel driver, DependentModel... chosen) {
     List<ServiceRequestItemRequestDTO> items =
         List.of(chosen).stream()
             .map(dependent -> new ServiceRequestItemRequestDTO(dependent.getToken(), roundTrips()))
