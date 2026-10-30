@@ -10,6 +10,7 @@ import java.util.List;
 public record ServiceRequestClientResponseDTO(
     String token,
     String clientDriverToken,
+    String conversationToken,
     String driverToken,
     String driverName,
     BigDecimal driverRating,

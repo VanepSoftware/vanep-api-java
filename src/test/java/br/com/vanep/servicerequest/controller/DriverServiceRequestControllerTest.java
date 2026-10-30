@@ -99,6 +99,7 @@ class DriverServiceRequestControllerTest {
             .andExpect(jsonPath("$.token").value(requestToken))
             .andExpect(jsonPath("$.status").value("OPEN"))
             .andExpect(jsonPath("$.clientFirstName").value("Ana"))
+            .andExpect(jsonPath("$.conversationToken").value(conversationTokenOf(ana, carlos)))
             .andExpect(jsonPath("$.notes").value("Portão azul"))
             .andExpect(jsonPath("$.expiresAt").isNotEmpty())
             .andExpect(jsonPath("$.desiredStartDate").isNotEmpty())
@@ -121,6 +122,18 @@ class DriverServiceRequestControllerTest {
         .doesNotContain("11144477735")
         .doesNotContain("ana@vanep.com")
         .doesNotContain("19999990000");
+  }
+
+  @Test
+  void theDriverTalksToTheClientInTheConversationOfTheRequest() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/conversations/" + conversationTokenOf(ana, carlos) + "/messages")
+                .with(as(carlosUser))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"body\":\"Tenho vaga de manhã.\"}"))
+        .andExpect(status().isCreated())
+        .andExpect(jsonPath("$.sender").value("DRIVER"));
   }
 
   @Test
@@ -157,6 +170,36 @@ class DriverServiceRequestControllerTest {
     mockMvc
         .perform(get(BASE).param("status", "SENT").with(as(carlosUser)))
         .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void theConversationFilterListsOnlyTheRequestsOfThatPair() throws Exception {
+    ClientModel bruno = fixtures.createReadyClient("Bruno", "bruno@vanep.com", "12345678909");
+    fixtures.sendRequest(
+        bruno,
+        carlos,
+        fixtures.createDependentGoingEveryWeekday(bruno, "Davi", LocalDate.of(2015, 3, 3)));
+    DriverModel joana = fixtures.createAvailableDriver("Joana", "joana@vanep.com", "39053344705");
+    fixtures.sendRequest(
+        ana,
+        joana,
+        fixtures.createDependentGoingEveryWeekday(ana, "Marina", LocalDate.of(2018, 9, 1)));
+
+    mockMvc
+        .perform(
+            get(BASE)
+                .param("conversationToken", conversationTokenOf(ana, carlos))
+                .with(as(carlosUser)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.totalElements").value(1))
+        .andExpect(jsonPath("$.content[0].token").value(requestToken));
+    mockMvc
+        .perform(
+            get(BASE)
+                .param("conversationToken", conversationTokenOf(ana, joana))
+                .with(as(carlosUser)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.totalElements").value(0));
   }
 
   @Test
@@ -243,5 +286,13 @@ class DriverServiceRequestControllerTest {
 
   private String message(String key) {
     return messages.getMessage(key, null, java.util.Locale.forLanguageTag("pt-BR"));
+  }
+
+  private String conversationTokenOf(ClientModel client, DriverModel driver) {
+    return jdbc.queryForObject(
+        "select token from conversation where client_id = ? and driver_id = ?",
+        String.class,
+        client.getId(),
+        driver.getId());
   }
 }

@@ -1,6 +1,6 @@
 # QA — service-request-proposal (constitution rule 55)
 
-Latest run: on the stack tip, `VAN-30/13-pickup-time-and-price`, which contains this branch: every scenario below passed there except B44 and B39 as written here (`windowStart`), which PR 13 removes and renames; those two passed on the tip's previous run, on 2026-11-01 (see the `qa.md` of PR 13 for the date and the counts). This file keeps the scenarios of PRs 1 to 11.
+Latest run: on the stack tip, `VAN-30/13-pickup-time-and-price`, which contains this branch: every scenario below passed there except B44 and B39 as written here (`windowStart`), which PR 13 removes and renames; those two passed on the tip's previous run, on 2026-11-01 (see the `qa.md` of PR 13 for the date and the counts). This file keeps the scenarios of PRs 1 to 12.
 
 ## How to run
 
@@ -34,6 +34,9 @@ QA_DB_CONTAINER=vanep-srp-qa-db BASE_URL=http://localhost:8081 scripts/qa/servic
 # 6. The e-mails, on a new throwaway database (steps 1 to 3 again), with the API started without
 #    EXPIRY_SWEEP_ENABLED=false and its output sent to a file (java -jar ... > app.log 2>&1)
 APP_LOG=app.log QA_DB_CONTAINER=vanep-srp-qa-db BASE_URL=http://localhost:8081 scripts/qa/service-request-proposal/email.sh
+
+# 7. The conversation opened by the request, on a new throwaway database (steps 1 to 3 again)
+QA_DB_CONTAINER=vanep-srp-qa-db BASE_URL=http://localhost:8081 scripts/qa/service-request-proposal/conversation.sh
 
 # 8. Clean up
 docker stop vanep-srp-qa-db; kill %1
@@ -800,6 +803,61 @@ For the approval scenarios (V1 to V12), Fabio is put back `UNDER_REVIEW` with `i
 | EM24 | the withdrawal sent nothing (e-mails in the log) | 15 | PASS |
 | EM25 | Ana blocks Fabio during a negotiation | 200 | PASS |
 | EM26 | the block sent nothing (e-mails in the log) | 16 | PASS |
+
+### Conversation opened by the request (PR 12)
+
+`conversation.sh` needs a database seeded on an empty schema, like `email.sh`. It ends the seeded contract (Ana – Fabio), wipes the conversations and runs the `V66` file again by hand to check the backfill and its idempotence.
+
+| id | scenario | expected | result |
+|---|---|---|---|
+| CV1 | no bundle holds `create_conversation` after boot | 0 | PASS |
+| CV2 | a client token does not carry it (it carries `list_client_conversations`) | f | PASS |
+| CV3 | the seeded request opened Ana's conversation with Gustavo | 1 | PASS |
+| CV4 | `V66` opens the conversation of a pair whose request had none | 1 | PASS |
+| CV5 | `V66` run again adds nothing | 1 | PASS |
+| CV6 | `V66` removes the permission from a bundle that still has it | 0 | PASS |
+| CV7 | the seeded request carries that conversation for Ana | 200 | PASS |
+| CV8 | and for Gustavo | 200 | PASS |
+| CV9 | the client can no longer open one directly | 404 | PASS |
+| CV10 | no token | 401 | PASS |
+| CV11 | nor can a driver | 404 | PASS |
+| CV12 | nothing was created | 1 | PASS |
+| CV13 | an invalid request to Helena | 400 | PASS |
+| CV14 | a request to an unknown driver | 404 | PASS |
+| CV15 | the refused requests opened no conversation | 1 | PASS |
+| CV16 | Ana asks Fabio for a quote, with the conversation token | 201 | PASS |
+| CV17 | it is the pair's only conversation | 1 | PASS |
+| CV18 | Ana's inbox lists it | 200 | PASS |
+| CV19 | Fabio's inbox lists it | 200 | PASS |
+| CV20 | Fabio reads the request with the same conversation | 200 | PASS |
+| CV21 | and finds it in his list with `?conversationToken=` | 200 | PASS |
+| CV22 | every request in Ana's list carries its conversation | 200 | PASS |
+| CV23 | Fabio writes first, from the request | 201 | PASS |
+| CV24 | Ana reads it | 200 | PASS |
+| CV25 | Bruno, outside the pair, cannot | 403 | PASS |
+| CV26 | Ana withdraws, and the request still carries the conversation | 200 | PASS |
+| CV27 | both still talk after the withdrawal | 201 | PASS |
+| CV28 | a new request to Fabio keeps the same conversation | 201 | PASS |
+| CV29 | still one conversation for the pair | 1 | PASS |
+| CV30 | Fabio declines it, with the conversation | 200 | PASS |
+| CV31 | and still writes after declining | 201 | PASS |
+| CV32 | the history keeps every message | 200 | PASS |
+| CV33 | six concurrent first requests to Helena | one 201, five 409 | PASS |
+| CV34 | open one conversation | 1 | PASS |
+| CV35 | another request while that one is open | 409 | PASS |
+| CV36 | opens no other | 1 | PASS |
+| CV37 | Ana lists her requests to Fabio from the conversation, newest first | 200 | PASS |
+| CV38 | combined with the status | 200 | PASS |
+| CV39 | paged | 200 | PASS |
+| CV40 | Fabio gets the same requests | 200 | PASS |
+| CV41 | Gustavo, with a conversation he is not part of, gets nothing | 200 | PASS |
+| CV42 | nor does Bruno | 200 | PASS |
+| CV43 | Ana's other conversation lists only the seeded request | 200 | PASS |
+| CV44 | an unknown conversation | 200 | PASS |
+| CV45 | a blank conversation token | 200 | PASS |
+| CV46 | with an invalid status | 400 | PASS |
+| CV47 | no token | 401 | PASS |
+| CV48 | the driver on the client surface | 403 | PASS |
 
 ### Regression: contract-core
 

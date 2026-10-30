@@ -60,10 +60,12 @@ public class ServiceRequestMapper {
   public ServiceRequestClientResponseDTO toClientResponse(
       ServiceRequestModel request,
       Map<Long, String> dependentTokens,
-      ProposalSummaryResponseDTO currentProposal) {
+      ProposalSummaryResponseDTO currentProposal,
+      String conversationToken) {
     return new ServiceRequestClientResponseDTO(
         request.getToken(),
         request.getClientDriver().getToken(),
+        conversationToken,
         request.getClientDriver().getDriver().getToken(),
         request.getClientDriver().getDriver().getUser().getName(),
         request.getClientDriver().getDriver().getRating(),
@@ -84,10 +86,12 @@ public class ServiceRequestMapper {
       ServiceRequestModel request,
       Map<Long, String> dependentTokens,
       LocalDate today,
-      ProposalSummaryResponseDTO currentProposal) {
+      ProposalSummaryResponseDTO currentProposal,
+      String conversationToken) {
     return new ServiceRequestDriverResponseDTO(
         request.getToken(),
         request.getClientDriver().getToken(),
+        conversationToken,
         firstNameOf(request.getClientDriver().getClient().getUser().getName()),
         request.getStatus(),
         request.getDesiredStartDate(),
