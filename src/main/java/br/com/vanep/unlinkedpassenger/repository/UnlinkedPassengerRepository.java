@@ -15,10 +15,8 @@ public interface UnlinkedPassengerRepository extends JpaRepository<UnlinkedPasse
       select passenger from UnlinkedPassengerModel passenger
       join fetch passenger.school school
       left join fetch school.city
-      left join fetch school.district
       join fetch passenger.address address
       join fetch address.city
-      left join fetch address.district
       join fetch passenger.schedule schedule
       left join fetch schedule.slots
       where passenger.driver.id = :driverId
@@ -31,10 +29,8 @@ public interface UnlinkedPassengerRepository extends JpaRepository<UnlinkedPasse
       select passenger from UnlinkedPassengerModel passenger
       join fetch passenger.school school
       left join fetch school.city
-      left join fetch school.district
       join fetch passenger.address address
       join fetch address.city
-      left join fetch address.district
       join fetch passenger.schedule schedule
       left join fetch schedule.slots
       where passenger.token = :token and passenger.driver.id = :driverId
@@ -48,12 +44,11 @@ public interface UnlinkedPassengerRepository extends JpaRepository<UnlinkedPasse
         passenger.token, passenger.name, school.token, school.name,
         slot.leg, slot.windowStart, slot.windowEnd,
         address.zipCode, address.street, address.number, address.complement,
-        address.neighborhood, district.name, city.token, city.name, address.googlePlaceId)
+        address.neighborhood, city.token, city.name, address.googlePlaceId)
       from UnlinkedPassengerModel passenger
       join passenger.school school
       join passenger.address address
       join address.city city
-      left join address.district district
       join passenger.schedule schedule
       join schedule.slots slot
       where passenger.driver.id = :driverId

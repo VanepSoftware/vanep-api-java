@@ -87,7 +87,6 @@ class RoutePassengerQueryServiceTest {
         "10",
         null,
         "Centro",
-        null,
         "campinas",
         "Campinas",
         null);

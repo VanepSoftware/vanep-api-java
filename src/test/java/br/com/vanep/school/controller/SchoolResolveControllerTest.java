@@ -1,12 +1,14 @@
 package br.com.vanep.school.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import br.com.vanep.address.repository.AddressRepository;
 import br.com.vanep.city.model.CityModel;
 import br.com.vanep.city.repository.CityRepository;
 import br.com.vanep.country.model.CountryModel;
@@ -14,6 +16,7 @@ import br.com.vanep.country.repository.CountryRepository;
 import br.com.vanep.places.client.PlacesClient;
 import br.com.vanep.places.dto.AddressComponentDTO;
 import br.com.vanep.places.dto.PlaceDetailsResponseDTO;
+import br.com.vanep.school.model.SchoolModel;
 import br.com.vanep.school.repository.SchoolRepository;
 import br.com.vanep.state.repository.StateRepository;
 import br.com.vanep.state.seed.StateSeeder;
@@ -55,6 +58,7 @@ class SchoolResolveControllerTest {
   @Autowired private CityRepository cities;
   @Autowired private StateSeeder stateSeeder;
   @Autowired private SchoolRepository schools;
+  @Autowired private AddressRepository addresses;
   @Autowired private MessageSource messages;
 
   @MockitoBean private PlacesClient places;
@@ -126,6 +130,20 @@ class SchoolResolveControllerTest {
         new PlaceDetailsResponseDTO.DisplayName("Escola Embu", "pt-BR"));
   }
 
+  private PlaceDetailsResponseDTO streetlessSchool() {
+    return new PlaceDetailsResponseDTO(
+        "place-streetless-school",
+        "Brasília, DF",
+        List.of(
+            new AddressComponentDTO("Brazil", "BR", List.of("country", "political")),
+            new AddressComponentDTO(
+                "Distrito Federal", "DF", List.of("administrative_area_level_1", "political")),
+            new AddressComponentDTO(
+                "Brasília", "Brasília", List.of("administrative_area_level_2", "political"))),
+        List.of("school", "educational_institution"),
+        new PlaceDetailsResponseDTO.DisplayName("Escola Sem Rua", "pt-BR"));
+  }
+
   private String message(String key) {
     return messages.getMessage(key, null, LocaleContextHolder.getLocale());
   }
@@ -153,10 +171,71 @@ class SchoolResolveControllerTest {
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.name").value("Colégio Objetivo Taguatinga"))
         .andExpect(jsonPath("$.cityName").value("Brasília"))
-        .andExpect(jsonPath("$.districtName").value("QI 21"))
-        .andExpect(jsonPath("$.token").isNotEmpty());
+        .andExpect(jsonPath("$.districtName").doesNotExist())
+        .andExpect(jsonPath("$.districtToken").doesNotExist())
+        .andExpect(jsonPath("$.token").isNotEmpty())
+        .andExpect(jsonPath("$.address.street").value("QI 21"))
+        .andExpect(jsonPath("$.address.zipCode").value("72145450"))
+        .andExpect(jsonPath("$.address.neighborhood").value("Taguatinga Norte"))
+        .andExpect(jsonPath("$.address.cityName").value("Brasília"))
+        .andExpect(jsonPath("$.address.stateUf").value("DF"))
+        .andExpect(jsonPath("$.address.district").doesNotExist());
 
     assertThat(schools.count()).isEqualTo(1);
+    assertThat(schools.findAll().getFirst().getAddressId()).isNotNull();
+    BDDMockito.then(places).should().findPlaceDetailsWithName("escola", null);
+    BDDMockito.then(places).shouldHaveNoMoreInteractions();
+  }
+
+  @Test
+  void createsASchoolWithoutAnAddressWhenThePlaceHasNoStreet() throws Exception {
+    BDDMockito.given(places.findPlaceDetailsWithName("escola-sem-rua", null))
+        .willReturn(streetlessSchool());
+
+    mockMvc
+        .perform(
+            post("/api/schools/resolve")
+                .with(caller())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"placeId\":\"escola-sem-rua\"}"))
+        .andExpect(status().isCreated())
+        .andExpect(jsonPath("$.name").value("Escola Sem Rua"))
+        .andExpect(jsonPath("$.address").value(nullValue()));
+
+    assertThat(schools.findAll().getFirst().getAddressId()).isNull();
+    assertThat(addresses.count()).isZero();
+  }
+
+  @Test
+  void completesAKnownSchoolWithoutAnAddress() throws Exception {
+    PlaceDetailsResponseDTO fixture = schoolFixture();
+    BDDMockito.given(places.findPlaceDetailsWithName("escola", null)).willReturn(fixture);
+    BDDMockito.given(places.findPlaceDetails(fixture.id(), "sessao-2")).willReturn(fixture);
+    mockMvc
+        .perform(
+            post("/api/schools/resolve")
+                .with(caller())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"placeId\":\"escola\"}"))
+        .andExpect(status().isCreated());
+    SchoolModel school = schools.findAll().getFirst();
+    addresses.delete(addresses.findById(school.getAddressId()).orElseThrow());
+    school.setAddressId(null);
+    schools.save(school);
+
+    mockMvc
+        .perform(
+            post("/api/schools/resolve")
+                .with(caller())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"placeId\":\"" + fixture.id() + "\",\"sessionToken\":\"sessao-2\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.token").value(school.getToken()))
+        .andExpect(jsonPath("$.address.street").value("QI 21"))
+        .andExpect(jsonPath("$.address.neighborhood").value("Taguatinga Norte"));
+
+    assertThat(schools.findById(school.getId()).orElseThrow().getAddressId()).isNotNull();
+    assertThat(addresses.count()).isEqualTo(1);
   }
 
   @Test
@@ -178,9 +257,11 @@ class SchoolResolveControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"placeId\":\"escola\"}"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.name").value("Colégio Objetivo Taguatinga"));
+        .andExpect(jsonPath("$.name").value("Colégio Objetivo Taguatinga"))
+        .andExpect(jsonPath("$.address.street").value("QI 21"));
 
     assertThat(schools.count()).isEqualTo(1);
+    assertThat(addresses.count()).isEqualTo(1);
   }
 
   @Test

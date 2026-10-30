@@ -18,8 +18,6 @@ import br.com.vanep.client.model.ClientModel;
 import br.com.vanep.client.repository.ClientRepository;
 import br.com.vanep.country.model.CountryModel;
 import br.com.vanep.country.repository.CountryRepository;
-import br.com.vanep.district.model.DistrictModel;
-import br.com.vanep.district.repository.DistrictRepository;
 import br.com.vanep.state.model.StateModel;
 import br.com.vanep.state.repository.StateRepository;
 import br.com.vanep.user.enums.UserType;
@@ -49,7 +47,6 @@ class ClientControllerTest {
   @Autowired private ClientRepository clients;
   @Autowired private AddressRepository addresses;
   @Autowired private CityRepository cities;
-  @Autowired private DistrictRepository districts;
   @Autowired private StateRepository states;
   @Autowired private CountryRepository countries;
 
@@ -139,14 +136,9 @@ class ClientControllerTest {
   private AddressModel persistLinkedHomeAddress() {
     CityModel city = cities.findByToken(cityToken).orElseThrow();
 
-    DistrictModel centro = new DistrictModel();
-    centro.setCity(city);
-    centro.setName("Centro");
-    centro = districts.save(centro);
-
     AddressModel address = new AddressModel();
     address.setCity(city);
-    address.setDistrict(centro);
+    address.setNeighborhood("Centro");
     address.setZipCode("13015904");
     address.setStreet("Rua Barão de Jaguara");
     address.setNumber("1481");
@@ -218,7 +210,8 @@ class ClientControllerTest {
         .andExpect(jsonPath("$.address.street").value("Rua Barão de Jaguara"))
         .andExpect(jsonPath("$.address.number").value("1481"))
         .andExpect(jsonPath("$.address.complement").value("Apto 12"))
-        .andExpect(jsonPath("$.address.district").value("Centro"))
+        .andExpect(jsonPath("$.address.neighborhood").value("Centro"))
+        .andExpect(jsonPath("$.address.district").doesNotExist())
         .andExpect(jsonPath("$.address.cityToken").value(cityToken))
         .andExpect(jsonPath("$.address.cityName").value("Campinas"))
         .andExpect(jsonPath("$.address.stateUf").value("SP"))
@@ -428,7 +421,8 @@ class ClientControllerTest {
         .andExpect(jsonPath("$.address.street").value("Rua Barão de Jaguara"))
         .andExpect(jsonPath("$.address.number").value("1481"))
         .andExpect(jsonPath("$.address.complement").value("Apto 12"))
-        .andExpect(jsonPath("$.address.district").value("Centro"))
+        .andExpect(jsonPath("$.address.neighborhood").value("Centro"))
+        .andExpect(jsonPath("$.address.district").doesNotExist())
         .andExpect(jsonPath("$.address.cityToken").value(cityToken))
         .andExpect(jsonPath("$.address.cityName").value("Campinas"))
         .andExpect(jsonPath("$.address.stateUf").value("SP"))

@@ -109,7 +109,7 @@ GUSTAVO_DRIVER=$(driver_token "Gustavo Santos")
 HELENA_DRIVER=$(driver_token "Helena Costa")
 echo "tokens ok"
 
-table "Operation shift on trips and school shift on dependents"
+table "Operation shift on trips"
 GUSTAVO_TRIPS="select count(*) from trip t join driver d on d.id = t.driver_id join users u on u.id = d.user_id where u.email = 'gustavo.santos@seed.vanep.com.br'"
 request POST /api/drivers/me/trips/start "$GUSTAVO" '{"shift":"MORNING"}'
 expect S1 "a driver starts the morning route" 200 '.shift == "MORNING" and .status == "IN_PROGRESS"'
@@ -148,21 +148,17 @@ request GET "/api/trips/$HELENA_TRIP" "$ADMIN"
 expect S17 "the rejected patches left the shift unchanged" 200 '.shift == "NIGHT"'
 request PATCH "/api/trips/$HELENA_TRIP" "$ADMIN" '{"shift":"AFTERNOON"}'
 expect S18 "the admin moves the trip to another operation shift" 200 '.shift == "AFTERNOON"'
-request POST /api/dependent "$BRUNO" "$(jq -nc '{name: "Davi Lima", shift: "FULLTIME"}')"
-expect S19 "a client creates a FULLTIME dependent" 201 '.shift == "FULLTIME"'
-FULLTIME_DEPENDENT=$(jq -r .token <<<"$RESP_BODY")
-request GET "/api/dependent/$FULLTIME_DEPENDENT" "$BRUNO"
-expect S20 "the dependent reads back as FULLTIME" 200 '.shift == "FULLTIME"'
-request PATCH "/api/dependent/$FULLTIME_DEPENDENT" "$BRUNO" '{"shift":"EVENING"}'
-expect S21 "unknown school shift on a dependent" 400
 sql "insert into trip (token, driver_id, service_date, shift, status) select 'qalegacyfulltime', d.id, date '2027-03-02', 'FULLTIME', 'SCHEDULED' from driver d join users u on u.id = d.user_id where u.email = 'helena.costa@seed.vanep.com.br'" >/dev/null
+# V62 dropped dependent.shift, which V56 comments: the column comes back only while V56 runs again.
+sql "alter table dependent add column shift varchar(16)" >/dev/null
 apply_migration V56
+sql "alter table dependent drop column shift" >/dev/null
 check S22 "re-applying V56 turns a stored FULLTIME trip into MORNING" MORNING "$(sql "select shift from trip where token = 'qalegacyfulltime'")"
 request GET /api/trips/qalegacyfulltime "$ADMIN"
 expect S23 "the converted trip is readable through the API" 200 '.shift == "MORNING"'
 check S24 "V56 left the other shifts alone" AFTERNOON "$(sql "select shift from trip where token = '$HELENA_TRIP'")"
-check S25 "trip.shift and dependent.shift are documented" "yes" \
-  "$(sql "select case when col_description('trip'::regclass, (select attnum from pg_attribute where attrelid = 'trip'::regclass and attname = 'shift')) is not null and col_description('dependent'::regclass, (select attnum from pg_attribute where attrelid = 'dependent'::regclass and attname = 'shift')) is not null then 'yes' else 'no' end")"
+check S25 "trip.shift is documented" "yes" \
+  "$(sql "select case when col_description('trip'::regclass, (select attnum from pg_attribute where attrelid = 'trip'::regclass and attname = 'shift')) is not null then 'yes' else 'no' end")"
 
 table "V57: schedule, schedule_slot and unlinked_passenger (database checks)"
 NEW_SCHEDULE="insert into schedule default values"

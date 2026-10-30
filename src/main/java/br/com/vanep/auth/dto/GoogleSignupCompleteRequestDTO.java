@@ -1,6 +1,6 @@
 package br.com.vanep.auth.dto;
 
-import br.com.vanep.auth.validation.Cpf;
+import br.com.vanep.shared.validation.Cpf;
 import br.com.vanep.user.enums.Gender;
 import br.com.vanep.user.enums.UserType;
 import jakarta.validation.constraints.AssertTrue;

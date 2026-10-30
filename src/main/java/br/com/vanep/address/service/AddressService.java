@@ -8,11 +8,13 @@ import br.com.vanep.address.model.AddressModel;
 import br.com.vanep.address.repository.AddressRepository;
 import br.com.vanep.dependent.model.DependentModel;
 import br.com.vanep.dependent.repository.DependentRepository;
+import br.com.vanep.places.dto.PlaceDetailsResponseDTO;
 import br.com.vanep.school.model.SchoolModel;
 import br.com.vanep.school.repository.SchoolRepository;
 import br.com.vanep.unlinkedpassenger.model.UnlinkedPassengerModel;
 import java.util.Collection;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import org.springframework.context.MessageSource;
@@ -109,15 +111,46 @@ public class AddressService {
     return upsertOwnedAddress(
         school.getAddressId(),
         address -> applyToNewAddress(address, request),
-        address -> applyToExistingAddress(address, request),
+        address -> {
+          applyToExistingAddress(address, request);
+          followAddressCity(school, address);
+        },
         () ->
             rejectIfOwnedByAnotherActiveOwner(
                 dependents.countByAddressId(school.getAddressId()),
                 schools.countByAddressIdAndIdNot(school.getAddressId(), school.getId())),
         saved -> {
           school.setAddressId(saved.getId());
+          school.setCity(saved.getCity());
           schools.save(school);
         });
+  }
+
+  // The school keeps its own city for when its place has no street; once it has an address, a new
+  // place moves both, so the two cities never disagree.
+  void followAddressCity(SchoolModel school, AddressModel address) {
+    Long schoolCityId = school.getCity() == null ? null : school.getCity().getId();
+    if (!address.getCity().getId().equals(schoolCityId)) {
+      school.setCity(address.getCity());
+      schools.save(school);
+    }
+  }
+
+  @Transactional
+  public Optional<AddressResponseDTO> createForSchoolFromPlace(
+      SchoolModel school, PlaceDetailsResponseDTO details) {
+    return placeResolver
+        .buildFromPlace(details, school.getCity())
+        .map(address -> attachToSchool(school.getId(), address));
+  }
+
+  AddressResponseDTO attachToSchool(Long schoolId, AddressModel address) {
+    AddressModel saved = addressRepository.save(address);
+    if (schools.attachAddressWhenMissing(schoolId, saved.getId()) == 1) {
+      return mapper.toResponse(saved);
+    }
+    addressRepository.delete(saved);
+    return toResponseOrNull(requireSchool(schoolId).getAddressId());
   }
 
   @Transactional

@@ -30,7 +30,6 @@ public class AddressCatalogResolverService {
     CityModel city = requireCityByToken(cityToken);
 
     address.setCity(city);
-    address.setDistrict(null);
     address.setGooglePlaceId(null);
     address.setStreet(street);
     address.setZipCode(zipCode);
