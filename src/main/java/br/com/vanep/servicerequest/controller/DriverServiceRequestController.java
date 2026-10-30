@@ -35,9 +35,10 @@ public class DriverServiceRequestController {
   public Page<ServiceRequestDriverResponseDTO> findMine(
       Authentication authentication,
       @RequestParam(required = false) Set<ServiceRequestStatus> status,
+      @RequestParam(required = false) String conversationToken,
       @PageableDefault(size = 20) Pageable pageable) {
     return service.findPageForDriver(
-        SecurityHelper.requireCallerUid(authentication), status, pageable);
+        SecurityHelper.requireCallerUid(authentication), status, conversationToken, pageable);
   }
 
   @GetMapping("/{token}")

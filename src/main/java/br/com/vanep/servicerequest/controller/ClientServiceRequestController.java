@@ -45,9 +45,10 @@ public class ClientServiceRequestController {
   public Page<ServiceRequestClientResponseDTO> findMine(
       Authentication authentication,
       @RequestParam(required = false) Set<ServiceRequestStatus> status,
+      @RequestParam(required = false) String conversationToken,
       @PageableDefault(size = 20) Pageable pageable) {
     return service.findPageForClient(
-        SecurityHelper.requireCallerUid(authentication), status, pageable);
+        SecurityHelper.requireCallerUid(authentication), status, conversationToken, pageable);
   }
 
   @GetMapping("/{token}")

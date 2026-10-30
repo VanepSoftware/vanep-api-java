@@ -1,6 +1,7 @@
 package br.com.vanep.conversation.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 
 import br.com.vanep.client.model.ClientModel;
 import br.com.vanep.client.repository.ClientRepository;
@@ -122,6 +123,27 @@ class ConversationRepositoryTest {
     assertThat(conversations.findByToken(saved.getToken())).isEmpty();
     assertThat(conversations.findByPair(maria.getId(), carlos.getId())).isEmpty();
     assertThat(conversations.findClientUserTokenByToken(saved.getToken())).isEmpty();
+  }
+
+  @Test
+  void findsTheTokensOfThePartiesConversationsLeavingOutRemovedOnes() {
+    ClientModel bruno = createClient("Bruno", "bruno@vanep.com", "12345678909");
+    DriverModel helena = createDriver("Helena", "helena@vanep.com", "15350946056");
+    ConversationModel mariaCarlos = conversations.save(newConversation(maria, carlos));
+    ConversationModel brunoHelena = conversations.save(newConversation(bruno, helena));
+    conversations.delete(conversations.save(newConversation(maria, helena)));
+    conversations.save(
+        newConversation(createClient("Julia", "julia@vanep.com", "98765432100"), carlos));
+
+    List<ConversationRepository.PairToken> found =
+        conversations.findTokensByClientIdInAndDriverIdIn(
+            List.of(maria.getId(), bruno.getId()), List.of(carlos.getId(), helena.getId()));
+
+    assertThat(found)
+        .extracting(row -> row.getClientId(), row -> row.getDriverId(), row -> row.getToken())
+        .containsExactlyInAnyOrder(
+            tuple(maria.getId(), carlos.getId(), mariaCarlos.getToken()),
+            tuple(bruno.getId(), helena.getId(), brunoHelena.getToken()));
   }
 
   @Test

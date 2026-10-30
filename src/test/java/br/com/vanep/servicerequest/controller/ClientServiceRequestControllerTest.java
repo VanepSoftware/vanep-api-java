@@ -126,6 +126,7 @@ class ClientServiceRequestControllerTest {
             .andExpect(jsonPath("$.driverToken").value(carlos.getToken()))
             .andExpect(jsonPath("$.driverName").value("Carlos Lima"))
             .andExpect(jsonPath("$.clientDriverToken").isNotEmpty())
+            .andExpect(jsonPath("$.conversationToken").isNotEmpty())
             .andExpect(jsonPath("$.notes").value("Portão azul"))
             .andExpect(jsonPath("$.items.length()").value(2))
             .andExpect(jsonPath("$.items[0].dependentToken").value(lucas.getToken()))
@@ -148,6 +149,29 @@ class ClientServiceRequestControllerTest {
     assertThat(expiresAt)
         .isBetween(before.plus(Duration.ofHours(72)), Instant.now().plus(Duration.ofHours(72)));
     assertThat(jdbc.queryForObject("select count(*) from client_driver", Long.class)).isOne();
+    assertThat(objectMapper.readTree(body).get("conversationToken").asText())
+        .isEqualTo(conversationTokenOf(ana, carlos));
+  }
+
+  @Test
+  void aNewRequestToTheSameDriverKeepsTheConversationOfThePair() throws Exception {
+    String first = fixtures.sendRequest(ana, carlos, lucas);
+    mockMvc
+        .perform(post(BASE + "/" + first + "/withdraw").with(as(anaUser)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.conversationToken").value(conversationTokenOf(ana, carlos)));
+    String second = fixtures.sendRequest(ana, carlos, marina);
+
+    mockMvc
+        .perform(get(BASE + "/" + second).with(as(anaUser)))
+        .andExpect(jsonPath("$.conversationToken").value(conversationTokenOf(ana, carlos)));
+    mockMvc
+        .perform(get(BASE).with(as(anaUser)))
+        .andExpect(
+            jsonPath("$.content[0].conversationToken").value(conversationTokenOf(ana, carlos)))
+        .andExpect(
+            jsonPath("$.content[1].conversationToken").value(conversationTokenOf(ana, carlos)));
+    assertThat(countConversations()).isOne();
   }
 
   @Test
@@ -306,6 +330,7 @@ class ClientServiceRequestControllerTest {
         .andExpect(status().isConflict())
         .andExpect(jsonPath("$.detail").value(message("service_request.open_exists")));
     assertThat(countRequests()).isOne();
+    assertThat(countConversations()).isOne();
   }
 
   @Test
@@ -350,6 +375,49 @@ class ClientServiceRequestControllerTest {
     mockMvc
         .perform(get(BASE).param("status", "OPEN,PENDING").with(as(anaUser)))
         .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void theConversationFilterListsOnlyTheRequestsOfThatPair() throws Exception {
+    DriverModel joana = fixtures.createAvailableDriver("Joana", "joana@vanep.com", "39053344705");
+    String first = fixtures.sendRequest(ana, carlos, lucas);
+    mockMvc
+        .perform(post(BASE + "/" + first + "/withdraw").with(as(anaUser)))
+        .andExpect(status().isOk());
+    String second = fixtures.sendRequest(ana, carlos, lucas);
+    fixtures.sendRequest(ana, joana, marina);
+    ClientModel bruno = fixtures.createReadyClient("Bruno", "bruno@vanep.com", "12345678909");
+    fixtures.sendRequest(
+        bruno,
+        carlos,
+        fixtures.createDependentGoingEveryWeekday(bruno, "Davi", LocalDate.of(2015, 3, 3)));
+    String withCarlos = conversationTokenOf(ana, carlos);
+
+    mockMvc
+        .perform(get(BASE).param("conversationToken", withCarlos).with(as(anaUser)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.totalElements").value(2))
+        .andExpect(jsonPath("$.content[0].token").value(second))
+        .andExpect(jsonPath("$.content[1].token").value(first));
+    mockMvc
+        .perform(
+            get(BASE)
+                .param("conversationToken", withCarlos)
+                .param("status", "WITHDRAWN")
+                .with(as(anaUser)))
+        .andExpect(jsonPath("$.content.length()").value(1))
+        .andExpect(jsonPath("$.content[0].token").value(first));
+    mockMvc
+        .perform(
+            get(BASE)
+                .param("conversationToken", conversationTokenOf(bruno, carlos))
+                .with(as(anaUser)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.totalElements").value(0));
+    mockMvc
+        .perform(get(BASE).param("conversationToken", "unknown").with(as(anaUser)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.totalElements").value(0));
   }
 
   @Test
@@ -433,6 +501,18 @@ class ClientServiceRequestControllerTest {
 
   private long countRequests() {
     return jdbc.queryForObject("select count(*) from service_request", Long.class);
+  }
+
+  private long countConversations() {
+    return jdbc.queryForObject("select count(*) from conversation", Long.class);
+  }
+
+  private String conversationTokenOf(ClientModel client, DriverModel driver) {
+    return jdbc.queryForObject(
+        "select token from conversation where client_id = ? and driver_id = ?",
+        String.class,
+        client.getId(),
+        driver.getId());
   }
 
   private String statusOf(String token) {
