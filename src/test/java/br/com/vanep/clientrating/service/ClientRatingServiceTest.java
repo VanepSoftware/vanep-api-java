@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 
 import br.com.vanep.client.model.ClientModel;
 import br.com.vanep.client.repository.ClientRepository;
+import br.com.vanep.clientdriver.enums.LinkOrigin;
 import br.com.vanep.clientdriver.enums.RelationshipStatus;
 import br.com.vanep.clientdriver.model.ClientDriverModel;
 import br.com.vanep.clientdriver.repository.ClientDriverRepository;
@@ -105,6 +106,7 @@ class ClientRatingServiceTest {
     link.setToken("link-token");
     link.setClient(client);
     link.setDriver(driver);
+    link.setOrigin(LinkOrigin.CLIENT_SEARCH);
     link.setStatus(RelationshipStatus.ACTIVE);
     return link;
   }

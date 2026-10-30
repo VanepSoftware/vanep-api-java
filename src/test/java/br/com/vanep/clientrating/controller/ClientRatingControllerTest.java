@@ -11,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import br.com.vanep.client.model.ClientModel;
 import br.com.vanep.client.repository.ClientRepository;
+import br.com.vanep.clientdriver.enums.LinkOrigin;
 import br.com.vanep.clientdriver.enums.RelationshipStatus;
 import br.com.vanep.clientdriver.model.ClientDriverModel;
 import br.com.vanep.clientdriver.repository.ClientDriverRepository;
@@ -110,6 +111,7 @@ class ClientRatingControllerTest {
     ClientDriverModel link = new ClientDriverModel();
     link.setClient(client);
     link.setDriver(driver);
+    link.setOrigin(LinkOrigin.CLIENT_SEARCH);
     link.setStatus(RelationshipStatus.ACTIVE);
     link = links.save(link);
     giveTheLinkAContract(link, ContractStatus.ACTIVE);
@@ -336,6 +338,7 @@ class ClientRatingControllerTest {
     ClientDriverModel link = new ClientDriverModel();
     link.setClient(linkedClient);
     link.setDriver(driver);
+    link.setOrigin(LinkOrigin.CLIENT_SEARCH);
     link.setStatus(status);
     link = links.save(link);
     for (ContractStatus contractStatus : contractStatuses) {

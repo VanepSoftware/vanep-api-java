@@ -53,7 +53,7 @@ create_dependent() {
 }
 
 create_link() {
-  request POST /api/client-drivers "$ADMIN" "$(jq -nc --arg c "$1" --arg d "$2" '{clientToken: $c, driverToken: $d}')"
+  request POST /api/client-drivers "$ADMIN" "$(jq -nc --arg c "$1" --arg d "$2" '{clientToken: $c, driverToken: $d, origin: "CLIENT_SEARCH"}')"
   [[ $RESP_STATUS == 201 ]] || { echo "SETUP FAIL | link | HTTP $RESP_STATUS $RESP_BODY" >&2; return 1; }
   jq -r .token <<<"$RESP_BODY"
 }
@@ -199,7 +199,7 @@ check D12 "the rolled-back checks left no passenger behind" 0 "$(count unlinked_
 
 table "V58: contract and contract_item (database checks)"
 CONTRACTS_BEFORE_CHECKS=$(count contract)
-QA_LINK="insert into client_driver (token, client_id, driver_id, status) select 'qalink', c.id, d.id, 'PENDING' from client c join users uc on uc.id = c.user_id, driver d join users ud on ud.id = d.user_id where uc.email = 'bruno.lima@seed.vanep.com.br' and ud.email = 'gustavo.santos@seed.vanep.com.br'"
+QA_LINK="insert into client_driver (token, client_id, driver_id, status, origin) select 'qalink', c.id, d.id, 'PENDING', 'CLIENT_SEARCH' from client c join users uc on uc.id = c.user_id, driver d join users ud on ud.id = d.user_id where uc.email = 'bruno.lima@seed.vanep.com.br' and ud.email = 'gustavo.santos@seed.vanep.com.br'"
 LINK_ID="(select id from client_driver where token = 'qalink')"
 CONTRACT="insert into contract (token, client_driver_id, status, starts_on, ends_on, total_amount, installments, due_day) select"
 ACTIVE_CONTRACT="$CONTRACT 'qac1', $LINK_ID, 'ACTIVE', date '2027-02-01', date '2027-12-17', 4200, 12, 5"
@@ -412,10 +412,10 @@ sql "update driver set approval_status = 'PENDING' where user_id = (select id fr
 request POST /api/contracts "$ADMIN" "$THEO_BODY"
 expect V38 "a driver pending approval, pt-BR message" 422 '.detail == "O motorista não está aprovado para ser contratado."'
 restore_drivers
-sql "update client_driver set status = 'BLOCKED' where token = '$BRUNO_GUSTAVO'" >/dev/null
+sql "update client_driver set status = 'BLOCKED', blocked_at = now(), blocked_by = (select id from users where email = 'gustavo.santos@seed.vanep.com.br') where token = '$BRUNO_GUSTAVO'" >/dev/null
 request POST /api/contracts "$ADMIN" "$THEO_BODY"
 expect V39 "a blocked link, pt-BR message" 422 '.detail == "Um vínculo bloqueado não pode ser contratado."'
-sql "update client_driver set status = 'PENDING' where token = '$BRUNO_GUSTAVO'" >/dev/null
+sql "update client_driver set status = 'PENDING', blocked_at = null, blocked_by = null where token = '$BRUNO_GUSTAVO'" >/dev/null
 request POST /api/contracts "$ADMIN" "$(contract_body "$SEED_LINK" 2027-02-01 2027-12-17 "[$(item "$LUCAS" "$(slots RETURN NIGHT 22:00 - SATURDAY)")]")"
 expect V40 "a second active contract on the same link, pt-BR message" 409 '.detail == "Este vínculo já tem um contrato ativo."'
 check V41 "the rejected creates stored nothing" "$CONTRACTS_BEFORE" "$(count contract) $(count contract_item) $(count schedule) $(count schedule_slot)"
@@ -586,16 +586,16 @@ check Z6 "a single one came back" 1 \
 table "The link status has no direct write path"
 request GET "/api/client-drivers/$SEED_LINK" "$ADMIN"
 expect B1 "the seeded link is ACTIVE through its seeded ACTIVE contract" 200 '.status == "ACTIVE"'
-request POST /api/client-drivers "$ADMIN" "$(jq -nc --arg c "$CARLA_CLIENT" --arg d "$HELENA_DRIVER" '{clientToken: $c, driverToken: $d, status: "ACTIVE"}')"
+request POST /api/client-drivers "$ADMIN" "$(jq -nc --arg c "$CARLA_CLIENT" --arg d "$HELENA_DRIVER" '{clientToken: $c, driverToken: $d, origin: "CLIENT_SEARCH", status: "ACTIVE"}')"
 expect B2 "a status sent on creation is ignored" 201 '.status == "PENDING"'
 CARLA_HELENA=$(jq -r .token <<<"$RESP_BODY")
-request POST /api/client-drivers "$ADMIN" "$(jq -nc --arg c "$CARLA_CLIENT" --arg d "$FABIO_DRIVER" '{clientToken: $c, driverToken: $d, status: "BLOCKED"}')"
+request POST /api/client-drivers "$ADMIN" "$(jq -nc --arg c "$CARLA_CLIENT" --arg d "$FABIO_DRIVER" '{clientToken: $c, driverToken: $d, origin: "CLIENT_SEARCH", status: "BLOCKED"}')"
 expect B3 "BLOCKED sent on creation is ignored too" 201 '.status == "PENDING"'
-request POST /api/client-drivers "$ADMIN" "$(jq -nc --arg c "$CARLA_CLIENT" --arg d "$HELENA_DRIVER" '{clientToken: $c, driverToken: $d}')"
+request POST /api/client-drivers "$ADMIN" "$(jq -nc --arg c "$CARLA_CLIENT" --arg d "$HELENA_DRIVER" '{clientToken: $c, driverToken: $d, origin: "CLIENT_SEARCH"}')"
 expect B4 "the same pair twice" 409 '.detail == "Este cliente e este motorista já estão vinculados."'
-request POST /api/client-drivers "$ADMIN" "$(jq -nc --arg d "$HELENA_DRIVER" '{driverToken: $d}')"
+request POST /api/client-drivers "$ADMIN" "$(jq -nc --arg d "$HELENA_DRIVER" '{driverToken: $d, origin: "CLIENT_SEARCH"}')"
 expect B5 "missing clientToken" 400
-request POST /api/client-drivers "$CARLA" "$(jq -nc --arg c "$CARLA_CLIENT" --arg d "$HELENA_DRIVER" '{clientToken: $c, driverToken: $d}')"
+request POST /api/client-drivers "$CARLA" "$(jq -nc --arg c "$CARLA_CLIENT" --arg d "$HELENA_DRIVER" '{clientToken: $c, driverToken: $d, origin: "CLIENT_SEARCH"}')"
 expect B6 "a client cannot create a link" 403
 request PATCH "/api/client-drivers/$CARLA_HELENA" "$CARLA" '{"status":"ACTIVE"}'
 expect B7 "the client of the link cannot activate it" 405

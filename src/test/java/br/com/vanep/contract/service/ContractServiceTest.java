@@ -14,6 +14,7 @@ import br.com.vanep.address.model.AddressModel;
 import br.com.vanep.address.repository.AddressRepository;
 import br.com.vanep.city.model.CityModel;
 import br.com.vanep.client.model.ClientModel;
+import br.com.vanep.clientdriver.enums.LinkOrigin;
 import br.com.vanep.clientdriver.enums.RelationshipStatus;
 import br.com.vanep.clientdriver.model.ClientDriverModel;
 import br.com.vanep.clientdriver.repository.ClientDriverRepository;
@@ -139,6 +140,7 @@ class ContractServiceTest {
     link.setToken("link");
     link.setClient(maria);
     link.setDriver(carlos);
+    link.setOrigin(LinkOrigin.CLIENT_SEARCH);
     link.setStatus(RelationshipStatus.PENDING);
     when(links.findByToken("link")).thenReturn(Optional.of(link));
 

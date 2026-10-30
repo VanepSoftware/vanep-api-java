@@ -15,6 +15,7 @@ public class ClientDriverMapper {
         link.getDriver().getToken(),
         link.getDriver().getUser().getName(),
         link.getStatus(),
+        link.getOrigin(),
         link.getCreatedAt(),
         link.getUpdatedAt());
   }
