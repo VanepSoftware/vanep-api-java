@@ -129,6 +129,7 @@ class DriverSearchControllerTest {
     driver.setUser(driverUser);
     driver.setBasePrice(BigDecimal.valueOf(75));
     driver.setApprovalStatus(approvalStatus);
+    driver.setAvailable(true);
     return drivers.save(driver);
   }
 
@@ -280,6 +281,22 @@ class DriverSearchControllerTest {
         .perform(get("/api/drivers/search").with(as(clientUid)).param("placeId", "taguatinga"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.content.length()").value(0));
+  }
+
+  @Test
+  void excludesDriverWhoIsNotAcceptingNewStudentsAndDoesNotCountThem() throws Exception {
+    stubPlaces();
+    createDriverWithAreas("aberto@vanep.com", "taguatinga");
+    DriverModel notAccepting = giveArea("fechado@vanep.com", districtNamed("Taguatinga"));
+    notAccepting.setAvailable(false);
+    drivers.save(notAccepting);
+
+    mockMvc
+        .perform(get("/api/drivers/search").with(as(clientUid)).param("placeId", "taguatinga"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content.length()").value(1))
+        .andExpect(jsonPath("$.totalElements").value(1))
+        .andExpect(jsonPath("$.content[0].name").value("Motorista aberto@vanep.com"));
   }
 
   @Test

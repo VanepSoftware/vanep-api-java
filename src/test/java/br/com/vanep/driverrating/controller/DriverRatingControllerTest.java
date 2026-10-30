@@ -15,6 +15,9 @@ import br.com.vanep.client.repository.ClientRepository;
 import br.com.vanep.clientdriver.enums.RelationshipStatus;
 import br.com.vanep.clientdriver.model.ClientDriverModel;
 import br.com.vanep.clientdriver.repository.ClientDriverRepository;
+import br.com.vanep.contract.enums.ContractStatus;
+import br.com.vanep.contract.model.ContractModel;
+import br.com.vanep.contract.repository.ContractRepository;
 import br.com.vanep.driver.DriverApprovalStatus;
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
@@ -27,11 +30,14 @@ import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.MessageSource;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -54,6 +60,8 @@ class DriverRatingControllerTest {
   @Autowired private DriverRatingRepository driverRatings;
   @Autowired private ClientDriverRepository links;
   @Autowired private JdbcTemplate jdbc;
+  @Autowired private ContractRepository contracts;
+  @Autowired private MessageSource messages;
 
   private MockMvc mockMvc;
 
@@ -111,6 +119,7 @@ class DriverRatingControllerTest {
     link.setDriver(driver);
     link.setStatus(RelationshipStatus.ACTIVE);
     link = links.save(link);
+    giveTheLinkAContract(link, ContractStatus.ACTIVE);
 
     // Initial Rating
     DriverRatingModel rating = new DriverRatingModel();
@@ -252,23 +261,85 @@ class DriverRatingControllerTest {
   }
 
   @Test
-  void ratingThroughALinkThatIsNotActiveIsRefused() throws Exception {
-    String inactiveDriverToken = linkTheClientToANewDriver(RelationshipStatus.INACTIVE);
+  void aLinkWithoutContractCannotRateAndTheStatusSaysSo() throws Exception {
+    String pendingDriverToken = linkTheClientToANewDriver(RelationshipStatus.PENDING);
+
+    mockMvc
+        .perform(
+            get("/api/driver-ratings/status?driverToken=" + pendingDriverToken).with(clientJwt()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.canRate").value(false));
 
     mockMvc
         .perform(
             post("/api/driver-ratings")
                 .with(clientJwt())
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(ratingBody(inactiveDriverToken)))
+                .content(ratingBody(pendingDriverToken)))
+        .andExpect(status().isUnprocessableContent())
+        .andExpect(jsonPath("$.detail").value(message("driver_rating.link.never_contracted")));
+
+    assertThat(driverRatings.count()).isEqualTo(1);
+  }
+
+  @Test
+  void aContractThatWasCancelledBeforeStartingDoesNotLetTheClientRate() throws Exception {
+    String driverWithCancelledContract =
+        linkTheClientToANewDriver(RelationshipStatus.INACTIVE, ContractStatus.CANCELLED);
+
+    mockMvc
+        .perform(
+            post("/api/driver-ratings")
+                .with(clientJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(ratingBody(driverWithCancelledContract)))
         .andExpect(status().isUnprocessableContent());
 
     assertThat(driverRatings.count()).isEqualTo(1);
   }
 
   @Test
+  void aDeletedContractDoesNotLetTheClientRate() throws Exception {
+    String driverWithDeletedContract = linkTheClientToANewDriver(RelationshipStatus.INACTIVE);
+    ClientDriverModel link =
+        links
+            .findByPair(
+                client.getId(), drivers.findByToken(driverWithDeletedContract).get().getId())
+            .orElseThrow();
+    ContractModel contract = giveTheLinkAContract(link, ContractStatus.ACTIVE);
+    contracts.delete(contracts.findByToken(contract.getToken()).orElseThrow());
+
+    mockMvc
+        .perform(
+            post("/api/driver-ratings")
+                .with(clientJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(ratingBody(driverWithDeletedContract)))
+        .andExpect(status().isUnprocessableContent());
+
+    assertThat(driverRatings.count()).isEqualTo(1);
+  }
+
+  @Test
+  void anInactiveLinkWhoseContractEndedCanRate() throws Exception {
+    String driverWithEndedContract =
+        linkTheClientToANewDriver(RelationshipStatus.INACTIVE, ContractStatus.ENDED);
+
+    mockMvc
+        .perform(
+            post("/api/driver-ratings")
+                .with(clientJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(ratingBody(driverWithEndedContract)))
+        .andExpect(status().isCreated());
+
+    assertThat(driverRatings.count()).isEqualTo(2);
+  }
+
+  @Test
   void aLinkYoungerThanFiveMinutesCannotRateYet() throws Exception {
-    String newDriverToken = linkTheClientToANewDriver(RelationshipStatus.ACTIVE, Duration.ZERO);
+    String newDriverToken =
+        linkTheClientToANewDriver(RelationshipStatus.ACTIVE, Duration.ZERO, ContractStatus.ACTIVE);
 
     mockMvc
         .perform(get("/api/driver-ratings/status?driverToken=" + newDriverToken).with(clientJwt()))
@@ -298,7 +369,8 @@ class DriverRatingControllerTest {
 
   @Test
   void aClientRatesAnActiveLinkOnceAndTheButtonGoesAway() throws Exception {
-    String newDriverToken = linkTheClientToANewDriver(RelationshipStatus.ACTIVE);
+    String newDriverToken =
+        linkTheClientToANewDriver(RelationshipStatus.ACTIVE, ContractStatus.ACTIVE);
     String statusUrl = "/api/driver-ratings/status?driverToken=" + newDriverToken;
 
     mockMvc
@@ -415,11 +487,13 @@ class DriverRatingControllerTest {
         .andExpect(jsonPath("$.clientDriverId").doesNotExist());
   }
 
-  private String linkTheClientToANewDriver(RelationshipStatus status) {
-    return linkTheClientToANewDriver(status, Duration.ofDays(1));
+  private String linkTheClientToANewDriver(
+      RelationshipStatus status, ContractStatus... contractStatuses) {
+    return linkTheClientToANewDriver(status, Duration.ofDays(1), contractStatuses);
   }
 
-  private String linkTheClientToANewDriver(RelationshipStatus status, Duration linkAge) {
+  private String linkTheClientToANewDriver(
+      RelationshipStatus status, Duration linkAge, ContractStatus... contractStatuses) {
     UserModel driverUser = new UserModel();
     driverUser.setType(UserType.DRIVER);
     driverUser.setName("Linked Driver");
@@ -444,7 +518,26 @@ class DriverRatingControllerTest {
         "update client_driver set created_at = ? where id = ?",
         Timestamp.from(Instant.now().minus(linkAge)),
         link.getId());
+    for (ContractStatus contractStatus : contractStatuses) {
+      giveTheLinkAContract(link, contractStatus);
+    }
     return driver.getToken();
+  }
+
+  private ContractModel giveTheLinkAContract(ClientDriverModel link, ContractStatus status) {
+    ContractModel contract = new ContractModel();
+    contract.setClientDriver(link);
+    contract.setStatus(status);
+    contract.setStartsOn(LocalDate.of(2027, 2, 1));
+    contract.setEndsOn(LocalDate.of(2027, 12, 1));
+    contract.setTotalAmount(new BigDecimal("4200.00"));
+    contract.setInstallments(12);
+    contract.setDueDay(5);
+    return contracts.save(contract);
+  }
+
+  private String message(String key) {
+    return messages.getMessage(key, null, LocaleContextHolder.getLocale());
   }
 
   private String ratingBody(String driverToken) {

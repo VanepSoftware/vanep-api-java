@@ -260,6 +260,33 @@ class DriverProfileControllerTest {
   }
 
   @Test
+  void recommendationLeavesOutDriversNotAcceptingNewStudentsAndDoesNotCountThem() throws Exception {
+    saveDriver("aberto@vanep.com", DriverApprovalStatus.APPROVED);
+    DriverModel notAccepting = saveDriver("fechado@vanep.com", DriverApprovalStatus.APPROVED);
+    notAccepting.setAvailable(false);
+    drivers.save(notAccepting);
+
+    mockMvc
+        .perform(get("/api/drivers/recommended").with(clientJwt()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.totalElements").value(1))
+        .andExpect(jsonPath("$.content.length()").value(1))
+        .andExpect(jsonPath("$.content[0].name").value("Motorista aberto@vanep.com"));
+  }
+
+  @Test
+  void theProfileOfADriverNotAcceptingNewStudentsStaysReachable() throws Exception {
+    DriverModel notAccepting = saveDriver("fechado@vanep.com", DriverApprovalStatus.APPROVED);
+    notAccepting.setAvailable(false);
+    drivers.save(notAccepting);
+
+    mockMvc
+        .perform(get("/api/drivers/" + notAccepting.getToken() + "/profile").with(clientJwt()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.available").value(false));
+  }
+
+  @Test
   void recommendationIgnoresACallerChosenSort() throws Exception {
     saveDriver("antigo@vanep.com", DriverApprovalStatus.APPROVED);
     saveDriver("novo@vanep.com", DriverApprovalStatus.APPROVED);
@@ -305,6 +332,7 @@ class DriverProfileControllerTest {
     driver.setExperienceYears(8);
     driver.setRating(new BigDecimal("4.80"));
     driver.setApprovalStatus(approvalStatus);
+    driver.setAvailable(true);
     return drivers.save(driver);
   }
 

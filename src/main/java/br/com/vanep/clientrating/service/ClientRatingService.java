@@ -4,11 +4,13 @@ import br.com.vanep.client.model.ClientModel;
 import br.com.vanep.client.repository.ClientRepository;
 import br.com.vanep.clientdriver.model.ClientDriverModel;
 import br.com.vanep.clientdriver.repository.ClientDriverRepository;
+import br.com.vanep.clientdriver.service.LinkRatingEligibilityPolicy;
 import br.com.vanep.clientrating.dto.ClientRatingCreateRequestDTO;
 import br.com.vanep.clientrating.dto.ClientRatingResponseDTO;
 import br.com.vanep.clientrating.mapper.ClientRatingMapper;
 import br.com.vanep.clientrating.model.ClientRatingModel;
 import br.com.vanep.clientrating.repository.ClientRatingRepository;
+import br.com.vanep.contract.repository.ContractRepository;
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.user.model.UserModel;
@@ -34,6 +36,8 @@ public class ClientRatingService {
   private final UserRepository userRepository;
   private final ClientRatingMapper mapper;
   private final MessageSource messages;
+  private final LinkRatingEligibilityPolicy linkEligibility;
+  private final ContractRepository contracts;
 
   public ClientRatingService(
       ClientRatingRepository clientRatingRepository,
@@ -42,7 +46,9 @@ public class ClientRatingService {
       ClientDriverRepository linkRepository,
       UserRepository userRepository,
       ClientRatingMapper mapper,
-      MessageSource messages) {
+      MessageSource messages,
+      LinkRatingEligibilityPolicy linkEligibility,
+      ContractRepository contracts) {
     this.clientRatingRepository = clientRatingRepository;
     this.driverRepository = driverRepository;
     this.clientRepository = clientRepository;
@@ -50,6 +56,8 @@ public class ClientRatingService {
     this.userRepository = userRepository;
     this.mapper = mapper;
     this.messages = messages;
+    this.linkEligibility = linkEligibility;
+    this.contracts = contracts;
   }
 
   private String message(String key) {
@@ -94,6 +102,11 @@ public class ClientRatingService {
                 () ->
                     new ResponseStatusException(
                         HttpStatus.NOT_FOUND, message("client_rating.link.not_found")));
+
+    if (!linkEligibility.allowsRating(contracts.findStatusesByClientDriverId(link.getId()))) {
+      throw new ResponseStatusException(
+          HttpStatus.UNPROCESSABLE_CONTENT, message("client_rating.link.never_contracted"));
+    }
 
     if (clientRatingRepository.existsByLinkId(link.getId())) {
       throw new ResponseStatusException(HttpStatus.CONFLICT, message("client_rating.duplicate"));
