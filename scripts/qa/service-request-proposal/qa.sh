@@ -702,5 +702,69 @@ sql "update contract_item set pickup_neighborhood = '$SEED_ITEM_NEIGHBORHOOD' wh
 request GET "/api/contracts/$SEED_CONTRACT" "$ADMIN"
 expect H6 "the API reads the contract after the migration ran again" 200 '.items[0].pickupNeighborhood == "Centro"'
 
+
+table "V64: service_request tables (database checks)"
+insert_request() {
+  echo "insert into service_request (token, client_driver_id, status, desired_start_date, expires_at)
+        select '$1', id, '$3', date '2027-02-01', now() + interval '72 hours' from client_driver where token = '$2'"
+}
+insert_item() {
+  echo "insert into service_request_item (service_request_id, dependent_id, school_id, pickup_city_id, snapshot)
+        select request.id, dependent.id, dependent.school_id, address.city_id, $QA_SNAPSHOT
+        from service_request request, dependent join address on address.id = dependent.address_id
+        where request.token = '$1' and dependent.token = '$LUCAS'"
+}
+QA_SNAPSHOT="jsonb_build_object('version', 1, 'dependent', jsonb_build_object('name', dependent.name,
+  'birthDate', dependent.birth_date), 'school', jsonb_build_object('name', 'QA'), 'pickup', jsonb_build_object('cityName', 'QA'))"
+insert_day() {
+  echo "insert into service_request_day (service_request_item_id, weekday, school_shift, needs_outbound, needs_return)
+        select item.id, '$2', 'MORNING', $3, $4 from service_request_item item
+        join service_request request on request.id = item.service_request_id where request.token = '$1'"
+}
+REQUESTS_BEFORE=$(count service_request)
+check_sql_rejected Q1 "a second OPEN request of the same pair" service_request_client_driver_open_key \
+  "$(insert_request qasr1 "$DIEGO_GUSTAVO" OPEN); $(insert_request qasr2 "$DIEGO_GUSTAVO" OPEN)"
+check_sql_rejected Q2 "an OPEN request while the pair has an ANSWERED one" service_request_client_driver_open_key \
+  "$(insert_request qasr1 "$DIEGO_GUSTAVO" ANSWERED); $(insert_request qasr2 "$DIEGO_GUSTAVO" OPEN)"
+check_sql_accepted Q3 "an OPEN request after an EXPIRED one of the same pair" \
+  "$(insert_request qasr1 "$DIEGO_GUSTAVO" EXPIRED); $(insert_request qasr2 "$DIEGO_GUSTAVO" OPEN)"
+check_sql_accepted Q4 "OPEN requests of two different pairs" \
+  "$(insert_request qasr1 "$DIEGO_GUSTAVO" OPEN); $(insert_request qasr2 "$BRUNO_HELENA" OPEN)"
+check_sql_rejected Q5 "a repeated token" service_request_token_key \
+  "$(insert_request qasr1 "$DIEGO_GUSTAVO" EXPIRED); $(insert_request qasr1 "$BRUNO_HELENA" OPEN)"
+check_sql_rejected Q6 "the same weekday twice in one item" service_request_day_weekday_key \
+  "$(insert_request qasr1 "$DIEGO_GUSTAVO" OPEN); $(insert_item qasr1);
+   $(insert_day qasr1 MONDAY true true); $(insert_day qasr1 MONDAY true false)"
+check_sql_rejected Q7 "a day with neither outbound nor return" service_request_day_leg_check \
+  "$(insert_request qasr1 "$DIEGO_GUSTAVO" OPEN); $(insert_item qasr1); $(insert_day qasr1 MONDAY false false)"
+check_sql_accepted Q8 "a day with only the outbound and a day with only the return" \
+  "$(insert_request qasr1 "$DIEGO_GUSTAVO" OPEN); $(insert_item qasr1);
+   $(insert_day qasr1 MONDAY true false); $(insert_day qasr1 TUESDAY false true)"
+check Q9 "the item keeps no district id" 0 \
+  "$(sql "select count(*) from information_schema.columns where table_name = 'service_request_item' and column_name = 'pickup_district_id'")"
+check_sql_rejected Q10 "an item for a dependent that does not exist" service_request_item_dependent_id_fkey \
+  "$(insert_request qasr1 "$DIEGO_GUSTAVO" OPEN);
+   insert into service_request_item (service_request_id, dependent_id, school_id, pickup_city_id, snapshot)
+   select id, -1, (select min(id) from school), (select min(id) from city),
+     '{\"version\": 1, \"dependent\": {}, \"school\": {}, \"pickup\": {}}' from service_request where token = 'qasr1'"
+check Q11 "the overdue sweep reads the partial index" yes \
+  "$(sql "set enable_seqscan = off; explain select id from service_request where status = 'OPEN' and expires_at <= now()" \
+       | grep -q service_request_open_expires_at_idx && echo yes || echo no)"
+check Q12 "the tables, the status and the copied and per-day columns are documented" 8 \
+  "$(sql "select (select count(*) from unnest(array['service_request', 'service_request_item', 'service_request_day']) name
+                  where obj_description(name::regclass, 'pg_class') is not null)
+             + (select count(*) from (values ('service_request', 'status'), ('service_request_item', 'snapshot'), ('service_request_item', 'school_id'),
+                  ('service_request_day', 'school_shift'), ('service_request_day', 'weekday')) column_name (tbl, col)
+                where col_description(tbl::regclass, (select attnum from pg_attribute where attrelid = tbl::regclass and attname = col)) is not null)")"
+check Q13 "the checks above were rolled back" "$REQUESTS_BEFORE" "$(count service_request)"
+check Q14 "the negotiation tables have no deleted_at" 0 \
+  "$(sql "select count(*) from information_schema.columns where table_name like 'service_request%' and column_name = 'deleted_at'")"
+check_sql_rejected Q15 "a snapshot without the dependent" service_request_item_snapshot_check \
+  "$(insert_request qasr1 "$DIEGO_GUSTAVO" OPEN);
+   insert into service_request_item (service_request_id, dependent_id, school_id, pickup_city_id, snapshot)
+   select request.id, dependent.id, dependent.school_id, address.city_id,
+     '{\"version\": 1, \"school\": {}, \"pickup\": {}}'
+   from service_request request, dependent join address on address.id = dependent.address_id
+   where request.token = 'qasr1' and dependent.token = '$LUCAS'"
 echo
 echo "ALL PASSED: $PASSED scenarios"
