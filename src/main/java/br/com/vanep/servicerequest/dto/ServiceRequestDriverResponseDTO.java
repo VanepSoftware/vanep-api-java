@@ -9,6 +9,7 @@ import java.util.List;
 public record ServiceRequestDriverResponseDTO(
     String token,
     String clientDriverToken,
+    String conversationToken,
     String clientFirstName,
     ServiceRequestStatus status,
     LocalDate desiredStartDate,

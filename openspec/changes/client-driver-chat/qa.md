@@ -1,6 +1,8 @@
 # QA — client-driver-chat (constitution rule 55)
 
-Latest run: API built from `feat/161-chat-client-inbox`, which contains phases B1–B5, so it covers the whole spec. Run date: 2026-10-12. Result: **69/69 passed** (49 HTTP, 9 encryption at rest, 11 realtime) on three consecutive runs.
+Latest run: API built from `VAN-30/12-conversation-on-request` (service-request-proposal PR 12), 2026-10-26: **56/56 passed** (36 HTTP, 9 encryption at rest, 11 realtime). That PR removed `POST /api/conversations`: a conversation now opens with the pair's first service request (`conversation-opening`, D23 of `service-request-proposal`). The script inserts its three conversations by SQL, and the open section keeps M1 (no token, 401) and gains M35 (the client gets 404 and nothing is created). H1–H3 and M2–M12 left with the endpoint; the open, its races and its refusals are in `scripts/qa/service-request-proposal/conversation.sh`.
+
+Previous run: API built from `feat/161-chat-client-inbox`, which contains phases B1–B5, so it covers the whole spec. Run date: 2026-10-12. Result: **69/69 passed** (49 HTTP, 9 encryption at rest, 11 realtime) on three consecutive runs.
 
 Earlier runs: B4 passed 68/68 on five consecutive runs.
 
@@ -8,7 +10,7 @@ History: B3 (`feat/161-chat-realtime`) passed 59/59 twice, before the encryption
 
 ## How to run
 
-The script wipes the chat tables and temporarily flips a seeded driver to `UNDER_REVIEW`, so it must only point at a throwaway database.
+The script wipes the chat tables, so it must only point at a throwaway database. (Before PR 12 it also flipped a seeded driver to `UNDER_REVIEW` for M10.)
 
 ```bash
 # 1. Throwaway Postgres (never the shared dev database)
@@ -43,6 +45,8 @@ Flyway applied `V53`, `V54` and `V55` on an empty database at boot. `role_permis
 ## Results
 
 ### `POST /api/conversations` — open or resume
+
+Run of 2026-10-12. Since PR 12 of `service-request-proposal`, only M1 (no token, 401) remains in the script, next to the new M35 (the client gets 404 and no conversation is created).
 
 | id | scenario | expected | result |
 |---|---|---|---|
