@@ -459,6 +459,60 @@ class ServiceRequestRepositoryTest {
     assertThat(reread.getDeclineReason()).isEqualTo("Sem vaga");
   }
 
+  @Test
+  void answersOnlyARequestStillOpenInTimeOrAlreadyAnswered() {
+    ServiceRequestModel inTime = saveRequest(link, ServiceRequestStatus.OPEN);
+    ServiceRequestModel answered =
+        saveRequest(
+            createLink(client, createDriver("answered@vanep.com", "39053344705")),
+            ServiceRequestStatus.ANSWERED);
+    ServiceRequestModel overdue =
+        saveRequest(
+            createLink(client, createDriver("overdue@vanep.com", "86288366757")),
+            ServiceRequestStatus.OPEN,
+            Instant.now().minusSeconds(60));
+    ServiceRequestModel converted =
+        saveRequest(
+            createLink(client, createDriver("converted@vanep.com", "12345678909")),
+            ServiceRequestStatus.CONVERTED);
+    Instant now = Instant.now();
+
+    assertThat(answer(inTime, now)).isEqualTo(1);
+    assertThat(answer(answered, now)).isEqualTo(1);
+    assertThat(answer(overdue, now)).isZero();
+    assertThat(answer(converted, now)).isZero();
+    assertThat(statusOf(inTime)).isEqualTo(ServiceRequestStatus.ANSWERED);
+    assertThat(statusOf(overdue)).isEqualTo(ServiceRequestStatus.OPEN);
+    assertThat(statusOf(converted)).isEqualTo(ServiceRequestStatus.CONVERTED);
+  }
+
+  @Test
+  void reopensOnlyAnAnsweredRequestWithTheNewDeadline() {
+    ServiceRequestModel answered = saveRequest(link, ServiceRequestStatus.ANSWERED);
+    ServiceRequestModel declined =
+        saveRequest(
+            createLink(client, createDriver("declined@vanep.com", "39053344705")),
+            ServiceRequestStatus.DECLINED);
+    Instant deadline = Instant.now().plus(Duration.ofHours(72)).truncatedTo(ChronoUnit.SECONDS);
+
+    Integer fromAnswered =
+        transactions.execute(status -> requests.reopen(answered.getId(), deadline));
+    Integer fromDeclined =
+        transactions.execute(status -> requests.reopen(declined.getId(), deadline));
+    ServiceRequestModel reread =
+        requests.findByTokenAndClientId(answered.getToken(), client.getId()).orElseThrow();
+
+    assertThat(fromAnswered).isEqualTo(1);
+    assertThat(fromDeclined).isZero();
+    assertThat(reread.getStatus()).isEqualTo(ServiceRequestStatus.OPEN);
+    assertThat(reread.getExpiresAt()).isEqualTo(deadline);
+    assertThat(statusOf(declined)).isEqualTo(ServiceRequestStatus.DECLINED);
+  }
+
+  private Integer answer(ServiceRequestModel request, Instant now) {
+    return transactions.execute(status -> requests.answer(request.getId(), now));
+  }
+
   private ServiceRequestStatus statusOf(ServiceRequestModel request) {
     return requests
         .findByTokenAndClientId(request.getToken(), client.getId())

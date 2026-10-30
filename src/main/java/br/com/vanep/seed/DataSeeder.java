@@ -15,6 +15,7 @@ import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.drivercnh.seed.DriverCnhSeeder;
 import br.com.vanep.driverdocument.seed.DriverDocumentSeeder;
 import br.com.vanep.driverrating.seed.DriverRatingSeeder;
+import br.com.vanep.proposal.seed.ProposalSeeder;
 import br.com.vanep.role.RoleName;
 import br.com.vanep.role.model.RoleModel;
 import br.com.vanep.role.repository.RoleRepository;
@@ -65,6 +66,7 @@ public class DataSeeder implements ApplicationRunner {
   private final VehicleSeeder vehicleSeeder;
   private final ContractSeeder contractSeeder;
   private final ServiceRequestSeeder serviceRequestSeeder;
+  private final ProposalSeeder proposalSeeder;
   private final PasswordEncoder passwordEncoder;
 
   @Value("${vanep.seed.enabled:false}")
@@ -100,6 +102,7 @@ public class DataSeeder implements ApplicationRunner {
       VehicleSeeder vehicleSeeder,
       ContractSeeder contractSeeder,
       ServiceRequestSeeder serviceRequestSeeder,
+      ProposalSeeder proposalSeeder,
       PasswordEncoder passwordEncoder) {
     this.users = users;
     this.clients = clients;
@@ -118,6 +121,7 @@ public class DataSeeder implements ApplicationRunner {
     this.vehicleSeeder = vehicleSeeder;
     this.contractSeeder = contractSeeder;
     this.serviceRequestSeeder = serviceRequestSeeder;
+    this.proposalSeeder = proposalSeeder;
     this.passwordEncoder = passwordEncoder;
   }
 
@@ -143,6 +147,7 @@ public class DataSeeder implements ApplicationRunner {
     clientDriverSeeder.seed();
     contractSeeder.seed();
     serviceRequestSeeder.seed();
+    proposalSeeder.seed();
     driverRatingSeeder.seed();
     clientRatingSeeder.seed();
     tripSeeder.seed();

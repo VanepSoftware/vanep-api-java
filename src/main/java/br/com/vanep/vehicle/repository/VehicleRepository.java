@@ -1,9 +1,11 @@
 package br.com.vanep.vehicle.repository;
 
 import br.com.vanep.vehicle.model.VehicleModel;
+import jakarta.persistence.LockModeType;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -13,6 +15,10 @@ public interface VehicleRepository extends JpaRepository<VehicleModel, Long> {
   Optional<VehicleModel> findByToken(String token);
 
   List<VehicleModel> findByDriverId(Long driverId);
+
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("select vehicle from VehicleModel vehicle where vehicle.id = :id")
+  Optional<VehicleModel> lockById(@Param("id") Long id);
 
   boolean existsByPlate(String plate);
 

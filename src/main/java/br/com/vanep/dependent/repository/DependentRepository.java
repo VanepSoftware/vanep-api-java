@@ -30,6 +30,15 @@ public interface DependentRepository extends JpaRepository<DependentModel, Long>
   List<DependentModel> lockByTokenInAndClientId(
       @Param("tokens") Collection<String> tokens, @Param("clientId") Long clientId);
 
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query(
+      """
+      select dependent from DependentModel dependent
+      where dependent.id in :ids
+      order by dependent.id
+      """)
+  List<DependentModel> lockByIdIn(@Param("ids") Collection<Long> ids);
+
   List<DependentModel> findByClientId(Long clientId);
 
   List<DependentModel> findByTokenInAndClientId(Collection<String> tokens, Long clientId);

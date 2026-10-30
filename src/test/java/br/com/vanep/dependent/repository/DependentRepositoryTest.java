@@ -169,6 +169,20 @@ class DependentRepositoryTest {
         .containsExactly("Lucas Souza", "Ana Souza");
   }
 
+  @Test
+  void locksTheActiveDependentsByIdInIdOrder() {
+    DependentModel removed = createDependent(client, "Rafa Souza");
+    dependents.delete(removed);
+
+    List<DependentModel> locked =
+        transactions.execute(
+            status -> dependents.lockByIdIn(List.of(ana.getId(), removed.getId(), lucas.getId())));
+
+    assertThat(locked)
+        .extracting(dependent -> dependent.getName())
+        .containsExactly("Lucas Souza", "Ana Souza");
+  }
+
   private ServiceRequestModel newRequest(DependentModel dependent) {
     ServiceRequestDayModel day = new ServiceRequestDayModel();
     day.setWeekday(DayOfWeek.MONDAY);
