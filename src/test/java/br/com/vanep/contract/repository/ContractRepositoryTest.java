@@ -111,7 +111,6 @@ class ContractRepositoryTest {
     assertThat(first.getSchool().getName()).isEqualTo("Escola Municipal");
     assertThat(first.getPickupStreet()).isEqualTo("Rua A");
     assertThat(first.getPickupCity().getName()).isEqualTo("Campinas");
-    assertThat(first.getMonthlyAmount()).isEqualByComparingTo("350.00");
     assertThat(first.getSchedule().getSlots())
         .extracting(slot -> slot.getLeg())
         .containsExactly(RouteLeg.OUTBOUND);
@@ -324,7 +323,7 @@ class ContractRepositoryTest {
               assertThat(passenger.name()).isEqualTo("Lucas");
               assertThat(passenger.schoolToken()).isEqualTo(school.getToken());
               assertThat(passenger.leg()).isEqualTo(RouteLeg.OUTBOUND);
-              assertThat(passenger.windowStart()).isEqualTo(LocalTime.of(6, 40));
+              assertThat(passenger.pickupTime()).isEqualTo(LocalTime.of(6, 40));
               assertThat(passenger.pickupStreet()).isEqualTo("Rua A");
               assertThat(passenger.pickupCityToken()).isEqualTo(city.getToken());
             });
@@ -512,7 +511,6 @@ class ContractRepositoryTest {
     item.setPickupZipCode("13015904");
     item.setPickupStreet("Rua A");
     item.setPickupNumber("10");
-    item.setMonthlyAmount(new BigDecimal("350.00"));
     item.setSchedule(mondaySchedule(leg));
     return item;
   }
@@ -522,7 +520,7 @@ class ContractRepositoryTest {
     slot.setWeekday(DayOfWeek.MONDAY);
     slot.setLeg(leg);
     slot.setShift(leg == RouteLeg.OUTBOUND ? OperationShift.MORNING : OperationShift.AFTERNOON);
-    slot.setWindowStart(leg == RouteLeg.OUTBOUND ? LocalTime.of(6, 40) : LocalTime.of(17, 0));
+    slot.setPickupTime(leg == RouteLeg.OUTBOUND ? LocalTime.of(6, 40) : LocalTime.of(17, 0));
     ScheduleModel schedule = new ScheduleModel();
     schedule.addSlot(slot);
     return schedule;

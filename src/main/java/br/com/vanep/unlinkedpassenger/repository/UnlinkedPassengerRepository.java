@@ -43,7 +43,7 @@ public interface UnlinkedPassengerRepository extends JpaRepository<UnlinkedPasse
       select new br.com.vanep.routepassenger.dto.RoutePassengerDTO(
         br.com.vanep.routepassenger.enums.PassengerSource.UNLINKED_PASSENGER,
         passenger.token, passenger.name, school.token, school.name,
-        slot.leg, slot.windowStart, slot.windowEnd,
+        slot.leg, slot.pickupTime,
         address.zipCode, address.street, address.number, address.complement,
         address.neighborhood, city.token, city.name, address.googlePlaceId)
       from UnlinkedPassengerModel passenger

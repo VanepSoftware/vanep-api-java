@@ -46,7 +46,7 @@ public interface ContractItemRepository extends JpaRepository<ContractItemModel,
       select new br.com.vanep.routepassenger.dto.RoutePassengerDTO(
         br.com.vanep.routepassenger.enums.PassengerSource.CONTRACT_ITEM,
         item.token, dependent.name, school.token, school.name,
-        slot.leg, slot.windowStart, slot.windowEnd,
+        slot.leg, slot.pickupTime,
         item.pickupZipCode, item.pickupStreet, item.pickupNumber, item.pickupComplement,
         item.pickupNeighborhood, city.token, city.name, item.pickupGooglePlaceId)
       from ContractItemModel item

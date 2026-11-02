@@ -39,16 +39,11 @@ class ScheduleMapperTest {
   @Test
   void copiesEveryFieldOfTheSlot() {
     ScheduleSlotModel slot = slot(DayOfWeek.MONDAY, RouteLeg.OUTBOUND, OperationShift.MORNING);
-    slot.setWindowEnd(LocalTime.of(6, 50));
 
     assertThat(mapper.toSlotResponse(slot))
         .isEqualTo(
             new ScheduleSlotResponseDTO(
-                DayOfWeek.MONDAY,
-                RouteLeg.OUTBOUND,
-                OperationShift.MORNING,
-                LocalTime.of(6, 40),
-                LocalTime.of(6, 50)));
+                DayOfWeek.MONDAY, RouteLeg.OUTBOUND, OperationShift.MORNING, LocalTime.of(6, 40)));
   }
 
   private ScheduleSlotModel slot(DayOfWeek weekday, RouteLeg leg, OperationShift shift) {
@@ -56,7 +51,7 @@ class ScheduleMapperTest {
     slot.setWeekday(weekday);
     slot.setLeg(leg);
     slot.setShift(shift);
-    slot.setWindowStart(LocalTime.of(6, 40));
+    slot.setPickupTime(LocalTime.of(6, 40));
     return slot;
   }
 }

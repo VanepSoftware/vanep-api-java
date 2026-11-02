@@ -530,8 +530,7 @@ class ProposalServiceTest {
   @Test
   void aLegTheRequestDidNotAskForIsRefusedBeforeAnyWrite() {
     ProposalItemRequestDTO marinaOnTuesday =
-        new ProposalItemRequestDTO(
-            "marina", List.of(slot(DayOfWeek.TUESDAY, RouteLeg.OUTBOUND, null)));
+        new ProposalItemRequestDTO("marina", List.of(slot(DayOfWeek.TUESDAY, RouteLeg.OUTBOUND)));
 
     expectRefusal(
         () -> service.send(CARLOS_UID, "request", bodyWithItems(item("lucas"), marinaOnTuesday)),
@@ -543,8 +542,7 @@ class ProposalServiceTest {
   @Test
   void fewerLegsThanRequestedAreSent() {
     ProposalItemRequestDTO lucasOnTuesdayMorning =
-        new ProposalItemRequestDTO(
-            "lucas", List.of(slot(DayOfWeek.TUESDAY, RouteLeg.OUTBOUND, null)));
+        new ProposalItemRequestDTO("lucas", List.of(slot(DayOfWeek.TUESDAY, RouteLeg.OUTBOUND)));
 
     ProposalResponseDTO response =
         service.send(CARLOS_UID, "request", bodyWithItems(lucasOnTuesdayMorning, item("marina")));
@@ -594,7 +592,7 @@ class ProposalServiceTest {
 
   @Test
   void aRepeatedWeekdayAndLegIsRefused() {
-    ScheduleSlotRequestDTO monday = slot(DayOfWeek.MONDAY, RouteLeg.OUTBOUND, null);
+    ScheduleSlotRequestDTO monday = slot(DayOfWeek.MONDAY, RouteLeg.OUTBOUND);
 
     expectRefusal(
         () ->
@@ -605,22 +603,6 @@ class ProposalServiceTest {
                     new ProposalItemRequestDTO("lucas", List.of(monday, monday)), item("marina"))),
         HttpStatus.BAD_REQUEST,
         "schedule.slot.duplicate");
-  }
-
-  @Test
-  void aWindowThatEndsBeforeItStartsIsRefused() {
-    ScheduleSlotRequestDTO backwards =
-        slot(DayOfWeek.MONDAY, RouteLeg.OUTBOUND, LocalTime.of(6, 0));
-
-    expectRefusal(
-        () ->
-            service.send(
-                CARLOS_UID,
-                "request",
-                bodyWithItems(
-                    new ProposalItemRequestDTO("lucas", List.of(backwards)), item("marina"))),
-        HttpStatus.BAD_REQUEST,
-        "schedule.slot.window_invalid");
   }
 
   @Test
@@ -1107,13 +1089,11 @@ class ProposalServiceTest {
     return new ProposalItemRequestDTO(
         dependentToken,
         List.of(
-            slot(DayOfWeek.MONDAY, RouteLeg.OUTBOUND, null),
-            slot(DayOfWeek.MONDAY, RouteLeg.RETURN, null)));
+            slot(DayOfWeek.MONDAY, RouteLeg.OUTBOUND), slot(DayOfWeek.MONDAY, RouteLeg.RETURN)));
   }
 
-  private ScheduleSlotRequestDTO slot(DayOfWeek weekday, RouteLeg leg, LocalTime windowEnd) {
-    return new ScheduleSlotRequestDTO(
-        weekday, leg, OperationShift.MORNING, LocalTime.of(6, 40), windowEnd);
+  private ScheduleSlotRequestDTO slot(DayOfWeek weekday, RouteLeg leg) {
+    return new ScheduleSlotRequestDTO(weekday, leg, OperationShift.MORNING, LocalTime.of(6, 40));
   }
 
   private ProposalModel sentProposal() {

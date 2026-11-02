@@ -16,7 +16,6 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
-import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 import lombok.Getter;
@@ -72,9 +71,6 @@ public class ContractItemModel {
 
   @Column(name = "pickup_google_place_id")
   private String pickupGooglePlaceId;
-
-  @Column(name = "monthly_amount", nullable = false, precision = 12, scale = 2)
-  private BigDecimal monthlyAmount;
 
   @OneToOne(fetch = FetchType.EAGER, optional = false, cascade = CascadeType.ALL)
   @JoinColumn(name = "schedule_id", nullable = false)

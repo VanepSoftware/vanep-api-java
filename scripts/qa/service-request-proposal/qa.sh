@@ -903,7 +903,7 @@ check S8 "it offers Gustavo's van, copied with its plate and capacity" \
           from proposal join vehicle on vehicle.id = proposal.vehicle_id where proposal.id = $SEED_PROPOSAL")"
 check S9 "one item for Lucas, with the schedule built from the requested grid" \
   "1 10 MONDAY:OUTBOUND:06:40,MONDAY:RETURN:12:10,TUESDAY:OUTBOUND:06:40,TUESDAY:RETURN:17:20" \
-  "$(sql "select count(distinct item.id) || ' ' || count(slot.id) || ' ' || string_agg(slot.weekday || ':' || slot.leg || ':' || to_char(slot.window_start, 'HH24:MI'), ','
+  "$(sql "select count(distinct item.id) || ' ' || count(slot.id) || ' ' || string_agg(slot.weekday || ':' || slot.leg || ':' || to_char(slot.pickup_time, 'HH24:MI'), ','
             order by array_position(array['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY'], slot.weekday::text), slot.leg)
             filter (where slot.weekday in ('MONDAY', 'TUESDAY'))
           from proposal_item item join schedule_slot slot on slot.schedule_id = item.schedule_id
@@ -957,9 +957,9 @@ expect T4 "a dependent in an ANSWERED request is not removed" 422 '.code == "dep
 sql "update service_request set status = 'WITHDRAWN' where token = 'qalock'" >/dev/null
 RAFA_GRID=$(grid_of "$RAFA")
 request POST /api/contracts "$ADMIN" "$(jq -nc --arg l "$ANA_FABIO" --arg d "$RAFA" '{clientDriverToken: $l, startsOn: "2027-02-01",
-  endsOn: "2027-12-17", totalAmount: 3500, installments: 10, dueDay: 5, items: [{dependentToken: $d, monthlyAmount: 350,
-  slots: [{weekday: "MONDAY", leg: "OUTBOUND", shift: "MORNING", windowStart: "06:40"}]}]}')"
-expect T5 "after the request is withdrawn, the admin contracts the dependent" 201 '.status == "ACTIVE"'
+  endsOn: "2027-12-17", totalAmount: 3500, installments: 10, dueDay: 5, items: [{dependentToken: $d,
+  slots: [{weekday: "MONDAY", leg: "OUTBOUND", shift: "MORNING", pickupTime: "06:40"}]}]}')"
+expect T5 "after the request is withdrawn, the admin contracts the dependent" 201 '.status == "ACTIVE" and .installmentAmount == 350'
 RAFA_CONTRACT=$(jq -r .token <<<"$RESP_BODY")
 request DELETE "/api/dependent/$RAFA" "$ANA"
 expect T6 "a dependent with an ACTIVE contract is not removed" 422 \
@@ -1388,8 +1388,8 @@ P_END=$(sql "select (current_date + 7 + interval '10 months' - interval '1 day')
 TWELVE_MONTHS=$(sql "select (current_date + 7 + interval '12 months')::date")
 TWELVE_MONTHS_AND_A_DAY=$(sql "select (current_date + 7 + interval '12 months' + interval '1 day')::date")
 P_SLOTS=$(jq -nc '[("MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY") as $d
-  | {weekday: $d, leg: "OUTBOUND", shift: "MORNING", windowStart: "06:40"},
-    {weekday: $d, leg: "RETURN", shift: "AFTERNOON", windowStart: "12:10"}]')
+  | {weekday: $d, leg: "OUTBOUND", shift: "MORNING", pickupTime: "06:40"},
+    {weekday: $d, leg: "RETURN", shift: "AFTERNOON", pickupTime: "12:10"}]')
 LUCAS_ITEM=$(p_item "$LUCAS")
 P_BODY=$(p_body "$GUSTAVO_VAN" "$LUCAS_ITEM")
 for open in $(sql "select request.token from service_request request join client_driver link on link.id = request.client_driver_id
@@ -1408,7 +1408,7 @@ expect X1 "Gustavo sends the first version" 201 \
    and (.items | length) == 1 and .items[0].dependentToken == \"$LUCAS\" and .items[0].dependentFirstName == \"Lucas\"
    and .items[0].dependentName == null and (.items[0] | has(\"monthlyAmount\") | not) and (.items[0].slots | length) == 10
    and (.items[0].slots[1] | .weekday == \"MONDAY\" and .leg == \"RETURN\" and .shift == \"AFTERNOON\"
-     and (.windowStart | startswith(\"12:10\")) and .windowEnd == null)
+     and (.pickupTime | startswith(\"12:10\")) and (has(\"windowEnd\") | not))
    and .adjustments == [] and .acceptedAt == null and (has(\"id\") | not)"
 G_P1=$(jq -r .token <<<"$RESP_BODY")
 check X2 "the driver's view has no surname" "" "$(grep -o Souza <<<"$RESP_BODY" | sort -u || true)"
@@ -1501,16 +1501,13 @@ expect_bad_proposal B34 "without items" "$(jq -c 'del(.items)' <<<"$P_BODY")"
 expect_bad_proposal B35 "items that are not a list" "$(jq -c '.items = "Lucas"' <<<"$P_BODY")"
 expect_bad_proposal B37 "an item without dependentToken" "$(jq -c 'del(.items[0].dependentToken)' <<<"$P_BODY")"
 expect_bad_proposal B38 "an item with no slots" "$(jq -c '.items[0].slots = []' <<<"$P_BODY")"
-expect_bad_proposal B39 "a slot without windowStart" "$(jq -c 'del(.items[0].slots[0].windowStart)' <<<"$P_BODY")"
+expect_bad_proposal B39 "a slot without pickupTime" "$(jq -c 'del(.items[0].slots[0].pickupTime)' <<<"$P_BODY")"
 expect_bad_proposal B40 "a shift that does not exist" "$(jq -c '.items[0].slots[0].shift = "MADRUGADA"' <<<"$P_BODY")"
 expect_bad_proposal B41 "a weekday that does not exist" "$(jq -c '.items[0].slots[0].weekday = "SEGUNDA"' <<<"$P_BODY")"
-expect_bad_proposal B42 "a time that is not a time" "$(jq -c '.items[0].slots[0].windowStart = "6h40"' <<<"$P_BODY")"
+expect_bad_proposal B42 "a time that is not a time" "$(jq -c '.items[0].slots[0].pickupTime = "6h40"' <<<"$P_BODY")"
 expect_bad_proposal B43 "the same weekday and leg twice" \
   "$(jq -c '.items[0].slots[1] = .items[0].slots[0]' <<<"$P_BODY")" 400 \
   '.detail == "O mesmo dia e trecho não pode aparecer duas vezes na agenda."'
-expect_bad_proposal B44 "a window that ends before it starts" \
-  "$(jq -c '.items[0].slots[0].windowEnd = "06:00"' <<<"$P_BODY")" 400 \
-  '.detail == "O fim da janela deve ser posterior ao início."'
 expect_bad_proposal B45 "malformed JSON" '{"totalAmount": '
 request POST "$DRIVER_SR/$G_REQ/proposals" "$GUSTAVO"
 expect B46 "no body" 400
@@ -1562,7 +1559,7 @@ check B61 "a proposal cannot be edited or removed on either surface" "405 405 40
      done | sed 's/ $//')"
 G_ROWS=$(chain_rows "$G_REQ")
 expect_bad_proposal B62 "a slot on Saturday, a day the request did not ask for" \
-  "$(jq -c '.items[0].slots += [{weekday: "SATURDAY", leg: "OUTBOUND", shift: "MORNING", windowStart: "06:40"}]' <<<"$P_BODY")" \
+  "$(jq -c '.items[0].slots += [{weekday: "SATURDAY", leg: "OUTBOUND", shift: "MORNING", pickupTime: "06:40"}]' <<<"$P_BODY")" \
   422 "$NOT_REQUESTED"
 check B63 "it sent no version" "$G_ROWS" "$(chain_rows "$G_REQ")"
 NINA_MONDAY="weekday = 'MONDAY' and service_request_item_id = (select item.id from service_request_item item
@@ -1575,7 +1572,7 @@ sql "update service_request_day set needs_return = true where $NINA_MONDAY" >/de
 check B65 "Fabio's request still has no proposal and is OPEN" "0 OPEN" \
   "$(sql "select count(*) from proposal where service_request_id = (select id from service_request where token = '$F_REQ')") $(request_status "$F_REQ")"
 request POST "$DRIVER_SR/$F_REQ/proposals" "$FABIO" "$(p_body "$FABIO_VAN" "$(jq -nc --arg d "$LUCAS" '{dependentToken: $d,
-  slots: [{weekday: "TUESDAY", leg: "RETURN", shift: "AFTERNOON", windowStart: "12:10"}]}')" "$NINA_ITEM")"
+  slots: [{weekday: "TUESDAY", leg: "RETURN", shift: "AFTERNOON", pickupTime: "12:10"}]}')" "$NINA_ITEM")"
 expect B66 "fewer legs than requested: only Tuesday's return for Lucas" 201 \
   ".status == \"SENT\" and .vehicle.token == \"$FABIO_VAN\" and [.items[0].slots[] | .weekday + \":\" + .leg] == [\"TUESDAY:RETURN\"]"
 expect_bad_proposal B67 "a total below one cent per installment" "$(jq -c '.totalAmount = 0.09 | .installments = 10' <<<"$P_BODY")" 422 \

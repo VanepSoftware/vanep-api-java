@@ -10,5 +10,4 @@ public record ScheduleSlotRequestDTO(
     @NotNull DayOfWeek weekday,
     @NotNull RouteLeg leg,
     @NotNull OperationShift shift,
-    @NotNull LocalTime windowStart,
-    LocalTime windowEnd) {}
+    @NotNull LocalTime pickupTime) {}

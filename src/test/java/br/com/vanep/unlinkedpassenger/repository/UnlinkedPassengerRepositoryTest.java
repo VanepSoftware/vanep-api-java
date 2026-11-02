@@ -141,7 +141,7 @@ class UnlinkedPassengerRepositoryTest {
               assertThat(passenger.name()).isEqualTo("Lucas");
               assertThat(passenger.schoolName()).isEqualTo("Escola Municipal");
               assertThat(passenger.leg()).isEqualTo(RouteLeg.OUTBOUND);
-              assertThat(passenger.windowStart()).isEqualTo(LocalTime.of(6, 40));
+              assertThat(passenger.pickupTime()).isEqualTo(LocalTime.of(6, 40));
               assertThat(passenger.pickupStreet()).isEqualTo("Rua A");
               assertThat(passenger.pickupCityToken()).isEqualTo(city.getToken());
             });
@@ -235,12 +235,12 @@ class UnlinkedPassengerRepositoryTest {
     return schedule;
   }
 
-  private ScheduleSlotModel slot(RouteLeg leg, OperationShift shift, LocalTime windowStart) {
+  private ScheduleSlotModel slot(RouteLeg leg, OperationShift shift, LocalTime pickupTime) {
     ScheduleSlotModel slot = new ScheduleSlotModel();
     slot.setWeekday(DayOfWeek.MONDAY);
     slot.setLeg(leg);
     slot.setShift(shift);
-    slot.setWindowStart(windowStart);
+    slot.setPickupTime(pickupTime);
     return slot;
   }
 

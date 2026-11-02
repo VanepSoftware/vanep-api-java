@@ -16,8 +16,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class RoutePassengerQueryService {
 
-  static final Comparator<RoutePassengerDTO> BY_WINDOW_THEN_NAME =
-      Comparator.comparing((RoutePassengerDTO passenger) -> passenger.windowStart())
+  static final Comparator<RoutePassengerDTO> BY_PICKUP_TIME_THEN_NAME =
+      Comparator.comparing((RoutePassengerDTO passenger) -> passenger.pickupTime())
           .thenComparing(passenger -> passenger.name());
 
   private final ContractItemRepository items;
@@ -38,7 +38,7 @@ public class RoutePassengerQueryService {
     List<RoutePassengerDTO> unlinked =
         unlinkedPassengers.findRoutePassengers(driver.getId(), weekday, shift);
     return Stream.concat(contracted.stream(), unlinked.stream())
-        .sorted(BY_WINDOW_THEN_NAME)
+        .sorted(BY_PICKUP_TIME_THEN_NAME)
         .toList();
   }
 }
