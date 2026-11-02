@@ -1,23 +1,32 @@
 package br.com.vanep.user.exception;
 
+import br.com.vanep.auth.api.EmailCodeApiController;
+import br.com.vanep.auth.api.ProfileController;
+import br.com.vanep.config.ApiErrorAdvice;
 import br.com.vanep.user.dto.ProfileErrorResponseDTO;
 import br.com.vanep.user.dto.UserEmailChangeRequestDTO;
 import br.com.vanep.user.enums.ProfileErrorCode;
 import java.util.Arrays;
 import java.util.List;
-import org.springframework.http.HttpHeaders;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
-import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
-@RestControllerAdvice
-public class ProfileErrorAdvice extends ResponseEntityExceptionHandler {
+@RestControllerAdvice(assignableTypes = {ProfileController.class, EmailCodeApiController.class})
+@Order(Ordered.HIGHEST_PRECEDENCE)
+public class ProfileErrorAdvice {
+
+  private final ApiErrorAdvice apiErrorAdvice;
+
+  public ProfileErrorAdvice(ApiErrorAdvice apiErrorAdvice) {
+    this.apiErrorAdvice = apiErrorAdvice;
+  }
 
   @ExceptionHandler(ProfileErrorException.class)
   public ResponseEntity<ProfileErrorResponseDTO> handleProfileError(
@@ -31,17 +40,14 @@ public class ProfileErrorAdvice extends ResponseEntityExceptionHandler {
     return ResponseEntity.status(exception.getStatus()).body(body);
   }
 
-  @Override
-  protected ResponseEntity<Object> handleMethodArgumentNotValid(
-      MethodArgumentNotValidException ex,
-      HttpHeaders headers,
-      HttpStatusCode status,
-      WebRequest request) {
-    if (!(ex.getBindingResult().getTarget() instanceof UserEmailChangeRequestDTO)) {
-      return super.handleMethodArgumentNotValid(ex, headers, status, request);
+  @ExceptionHandler(MethodArgumentNotValidException.class)
+  public ResponseEntity<?> handleValidation(
+      MethodArgumentNotValidException exception, WebRequest request) {
+    if (!(exception.getBindingResult().getTarget() instanceof UserEmailChangeRequestDTO)) {
+      return apiErrorAdvice.handleValidationException(exception, request);
     }
 
-    List<FieldError> emailErrors = ex.getBindingResult().getFieldErrors("email");
+    List<FieldError> emailErrors = exception.getBindingResult().getFieldErrors("email");
     FieldError selected = selectEmailFieldError(emailErrors);
     ProfileErrorCode code = resolveEmailValidationCode(selected);
     String message =

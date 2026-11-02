@@ -40,6 +40,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.MessageSource;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor;
@@ -67,6 +69,7 @@ class DependentControllerTest {
   @Autowired private CityRepository cities;
   @Autowired private StateRepository states;
   @Autowired private CountryRepository countries;
+  @Autowired private MessageSource messages;
 
   private MockMvc mockMvc;
 
@@ -570,6 +573,48 @@ class DependentControllerTest {
   }
 
   @Test
+  void patchInvalidJsonNullableNameReturnsTheResolvedValidationError() throws Exception {
+    DependentModel own = createDependent(ownerClientId, "Old Name", true);
+
+    mockMvc
+        .perform(
+            patch("/api/dependent/" + own.getToken())
+                .with(ownerJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"" + "a".repeat(256) + "\"}"))
+        .andExpect(status().isBadRequest())
+        .andExpect(
+            jsonPath("$.detail").value(message("dependent.name.too_long").replace("{max}", "255")))
+        .andExpect(jsonPath("$.field").value("name"))
+        .andExpect(jsonPath("$.errors[0].field").value("name"))
+        .andExpect(
+            jsonPath("$.errors[0].message")
+                .value(message("dependent.name.too_long").replace("{max}", "255")));
+  }
+
+  @Test
+  void patchInvalidNestedJsonNullableAddressReturnsTheFullFieldPath() throws Exception {
+    DependentModel own = createDependent(ownerClientId, "Old Name", true);
+
+    mockMvc
+        .perform(
+            patch("/api/dependent/" + own.getToken())
+                .with(ownerJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"address\":{"
+                        + "\"cityToken\":\""
+                        + cityToken
+                        + "\",\"street\":\"Rua Teste\",\"zipCode\":\"123\"}}"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.detail").value(message("dependent_address.zip_code.invalid")))
+        .andExpect(jsonPath("$.field").value("address.zipCode"))
+        .andExpect(jsonPath("$.errors[0].field").value("address.zipCode"))
+        .andExpect(
+            jsonPath("$.errors[0].message").value(message("dependent_address.zip_code.invalid")));
+  }
+
+  @Test
   void updateReturns403ForOtherClient() throws Exception {
     DependentModel own = createDependent(ownerClientId, "Old Name", true);
 
@@ -580,6 +625,10 @@ class DependentControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"name\":\"New Name\"}"))
         .andExpect(status().isForbidden());
+  }
+
+  private String message(String key) {
+    return messages.getMessage(key, null, LocaleContextHolder.getLocale());
   }
 
   @Test

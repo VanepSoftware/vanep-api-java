@@ -450,17 +450,20 @@ expect V4 "end date before the start date" 422 '.detail == "A data de término d
 request POST /api/contracts "$ADMIN" "$(theo '.endsOn = "2028-02-02"')"
 expect V5 "one day past twelve months, pt-BR message" 422 '.detail == "O período do contrato não pode passar de doze meses."'
 request POST /api/contracts "$ADMIN" "$(theo '.dueDay = 31')"
-expect V6 "due day 31" 400
+expect V6 "due day 31, resolved message and field" 400 \
+  '.detail == "O dia de vencimento deve ser de 1 a 28." and .field == "dueDay" and .errors[0].field == "dueDay" and .errors[0].message == .detail'
 request POST /api/contracts "$ADMIN" "$(theo '.dueDay = 29')"
 expect V7 "due day 29" 400
 request POST /api/contracts "$ADMIN" "$(theo '.dueDay = 0')"
 expect V8 "due day 0" 400
 request POST /api/contracts "$ADMIN" "$(theo '.installments = 13')"
-expect V9 "thirteen installments" 400
+expect V9 "thirteen installments, resolved message and field" 400 \
+  '.detail == "O número de parcelas deve ser de 1 a 12." and .field == "installments" and .errors[0].field == "installments" and .errors[0].message == .detail'
 request POST /api/contracts "$ADMIN" "$(theo '.installments = 0')"
 expect V10 "zero installments" 400
 request POST /api/contracts "$ADMIN" "$(theo '.totalAmount = 0')"
-expect V11 "total amount of zero" 400
+expect V11 "total amount of zero, resolved message and field" 400 \
+  '.detail == "O valor deve ser maior que zero." and .field == "totalAmount" and .errors[0].field == "totalAmount" and .errors[0].message == .detail'
 request POST /api/contracts "$ADMIN" "$(theo '.totalAmount = -10')"
 expect V12 "negative total amount" 400
 request POST /api/contracts "$ADMIN" "$(theo '.totalAmount = "abc"')"

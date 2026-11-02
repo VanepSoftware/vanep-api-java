@@ -44,10 +44,8 @@ import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequ
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.ResultMatcher;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.context.WebApplicationContext;
 
 @SpringBootTest
@@ -291,7 +289,11 @@ class UnlinkedPassengerControllerTest {
     mockMvc
         .perform(postJson(BASE, request).with(as(carlosUid)))
         .andExpect(status().isBadRequest())
-        .andExpect(fieldErrorMessage("name", message("unlinked_passenger.name.required")));
+        .andExpect(jsonPath("$.detail").value(message("unlinked_passenger.name.required")))
+        .andExpect(jsonPath("$.field").value("name"))
+        .andExpect(jsonPath("$.errors[0].field").value("name"))
+        .andExpect(
+            jsonPath("$.errors[0].message").value(message("unlinked_passenger.name.required")));
   }
 
   @Test
@@ -378,15 +380,6 @@ class UnlinkedPassengerControllerTest {
 
   private String json(Object body) throws Exception {
     return objectMapper.writeValueAsString(body);
-  }
-
-  private ResultMatcher fieldErrorMessage(String field, String expected) {
-    return result -> {
-      MethodArgumentNotValidException exception =
-          (MethodArgumentNotValidException) result.getResolvedException();
-      assertThat(exception.getBindingResult().getFieldError(field).getDefaultMessage())
-          .isEqualTo(expected);
-    };
   }
 
   private String message(String key) {
