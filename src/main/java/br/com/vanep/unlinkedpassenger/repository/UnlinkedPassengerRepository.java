@@ -1,5 +1,6 @@
 package br.com.vanep.unlinkedpassenger.repository;
 
+import br.com.vanep.driveroccupancy.dto.ShiftOccupancyDTO;
 import br.com.vanep.routepassenger.dto.RoutePassengerDTO;
 import br.com.vanep.shared.enums.OperationShift;
 import br.com.vanep.unlinkedpassenger.model.UnlinkedPassengerModel;
@@ -61,4 +62,18 @@ public interface UnlinkedPassengerRepository extends JpaRepository<UnlinkedPasse
       """)
   List<RoutePassengerDTO> findRoutePassengers(
       Long driverId, DayOfWeek weekday, OperationShift shift);
+
+  @Query(
+      """
+      select new br.com.vanep.driveroccupancy.dto.ShiftOccupancyDTO(
+        slot.shift, count(distinct passenger.id))
+      from UnlinkedPassengerModel passenger
+      join passenger.schedule schedule
+      join schedule.slots slot
+      where passenger.driver.id = :driverId
+      group by slot.shift
+      """)
+  List<ShiftOccupancyDTO> countPassengersByShift(Long driverId);
+
+  long countByDriverId(Long driverId);
 }

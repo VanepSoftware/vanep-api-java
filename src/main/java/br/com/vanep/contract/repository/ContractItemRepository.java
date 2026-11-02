@@ -2,6 +2,7 @@ package br.com.vanep.contract.repository;
 
 import br.com.vanep.contract.enums.ContractStatus;
 import br.com.vanep.contract.model.ContractItemModel;
+import br.com.vanep.driveroccupancy.dto.ShiftOccupancyDTO;
 import br.com.vanep.routepassenger.dto.RoutePassengerDTO;
 import br.com.vanep.schedule.model.ScheduleSlotModel;
 import br.com.vanep.shared.enums.OperationShift;
@@ -65,6 +66,32 @@ public interface ContractItemRepository extends JpaRepository<ContractItemModel,
       """)
   List<RoutePassengerDTO> findRoutePassengers(
       Long driverId, LocalDate serviceDate, DayOfWeek weekday, OperationShift shift);
+
+  @Query(
+      """
+      select new br.com.vanep.driveroccupancy.dto.ShiftOccupancyDTO(
+        slot.shift, count(distinct item.dependent.id))
+      from ContractItemModel item
+      join item.contract contract
+      join item.schedule schedule
+      join schedule.slots slot
+      where contract.clientDriver.driver.id = :driverId
+        and contract.status = br.com.vanep.contract.enums.ContractStatus.ACTIVE
+        and contract.startsOn <= :today and contract.endsOn >= :today
+      group by slot.shift
+      """)
+  List<ShiftOccupancyDTO> countActivePassengersByShift(Long driverId, LocalDate today);
+
+  @Query(
+      """
+      select count(distinct item.dependent.id)
+      from ContractItemModel item
+      join item.contract contract
+      where contract.clientDriver.driver.id = :driverId
+        and contract.status = br.com.vanep.contract.enums.ContractStatus.ACTIVE
+        and contract.startsOn <= :today and contract.endsOn >= :today
+      """)
+  long countActiveDependents(Long driverId, LocalDate today);
 
   @Modifying
   @Query(
