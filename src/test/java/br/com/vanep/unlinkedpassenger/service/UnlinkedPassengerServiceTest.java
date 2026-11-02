@@ -435,7 +435,7 @@ class UnlinkedPassengerServiceTest {
     slot.setWeekday(DayOfWeek.MONDAY);
     slot.setLeg(RouteLeg.OUTBOUND);
     slot.setShift(OperationShift.MORNING);
-    slot.setWindowStart(LocalTime.of(6, 40));
+    slot.setPickupTime(LocalTime.of(6, 40));
     schedule.addSlot(slot);
     passenger.setSchedule(schedule);
     return passenger;
@@ -458,15 +458,11 @@ class UnlinkedPassengerServiceTest {
   List<ScheduleSlotRequestDTO> slots() {
     return List.of(
         new ScheduleSlotRequestDTO(
-            DayOfWeek.MONDAY,
-            RouteLeg.RETURN,
-            OperationShift.AFTERNOON,
-            LocalTime.of(12, 10),
-            null),
+            DayOfWeek.MONDAY, RouteLeg.RETURN, OperationShift.AFTERNOON, LocalTime.of(12, 10)),
         slot(DayOfWeek.MONDAY, RouteLeg.OUTBOUND, LocalTime.of(6, 40)));
   }
 
-  ScheduleSlotRequestDTO slot(DayOfWeek weekday, RouteLeg leg, LocalTime windowStart) {
-    return new ScheduleSlotRequestDTO(weekday, leg, OperationShift.MORNING, windowStart, null);
+  ScheduleSlotRequestDTO slot(DayOfWeek weekday, RouteLeg leg, LocalTime pickupTime) {
+    return new ScheduleSlotRequestDTO(weekday, leg, OperationShift.MORNING, pickupTime);
   }
 }

@@ -214,7 +214,7 @@ class DependentRepositoryTest {
     slot.setWeekday(DayOfWeek.MONDAY);
     slot.setLeg(RouteLeg.OUTBOUND);
     slot.setShift(OperationShift.MORNING);
-    slot.setWindowStart(LocalTime.of(6, 40));
+    slot.setPickupTime(LocalTime.of(6, 40));
     ScheduleModel schedule = new ScheduleModel();
     schedule.addSlot(slot);
     ContractItemModel item = new ContractItemModel();
@@ -222,7 +222,6 @@ class DependentRepositoryTest {
     item.setSchool(school);
     item.setPickupCity(city);
     item.setPickupStreet("Rua A");
-    item.setMonthlyAmount(new BigDecimal("350.00"));
     item.setSchedule(schedule);
     ContractModel contract = new ContractModel();
     contract.setClientDriver(link);

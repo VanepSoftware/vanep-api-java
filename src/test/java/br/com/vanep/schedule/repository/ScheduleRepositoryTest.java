@@ -41,21 +41,11 @@ class ScheduleRepositoryTest {
             slot -> slot.getWeekday(),
             slot -> slot.getLeg(),
             slot -> slot.getShift(),
-            slot -> slot.getWindowStart(),
-            slot -> slot.getWindowEnd())
+            slot -> slot.getPickupTime())
         .containsExactlyInAnyOrder(
+            tuple(DayOfWeek.MONDAY, RouteLeg.OUTBOUND, OperationShift.MORNING, LocalTime.of(6, 40)),
             tuple(
-                DayOfWeek.MONDAY,
-                RouteLeg.OUTBOUND,
-                OperationShift.MORNING,
-                LocalTime.of(6, 40),
-                LocalTime.of(6, 50)),
-            tuple(
-                DayOfWeek.MONDAY,
-                RouteLeg.RETURN,
-                OperationShift.AFTERNOON,
-                LocalTime.of(17, 0),
-                null));
+                DayOfWeek.MONDAY, RouteLeg.RETURN, OperationShift.AFTERNOON, LocalTime.of(17, 0)));
   }
 
   @Test
@@ -80,12 +70,7 @@ class ScheduleRepositoryTest {
 
     loaded.getSlots().clear();
     loaded.addSlot(
-        slot(
-            DayOfWeek.TUESDAY,
-            RouteLeg.OUTBOUND,
-            OperationShift.MORNING,
-            LocalTime.of(7, 0),
-            null));
+        slot(DayOfWeek.TUESDAY, RouteLeg.OUTBOUND, OperationShift.MORNING, LocalTime.of(7, 0)));
     schedules.save(loaded);
 
     assertThat(schedules.findWithSlotsById(saved.getId()).orElseThrow().getSlots())
@@ -100,7 +85,7 @@ class ScheduleRepositoryTest {
     ScheduleModel saved = schedules.save(fullTimeMonday());
     ScheduleSlotRequestDTO laterMondayOutbound =
         new ScheduleSlotRequestDTO(
-            DayOfWeek.MONDAY, RouteLeg.OUTBOUND, OperationShift.MORNING, LocalTime.of(7, 10), null);
+            DayOfWeek.MONDAY, RouteLeg.OUTBOUND, OperationShift.MORNING, LocalTime.of(7, 10));
 
     transactions.executeWithoutResult(
         status ->
@@ -109,7 +94,7 @@ class ScheduleRepositoryTest {
                 List.of(laterMondayOutbound)));
 
     assertThat(schedules.findWithSlotsById(saved.getId()).orElseThrow().getSlots())
-        .extracting(slot -> slot.getWeekday(), slot -> slot.getLeg(), slot -> slot.getWindowStart())
+        .extracting(slot -> slot.getWeekday(), slot -> slot.getLeg(), slot -> slot.getPickupTime())
         .containsExactly(tuple(DayOfWeek.MONDAY, RouteLeg.OUTBOUND, LocalTime.of(7, 10)));
     assertThat(countSoftDeletedSlots()).isEqualTo(2);
   }
@@ -117,34 +102,19 @@ class ScheduleRepositoryTest {
   private ScheduleModel fullTimeMonday() {
     ScheduleModel schedule = new ScheduleModel();
     schedule.addSlot(
-        slot(
-            DayOfWeek.MONDAY,
-            RouteLeg.OUTBOUND,
-            OperationShift.MORNING,
-            LocalTime.of(6, 40),
-            LocalTime.of(6, 50)));
+        slot(DayOfWeek.MONDAY, RouteLeg.OUTBOUND, OperationShift.MORNING, LocalTime.of(6, 40)));
     schedule.addSlot(
-        slot(
-            DayOfWeek.MONDAY,
-            RouteLeg.RETURN,
-            OperationShift.AFTERNOON,
-            LocalTime.of(17, 0),
-            null));
+        slot(DayOfWeek.MONDAY, RouteLeg.RETURN, OperationShift.AFTERNOON, LocalTime.of(17, 0)));
     return schedule;
   }
 
   private ScheduleSlotModel slot(
-      DayOfWeek weekday,
-      RouteLeg leg,
-      OperationShift shift,
-      LocalTime windowStart,
-      LocalTime windowEnd) {
+      DayOfWeek weekday, RouteLeg leg, OperationShift shift, LocalTime pickupTime) {
     ScheduleSlotModel slot = new ScheduleSlotModel();
     slot.setWeekday(weekday);
     slot.setLeg(leg);
     slot.setShift(shift);
-    slot.setWindowStart(windowStart);
-    slot.setWindowEnd(windowEnd);
+    slot.setPickupTime(pickupTime);
     return slot;
   }
 

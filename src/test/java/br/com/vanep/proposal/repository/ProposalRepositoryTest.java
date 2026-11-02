@@ -532,7 +532,7 @@ class ProposalRepositoryTest {
       slot.setWeekday(DayOfWeek.MONDAY);
       slot.setLeg(leg);
       slot.setShift(leg == RouteLeg.OUTBOUND ? OperationShift.MORNING : OperationShift.AFTERNOON);
-      slot.setWindowStart(leg == RouteLeg.OUTBOUND ? LocalTime.of(6, 40) : LocalTime.of(12, 10));
+      slot.setPickupTime(leg == RouteLeg.OUTBOUND ? LocalTime.of(6, 40) : LocalTime.of(12, 10));
       schedule.addSlot(slot);
     }
     item.setSchedule(schedule);
