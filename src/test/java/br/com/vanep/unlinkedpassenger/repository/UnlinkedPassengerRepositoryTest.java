@@ -1,6 +1,7 @@
 package br.com.vanep.unlinkedpassenger.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.groups.Tuple.tuple;
 
 import br.com.vanep.address.model.AddressModel;
 import br.com.vanep.address.repository.AddressRepository;
@@ -10,6 +11,7 @@ import br.com.vanep.country.model.CountryModel;
 import br.com.vanep.country.repository.CountryRepository;
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
+import br.com.vanep.driveroccupancy.dto.ShiftOccupancyDTO;
 import br.com.vanep.routepassenger.dto.RoutePassengerDTO;
 import br.com.vanep.routepassenger.enums.PassengerSource;
 import br.com.vanep.schedule.model.ScheduleModel;
@@ -181,6 +183,33 @@ class UnlinkedPassengerRepositoryTest {
     assertThat(findMondayMorningPassengers()).hasSize(3);
     assertThat(withOne).isEqualTo(1);
     assertThat(withThree).isEqualTo(1);
+  }
+
+  @Test
+  void countsTheDriversOwnPassengersOncePerShift() {
+    passengers.save(newPassenger(driver, "Lucas", "Rua A"));
+    passengers.save(newPassenger(driver, "Ana", "Rua B"));
+    passengers.save(newPassenger(otherDriver, "Bia", "Rua C"));
+    passengers.delete(passengers.save(newPassenger(driver, "Caio", "Rua D")));
+
+    assertThat(passengers.countPassengersByShift(driver.getId()))
+        .extracting(ShiftOccupancyDTO::shift, ShiftOccupancyDTO::passengers)
+        .containsExactlyInAnyOrder(
+            tuple(OperationShift.MORNING, 2L), tuple(OperationShift.AFTERNOON, 2L));
+    assertThat(passengers.countByDriverId(driver.getId())).isEqualTo(2);
+  }
+
+  @Test
+  void countsThePassengersPerShiftInOneStatementWhateverTheirNumber() {
+    SqlStatementCounter counter = new SqlStatementCounter(entityManagerFactory);
+    passengers.save(newPassenger(driver, "Lucas", "Rua A"));
+    long withOne = counter.countStatements(() -> passengers.countPassengersByShift(driver.getId()));
+
+    passengers.save(newPassenger(driver, "Ana", "Rua B"));
+    long withTwo = counter.countStatements(() -> passengers.countPassengersByShift(driver.getId()));
+
+    assertThat(withOne).isEqualTo(1);
+    assertThat(withTwo).isEqualTo(1);
   }
 
   private List<RoutePassengerDTO> findMondayMorningPassengers() {

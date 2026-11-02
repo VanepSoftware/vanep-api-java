@@ -11,4 +11,5 @@ public record DriverMeSummaryResponseDTO(
     DriverApprovalStatus approvalStatus,
     boolean available,
     boolean active,
+    BigDecimal basePrice,
     UserMeResponseDTO user) {}
