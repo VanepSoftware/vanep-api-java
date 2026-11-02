@@ -3,6 +3,7 @@
 # branch on port 8081, seeded on an empty schema. Never points at the shared dev database.
 #   local-env.sh start   build the jar, start Postgres + API, wait for the seed
 #   local-env.sh demo    add demo data for the app (more passengers, a driver without a van)
+#   local-env.sh multi-van  give Fabio a second van so the app's van selector can be exercised
 #   local-env.sh stop    stop the API and drop the container (all data is lost)
 set -euo pipefail
 
@@ -84,6 +85,17 @@ demo() {
   curl -s "$BASE_URL/api/drivers/me/occupancy" -H "Authorization: Bearer $fabio" | jq -c .
 }
 
+multi_van() {
+  local fabio
+  fabio=$(login fabio.teixeira@seed.vanep.com.br)
+  curl -s -o /dev/null -w '%{http_code}\n' -X POST "$BASE_URL/api/vehicles/me" \
+    -H "Authorization: Bearer $fabio" -H "Content-Type: application/json" \
+    --data-binary '{"plate":"RTA3B45","brand":"Renault","model":"Master","manufactureYear":2022,"color":"Prata","capacity":12}' |
+    grep -q 201
+  echo "Fabio's vans:"
+  curl -s "$BASE_URL/api/vehicles/me" -H "Authorization: Bearer $fabio" | jq -c '[.[] | {plate, model, capacity}]'
+}
+
 stop() {
   if [[ -f $PID_FILE ]]; then kill "$(cat "$PID_FILE")" 2>/dev/null || true; rm -f "$PID_FILE"; fi
   docker stop "$DB_CONTAINER" >/dev/null 2>&1 || true
@@ -93,6 +105,7 @@ stop() {
 case "${1:-}" in
   start) start ;;
   demo) demo ;;
+  multi-van) multi_van ;;
   stop) stop ;;
-  *) echo "usage: $0 start|demo|stop" >&2; exit 2 ;;
+  *) echo "usage: $0 start|demo|multi-van|stop" >&2; exit 2 ;;
 esac
