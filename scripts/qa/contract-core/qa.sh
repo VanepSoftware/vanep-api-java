@@ -229,8 +229,8 @@ request POST /api/drivers/me/trips/start "$GUSTAVO" '{}'
 expect S5 "missing shift" 400
 request POST /api/drivers/me/trips/start "$GUSTAVO" '{"shift":null}'
 expect S6 "null shift" 400
-request POST /api/drivers/me/trips/start "$GUSTAVO" '{"shift":["MORNING"]}'
-expect S7 "shift with the wrong JSON type" 400
+request POST /api/drivers/me/trips/start "$GUSTAVO" '{"shift":1}'
+expect S7 "numeric shift" 400
 request POST /api/drivers/me/trips/start "$GUSTAVO" '{"shift":'
 expect S8 "malformed JSON" 400
 request POST /api/drivers/me/trips/start "" '{"shift":"NIGHT"}'
@@ -813,8 +813,8 @@ request POST "$UP" "$GUSTAVO" "$(rafael '.slots[0].windowEnd = "06:00"')"
 expect N15 "window end before its start" 400 '.detail == "O fim da janela deve ser posterior ao início."'
 request POST "$UP" "$GUSTAVO" "$(rafael '.slots[0].shift = "FULLTIME"')"
 expect N16 "a slot with the FULLTIME shift" 400
-request POST "$UP" "$GUSTAVO" "$(rafael '.name = {first: "Rafael"}')"
-expect N17 "name with the wrong JSON type" 400
+request POST "$UP" "$GUSTAVO" "$(rafael '.name = 42')"
+expect N17 "numeric name" 400
 request POST "$UP" "$GUSTAVO" '{"name":'
 expect N18 "malformed JSON" 400
 request POST "$UP" "$GUSTAVO" "$RAFAEL_BODY" "text/plain"
