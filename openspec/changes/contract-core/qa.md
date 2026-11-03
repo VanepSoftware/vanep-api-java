@@ -1,8 +1,8 @@
 # QA — contract-core (constitution rule 55)
 
-Latest run: API built from `fix/van-55-validation-errors`, based on current `main`. Run date: 2026-11-02. Result: **269/269 passed**.
+Latest run: API built from `feat/contract-core-route-passengers`, which contains phases 1 to 9. Run date: 2026-10-13. Result: **269/269 passed**.
 
-VAN-55 changes the global Bean Validation response, so this run covers the entire contract-core script as a regression and adds body assertions for the affected contract validation scenarios.
+Phase 9 adds `RoutePassengerQueryService` without an HTTP endpoint (the spec forbids one in this change), so this branch runs the whole script as a regression. The query is covered by its repository and service tests (task 9.2).
 
 ## How to run
 
@@ -151,12 +151,12 @@ Flyway applied `V56` to `V60` on an empty database at boot, after the `main` mig
 | V3 | end date on the start date, pt-BR message | 422 | PASS |
 | V4 | end date before the start date | 422 | PASS |
 | V5 | one day past twelve months, pt-BR message | 422 | PASS |
-| V6 | due day 31, resolved message and field | 400 | PASS |
+| V6 | due day 31 | 400 | PASS |
 | V7 | due day 29 | 400 | PASS |
 | V8 | due day 0 | 400 | PASS |
-| V9 | thirteen installments, resolved message and field | 400 | PASS |
+| V9 | thirteen installments | 400 | PASS |
 | V10 | zero installments | 400 | PASS |
-| V11 | total amount of zero, resolved message and field | 400 | PASS |
+| V11 | total amount of zero | 400 | PASS |
 | V12 | negative total amount | 400 | PASS |
 | V13 | total amount with the wrong JSON type | 400 | PASS |
 | V14 | no items | 400 | PASS |
@@ -399,7 +399,7 @@ Flyway applied `V56` to `V60` on an empty database at boot, after the `main` mig
 - **A JSON number is accepted where an enum is expected.** `{"shift": 1}` starts the `AFTERNOON` route: Jackson reads the number as the enum position. This is the API-wide default, not something this change introduced. S7 checks a wrong type that is refused (an array).
 - **Re-applying a migration (S22, P3, M1) runs its SQL again through `psql`** against rows written by the script. The data migrations of this change are idempotent, which is what makes this a fair test of what they do to rows that already exist.
 - **The schema checks (D, K) run each statement in a transaction that is rolled back**, on the same database the API migrated at boot, so they prove the indexes and `CHECK`s exactly as Flyway applied them and leave nothing behind (D12, K15).
-- **A Bean Validation failure is a 400 with the resolved pt-BR message in `detail`, the selected field in `field`, and every failure in `errors`.** The script asserts that contract term failures expose `contract.due_day.invalid`, `contract.installments.invalid`, and `contract.amount.invalid` through this response contract. Errors raised by the services (422, 409 and the schedule 400s) continue to carry their existing pt-BR messages.
+- **A Bean Validation failure is a 400 with the generic detail `Invalid request content.`**, as on every endpoint of the API (the dependent endpoint does the same). The key the spec names for those cases (`contract.due_day.invalid`, `contract.installments.invalid`, `contract.amount.invalid`) is resolved into the field error but not shown in the body. Errors raised by the services (422, 409 and the schedule 400s) carry the pt-BR message, and the script asserts it.
 - **An unknown contract token is 403 for a party and 404 for the admin (C9, C10).** `@sec.isContractParty` runs before the service, so the API does not reveal whether a token exists to someone without `show_contract`.
 - **Concurrent writes on one link keep a single `ACTIVE` contract (Z1 to Z6).** The service checks first and the partial unique index decides the race; the request that loses gets the same `409 contract.active_conflict` as the sequential check. Before the fix in phase 5, one of six concurrent creates returned 500.
 - **The weekday-and-leg collision is enforced by the service only** (R5 in `design.md`). Two simultaneous creates for the same dependent on different links are not guarded by the database in this phase, and the script does not race them.

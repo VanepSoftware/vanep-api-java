@@ -21,9 +21,12 @@ Existing advice and client compatibility audit
 - [x] 1.4 Add failing profile/auth regression tests that preserve the profile email envelope, profile business-error envelope, and auth validation envelope while non-email profile validation uses the global format.
 - [x] 1.5 Implement `ApiErrorAdvice` as the global `ResponseEntityExceptionHandler` for Bean Validation failures.
 - [x] 1.6 Restrict `ProfileErrorAdvice` to its controllers, remove its global Spring MVC inheritance, and preserve its existing email and business-error formats.
-- [x] 1.7 Update the `contract-core` QA assertions and documentation to require the pt-BR validation detail and field.
-- [x] 1.8 Run focused tests, `make lint`, `./mvnw verify -B`, and the relevant Docker QA.
-- [ ] 1.9 Receive developer review before commit or push.
+- [x] 1.7 Add a dedicated running-API QA for the global, nested, profile, and auth envelopes.
+- [x] 1.8 Extract validation `ProblemDetail` construction into a factory shared by the global and profile advices.
+- [x] 1.9 Make auth/profile advice precedence explicit on their shared controller.
+- [x] 1.10 Complete and strictly validate the OpenSpec artifacts.
+- [x] 1.11 Run focused tests, `make lint`, `./mvnw verify -B`, and the dedicated Docker QA.
+- [ ] 1.12 Receive developer review before push.
 
 ### Scope decision
 

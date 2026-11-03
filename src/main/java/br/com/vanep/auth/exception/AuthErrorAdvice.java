@@ -17,8 +17,8 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 /**
- * Scoped to the auth API controllers and ordered ahead of the global profile advice, which also
- * handles {@code MethodArgumentNotValidException}.
+ * Scoped to the auth API controllers and ordered ahead of the profile advice, which also handles
+ * {@code MethodArgumentNotValidException}.
  */
 @RestControllerAdvice(assignableTypes = {SignupApiController.class, EmailCodeApiController.class})
 @Order(Ordered.HIGHEST_PRECEDENCE)

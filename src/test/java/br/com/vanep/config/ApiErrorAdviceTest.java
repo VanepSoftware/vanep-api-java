@@ -33,7 +33,7 @@ class ApiErrorAdviceTest {
   void setUp() {
     mockMvc =
         MockMvcBuilders.standaloneSetup(new ValidationFixtureController())
-            .setControllerAdvice(new ApiErrorAdvice())
+            .setControllerAdvice(new ApiErrorAdvice(new ValidationProblemDetailsFactory()))
             .build();
   }
 

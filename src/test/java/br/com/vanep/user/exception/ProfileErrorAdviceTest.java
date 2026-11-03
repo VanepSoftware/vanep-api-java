@@ -7,7 +7,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import br.com.vanep.auth.api.EmailCodeApiController;
 import br.com.vanep.auth.api.ProfileController;
-import br.com.vanep.config.ApiErrorAdvice;
+import br.com.vanep.config.ValidationProblemDetailsFactory;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -33,7 +33,7 @@ class ProfileErrorAdviceTest {
   void setUp() {
     mockMvc =
         MockMvcBuilders.standaloneSetup(new ProfileErrorFixtureController())
-            .setControllerAdvice(new ProfileErrorAdvice(new ApiErrorAdvice()))
+            .setControllerAdvice(new ProfileErrorAdvice(new ValidationProblemDetailsFactory()))
             .build();
   }
 
@@ -46,7 +46,7 @@ class ProfileErrorAdviceTest {
     assertThat(advice).isNotNull();
     assertThat(List.of(advice.assignableTypes()))
         .containsExactlyInAnyOrder(ProfileController.class, EmailCodeApiController.class);
-    assertThat(order.value()).isEqualTo(Ordered.HIGHEST_PRECEDENCE);
+    assertThat(order.value()).isEqualTo(Ordered.HIGHEST_PRECEDENCE + 1);
     assertThat(ResponseEntityExceptionHandler.class.isAssignableFrom(ProfileErrorAdvice.class))
         .isFalse();
   }

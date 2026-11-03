@@ -2,7 +2,7 @@ package br.com.vanep.user.exception;
 
 import br.com.vanep.auth.api.EmailCodeApiController;
 import br.com.vanep.auth.api.ProfileController;
-import br.com.vanep.config.ApiErrorAdvice;
+import br.com.vanep.config.ValidationProblemDetailsFactory;
 import br.com.vanep.user.dto.ProfileErrorResponseDTO;
 import br.com.vanep.user.dto.UserEmailChangeRequestDTO;
 import br.com.vanep.user.enums.ProfileErrorCode;
@@ -16,16 +16,15 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
-import org.springframework.web.context.request.WebRequest;
 
 @RestControllerAdvice(assignableTypes = {ProfileController.class, EmailCodeApiController.class})
-@Order(Ordered.HIGHEST_PRECEDENCE)
+@Order(Ordered.HIGHEST_PRECEDENCE + 1)
 public class ProfileErrorAdvice {
 
-  private final ApiErrorAdvice apiErrorAdvice;
+  private final ValidationProblemDetailsFactory validationProblems;
 
-  public ProfileErrorAdvice(ApiErrorAdvice apiErrorAdvice) {
-    this.apiErrorAdvice = apiErrorAdvice;
+  public ProfileErrorAdvice(ValidationProblemDetailsFactory validationProblems) {
+    this.validationProblems = validationProblems;
   }
 
   @ExceptionHandler(ProfileErrorException.class)
@@ -41,10 +40,9 @@ public class ProfileErrorAdvice {
   }
 
   @ExceptionHandler(MethodArgumentNotValidException.class)
-  public ResponseEntity<?> handleValidation(
-      MethodArgumentNotValidException exception, WebRequest request) {
+  public ResponseEntity<?> handleValidation(MethodArgumentNotValidException exception) {
     if (!(exception.getBindingResult().getTarget() instanceof UserEmailChangeRequestDTO)) {
-      return apiErrorAdvice.handleValidationException(exception, request);
+      return ResponseEntity.badRequest().body(validationProblems.create(exception));
     }
 
     List<FieldError> emailErrors = exception.getBindingResult().getFieldErrors("email");
