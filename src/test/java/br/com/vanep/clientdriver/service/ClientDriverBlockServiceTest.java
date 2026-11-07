@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -35,6 +36,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -92,6 +94,7 @@ class ClientDriverBlockServiceTest {
     link.setStatus(RelationshipStatus.PENDING);
     link.setOrigin(LinkOrigin.CLIENT_SEARCH);
     when(links.findByToken("link")).thenReturn(Optional.of(link));
+    when(links.lockByToken("link")).thenReturn(Optional.of(link));
     when(contracts.findStatusesByClientDriverId(40L)).thenReturn(List.of());
     when(links.block(eq(40L), any(), any())).thenReturn(1);
     when(links.unblock(eq(40L), any(), any())).thenReturn(1);
@@ -99,9 +102,7 @@ class ClientDriverBlockServiceTest {
 
   @Test
   void theClientBlocksAndWithdrawsTheNegotiation() {
-    when(links.findByToken("link"))
-        .thenReturn(Optional.of(link))
-        .thenReturn(Optional.of(blockedBy(mariaUser)));
+    when(links.findByToken("link")).thenReturn(Optional.of(blockedBy(mariaUser)));
 
     ClientDriverResponseDTO response = service.block(MARIA_UID, "link");
 
@@ -114,9 +115,7 @@ class ClientDriverBlockServiceTest {
 
   @Test
   void theDriverBlocksAndDeclinesTheNegotiation() {
-    when(links.findByToken("link"))
-        .thenReturn(Optional.of(link))
-        .thenReturn(Optional.of(blockedBy(carlosUser)));
+    when(links.findByToken("link")).thenReturn(Optional.of(blockedBy(carlosUser)));
 
     ClientDriverResponseDTO response = service.block(CARLOS_UID, "link");
 
@@ -129,7 +128,7 @@ class ClientDriverBlockServiceTest {
   @ParameterizedTest
   @EnumSource(
       value = ContractStatus.class,
-      names = {"SIGNED", "ACTIVE", "SUSPENDED"})
+      names = {"AWAITING_SIGNATURES", "SIGNED", "ACTIVE", "SUSPENDED"})
   void aContractInProgressPreventsTheBlock(ContractStatus status) {
     when(contracts.findStatusesByClientDriverId(40L))
         .thenReturn(List.of(ContractStatus.ENDED, status));
@@ -153,8 +152,18 @@ class ClientDriverBlockServiceTest {
   }
 
   @Test
+  void theBlockLocksTheLinkBeforeReadingItsContracts() {
+    service.block(MARIA_UID, "link");
+
+    InOrder order = inOrder(links, contracts);
+    order.verify(links).lockByToken("link");
+    order.verify(contracts).findStatusesByClientDriverId(40L);
+    order.verify(links).block(eq(40L), eq(1L), any(Instant.class));
+  }
+
+  @Test
   void anAlreadyBlockedLinkIsAConflict() {
-    when(links.findByToken("link")).thenReturn(Optional.of(blockedBy(carlosUser)));
+    when(links.lockByToken("link")).thenReturn(Optional.of(blockedBy(carlosUser)));
 
     assertRefused(
         () -> service.block(MARIA_UID, "link"),

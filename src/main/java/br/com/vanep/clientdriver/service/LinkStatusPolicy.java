@@ -25,4 +25,9 @@ public class LinkStatusPolicy {
     return contractStatuses.stream()
         .anyMatch(status -> ContractStatus.SIGNED_AND_NOT_ENDED.contains(status));
   }
+
+  boolean hasContractInProgress(List<ContractStatus> contractStatuses) {
+    return contractStatuses.stream()
+        .anyMatch(status -> ContractStatus.IN_PROGRESS.contains(status));
+  }
 }

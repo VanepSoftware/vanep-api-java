@@ -44,6 +44,11 @@ public interface ClientDriverRepository extends JpaRepository<ClientDriverModel,
       """)
   Optional<ClientDriverModel> findByToken(String token);
 
+  // No fetch joins: FOR UPDATE would lock the joined client, driver and user rows too.
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("select link from ClientDriverModel link where link.token = :token")
+  Optional<ClientDriverModel> lockByToken(String token);
+
   @Query(
       """
       select link from ClientDriverModel link
@@ -130,4 +135,17 @@ public interface ClientDriverRepository extends JpaRepository<ClientDriverModel,
       nativeQuery = true)
   int unblock(
       @Param("id") Long id, @Param("blockerId") Long blockerId, @Param("status") String status);
+
+  // A save of the link loaded earlier would rewrite blocked_by and blocked_at and erase a block
+  // that landed in between; only the status moves, and never out of BLOCKED.
+  @Modifying(flushAutomatically = true)
+  @Query(
+      value =
+          """
+          update client_driver
+          set status = :status, updated_at = current_timestamp
+          where id = :id and status <> 'BLOCKED' and deleted_at is null
+          """,
+      nativeQuery = true)
+  int updateStatusUnlessBlocked(@Param("id") Long id, @Param("status") String status);
 }

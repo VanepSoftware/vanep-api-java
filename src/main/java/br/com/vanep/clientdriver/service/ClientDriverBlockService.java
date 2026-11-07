@@ -50,12 +50,13 @@ public class ClientDriverBlockService {
   @Transactional
   public ClientDriverResponseDTO block(String callerUid, String token) {
     UserModel caller = users.requireByToken(callerUid);
-    ClientDriverModel link = requireLink(token);
+    // The lock makes a contract created for the same link wait for the block, or the block see it.
+    ClientDriverModel link =
+        links.lockByToken(token).orElseThrow(() -> notFound("client_driver.not_found"));
     if (link.getStatus() == RelationshipStatus.BLOCKED) {
       throw conflict("client_driver.already_blocked");
     }
-    if (statusPolicy.hasSignedContractNotEnded(
-        contracts.findStatusesByClientDriverId(link.getId()))) {
+    if (statusPolicy.hasContractInProgress(contracts.findStatusesByClientDriverId(link.getId()))) {
       throw unprocessableContent("client_driver.block.has_contract");
     }
 
