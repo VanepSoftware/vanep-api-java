@@ -16,6 +16,7 @@ import br.com.vanep.client.model.ClientModel;
 import br.com.vanep.dependent.model.DependentModel;
 import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.servicerequest.controller.ServiceRequestControllerFixtures;
+import br.com.vanep.trip.service.TripService;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.vehicle.model.VehicleModel;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -158,7 +159,8 @@ class DriverProposalControllerTest {
             validBodyWith("installments", "dez"),
             validBodyWith("dueDay", 29),
             validBodyWith("validDays", 8),
-            validBodyWith("startsOn", LocalDate.now().minusDays(1).toString()),
+            validBodyWith(
+                "startsOn", LocalDate.now(TripService.SERVICE_ZONE).minusDays(1).toString()),
             validBodyWith("adjustmentPolicy", "SOMETIMES"),
             validBodyWith("vehicleToken", " "),
             validBodyWith("message", "a".repeat(1001)),
