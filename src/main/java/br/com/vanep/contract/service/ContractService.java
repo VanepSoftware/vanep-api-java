@@ -84,7 +84,11 @@ public class ContractService {
 
   @Transactional
   public ContractResponseDTO create(ContractCreateRequestDTO request) {
-    ClientDriverModel link = requireLink(request.clientDriverToken());
+    // The lock makes a block of the same link wait for the contract, or the contract see it.
+    ClientDriverModel link =
+        links
+            .lockByToken(request.clientDriverToken())
+            .orElseThrow(() -> notFound("client_driver.not_found"));
     ensureLinkCanBeContracted(link);
     ensureValidTerms(request);
     ensureDistinctDependents(request.items());
@@ -301,10 +305,10 @@ public class ContractService {
   }
 
   void recomputeLinkStatus(ClientDriverModel link) {
-    link.setStatus(
+    RelationshipStatus derived =
         linkStatusPolicy.deriveStatus(
-            link.getStatus(), contracts.findStatusesByClientDriverId(link.getId())));
-    links.save(link);
+            link.getStatus(), contracts.findStatusesByClientDriverId(link.getId()));
+    links.updateStatusUnlessBlocked(link.getId(), derived.name());
   }
 
   ContractResponseDTO toResponse(ContractModel contract) {

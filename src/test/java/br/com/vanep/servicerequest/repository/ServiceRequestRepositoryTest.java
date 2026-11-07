@@ -41,6 +41,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.domain.Limit;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -369,7 +370,52 @@ class ServiceRequestRepositoryTest {
         ServiceRequestStatus.ANSWERED,
         now.minusSeconds(60));
 
-    assertThat(requests.findOverdueOpenIds(now)).containsExactly(overdue.getId(), dueNow.getId());
+    assertThat(requests.findOverdueOpenIds(now, Limit.unlimited()))
+        .containsExactly(overdue.getId(), dueNow.getId());
+  }
+
+  @Test
+  void findsTheOldestOverdueRequestsFirstUpToTheLimit() {
+    Instant now = Instant.now().truncatedTo(ChronoUnit.MICROS);
+    saveRequest(link, ServiceRequestStatus.OPEN, now.minusSeconds(60));
+    ServiceRequestModel oldest =
+        saveRequest(
+            createLink(client, createDriver("second@vanep.com", "52998224725")),
+            ServiceRequestStatus.OPEN,
+            now.minusSeconds(180));
+    ServiceRequestModel second =
+        saveRequest(
+            createLink(client, createDriver("third@vanep.com", "39053344705")),
+            ServiceRequestStatus.OPEN,
+            now.minusSeconds(120));
+
+    assertThat(requests.findOverdueOpenIds(now, Limit.of(2)))
+        .containsExactly(oldest.getId(), second.getId());
+  }
+
+  @Test
+  void expiresARequestOnlyWhileItIsOpenAndOverdue() {
+    Instant now = Instant.now().truncatedTo(ChronoUnit.MICROS);
+    ServiceRequestModel overdue =
+        saveRequest(link, ServiceRequestStatus.OPEN, now.minusSeconds(60));
+    ServiceRequestModel onTime =
+        saveRequest(
+            createLink(client, createDriver("second@vanep.com", "52998224725")),
+            ServiceRequestStatus.OPEN,
+            now.plusSeconds(60));
+    ServiceRequestModel answered =
+        saveRequest(
+            createLink(client, createDriver("third@vanep.com", "39053344705")),
+            ServiceRequestStatus.ANSWERED,
+            now.minusSeconds(60));
+
+    assertThat(expire(overdue, now)).isEqualTo(1);
+    assertThat(expire(overdue, now)).isZero();
+    assertThat(expire(onTime, now)).isZero();
+    assertThat(expire(answered, now)).isZero();
+    assertThat(statusOf(overdue)).isEqualTo(ServiceRequestStatus.EXPIRED);
+    assertThat(statusOf(onTime)).isEqualTo(ServiceRequestStatus.OPEN);
+    assertThat(statusOf(answered)).isEqualTo(ServiceRequestStatus.ANSWERED);
   }
 
   @Test
@@ -507,6 +553,10 @@ class ServiceRequestRepositoryTest {
     assertThat(reread.getStatus()).isEqualTo(ServiceRequestStatus.OPEN);
     assertThat(reread.getExpiresAt()).isEqualTo(deadline);
     assertThat(statusOf(declined)).isEqualTo(ServiceRequestStatus.DECLINED);
+  }
+
+  private Integer expire(ServiceRequestModel request, Instant now) {
+    return transactions.execute(status -> requests.expire(request.getId(), now));
   }
 
   private Integer answer(ServiceRequestModel request, Instant now) {

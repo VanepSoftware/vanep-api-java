@@ -1,6 +1,6 @@
 # QA — service-request-proposal (constitution rule 55)
 
-Latest run: on the stack tip, `VAN-30/13-pickup-time-and-price`, which contains this branch: every scenario below passed there except B44 and B39 as written here (`windowStart`), which PR 13 removes and renames; those two passed on the tip's previous run, on 2026-11-01 (see the `qa.md` of PR 13 for the date and the counts). This file keeps the scenarios of PRs 1 to 9.
+Latest run: on the stack tip, `VAN-30/13-pickup-time-and-price`, which contains this branch: every scenario below passed there except B44 and B39 as written here (`windowStart`), which PR 13 removes and renames; those two passed on the tip's previous run, on 2026-11-01 (see the `qa.md` of PR 13 for the date and the counts). This file keeps the scenarios of PRs 1 to 10.
 
 ## How to run
 
@@ -27,9 +27,15 @@ SPRING_PROFILES_ACTIVE=local SERVER_PORT=8081 POSTGRES_PORT=5433 POSTGRES_USER=v
 # 4. The QA (needs curl, jq and docker), once the seed log shows both the cities and the trips
 QA_DB_CONTAINER=vanep-srp-qa-db BASE_URL=http://localhost:8081 scripts/qa/service-request-proposal/qa.sh
 
+# 5. The sweep, on a new throwaway database (steps 1 to 3 again), with the API started with
+#    EXPIRY_SWEEP_BATCH_SIZE=2 instead of EXPIRY_SWEEP_ENABLED=false; it takes about three minutes
+QA_DB_CONTAINER=vanep-srp-qa-db BASE_URL=http://localhost:8081 scripts/qa/service-request-proposal/sweep.sh
+
 # 8. Clean up
 docker stop vanep-srp-qa-db; kill %1
 ```
+
+`qa.sh` runs with the expiry sweep off: several scenarios move a deadline into the past by SQL and check what the parties get before the sweep (E29, X14, Y36), and a round in between would close those rows. OFF1 checks that, off, nothing expires on its own for more than an interval. `sweep.sh` runs with the sweep on, at the default one-minute interval, and a batch of 2 so that one round cannot expire three rows. `email.sh` reads the e-mails from the API log: with `VANEP_MAIL_ENABLED=false`, `MailService` logs each one as `[mail desabilitado] para=… assunto="…"` followed by its HTML, and the script counts these lines per recipient and subject and searches the HTML of the last one.
 
 Tokens come from the mobile password grant (`urn:vanep:params:oauth:grant-type:password` on `/oauth2/token`) for the admin, the clients and the drivers. The script stops at the first mismatch with a non-zero exit. The generic helpers (`request`, `expect`, `check`, `sql`, `login`, `in_parallel`…) live in `scripts/qa/lib.sh`, shared with the `contract-core` script.
 
@@ -61,6 +67,12 @@ For the seeded request (S1 to S14), SQL reads the request the seed sent at start
 For the dependent locks (T1 to T18), Ana creates Rafa Souza; SQL gives him Lucas's school and a pickup address of his own, and the API his grid. T2 to T4 use a request inserted by SQL on Ana – Fabio, `OPEN` and then `ANSWERED`, set `WITHDRAWN` before the contract. T5 is a real `POST /api/contracts` by the admin on the same link, whose seeded contract already ended.
 
 For the service request routes (U1 to U35, E1 to E37, J1 to J17), the script adds four approved and available drivers by SQL (Igor, Julia, Kaio and Lara, who never log in), so that Ana can reach five open requests and race on a pair without a link. Ana is the only ready client; Bruno, without phone and address, gets a dependent of his own (Davi) through the API for the readiness refusal. U1 to U5 call the seven routes in a row with each kind of caller. The block, the `ACTIVE` contract, the `ANSWERED` and `CONVERTED` statuses, the overdue deadline and the `SENT` proposals are set by SQL, because the routes that reach them come in later PRs (proposal, block, sweep); each is undone right after its scenario. Marina gets an address and a Monday-to-Friday grid through the API (E2, E3) before the request for the two siblings, and is removed after it is withdrawn (E24).
+
+For the proposal routes (X1 to X15, B1 to B67, Y1 to Y47, Z1 to Z14), Ana first withdraws her open requests and then sends new ones through the API to the three seeded drivers, who answer with their seeded vans (Gustavo `VAN2B34`, Fabio `VAN1A23`, Helena `VAN3C45`). B1 to B7 call the nine routes in a row with each kind of caller, on Gustavo's chain. Ana creates Nina Souza through the API (school, pickup address and grid) for the request for two siblings to Fabio. SQL sets only what no route reaches yet: an `OPEN` request and a `SENT` proposal past their deadlines (X14, Y36, before the sweep of PR 10), Gustavo's van inactive (B54, there is no route for it) and Nina removed during the negotiation (B59, the API refuses to remove a dependent in an open request); each is undone right after its scenario. Helena changes her plate through `PUT /api/vehicles/{token}` and Ana moves Lucas through `PATCH /api/dependent/{token}`, and both are put back afterwards, as are Lucas's name, phone and birth date after Z8. Z13 and Z14 send the accept and the new version as two concurrent calls with each party's token. Y39 to Y47 follow the current proposal in both request lists through the adjustment, the accept, the decline and the withdrawal; for Y44, Helena sends one more version (1,000.00 in three installments, starting a day after the desired date) on the request her withdrawal reopened, and withdraws it at Y47, so the races block starts from the same `OPEN` request.
+
+For the block (BL1 to BL35), every link is one the run already has: Ana – Helena with no contract, Ana – Fabio with only ended contracts (BL24 comes back `INACTIVE`), Ana – Kaio for a request still `OPEN`, and Bruno – Gustavo with its `ACTIVE` contract for the refusal. Each negotiation that a block closes is opened through the API right before it (a request by Ana and a proposal by the driver). BL31 sends three blocks of Ana at once; BL32 and BL33 race Ana's block against Helena's with each party's token. BL35 runs ten rounds of Ana's request to Helena sent at the same time as Helena's block, with Helena unblocking after each round. Every block is lifted by its owner before the next scenario.
+
+For the sweep, `qa.sh` ends with OFF1: an `OPEN` request to Kaio and a `SENT` proposal of Helena past their deadlines by SQL, then 70 seconds of waiting. `sweep.sh` starts from its own throwaway database: the seeded request to Gustavo, `ANSWERED` with its `SENT` proposal, plus requests by Ana to Fabio and Helena; it ends the seeded contract by SQL so that Ana can ask Fabio. Each set of deadlines goes into the past in one SQL statement, so a round sees the whole set or none of it, and the script waits for the round (at most 75 seconds) before checking. SW7 and SW8 pull three deadlines back by three, two and one minutes.
 
 For the approval scenarios (V1 to V12), Fabio is put back `UNDER_REVIEW` with `is_available = false` by SQL, as a driver who just finished the onboarding. The cleanup restores every seeded driver to `APPROVED` and available.
 
@@ -696,6 +708,63 @@ For the approval scenarios (V1 to V12), Fabio is put back `UNDER_REVIEW` with `i
 | Z13 | Ana accepts while Gustavo sends a new version: exactly one wins, the other gets 409 | ok | PASS |
 | Z14 | never an ACCEPTED and a SENT proposal for the request | 1 SENT ANSWERED | PASS |
 
+### Block with an owner (client-driver-block)
+| id | scenario | expected | result |
+|---|---|---|---|
+| BL1 | block and unblock without a token | 401 401 | PASS |
+| BL2 | with an invalid token | 401 401 | PASS |
+| BL3 | the admin is not a party | 403 403 | PASS |
+| BL4 | a client outside the link | 403 403 | PASS |
+| BL5 | a driver outside the link | 403 403 | PASS |
+| BL6 | an unknown link | 403 403 | PASS |
+| BL7 | the link did not change | PENDING - f | PASS |
+| BL8 | Ana blocks Helena during a negotiation | 200 | PASS |
+| BL9 | the blocker and the time are stored, the request is WITHDRAWN and the proposal DECLINED | BLOCKED CLIENT t WITHDRAWN DECLINED | PASS |
+| BL10 | Helena reads that the client blocked | 200 | PASS |
+| BL11 | Ana asks Helena for a quote while she blocks her | 422 | PASS |
+| BL12 | no request was created | 16 15 | PASS |
+| BL13 | Helena, who was blocked, tries to unblock | 403 | PASS |
+| BL14 | Helena blocks the blocked link | 409 | PASS |
+| BL15 | Ana blocks it again | 409 | PASS |
+| BL16 | the link is still blocked by Ana | BLOCKED CLIENT t | PASS |
+| BL17 | Ana unblocks a link with no contract | 200 | PASS |
+| BL18 | the blocker and the time are cleared | PENDING - f | PASS |
+| BL19 | unblocking it again | 409 | PASS |
+| BL20 | Fabio blocks Ana during a negotiation | 200 | PASS |
+| BL21 | the request is DECLINED, the proposal WITHDRAWN and the accepted one untouched | BLOCKED DRIVER t DECLINED WITHDRAWN ACCEPTED | PASS |
+| BL22 | Ana asks Fabio, who blocked her, for a quote: the same message | 422 | PASS |
+| BL23 | Ana cannot lift Fabio's block | 403 | PASS |
+| BL24 | Fabio unblocks; the link had only ended contracts | 200 | PASS |
+| BL25 | Ana blocks a driver whose request is still OPEN | 200 | PASS |
+| BL26 | the OPEN request is WITHDRAWN | WITHDRAWN | PASS |
+| BL27 | and unblocks it | 200 | PASS |
+| BL28 | Bruno blocks a link with an ACTIVE contract | 422 | PASS |
+| BL29 | and so does Gustavo | 422 | PASS |
+| BL30 | the link stays ACTIVE with no blocker | ACTIVE - f | PASS |
+| BL31 | three blocks at once by the same party: one 200, two 409 | 200 409 409 | PASS |
+| BL32 | Ana and Helena block each other at once: exactly one wins | ok | PASS |
+| BL33 | the negotiation was closed once, with the statuses of the side that won | CLIENT WITHDRAWN DECLINED | PASS |
+| BL34 | the winner unblocks | 200 | PASS |
+| BL35 | ten rounds of Ana asking Helena for a quote while Helena blocks her: every block gets 200, and the request is refused or closed by it | (none) | PASS |
+
+### Expiry sweep turned off (EXPIRY_SWEEP_ENABLED=false)
+| id | scenario | expected | result |
+|---|---|---|---|
+| OFF1 | 70 seconds later, past more than one interval, nothing expired on its own | OPEN SENT ANSWERED | PASS |
+
+### Expiry sweep (one-minute interval, batch of 2)
+| id | scenario | expected | result |
+|---|---|---|---|
+| SW1 | within one interval the overdue proposal is EXPIRED | EXPIRED | PASS |
+| SW2 | its request is OPEN again for 72 hours instead of expiring in the same round | OPEN 72 | PASS |
+| SW3 | the overdue OPEN request is EXPIRED in the same round | EXPIRED | PASS |
+| SW4 | the request still on time is untouched | OPEN | PASS |
+| SW5 | accepting the expired proposal | 409 | PASS |
+| SW6 | Ana asks Fabio again: the expired request no longer counts as open | 201 | PASS |
+| SW7 | three overdue requests: a round expires only the two oldest | EXPIRED EXPIRED OPEN | PASS |
+| SW8 | the next round expires the third | EXPIRED | PASS |
+| SW9 | the two rounds ran about one interval apart (55 to 65 seconds) | t | PASS |
+
 ### Regression: contract-core
 
 `scripts/qa/contract-core/qa.sh`, now sourcing `scripts/qa/lib.sh`, passed 269/269 against `main` before this change and 267/267 against this branch. Its B13 now expects the new message (`driver_rating.link.never_contracted`): the scenario is the same (a link without contract cannot rate), and only the text changed in PR 1. Since PR 2, every link it creates sends `origin`, and V39 blocks its link with a blocker and a block time, as the `V61` checks require. Since PR 3 the seeded dependents carry a school grid, which no `contract-core` scenario reads, and `V62` drops `dependent.shift`: S19 to S21, which tested that field, are gone, S25 checks only `trip.shift`, and S22 re-applies `V56` with the column added back for the duration, because `V56` comments it. `V63` drops `address.district_id`, `contract_item.pickup_district_id` and `school.district_id`, and no `contract-core` scenario reads these columns, `pickupDistrictName` or the school's `districtName`. Since PR 6 the seed sends a service request from Ana to Gustavo, which creates that link: the setup accepts the second seeded link and reuses it as Ana – Gustavo instead of creating it. A1 used to move Marina while she had contracts in progress, which D17 now refuses: A1 checks the refusal, the script ends her `ACTIVE` contracts through the admin, and A2 and A3 move her and check that the contracts still pick up at the old address. Since PR 8 the total must cover one cent per installment: L4 sends 0.12 in twelve, and L6 checks that 0.11 is refused with its pt-BR message.
@@ -730,3 +799,7 @@ For the approval scenarios (V1 to V12), Fabio is put back `UNDER_REVIEW` with `i
 - The summary carries the start the driver proposed (`startsOn`), which can differ from the request's `desiredStartDate` (Y45), and the client's view carries the driver's rating as `driver.rating` stores it (E36, E37).
 - The `status` filter of both lists takes several statuses, comma-separated or with the parameter repeated (E33, E34, Y46); one unknown status in the list gives 400 (E35).
 - An expired proposal that the sweep has not closed yet can still be withdrawn by the driver (Y38), which reopens the request; the sweep would have done the same.
+- The block and the unblock are native conditional `UPDATE`s. In HQL, assigning `blockedBy`, an association to the soft-deletable `UserModel`, makes Hibernate 7 join `users` and write the parameter into the link's id; the native statement writes the `blocked_by` column and keeps `deleted_at is null` in its condition.
+- Without a scheduler of its own, `@Scheduled` took the STOMP broker's scheduler, the only `TaskScheduler` in the context (the first run logged the rounds on `MessageBroker-*` threads). `SchedulingConfig` gives the sweep a one-thread `scheduling-1`, and the chat script still passes with the sweep on.
+- A block closes the negotiation through the same writes as the withdrawal and the decline, after the conditional write on the link: two blocks at once leave one blocker and one set of closing statuses (BL31 to BL33).
+- The sweep's first round runs at startup, and the next ones one interval after the previous ended (`fixedDelay`): SW9 measures the gap between two rounds.

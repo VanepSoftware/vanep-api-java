@@ -94,7 +94,7 @@ class ContractServiceTest {
     when(messages.getMessage(anyString(), any(), any())).thenAnswer(call -> call.getArgument(0));
     when(contracts.save(any())).thenAnswer(call -> call.getArgument(0));
     when(contracts.saveAndFlush(any())).thenAnswer(call -> call.getArgument(0));
-    when(links.save(any())).thenAnswer(call -> call.getArgument(0));
+    when(links.updateStatusUnlessBlocked(anyLong(), anyString())).thenReturn(1);
     when(scheduleRepository.save(any())).thenAnswer(call -> call.getArgument(0));
     when(contracts.findActiveByClientDriverId(anyLong())).thenReturn(Optional.empty());
     when(items.findSlotsByDependentIdAndContractStatusIn(anyLong(), any())).thenReturn(List.of());
@@ -143,6 +143,7 @@ class ContractServiceTest {
     link.setOrigin(LinkOrigin.CLIENT_SEARCH);
     link.setStatus(RelationshipStatus.PENDING);
     when(links.findByToken("link")).thenReturn(Optional.of(link));
+    when(links.lockByToken("link")).thenReturn(Optional.of(link));
 
     registerDependent("lucas", 11L, 1L, 7L, address(21L, "Rua A", "10"));
     registerDependent("ana", 12L, 1L, 7L, address(22L, "Rua B", "20"));
@@ -172,8 +173,16 @@ class ContractServiceTest {
     assertThat(response.status()).isEqualTo(ContractStatus.ACTIVE);
     assertThat(response.totalAmount()).isEqualByComparingTo("4200.00");
     assertThat(response.items()).hasSize(2);
-    assertThat(link.getStatus()).isEqualTo(RelationshipStatus.ACTIVE);
-    verify(links).save(link);
+    verify(links).updateStatusUnlessBlocked(3L, "ACTIVE");
+    verify(links, never()).save(any());
+  }
+
+  @Test
+  void creatingLocksTheLinkSoABlockCannotInterleave() {
+    service.create(createRequest(item("lucas", outbound())));
+
+    verify(links).lockByToken("link");
+    verify(links, never()).findByToken(anyString());
   }
 
   @Test
@@ -337,7 +346,7 @@ class ContractServiceTest {
 
     assertThat(contract.getStatus()).isEqualTo(ContractStatus.ENDED);
     assertThat(response.status()).isEqualTo(ContractStatus.ENDED);
-    assertThat(link.getStatus()).isEqualTo(RelationshipStatus.INACTIVE);
+    verify(links).updateStatusUnlessBlocked(3L, "INACTIVE");
   }
 
   @Test
@@ -348,7 +357,7 @@ class ContractServiceTest {
 
     service.update("contract", statusPatch(ContractStatus.SUSPENDED));
 
-    assertThat(link.getStatus()).isEqualTo(RelationshipStatus.ACTIVE);
+    verify(links).updateStatusUnlessBlocked(3L, "ACTIVE");
   }
 
   @Test
@@ -414,7 +423,7 @@ class ContractServiceTest {
 
     assertThat(contract.getStatus()).isEqualTo(ContractStatus.ACTIVE);
     verify(contracts, never()).save(any());
-    verify(links, never()).save(any());
+    verify(links, never()).updateStatusUnlessBlocked(anyLong(), anyString());
   }
 
   @Test
@@ -426,7 +435,7 @@ class ContractServiceTest {
     service.delete("contract");
 
     verify(contracts).delete(contract);
-    assertThat(link.getStatus()).isEqualTo(RelationshipStatus.PENDING);
+    verify(links).updateStatusUnlessBlocked(3L, "PENDING");
   }
 
   @Test
@@ -442,7 +451,7 @@ class ContractServiceTest {
     verify(items).restoreByContractToken("contract");
     verify(items).restoreSchedulesByContractToken("contract");
     verify(items).restoreSlotsByContractToken("contract");
-    assertThat(link.getStatus()).isEqualTo(RelationshipStatus.ACTIVE);
+    verify(links).updateStatusUnlessBlocked(3L, "ACTIVE");
   }
 
   @Test
