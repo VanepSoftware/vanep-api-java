@@ -1,6 +1,6 @@
 # QA — service-request-proposal (constitution rule 55)
 
-Latest run: on the stack tip, `VAN-30/13-pickup-time-and-price`, which contains this branch: every scenario below passed there (see the `qa.md` of PR 13 for the date and the counts). This file keeps the scenarios of PRs 1 to 5.
+Latest run: on the stack tip, `VAN-30/13-pickup-time-and-price`, which contains this branch: every scenario below passed there (see the `qa.md` of PR 13 for the date and the counts). This file keeps the scenarios of PRs 1 to 6.
 
 ## How to run
 
@@ -35,6 +35,8 @@ Tokens come from the mobile password grant (`urn:vanep:params:oauth:grant-type:p
 
 ## Setup
 
+The admin creates six links through `POST /api/client-drivers`. Their contracts are inserted by SQL, because the admin API only creates `ACTIVE` contracts and cannot reach `CANCELLED`. Each link status is set to match its contracts, and every link except Elena–Helena is backdated one day to clear the five-minute minimum age of the driver rating. Before that, the admin ends the seeded contract (Ana – Fabio, for Lucas): while it is in progress, D17 locks Lucas, and the grid and readiness scenarios edit him. The seed also brings Ana's open service request to Gustavo (PR 6), with the link it created.
+
 | Link | Contract | Link status |
 |---|---|---|
 | Bruno – Gustavo | `ACTIVE` | `ACTIVE` |
@@ -48,9 +50,13 @@ For the origin scenarios (O1 to O28), the admin creates Diego – Helena as `DRI
 
 For the school days scenarios (G1 to G24, W1 to W24, K1 to K8), Ana's two seeded dependents come complete from the seed (valid CPF, birth date, gender, school, pickup address and grid): Lucas is full time on Tuesday and Thursday and in the morning on the other weekdays, Marina in the morning from Monday to Friday. Bruno is the other client and Gustavo the driver of the misuse block.
 
+The seed gives Ana a phone and a personal address (PR 6), so that her service request goes out; the readiness scenarios (C1 to C18) clear both by SQL first, so Ana starts with neither, and her dependents complete; Marina lost her pickup address in G14 (removing a dependent removes its address). C7 gives Ana a phone and an address by SQL. The CPF scenarios (F1 to F11) create and remove their own dependents. For the school address scenarios (N1 to N9), Ana resolves the two school fixtures through the Places stub: Colégio Bandeirantes, in São Paulo, has a route, and the Objetivo of Taguatinga has none, so its deepest subdivision stands for the street. N5 removes the Bandeirantes address by SQL and points the school to the fixture name, so the next resolve finds a known school without an address and completes it. The neighborhood scenarios (N10 to N14) read Lucas, Ana's personal address, the seeded contract and the seeded school, which the seed gives an address of its own (Rua Vergueiro, 1000, Liberdade, São Paulo), apart from the dependents' home. The last block (H1 to H6) adds the three district columns back, points two new addresses, a new school and the seeded contract item to a district node, runs the `V63` file again, and restores the item.
+
 For the `V64` scenarios (Q1 to Q15), every insert runs inside a transaction that is rolled back. The requests use Diego – Gustavo and Bruno – Helena, and the items take Lucas's school and the city of his pickup address, with a snapshot built from his name and birth date. The checks are SQL against the tables.
 
 For the `V65` scenarios (P1 to P27), each check runs in a rolled-back transaction that first inserts the requests it needs (Diego – Gustavo `ANSWERED`, Bruno – Helena) and a `SENT` version 1 on Diego – Gustavo; the vehicle is the first seeded one, with its plate and capacity in the snapshot and the resulting contract the seeded one. P10 walks every numeric range to both of its limits on the same proposal; P11 to P18 go one step beyond each. P23 sets the pair index aside inside its transaction: with an empty table the planner has no reason to prefer one `SENT` index over the other.
+
+For the dependent locks (T1 to T18), Ana creates Rafa Souza; SQL gives him Lucas's school and a pickup address of his own, and the API his grid. T2 to T4 use a request inserted by SQL on Ana – Fabio, `OPEN` and then `ANSWERED`, set `WITHDRAWN` before the contract. T5 is a real `POST /api/contracts` by the admin on the same link, whose seeded contract already ended.
 
 For the approval scenarios (V1 to V12), Fabio is put back `UNDER_REVIEW` with `is_available = false` by SQL, as a driver who just finished the onboarding. The cleanup restores every seeded driver to `APPROVED` and available.
 
@@ -386,9 +392,41 @@ For the approval scenarios (V1 to V12), Fabio is put back `UNDER_REVIEW` with `i
 | H5 | the three columns are gone again | 0 | PASS |
 | H6 | the API reads the contract after the migration ran again | 200 | PASS |
 
+### Seeded service request
+| id | scenario | expected | result |
+|---|---|---|---|
+| S1 | the seed sent one request from Ana to Gustavo, answered by the seeded proposal, on a PENDING link from the search | ANSWERED PENDING CLIENT_SEARCH | PASS |
+| S2 | its item copies Lucas, his school, his city and his neighborhood | Lucas Souza|2016-04-02|Escola Municipal Seed|São Paulo|SP|Centro | PASS |
+| S3 | the days keep the grid of the sending time, although the grid changed since | MONDAY:MORNING,TUESDAY:FULLTIME,WEDNESDAY:MORNING,THURSDAY:FULLTIME,FRIDAY:MORNING | PASS |
+| S4 | every seeded day asks for the way to school and back | t | PASS |
+| S5 | it expires 72 hours after it was sent | 72 | PASS |
+| S6 | Lucas is not removed while the seeded request is open | 422 | PASS |
+
+### Dependent locks (D17)
+| id | scenario | expected | result |
+|---|---|---|---|
+| T1 | a new dependent gets school, address and grid | 200 | PASS |
+| T2 | a dependent in an OPEN request is not removed | 422 | PASS |
+| T3 | during the negotiation the grid still changes (the accept re-checks it) | 200 | PASS |
+| T4 | a dependent in an ANSWERED request is not removed | 422 | PASS |
+| T5 | after the request is withdrawn, the admin contracts the dependent | 201 | PASS |
+| T6 | a dependent with an ACTIVE contract is not removed | 422 | PASS |
+| T7 | not even by the admin | 422 | PASS |
+| T8 | the school is locked, even resent with its current value | 422 | PASS |
+| T9 | the address is locked | 422 | PASS |
+| T10 | clearing the address is locked too | 422 | PASS |
+| T11 | the grid is locked | 422 | PASS |
+| T12 | the name still changes | 200 | PASS |
+| T13 | the dependent kept its school, address and grid, and was not removed | t t t MONDAY:MORNING,TUESDAY:FULLTIME | PASS |
+| T14 | the contract still lists the dependent's item | 200 | PASS |
+| T15 | the contract ends | 200 | PASS |
+| T16 | two removals at once after the contract ended: one 204, one 404 | 204 404 | PASS |
+| T17 | the ended contract stays readable, without the removed dependent's item until phase 3 (R14) | 200 | PASS |
+| T18 | another client still cannot remove the dependent | 403 | PASS |
+
 ### Regression: contract-core
 
-`scripts/qa/contract-core/qa.sh`, now sourcing `scripts/qa/lib.sh`, passed 269/269 against `main` before this change and 267/267 against this branch. Its B13 now expects the new message (`driver_rating.link.never_contracted`): the scenario is the same (a link without contract cannot rate), and only the text changed in PR 1. Since PR 2, every link it creates sends `origin`, and V39 blocks its link with a blocker and a block time, as the `V61` checks require. Since PR 3 the seeded dependents carry a school grid, which no `contract-core` scenario reads, and `V62` drops `dependent.shift`: S19 to S21, which tested that field, are gone, S25 checks only `trip.shift`, and S22 re-applies `V56` with the column added back for the duration, because `V56` comments it. `V63` drops `address.district_id`, `contract_item.pickup_district_id` and `school.district_id`, and no `contract-core` scenario reads these columns, `pickupDistrictName` or the school's `districtName`.
+`scripts/qa/contract-core/qa.sh`, now sourcing `scripts/qa/lib.sh`, passed 269/269 against `main` before this change and 267/267 against this branch. Its B13 now expects the new message (`driver_rating.link.never_contracted`): the scenario is the same (a link without contract cannot rate), and only the text changed in PR 1. Since PR 2, every link it creates sends `origin`, and V39 blocks its link with a blocker and a block time, as the `V61` checks require. Since PR 3 the seeded dependents carry a school grid, which no `contract-core` scenario reads, and `V62` drops `dependent.shift`: S19 to S21, which tested that field, are gone, S25 checks only `trip.shift`, and S22 re-applies `V56` with the column added back for the duration, because `V56` comments it. `V63` drops `address.district_id`, `contract_item.pickup_district_id` and `school.district_id`, and no `contract-core` scenario reads these columns, `pickupDistrictName` or the school's `districtName`. Since PR 6 the seed sends a service request from Ana to Gustavo, which creates that link: the setup accepts the second seeded link and reuses it as Ana – Gustavo instead of creating it. A1 used to move Marina while she had contracts in progress, which D17 now refuses: A1 checks the refusal, the script ends her `ACTIVE` contracts through the admin, and A2 and A3 move her and check that the contracts still pick up at the old address.
 
 ## Behaviors worth knowing
 
@@ -405,3 +443,6 @@ For the approval scenarios (V1 to V12), Fabio is put back `UNDER_REVIEW` with `i
 - The school types the app searches by (`primary_school`, `secondary_school`) are covered by `SchoolResolveServiceTest` only: the Places stub serves recorded fixtures, and none of them is typed only as a primary or secondary school (rule 50 forbids inventing one).
 - Before PR 3, removing a dependent removed its pickup address but left `address_id` pointing to it, because Hibernate drops the pending update of an entity it deletes. A restored dependent then passed the readiness with an address that no longer existed. C1 checks the fix: Marina, removed and restored in G14 to G18, misses her address.
 - The seed school used to have no address, so every route that returns a school showed `address: null` for it. The seed now stores one (N14), and a database seeded before gets it on the next start.
+- The lock on the school, the address and the grid looks at the field, not at its value: resending the current school is refused too (T8). The app sends only the fields the person changed.
+- Removing a dependent locks its row, as the service request and the contract item do: two removals at once give one 204 and one 404 (T16).
+- Once the contract ended and the dependent left, the contract is still read, but without the dependent's item (T17): `contract_item` points to the dependent by association, and Hibernate hides the removed row. The plain ids come in phase 3 (R14).

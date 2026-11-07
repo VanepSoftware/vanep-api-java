@@ -177,6 +177,15 @@ class ContractServiceTest {
   }
 
   @Test
+  void eachItemLocksItsDependentSoARemovalCannotInterleave() {
+    service.create(createRequest(item("lucas", outbound()), item("ana", outbound())));
+
+    verify(dependents).lockByToken("lucas");
+    verify(dependents).lockByToken("ana");
+    verify(dependents, never()).findByToken(anyString());
+  }
+
+  @Test
   void aDependentOfAnotherClientIsRefused() {
     registerDependent("stranger", 13L, 99L, 7L, address(23L, "Rua C", "30"));
 
@@ -587,6 +596,7 @@ class ContractServiceTest {
       when(addresses.findById(address.getId())).thenReturn(Optional.of(address));
     }
     when(dependents.findByToken(token)).thenReturn(Optional.of(dependent));
+    when(dependents.lockByToken(token)).thenReturn(Optional.of(dependent));
   }
 
   private AddressModel address(Long id, String street, String number) {

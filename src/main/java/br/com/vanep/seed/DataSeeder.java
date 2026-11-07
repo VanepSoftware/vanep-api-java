@@ -1,5 +1,6 @@
 package br.com.vanep.seed;
 
+import br.com.vanep.address.seed.PersonalAddressSeeder;
 import br.com.vanep.auth.security.PermissionEnum;
 import br.com.vanep.auth.security.PermissionRegistry;
 import br.com.vanep.client.model.ClientModel;
@@ -20,6 +21,7 @@ import br.com.vanep.role.repository.RoleRepository;
 import br.com.vanep.rolepermission.model.RolePermissionModel;
 import br.com.vanep.rolepermission.repository.RolePermissionRepository;
 import br.com.vanep.school.seed.SchoolSeeder;
+import br.com.vanep.servicerequest.seed.ServiceRequestSeeder;
 import br.com.vanep.trip.seed.TripSeeder;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
@@ -52,6 +54,7 @@ public class DataSeeder implements ApplicationRunner {
   private final RoleRepository roles;
   private final RolePermissionRepository rolePermissions;
   private final SchoolSeeder schoolSeeder;
+  private final PersonalAddressSeeder personalAddressSeeder;
   private final DependentSeeder dependentSeeder;
   private final DriverCnhSeeder driverCnhSeeder;
   private final DriverDocumentSeeder driverDocumentSeeder;
@@ -61,6 +64,7 @@ public class DataSeeder implements ApplicationRunner {
   private final ClientDriverSeeder clientDriverSeeder;
   private final VehicleSeeder vehicleSeeder;
   private final ContractSeeder contractSeeder;
+  private final ServiceRequestSeeder serviceRequestSeeder;
   private final PasswordEncoder passwordEncoder;
 
   @Value("${vanep.seed.enabled:false}")
@@ -85,6 +89,7 @@ public class DataSeeder implements ApplicationRunner {
       RoleRepository roles,
       RolePermissionRepository rolePermissions,
       SchoolSeeder schoolSeeder,
+      PersonalAddressSeeder personalAddressSeeder,
       DependentSeeder dependentSeeder,
       DriverCnhSeeder driverCnhSeeder,
       DriverDocumentSeeder driverDocumentSeeder,
@@ -94,6 +99,7 @@ public class DataSeeder implements ApplicationRunner {
       ClientDriverSeeder clientDriverSeeder,
       VehicleSeeder vehicleSeeder,
       ContractSeeder contractSeeder,
+      ServiceRequestSeeder serviceRequestSeeder,
       PasswordEncoder passwordEncoder) {
     this.users = users;
     this.clients = clients;
@@ -101,6 +107,7 @@ public class DataSeeder implements ApplicationRunner {
     this.roles = roles;
     this.rolePermissions = rolePermissions;
     this.schoolSeeder = schoolSeeder;
+    this.personalAddressSeeder = personalAddressSeeder;
     this.dependentSeeder = dependentSeeder;
     this.driverCnhSeeder = driverCnhSeeder;
     this.driverDocumentSeeder = driverDocumentSeeder;
@@ -110,6 +117,7 @@ public class DataSeeder implements ApplicationRunner {
     this.clientDriverSeeder = clientDriverSeeder;
     this.vehicleSeeder = vehicleSeeder;
     this.contractSeeder = contractSeeder;
+    this.serviceRequestSeeder = serviceRequestSeeder;
     this.passwordEncoder = passwordEncoder;
   }
 
@@ -127,12 +135,14 @@ public class DataSeeder implements ApplicationRunner {
     seedClients();
     seedDrivers();
     schoolSeeder.seed();
+    personalAddressSeeder.seed();
     dependentSeeder.seed();
     driverCnhSeeder.seed();
     driverDocumentSeeder.seed();
     vehicleSeeder.seed();
     clientDriverSeeder.seed();
     contractSeeder.seed();
+    serviceRequestSeeder.seed();
     driverRatingSeeder.seed();
     clientRatingSeeder.seed();
     tripSeeder.seed();
@@ -295,14 +305,15 @@ public class DataSeeder implements ApplicationRunner {
   }
 
   private void seedClients() {
-    record ClientSeed(String name, String email, String document) {}
+    record ClientSeed(String name, String email, String document, String phone) {}
     List<ClientSeed> seeds =
         List.of(
-            new ClientSeed("Ana Souza", "ana.souza@seed.vanep.com.br", "39053344705"),
-            new ClientSeed("Bruno Lima", "bruno.lima@seed.vanep.com.br", "52998224725"),
-            new ClientSeed("Carla Nunes", "carla.nunes@seed.vanep.com.br", "11144477735"),
-            new ClientSeed("Diego Alves", "diego.alves@seed.vanep.com.br", "12345678909"),
-            new ClientSeed("Elena Rocha", "elena.rocha@seed.vanep.com.br", "86288366757"));
+            new ClientSeed(
+                "Ana Souza", "ana.souza@seed.vanep.com.br", "39053344705", "11987650001"),
+            new ClientSeed("Bruno Lima", "bruno.lima@seed.vanep.com.br", "52998224725", null),
+            new ClientSeed("Carla Nunes", "carla.nunes@seed.vanep.com.br", "11144477735", null),
+            new ClientSeed("Diego Alves", "diego.alves@seed.vanep.com.br", "12345678909", null),
+            new ClientSeed("Elena Rocha", "elena.rocha@seed.vanep.com.br", "86288366757", null));
 
     RoleModel clientRole = roles.findByRoleName(RoleName.CLIENT).orElseThrow();
     for (ClientSeed seed : seeds) {
@@ -313,6 +324,7 @@ public class DataSeeder implements ApplicationRunner {
       user.setName(seed.name());
       user.setEmail(seed.email());
       user.setDocument(seed.document());
+      user.setPhone(seed.phone());
       user.setPassword(passwordEncoder.encode("password"));
       user.setVerified(true);
       user.setTermsAcceptedAt(Instant.now());
