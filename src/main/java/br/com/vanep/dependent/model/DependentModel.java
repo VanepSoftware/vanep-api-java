@@ -1,6 +1,5 @@
 package br.com.vanep.dependent.model;
 
-import br.com.vanep.shared.enums.SchoolShift;
 import br.com.vanep.user.enums.Gender;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -67,10 +66,6 @@ public class DependentModel {
 
   @Column(name = "is_default", nullable = false)
   private boolean defaultDependent;
-
-  @Enumerated(EnumType.STRING)
-  @Column(nullable = false, length = 16)
-  private SchoolShift shift = SchoolShift.MORNING;
 
   @CreationTimestamp
   @Column(name = "created_at", nullable = false, updatable = false)

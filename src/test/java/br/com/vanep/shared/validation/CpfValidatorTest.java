@@ -1,4 +1,4 @@
-package br.com.vanep.auth.validation;
+package br.com.vanep.shared.validation;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

@@ -233,7 +233,6 @@ public class ContractService {
     item.setPickupNumber(address.getNumber());
     item.setPickupComplement(address.getComplement());
     item.setPickupNeighborhood(address.getNeighborhood());
-    item.setPickupDistrict(address.getDistrict());
     item.setPickupGooglePlaceId(address.getGooglePlaceId());
   }
 

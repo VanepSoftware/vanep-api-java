@@ -1,6 +1,6 @@
 # QA — service-request-proposal (constitution rule 55)
 
-Latest run: on the stack tip, `VAN-30/13-pickup-time-and-price`, which contains this branch: every scenario below passed there (see the `qa.md` of PR 13 for the date and the counts). This file keeps the scenarios of PRs 1 to 2.
+Latest run: on the stack tip, `VAN-30/13-pickup-time-and-price`, which contains this branch: every scenario below passed there (see the `qa.md` of PR 13 for the date and the counts). This file keeps the scenarios of PRs 1 to 3.
 
 ## How to run
 
@@ -45,6 +45,8 @@ Tokens come from the mobile password grant (`urn:vanep:params:oauth:grant-type:p
 | Elena – Helena | `ACTIVE`, link just created | `ACTIVE` |
 
 For the origin scenarios (O1 to O28), the admin creates Diego – Helena as `DRIVER_INVITE`, Diego – Fabio as `CLIENT_SEARCH` and Elena – Gustavo through six concurrent requests. The last block (L1 to L5) rebuilds the schema as it was before `V61`: it drops the three columns and both checks, marks six links `BLOCKED` with no blocker (Diego – Fabio also removed), and runs the `V61` file again.
+
+For the school days scenarios (G1 to G24, W1 to W24, K1 to K8), Ana's two seeded dependents come complete from the seed (valid CPF, birth date, gender, school, pickup address and grid): Lucas is full time on Tuesday and Thursday and in the morning on the other weekdays, Marina in the morning from Monday to Friday. Bruno is the other client and Gustavo the driver of the misuse block.
 
 For the approval scenarios (V1 to V12), Fabio is put back `UNDER_REVIEW` with `is_available = false` by SQL, as a driver who just finished the onboarding. The cleanup restores every seeded driver to `APPROVED` and available.
 
@@ -190,9 +192,150 @@ For the approval scenarios (V1 to V12), Fabio is put back `UNDER_REVIEW` with `i
 | L4 | the checks are back | rejected by client_driver_blocked_by_check | PASS |
 | L5 | the API reads a link the migration brought back | 200 | PASS |
 
+### Weekly school days of a dependent
+| id | scenario | expected | result |
+|---|---|---|---|
+| G1 | the seeded dependent is full time on Tuesday and Thursday, Monday first | 200 | PASS |
+| G2 | the other seeded dependent has mornings from Monday to Friday | 200 | PASS |
+| G3 | the client replaces the grid out of order and gets it back Monday first | 200 | PASS |
+| G4 | reading the grid returns the replaced days | 200 | PASS |
+| G5 | the database holds only the replaced days as active | MONDAY:AFTERNOON,THURSDAY:FULLTIME,FRIDAY:AFTERNOON | PASS |
+| G6 | the five replaced days were soft-deleted, not removed | 5 | PASS |
+| G7 | replacing the grid changed no other field of the dependent | {"token":"403d2a811a8a4336a2e3b17ed","client":{"token":"438845e1aa614c1fbcd065c0d"},"name":"Marina Souza","birthDate":"2019-09-15","gender":"FEMALE","document":"45317828791","phone":null,"email":null,"isSelf":false,"isDefault":false,"school":{"token":"cd45c837648a40e588c3bc001","name":"Escola Municipal Seed","address":null},"address":{"token":"9981eb44adf047c5825ffdd0e","zipCode":"01001000","street":"Rua das Acácias","number":"250","complement":null,"neighborhood":"Centro","cityToken":"bfbf0dd051a040a893ca814ec","cityName":"São Paulo","stateUf":"SP","active":true,"createdAt":"2026-10-24T23:10:46.613208Z"},"createdAt":"2026-10-24T23:10:46.614521Z","updatedAt":"2026-10-24T23:10:46.614521Z"} | PASS |
+| G8 | all seven weekdays are accepted | 200 | PASS |
+| G9 | the admin reads the grid of any dependent | 200 | PASS |
+| G10 | the admin replaces the grid of any dependent | 200 | PASS |
+| G11 | an empty list clears the grid | 200 | PASS |
+| G12 | the cleared grid reads empty | 200 | PASS |
+| G13 | the client sets a grid on the dependent it is about to remove | 200 | PASS |
+| G14 | the client removes the dependent | 204 | PASS |
+| G15 | the grid of a removed dependent is not found | 404 | PASS |
+| G16 | nor can it be replaced | 404 | PASS |
+| G17 | the rows of the removed dependent stay as they were | TUESDAY:NIGHT | PASS |
+| G18 | the client restores the dependent | 200 | PASS |
+| G19 | the restored dependent comes back with its grid | 200 | PASS |
+| G20 | six concurrent replacements of the same grid all succeed | 200 200 200 200 200 200 | PASS |
+| G21 | and leave exactly one active grid | MONDAY:MORNING,TUESDAY:FULLTIME,WEDNESDAY:MORNING,THURSDAY:FULLTIME,FRIDAY:MORNING | PASS |
+| G22 | the dependent has no single shift anymore | 200 | PASS |
+| G23 | a shift sent on creation is ignored | 201 | PASS |
+| G24 | the client removes the dependent created to check the shift | 204 | PASS |
+
+### Weekly school days — misuse
+| id | scenario | expected | result |
+|---|---|---|---|
+| W1 | reading without a token | 401 | PASS |
+| W2 | reading with an invalid token | 401 | PASS |
+| W3 | replacing without a token | 401 | PASS |
+| W4 | another client cannot read the grid | 403 | PASS |
+| W5 | another client cannot replace the grid | 403 | PASS |
+| W6 | a driver cannot read the grid | 403 | PASS |
+| W7 | a driver cannot replace the grid | 403 | PASS |
+| W8 | the grid of an unknown dependent | 404 | PASS |
+| W9 | replacing the grid of an unknown dependent | 404 | PASS |
+| W10 | the same weekday twice, pt-BR message | 400 | PASS |
+| W11 | eight entries, one past the seven weekdays | 400 | PASS |
+| W12 | a day without weekday | 400 | PASS |
+| W13 | a day without schoolShift | 400 | PASS |
+| W14 | an unknown weekday | 400 | PASS |
+| W15 | an unknown schoolShift | 400 | PASS |
+| W16 | a weekday in lower case | 400 | PASS |
+| W17 | a null day | 400 | PASS |
+| W18 | days null | 400 | PASS |
+| W19 | no days field | 400 | PASS |
+| W20 | days as a string | 400 | PASS |
+| W21 | days as an object | 400 | PASS |
+| W22 | schoolShift as a boolean | 400 | PASS |
+| W23 | malformed JSON | 400 | PASS |
+| W24 | the refused requests left the grid unchanged | MONDAY:MORNING,TUESDAY:FULLTIME,WEDNESDAY:MORNING,THURSDAY:FULLTIME,FRIDAY:MORNING | PASS |
+
+### V62: dependent_school_day (database checks)
+| id | scenario | expected | result |
+|---|---|---|---|
+| K1 | a second active row for the same weekday | rejected by dependent_school_day_weekday_active_key | PASS |
+| K2 | the same weekday once the active row is soft-deleted | accepted | PASS |
+| K3 | the same weekday on another dependent | accepted | PASS |
+| K4 | a row without school_shift | rejected by "school_shift" | PASS |
+| K5 | a row for a dependent that does not exist | rejected by dependent_school_day_dependent_id_fkey | PASS |
+| K6 | the table, weekday and school_shift are documented | 3 | PASS |
+| K7 | the checks above were rolled back | MONDAY:MORNING,TUESDAY:FULLTIME,WEDNESDAY:MORNING,THURSDAY:FULLTIME,FRIDAY:MORNING | PASS |
+| K8 | V62 dropped dependent.shift | 0 | PASS |
+
+### Contract readiness
+| id | scenario | expected | result |
+|---|---|---|---|
+| C1 | the seeded client misses phone and address; the restored dependent misses its address | 200 | PASS |
+| C2 | client entries carry no dependentToken | yes | PASS |
+| C3 | the tokens separated by a comma give the same answer | 200 | PASS |
+| C4 | a token sent twice is checked once | 200 | PASS |
+| C5 | without dependent tokens only the client is checked | 200 | PASS |
+| C6 | clearing the birth date makes the dependent miss it | 200 | PASS |
+| C7 | with phone, address and a complete dependent the client is ready | 200 | PASS |
+| C8 | clearing the grid makes the dependent miss the school days | 200 | PASS |
+| C9 | the client sets the grid back | 200 | PASS |
+| C10 | and the dependent is ready again | 200 | PASS |
+
+### Contract readiness — misuse
+| id | scenario | expected | result |
+|---|---|---|---|
+| C11 | no token | 401 | PASS |
+| C12 | invalid token | 401 | PASS |
+| C13 | a driver cannot ask | 403 | PASS |
+| C14 | the admin is not a client | 403 | PASS |
+| C15 | another client's dependent | 404 | PASS |
+| C16 | an unknown token among known ones | 404 | PASS |
+| C17 | the client removes a dependent | 204 | PASS |
+| C18 | a removed dependent | 404 | PASS |
+
+### CPF of a dependent
+| id | scenario | expected | result |
+|---|---|---|---|
+| F1 | a CPF with wrong check digits on creation | 400 | PASS |
+| F2 | a CPF of repeated digits on creation | 400 | PASS |
+| F3 | a CPF one digit short | 400 | PASS |
+| F4 | the refused creations stored nothing | 4 | PASS |
+| F5 | a masked CPF is stored as digits | 201 | PASS |
+| F6 | the same CPF without the mask is a duplicate | 409 | PASS |
+| F7 | an invalid CPF on update | 400 | PASS |
+| F8 | the refused update kept the stored CPF | 52998224725 | PASS |
+| F9 | document null clears the CPF | 200 | PASS |
+| F10 | an empty document is stored as no document | 201 | PASS |
+| F11 | the client removes the dependents created to check the CPF | 204 | PASS |
+
+### School address on resolve (D21)
+| id | scenario | expected | result |
+|---|---|---|---|
+| N1 | a new school gets the address of its place | 201 | PASS |
+| N2 | a place with no route takes its deepest subdivision as the street and its shallowest sublocality as the neighborhood, and the school has no districtName nor districtToken | 201 | PASS |
+| N3 | resolving the school again keeps its address | 200 | PASS |
+| N4 | no second address was stored for the school | 1 | PASS |
+| N5 | a known school without an address is completed on resolve | 200 | PASS |
+| N6 | the school now points to the new address | d38950d86f614c71813d7b325 | PASS |
+| N7 | the dependent's school comes with its address | 201 | PASS |
+| N8 | the dependent list carries the school address | 200 | PASS |
+| N9 | the client removes the dependent created for the school | 204 | PASS |
+
+### Neighborhood instead of district (D20)
+| id | scenario | expected | result |
+|---|---|---|---|
+| N10 | the dependent address has a neighborhood and no district | 200 | PASS |
+| N11 | the personal address has no districtName nor districtToken | 200 | PASS |
+| N12 | the contract item shows the pickup neighborhood and no pickupDistrictName | 200 | PASS |
+| N13 | V63 removed address.district_id, contract_item.pickup_district_id and school.district_id | 0 | PASS |
+| N14 | the seeded school comes with an address of its own, in its city | 200 | PASS |
+
+### V63 re-applied on rows that pointed to a district
+| id | scenario | expected | result |
+|---|---|---|---|
+| H1 | an address without a neighborhood takes the name of its district | Setor L Norte | PASS |
+| H2 | an address with a neighborhood keeps it | Centro | PASS |
+| H3 | a contract item without a pickup neighborhood takes the name of its district | Setor L Norte | PASS |
+| H4 | a school address without a neighborhood takes the name of the school's district | Setor L Norte | PASS |
+| H5 | the three columns are gone again | 0 | PASS |
+| H6 | the API reads the contract after the migration ran again | 200 | PASS |
+
 ### Regression: contract-core
 
-`scripts/qa/contract-core/qa.sh`, now sourcing `scripts/qa/lib.sh`, passed 269/269 against `main` before this change and 267/267 against this branch. Its B13 now expects the new message (`driver_rating.link.never_contracted`): the scenario is the same (a link without contract cannot rate), and only the text changed in PR 1. Since PR 2, every link it creates sends `origin`, and V39 blocks its link with a blocker and a block time, as the `V61` checks require.
+`scripts/qa/contract-core/qa.sh`, now sourcing `scripts/qa/lib.sh`, passed 269/269 against `main` before this change and 267/267 against this branch. Its B13 now expects the new message (`driver_rating.link.never_contracted`): the scenario is the same (a link without contract cannot rate), and only the text changed in PR 1. Since PR 2, every link it creates sends `origin`, and V39 blocks its link with a blocker and a block time, as the `V61` checks require. Since PR 3 the seeded dependents carry a school grid, which no `contract-core` scenario reads, and `V62` drops `dependent.shift`: S19 to S21, which tested that field, are gone, S25 checks only `trip.shift`, and S22 re-applies `V56` with the column added back for the duration, because `V56` comments it. `V63` drops `address.district_id`, `contract_item.pickup_district_id` and `school.district_id`, and no `contract-core` scenario reads these columns, `pickupDistrictName` or the school's `districtName`.
 
 ## Behaviors worth knowing
 
@@ -203,3 +346,9 @@ For the approval scenarios (V1 to V12), Fabio is put back `UNDER_REVIEW` with `i
 - Two admin creations of the same pair that race get `409 client_driver.duplicate_pair`, not a 500 (O27): the unique pair index decides, and the service turns its violation into the same conflict as the sequential case.
 - Jackson is lenient with enums: `"origin": 1` creates a `DRIVER_INVITE` link (the index of the value) and `"DRIVER_INVITE "` with a trailing space is accepted. The scenarios above stick to what the API refuses; tightening enum parsing is left for the global change on validation errors.
 - `V61` cannot run twice as it stands (`add column`), so L1 to L5 rebuild the schema before it rather than re-running it on top of itself. Rebuilding drops the stored origins, which is why every link comes back `CLIENT_SEARCH` (L3).
+- Six concurrent `PUT`s of the same grid all return 200 and leave one active grid (G20, G21): the replace locks the dependent row, so each one waits for the previous and replaces it. Without it, two of them could insert the same weekdays at once and run into the partial unique index.
+- Removing a dependent leaves its grid rows untouched (G17), hidden with the dependent, so the restore brings the grid back (G19).
+- A request body that fails Bean Validation on the dependent routes gets the generic `Invalid request content.` detail, not the field message (F1 to F3, F7): the `dependent.document.invalid` key is in place for the global change on validation errors. Since `api-validation-errors` (VAN-55) is in `main`, the same bodies return the field message in pt-BR in `detail`, with `field` and `errors[]`; the script only checks the status there, so it is unchanged. The duplicate CPF is a service error and carries its pt-BR message (F6).
+- The school types the app searches by (`primary_school`, `secondary_school`) are covered by `SchoolResolveServiceTest` only: the Places stub serves recorded fixtures, and none of them is typed only as a primary or secondary school (rule 50 forbids inventing one).
+- Before PR 3, removing a dependent removed its pickup address but left `address_id` pointing to it, because Hibernate drops the pending update of an entity it deletes. A restored dependent then passed the readiness with an address that no longer existed. C1 checks the fix: Marina, removed and restored in G14 to G18, misses her address.
+- The seed school used to have no address, so every route that returns a school showed `address: null` for it. The seed now stores one (N14), and a database seeded before gets it on the next start.
