@@ -43,15 +43,15 @@
 > Depends on: PR 1 | Parallel with: —
 > Order: test → migration → enum → model → DTO → service
 
-- [ ] 2.1 Criar branch `VAN-30/2-link-origin` de dentro da branch do PR 1
-- [ ] 2.2 Testes: `POST /api/client-drivers` sem `origin` → 400 e nada criado; com `origin` desconhecida → 400; com `DRIVER_INVITE` → 201 com `origin` e `PENDING`; a resposta de `GET /{token}` e `/me` traz `origin`; repositório grava e relê `origin`, `blocked_by` e `blocked_at`; `origin` não muda num `save` de um vínculo existente com outro valor (`updatable = false`)
-- [ ] 2.3 Migration `V61__client_driver_origin_and_block.sql`: `origin varchar(16)`, `update … set origin = 'CLIENT_SEARCH'`, `set not null`; `blocked_by bigint references users (id)`, `blocked_at timestamptz`; vínculos `BLOCKED` voltam ao status derivado dos contratos (mesma regra SQL da `V60`); `check ((status = 'BLOCKED') = (blocked_by is not null))` e o mesmo para `blocked_at`; comments (origem imutável e por quê; quem bloqueou)
-- [ ] 2.4 `clientdriver.enums.LinkOrigin` (`CLIENT_SEARCH`, `DRIVER_INVITE`) e as colunas no `ClientDriverModel` (`origin` com `updatable = false`; `blockedBy` como `UserModel` `EAGER`)
-- [ ] 2.5 `ClientDriverCreateRequestDTO` com `@NotNull LinkOrigin origin`; `ClientDriverService.create` grava; `ClientDriverResponseDTO` e mapper com `origin`
-- [ ] 2.6 `ClientDriverSeeder` grava a origem; conferir que nenhum outro ponto do código cria `ClientDriverModel` sem origem (`grep "new ClientDriverModel"`, inclusive nos testes)
-- [ ] 2.7 Reconferir que `vanep-frontend` e `vanep-mobile` não chamam `POST /api/client-drivers` (R10)
-- [ ] 2.8 `make lint` + `./mvnw verify -B`
-- [ ] 2.9 QA da regra 55: `POST` do admin com e sem `origin`, com tipo errado e valor desconhecido; por SQL, o `CHECK` recusa `BLOCKED` sem dono e dono sem `BLOCKED`; a `V61` reaplicada sobre um vínculo `BLOCKED` sem dono o devolve ao status derivado e preenche `origin`
+- [x] 2.1 Criar branch `VAN-30/2-link-origin` de dentro da branch do PR 1
+- [x] 2.2 Testes: `POST /api/client-drivers` sem `origin` → 400 e nada criado; com `origin` desconhecida → 400; com `DRIVER_INVITE` → 201 com `origin` e `PENDING`; a resposta de `GET /{token}` e `/me` traz `origin`; repositório grava e relê `origin`, `blocked_by` e `blocked_at`; `origin` não muda num `save` de um vínculo existente com outro valor (`updatable = false`)
+- [x] 2.3 Migration `V61__client_driver_origin_and_block.sql`: `origin varchar(16)`, `update … set origin = 'CLIENT_SEARCH'`, `set not null`; `blocked_by bigint references users (id)`, `blocked_at timestamptz`; vínculos `BLOCKED` voltam ao status derivado dos contratos (mesma regra SQL da `V60`); `check ((status = 'BLOCKED') = (blocked_by is not null))` e o mesmo para `blocked_at`; comments (origem imutável e por quê; quem bloqueou)
+- [x] 2.4 `clientdriver.enums.LinkOrigin` (`CLIENT_SEARCH`, `DRIVER_INVITE`) e as colunas no `ClientDriverModel` (`origin` com `updatable = false`; `blockedBy` como `UserModel` `EAGER`)
+- [x] 2.5 `ClientDriverCreateRequestDTO` com `@NotNull LinkOrigin origin`; `ClientDriverService.create` grava; `ClientDriverResponseDTO` e mapper com `origin`
+- [x] 2.6 `ClientDriverSeeder` grava a origem; conferir que nenhum outro ponto do código cria `ClientDriverModel` sem origem (`grep "new ClientDriverModel"`, inclusive nos testes)
+- [x] 2.7 Reconferir que `vanep-frontend` e `vanep-mobile` não chamam `POST /api/client-drivers` (R10)
+- [x] 2.8 `make lint` + `./mvnw verify -B`
+- [x] 2.9 QA da regra 55: `POST` do admin com e sem `origin`, com tipo errado e valor desconhecido; por SQL, o `CHECK` recusa `BLOCKED` sem dono e dono sem `BLOCKED`; a `V61` reaplicada sobre um vínculo `BLOCKED` sem dono o devolve ao status derivado e preenche `origin`
 
 ## 3. PR 3 — Grade escolar do dependente e prontidão contratual
 

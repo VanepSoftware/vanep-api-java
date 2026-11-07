@@ -1,6 +1,6 @@
 # QA — service-request-proposal (constitution rule 55)
 
-Latest run: on the stack tip, `VAN-30/13-pickup-time-and-price`, which contains this branch: every scenario below passed there (see the `qa.md` of PR 13 for the date and the counts). This file keeps the scenarios of PRs 1 to 1.
+Latest run: on the stack tip, `VAN-30/13-pickup-time-and-price`, which contains this branch: every scenario below passed there (see the `qa.md` of PR 13 for the date and the counts). This file keeps the scenarios of PRs 1 to 2.
 
 ## How to run
 
@@ -43,6 +43,8 @@ Tokens come from the mobile password grant (`urn:vanep:params:oauth:grant-type:p
 | Carla – Helena | `ACTIVE`, deleted by the admin during the run (R12) | `ACTIVE` |
 | Diego – Gustavo | none | `PENDING` |
 | Elena – Helena | `ACTIVE`, link just created | `ACTIVE` |
+
+For the origin scenarios (O1 to O28), the admin creates Diego – Helena as `DRIVER_INVITE`, Diego – Fabio as `CLIENT_SEARCH` and Elena – Gustavo through six concurrent requests. The last block (L1 to L5) rebuilds the schema as it was before `V61`: it drops the three columns and both checks, marks six links `BLOCKED` with no blocker (Diego – Fabio also removed), and runs the `V61` file again.
 
 For the approval scenarios (V1 to V12), Fabio is put back `UNDER_REVIEW` with `is_available = false` by SQL, as a driver who just finished the onboarding. The cleanup restores every seeded driver to `APPROVED` and available.
 
@@ -130,9 +132,67 @@ For the approval scenarios (V1 to V12), Fabio is put back `UNDER_REVIEW` with `i
 | V11 | approving an approved driver again | 400 | PASS |
 | V12 | approving an unknown driver | 404 | PASS |
 
+### Every link has an immutable origin
+| id | scenario | expected | result |
+|---|---|---|---|
+| O1 | the seeded link and the links of the setup were created as CLIENT_SEARCH | 0 | PASS |
+| O2 | the admin creates a link with origin DRIVER_INVITE | 201 | PASS |
+| O3 | the origin is stored | DRIVER_INVITE | PASS |
+| O4 | the client of the link reads its origin | 200 | PASS |
+| O5 | the driver's own list carries the origin of every link | 200 | PASS |
+| O6 | the admin's page carries the origin of every link | 200 | PASS |
+| O7 | the admin creates a link with origin CLIENT_SEARCH | 201 | PASS |
+
+### Link origin — misuse
+| id | scenario | expected | result |
+|---|---|---|---|
+| O8 | no origin | 400 | PASS |
+| O9 | origin null | 400 | PASS |
+| O10 | unknown origin | 400 | PASS |
+| O11 | origin in lower case | 400 | PASS |
+| O12 | blank origin | 400 | PASS |
+| O13 | origin as a boolean | 400 | PASS |
+| O14 | origin as an object | 400 | PASS |
+| O15 | malformed JSON | 400 | PASS |
+| O16 | a client cannot create a link | 403 | PASS |
+| O17 | a driver cannot create a link | 403 | PASS |
+| O18 | no token | 401 | PASS |
+| O19 | invalid token | 401 | PASS |
+| O20 | the refused creations wrote nothing | 10 | PASS |
+| O21 | the same pair again with the other origin | 409 | PASS |
+| O22 | the existing link keeps DRIVER_INVITE | DRIVER_INVITE | PASS |
+| O23 | there is no route that writes the origin | 405 | PASS |
+| O24 | the origin did not change | DRIVER_INVITE | PASS |
+| O25 | the admin removes the link | 204 | PASS |
+| O26 | restoring brings it back with its origin, whatever the body says | 200 | PASS |
+| O27 | six concurrent creations of a new pair: one wins, the rest get 409 | 201 409 409 409 409 409 | PASS |
+| O28 | and the pair has exactly one link | 1 | PASS |
+
+### V61: origin and block columns (database checks)
+| id | scenario | expected | result |
+|---|---|---|---|
+| D1 | BLOCKED without a blocker | rejected by client_driver_blocked_by_check | PASS |
+| D2 | BLOCKED without a block time | rejected by client_driver_blocked_at_check | PASS |
+| D3 | a blocker on a link that is not BLOCKED | rejected by client_driver_blocked_by_check | PASS |
+| D4 | a block time on a link that is not BLOCKED | rejected by client_driver_blocked_at_check | PASS |
+| D5 | BLOCKED with a blocker and a block time | accepted | PASS |
+| D6 | a blocker that is not a user | rejected by client_driver_blocked_by_fkey | PASS |
+| D7 | a link without origin | rejected by "origin" | PASS |
+| D8 | the checks above were rolled back | PENDING CLIENT_SEARCH | PASS |
+| D9 | origin, blocked_by and blocked_at are documented | 3 | PASS |
+
+### V61 re-applied on links blocked before the blocker existed
+| id | scenario | expected | result |
+|---|---|---|---|
+| L1 | each legacy BLOCKED link gets the status its contracts give | 02bad9e33db04ac8a1176e781=PENDING,376ed1b721694cdbb2038bfe6=PENDING,78711ae19daa4285aca20c590=INACTIVE,ca28d676994346a58b0c331d7=INACTIVE,e66f629d7f4b4200a5729b526=ACTIVE,fb8d83209b084e9fab1e12e6b=PENDING | PASS |
+| L2 | the links that were not BLOCKED keep their status | 249c8ab01e7445b894e0d0c5d=PENDING,93725a1b6a2b40f0be09937ef=PENDING,a19be41714774502978be4ad5=PENDING,cfbdafbce82e48d584c1f2813=INACTIVE,ec031310f4724723990706d69=ACTIVE | PASS |
+| L3 | every link, removed ones included, gets CLIENT_SEARCH | 0 0 | PASS |
+| L4 | the checks are back | rejected by client_driver_blocked_by_check | PASS |
+| L5 | the API reads a link the migration brought back | 200 | PASS |
+
 ### Regression: contract-core
 
-`scripts/qa/contract-core/qa.sh`, now sourcing `scripts/qa/lib.sh`, passed 269/269 against `main` before this change and 267/267 against this branch. Its B13 now expects the new message (`driver_rating.link.never_contracted`): the scenario is the same (a link without contract cannot rate), and only the text changed in PR 1.
+`scripts/qa/contract-core/qa.sh`, now sourcing `scripts/qa/lib.sh`, passed 269/269 against `main` before this change and 267/267 against this branch. Its B13 now expects the new message (`driver_rating.link.never_contracted`): the scenario is the same (a link without contract cannot rate), and only the text changed in PR 1. Since PR 2, every link it creates sends `origin`, and V39 blocks its link with a blocker and a block time, as the `V61` checks require.
 
 ## Behaviors worth knowing
 
@@ -140,3 +200,6 @@ For the approval scenarios (V1 to V12), Fabio is put back `UNDER_REVIEW` with `i
 - The link status does not decide eligibility: an `INACTIVE` link whose contract ended still allows rating (R6 to R8).
 - The profile of a driver who is not accepting new students stays reachable and reports `available = false` (A10, A11); only search and recommended hide them.
 - Approving a driver turns `is_available` on in the same write, so an approved driver shows up in search and recommended right away (V8 to V10). A rejected driver stays unavailable (V3).
+- Two admin creations of the same pair that race get `409 client_driver.duplicate_pair`, not a 500 (O27): the unique pair index decides, and the service turns its violation into the same conflict as the sequential case.
+- Jackson is lenient with enums: `"origin": 1` creates a `DRIVER_INVITE` link (the index of the value) and `"DRIVER_INVITE "` with a trailing space is accepted. The scenarios above stick to what the API refuses; tightening enum parsing is left for the global change on validation errors.
+- `V61` cannot run twice as it stands (`add column`), so L1 to L5 rebuild the schema before it rather than re-running it on top of itself. Rebuilding drops the stored origins, which is why every link comes back `CLIENT_SEARCH` (L3).

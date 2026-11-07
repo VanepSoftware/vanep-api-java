@@ -12,6 +12,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import br.com.vanep.client.model.ClientModel;
 import br.com.vanep.client.repository.ClientRepository;
+import br.com.vanep.clientdriver.enums.LinkOrigin;
 import br.com.vanep.clientdriver.enums.RelationshipStatus;
 import br.com.vanep.clientdriver.model.ClientDriverModel;
 import br.com.vanep.clientdriver.repository.ClientDriverRepository;
@@ -75,16 +76,53 @@ class ClientDriverControllerTest {
   }
 
   @Test
-  void adminCreatesTheLinkAsPending() throws Exception {
+  void adminCreatesTheLinkAsPendingWithTheGivenOrigin() throws Exception {
     mockMvc
         .perform(
             post("/api/client-drivers")
                 .with(adminJwt())
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(createBody(maria.getToken(), carlos.getToken())))
+                .content(createBody(maria.getToken(), carlos.getToken(), "DRIVER_INVITE")))
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.status").value("PENDING"))
+        .andExpect(jsonPath("$.origin").value("DRIVER_INVITE"))
         .andExpect(jsonPath("$.token").isNotEmpty());
+
+    assertThat(links.findByPair(maria.getId(), carlos.getId()))
+        .get()
+        .extracting(link -> link.getOrigin())
+        .isEqualTo(LinkOrigin.DRIVER_INVITE);
+  }
+
+  @Test
+  void createRequiresAnOrigin() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/client-drivers")
+                .with(adminJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"clientToken\":\""
+                        + maria.getToken()
+                        + "\",\"driverToken\":\""
+                        + carlos.getToken()
+                        + "\"}"))
+        .andExpect(status().isBadRequest());
+
+    assertThat(links.findAll()).isEmpty();
+  }
+
+  @Test
+  void createRejectsAnUnknownOrigin() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/client-drivers")
+                .with(adminJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(createBody(maria.getToken(), carlos.getToken(), "WALK_IN")))
+        .andExpect(status().isBadRequest());
+
+    assertThat(links.findAll()).isEmpty();
   }
 
   @Test
@@ -99,7 +137,7 @@ class ClientDriverControllerTest {
                         + maria.getToken()
                         + "\",\"driverToken\":\""
                         + carlos.getToken()
-                        + "\",\"status\":\"ACTIVE\"}"))
+                        + "\",\"origin\":\"CLIENT_SEARCH\",\"status\":\"ACTIVE\"}"))
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.status").value("PENDING"));
   }
@@ -131,7 +169,7 @@ class ClientDriverControllerTest {
             post("/api/client-drivers")
                 .with(adminJwt())
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(createBody(maria.getToken(), pendingDriver.getToken())))
+                .content(createBody(maria.getToken(), pendingDriver.getToken(), "CLIENT_SEARCH")))
         .andExpect(status().isUnprocessableContent());
   }
 
@@ -144,7 +182,7 @@ class ClientDriverControllerTest {
             post("/api/client-drivers")
                 .with(adminJwt())
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(createBody(maria.getToken(), carlos.getToken())))
+                .content(createBody(maria.getToken(), carlos.getToken(), "CLIENT_SEARCH")))
         .andExpect(status().isConflict());
   }
 
@@ -155,7 +193,7 @@ class ClientDriverControllerTest {
             post("/api/client-drivers")
                 .with(adminJwt())
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(createBody("naoexiste", carlos.getToken())))
+                .content(createBody("naoexiste", carlos.getToken(), "CLIENT_SEARCH")))
         .andExpect(status().isNotFound());
   }
 
@@ -177,7 +215,8 @@ class ClientDriverControllerTest {
     mockMvc
         .perform(get("/api/client-drivers/" + link.getToken()).with(partyJwt(mariaUid, "CLIENT")))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.token").value(link.getToken()));
+        .andExpect(jsonPath("$.token").value(link.getToken()))
+        .andExpect(jsonPath("$.origin").value("CLIENT_SEARCH"));
   }
 
   @Test
@@ -238,7 +277,8 @@ class ClientDriverControllerTest {
     mockMvc
         .perform(get("/api/client-drivers/me").with(partyJwt(mariaUid, "CLIENT")))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.length()").value(1));
+        .andExpect(jsonPath("$.length()").value(1))
+        .andExpect(jsonPath("$[0].origin").value("CLIENT_SEARCH"));
 
     mockMvc
         .perform(get("/api/client-drivers/me").with(partyJwt(carlosUid, "DRIVER")))
@@ -268,14 +308,21 @@ class ClientDriverControllerTest {
         .andExpect(jsonPath("$.driverToken").value(carlos.getToken()));
   }
 
-  private String createBody(String clientToken, String driverToken) {
-    return "{\"clientToken\":\"" + clientToken + "\",\"driverToken\":\"" + driverToken + "\"}";
+  private String createBody(String clientToken, String driverToken, String origin) {
+    return "{\"clientToken\":\""
+        + clientToken
+        + "\",\"driverToken\":\""
+        + driverToken
+        + "\",\"origin\":\""
+        + origin
+        + "\"}";
   }
 
   private ClientDriverModel persistLink(RelationshipStatus status) {
     ClientDriverModel link = new ClientDriverModel();
     link.setClient(maria);
     link.setDriver(carlos);
+    link.setOrigin(LinkOrigin.CLIENT_SEARCH);
     link.setStatus(status);
     return links.save(link);
   }
