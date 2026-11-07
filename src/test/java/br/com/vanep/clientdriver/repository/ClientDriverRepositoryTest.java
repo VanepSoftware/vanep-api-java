@@ -167,6 +167,37 @@ class ClientDriverRepositoryTest {
   }
 
   @Test
+  void theStatusRecomputeNeverRewritesABlock() {
+    ClientDriverModel saved = repository.save(newLink(maria, carlos));
+    Instant blockedAt = Instant.parse("2026-10-17T12:00:00Z");
+    transactions.execute(
+        status -> repository.block(saved.getId(), maria.getUser().getId(), blockedAt));
+
+    Integer updated =
+        transactions.execute(
+            status -> repository.updateStatusUnlessBlocked(saved.getId(), "ACTIVE"));
+
+    ClientDriverModel reread = repository.findByToken(saved.getToken()).orElseThrow();
+    assertThat(updated).isZero();
+    assertThat(reread.getStatus()).isEqualTo(RelationshipStatus.BLOCKED);
+    assertThat(reread.getBlockedBy().getId()).isEqualTo(maria.getUser().getId());
+    assertThat(reread.getBlockedAt()).isEqualTo(blockedAt);
+  }
+
+  @Test
+  void theStatusRecomputeMovesALinkThatIsNotBlocked() {
+    ClientDriverModel saved = repository.save(newLink(maria, carlos));
+
+    Integer updated =
+        transactions.execute(
+            status -> repository.updateStatusUnlessBlocked(saved.getId(), "ACTIVE"));
+
+    assertThat(updated).isEqualTo(1);
+    assertThat(repository.findByToken(saved.getToken()).orElseThrow().getStatus())
+        .isEqualTo(RelationshipStatus.ACTIVE);
+  }
+
+  @Test
   void unblocksALinkOnlyForItsBlocker() {
     ClientDriverModel saved = repository.save(newLink(maria, carlos));
     transactions.execute(
