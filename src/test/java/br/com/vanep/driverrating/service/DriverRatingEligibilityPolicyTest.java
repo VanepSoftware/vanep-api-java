@@ -2,29 +2,33 @@ package br.com.vanep.driverrating.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import br.com.vanep.clientdriver.enums.RelationshipStatus;
+import br.com.vanep.clientdriver.service.LinkRatingEligibilityPolicy;
+import br.com.vanep.contract.enums.ContractStatus;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.EnumSource;
-import org.junit.jupiter.params.provider.EnumSource.Mode;
 
 class DriverRatingEligibilityPolicyTest {
 
   private static final Instant NOW = Instant.parse("2026-09-29T12:00:00Z");
 
-  private final DriverRatingEligibilityPolicy policy = new DriverRatingEligibilityPolicy();
+  private final DriverRatingEligibilityPolicy policy =
+      new DriverRatingEligibilityPolicy(new LinkRatingEligibilityPolicy());
 
   @Test
-  void anActiveLinkCanRate() {
-    assertThat(policy.isLinkActive(RelationshipStatus.ACTIVE)).isTrue();
+  void aLinkWhoseContractEndedHasAContractThatReachedActive() {
+    assertThat(policy.hasContractThatReachedActive(List.of(ContractStatus.ENDED))).isTrue();
   }
 
-  @ParameterizedTest
-  @EnumSource(value = RelationshipStatus.class, mode = Mode.EXCLUDE, names = "ACTIVE")
-  void aLinkThatIsNotActiveCannotRate(RelationshipStatus status) {
-    assertThat(policy.isLinkActive(status)).isFalse();
+  @Test
+  void aLinkWithOnlyACancelledContractHasNoContractThatReachedActive() {
+    assertThat(policy.hasContractThatReachedActive(List.of(ContractStatus.CANCELLED))).isFalse();
+  }
+
+  @Test
+  void aLinkWithoutContractsHasNoContractThatReachedActive() {
+    assertThat(policy.hasContractThatReachedActive(List.of())).isFalse();
   }
 
   @Test
@@ -43,12 +47,14 @@ class DriverRatingEligibilityPolicyTest {
   }
 
   @Test
-  void canRateRequiresAnActiveLinkOldEnough() {
+  void canRateRequiresAContractThatReachedActiveAndALinkOldEnough() {
     Instant longAgo = NOW.minus(Duration.ofDays(1));
     Instant justNow = NOW.minus(Duration.ofMinutes(1));
+    List<ContractStatus> ended = List.of(ContractStatus.ENDED);
 
-    assertThat(policy.canRate(RelationshipStatus.ACTIVE, longAgo, NOW)).isTrue();
-    assertThat(policy.canRate(RelationshipStatus.ACTIVE, justNow, NOW)).isFalse();
-    assertThat(policy.canRate(RelationshipStatus.INACTIVE, longAgo, NOW)).isFalse();
+    assertThat(policy.canRate(ended, longAgo, NOW)).isTrue();
+    assertThat(policy.canRate(ended, justNow, NOW)).isFalse();
+    assertThat(policy.canRate(List.of(ContractStatus.SIGNED), longAgo, NOW)).isFalse();
+    assertThat(policy.canRate(List.of(), longAgo, NOW)).isFalse();
   }
 }
