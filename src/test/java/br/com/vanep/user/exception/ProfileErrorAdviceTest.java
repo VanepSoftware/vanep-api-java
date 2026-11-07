@@ -1,18 +1,27 @@
 package br.com.vanep.user.exception;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import br.com.vanep.auth.api.EmailCodeApiController;
+import br.com.vanep.auth.api.ProfileController;
+import br.com.vanep.config.ValidationProblemDetailsFactory;
 import java.time.Instant;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
 class ProfileErrorAdviceTest {
 
@@ -24,8 +33,22 @@ class ProfileErrorAdviceTest {
   void setUp() {
     mockMvc =
         MockMvcBuilders.standaloneSetup(new ProfileErrorFixtureController())
-            .setControllerAdvice(new ProfileErrorAdvice())
+            .setControllerAdvice(new ProfileErrorAdvice(new ValidationProblemDetailsFactory()))
             .build();
+  }
+
+  @Test
+  void adviceIsScopedToProfileAndEmailCodeControllers() {
+    RestControllerAdvice advice =
+        ProfileErrorAdvice.class.getAnnotation(RestControllerAdvice.class);
+    Order order = ProfileErrorAdvice.class.getAnnotation(Order.class);
+
+    assertThat(advice).isNotNull();
+    assertThat(List.of(advice.assignableTypes()))
+        .containsExactlyInAnyOrder(ProfileController.class, EmailCodeApiController.class);
+    assertThat(order.value()).isEqualTo(Ordered.HIGHEST_PRECEDENCE + 1);
+    assertThat(ResponseEntityExceptionHandler.class.isAssignableFrom(ProfileErrorAdvice.class))
+        .isFalse();
   }
 
   @Test
@@ -140,7 +163,11 @@ class ProfileErrorAdviceTest {
 
   @RestController
   @RequestMapping("/__test/profile-error")
-  static class ProfileErrorFixtureController {
+  static class ProfileErrorFixtureController extends ProfileController {
+
+    ProfileErrorFixtureController() {
+      super(null, null);
+    }
 
     @GetMapping("/cooldown")
     void throwCooldown() {

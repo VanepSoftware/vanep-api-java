@@ -56,10 +56,8 @@ import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequ
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.ResultMatcher;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.context.WebApplicationContext;
 
 @SpringBootTest
@@ -305,7 +303,11 @@ class ContractControllerTest {
     mockMvc
         .perform(postContract(request, adminJwt()))
         .andExpect(status().isBadRequest())
-        .andExpect(fieldErrorMessage(field, message(key)));
+        .andExpect(jsonPath("$.detail").value(message(key)))
+        .andExpect(jsonPath("$.field").value(field))
+        .andExpect(jsonPath("$.errors.length()").value(1))
+        .andExpect(jsonPath("$.errors[0].field").value(field))
+        .andExpect(jsonPath("$.errors[0].message").value(message(key)));
   }
 
   @Test
@@ -405,15 +407,6 @@ class ContractControllerTest {
     slot.put("shift", "MORNING");
     slot.put("windowStart", "06:40");
     return slot;
-  }
-
-  private ResultMatcher fieldErrorMessage(String field, String expected) {
-    return result -> {
-      MethodArgumentNotValidException exception =
-          (MethodArgumentNotValidException) result.getResolvedException();
-      assertThat(exception.getBindingResult().getFieldError(field).getDefaultMessage())
-          .isEqualTo(expected);
-    };
   }
 
   private String message(String key) {
