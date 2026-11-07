@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+  <head>
+    <meta charset="utf-8" />
+  </head>
+  <body style="font-family: Arial, Helvetica, sans-serif; color: #111">
+    <h2>Pedido de ajuste na proposta</h2>
+    <p th:text="'Olá, ' + ${name} + '!'">Olá!</p>
+    <p th:text="${clientFirstName} + ' pediu um ajuste na versão ' + ${version} + ' da sua proposta.'">
+      Pedido de ajuste.
+    </p>
+    <p th:text="'O que mudar: ' + ${field}">Campo.</p>
+    <p th:if="${suggestedValue}" th:text="'Valor sugerido: ' + ${suggestedValue}">Valor sugerido.</p>
+    <p th:if="${note}" th:text="'Observação: ' + ${note}">Observação.</p>
+    <p>Acesse o aplicativo Vanep para enviar uma nova versão.</p>
+    <p style="color: #666; font-size: 12px">
+      Equipe Vanep.
+    </p>
+  </body>
+</html>

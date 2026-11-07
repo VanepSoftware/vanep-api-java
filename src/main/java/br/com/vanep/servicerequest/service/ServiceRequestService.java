@@ -30,6 +30,7 @@ import br.com.vanep.servicerequest.dto.ServiceRequestDriverResponseDTO;
 import br.com.vanep.servicerequest.dto.ServiceRequestItemRequestDTO;
 import br.com.vanep.servicerequest.enums.ServiceRequestItemsViolation;
 import br.com.vanep.servicerequest.enums.ServiceRequestStatus;
+import br.com.vanep.servicerequest.event.ServiceRequestEvent;
 import br.com.vanep.servicerequest.mapper.ServiceRequestMapper;
 import br.com.vanep.servicerequest.model.ServiceRequestItemModel;
 import br.com.vanep.servicerequest.model.ServiceRequestModel;
@@ -53,6 +54,7 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -94,6 +96,7 @@ public class ServiceRequestService {
   private final ServiceRequestMapper mapper;
   private final ProposalMapper proposalMapper;
   private final TransactionTemplate transactions;
+  private final ApplicationEventPublisher events;
   private final MessageSource messages;
 
   public ServiceRequestService(
@@ -114,6 +117,7 @@ public class ServiceRequestService {
       ServiceRequestMapper mapper,
       ProposalMapper proposalMapper,
       TransactionTemplate transactions,
+      ApplicationEventPublisher events,
       MessageSource messages) {
     this.requests = requests;
     this.proposals = proposals;
@@ -132,6 +136,7 @@ public class ServiceRequestService {
     this.mapper = mapper;
     this.proposalMapper = proposalMapper;
     this.transactions = transactions;
+    this.events = events;
     this.messages = messages;
   }
 
@@ -154,6 +159,8 @@ public class ServiceRequestService {
     ensureBelowOpenLimit(client);
     draft.setClientDriver(link);
     ServiceRequestModel saved = keepingOneOpenRequestPerPair(() -> requests.saveAndFlush(draft));
+    events.publishEvent(
+        new ServiceRequestEvent.Sent(saved.getToken(), driver.getUser().getToken()));
     return mapper.toClientResponse(saved, tokensById(chosen), null);
   }
 
@@ -223,6 +230,9 @@ public class ServiceRequestService {
         requests.updateStatusWithDeclineReason(
             request.getId(), Set.of(from), ServiceRequestStatus.DECLINED, reasonOf(body)));
     closeSentProposalIfAnswered(from, request, ProposalStatus.WITHDRAWN);
+    events.publishEvent(
+        new ServiceRequestEvent.Declined(
+            token, request.getClientDriver().getClient().getUser().getToken()));
     return toDriverResponse(requireOfDriver(driver, token));
   }
 

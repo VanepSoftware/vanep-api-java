@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+  <head>
+    <meta charset="utf-8" />
+  </head>
+  <body style="font-family: Arial, Helvetica, sans-serif; color: #111">
+    <h2>Solicitação recusada</h2>
+    <p th:text="'Olá, ' + ${name} + '!'">Olá!</p>
+    <p th:text="${driverName} + ' recusou a sua solicitação de orçamento.'">Solicitação recusada.</p>
+    <p th:if="${reason}" th:text="'Motivo: ' + ${reason}">Motivo.</p>
+    <p>No aplicativo Vanep você pode pedir orçamento a outros motoristas.</p>
+    <p style="color: #666; font-size: 12px">
+      Equipe Vanep.
+    </p>
+  </body>
+</html>

@@ -13,6 +13,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import br.com.vanep.address.model.AddressModel;
@@ -38,6 +39,7 @@ import br.com.vanep.proposal.enums.ProposalAdjustmentField;
 import br.com.vanep.proposal.enums.ProposalAdjustmentPolicy;
 import br.com.vanep.proposal.enums.ProposalCancellationPolicy;
 import br.com.vanep.proposal.enums.ProposalStatus;
+import br.com.vanep.proposal.event.ProposalEvent;
 import br.com.vanep.proposal.mapper.ProposalMapper;
 import br.com.vanep.proposal.model.ProposalAdjustmentModel;
 import br.com.vanep.proposal.model.ProposalItemModel;
@@ -87,6 +89,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.MessageSource;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Limit;
@@ -115,6 +118,7 @@ class ProposalServiceTest {
   @Mock private VehicleRepository vehicles;
   @Mock private ScheduleRepository scheduleRepository;
   @Mock private TransactionTemplate transactions;
+  @Mock private ApplicationEventPublisher events;
   @Mock private MessageSource messages;
 
   @Captor private ArgumentCaptor<ProposalModel> savedProposal;
@@ -152,6 +156,7 @@ class ProposalServiceTest {
             new ProposalMapper(
                 new ScheduleMapper(), new ServiceRequestMapper(), new InstallmentMapper()),
             transactions,
+            events,
             messages);
     when(messages.getMessage(anyString(), any(), any())).thenAnswer(call -> call.getArgument(0));
     doAnswer(
@@ -163,6 +168,7 @@ class ProposalServiceTest {
         .executeWithoutResult(any());
 
     UserModel anaUser = user(1L, "Ana Souza", UserType.CLIENT);
+    anaUser.setToken(ANA_UID);
     ClientModel ana = new ClientModel();
     ana.setId(10L);
     ana.setUser(anaUser);
@@ -170,6 +176,7 @@ class ProposalServiceTest {
     when(clients.findByUserId(1L)).thenReturn(Optional.of(ana));
 
     UserModel carlosUser = user(2L, "Carlos Pereira", UserType.DRIVER);
+    carlosUser.setToken(CARLOS_UID);
     carlos = new DriverModel();
     carlos.setId(20L);
     carlos.setUser(carlosUser);
@@ -991,6 +998,49 @@ class ProposalServiceTest {
     assertThat(service.expireOverdue(now, 200)).isZero();
     verify(requests, never()).reopen(any(), any());
     verify(proposals, never()).updateStatus(anyLong(), any(), any());
+  }
+
+  @Test
+  void aSentProposalIsPublishedForTheClient() {
+    service.send(CARLOS_UID, "request", validBody());
+
+    verify(events).publishEvent(new ProposalEvent.Sent("proposal", ANA_UID));
+  }
+
+  @Test
+  void anAcceptedProposalIsPublishedForTheDriver() {
+    service.accept(ANA_UID, "sent");
+
+    verify(events).publishEvent(new ProposalEvent.Accepted("sent", CARLOS_UID));
+  }
+
+  @Test
+  void aDeclinedProposalIsPublishedForTheDriver() {
+    service.decline(ANA_UID, "sent", null);
+
+    verify(events).publishEvent(new ProposalEvent.Declined("sent", CARLOS_UID));
+  }
+
+  @Test
+  void anAdjustmentIsPublishedForTheDriver() {
+    service.requestAdjustment(
+        ANA_UID,
+        "sent",
+        new ProposalAdjustmentRequestDTO(ProposalAdjustmentField.PRICE, "320,00", null));
+
+    verify(events).publishEvent(new ProposalEvent.AdjustmentRequested("sent", CARLOS_UID));
+  }
+
+  @Test
+  void withdrawalsExpirationsAndRefusalsAreNotPublished() {
+    sent.setValidUntil(Instant.now().minusSeconds(60));
+    expectRefusal(() -> service.accept(ANA_UID, "sent"), HttpStatus.CONFLICT, "proposal.expired");
+    service.withdraw(CARLOS_UID, "sent");
+    when(proposals.findOverdueSentIds(any(), any())).thenReturn(List.of(71L));
+    when(proposals.findById(71L)).thenReturn(Optional.of(sent));
+    service.expireOverdue(Instant.now(), 10);
+
+    verifyNoInteractions(events);
   }
 
   private void expectNothingAccepted(HttpStatus status, String key) {
