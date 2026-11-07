@@ -312,7 +312,7 @@ public class ServiceRequestService {
     }
     boolean hasContract =
         contracts.findStatusesByClientDriverId(link.getId()).stream()
-            .anyMatch(status -> ContractStatus.SIGNED_AND_NOT_ENDED.contains(status));
+            .anyMatch(status -> ContractStatus.IN_PROGRESS.contains(status));
     if (hasContract) {
       throw unprocessableContent("service_request.link.has_contract");
     }

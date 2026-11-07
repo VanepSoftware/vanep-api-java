@@ -372,8 +372,13 @@ class ServiceRequestServiceTest {
   }
 
   @Test
-  void aPairWithASignedContractNotEndedIsRefused() {
-    for (ContractStatus status : ContractStatus.SIGNED_AND_NOT_ENDED) {
+  void aPairWithAContractInProgressIsRefused() {
+    for (ContractStatus status :
+        List.of(
+            ContractStatus.AWAITING_SIGNATURES,
+            ContractStatus.SIGNED,
+            ContractStatus.ACTIVE,
+            ContractStatus.SUSPENDED)) {
       when(contracts.findStatusesByClientDriverId(40L))
           .thenReturn(List.of(ContractStatus.ENDED, status));
 
