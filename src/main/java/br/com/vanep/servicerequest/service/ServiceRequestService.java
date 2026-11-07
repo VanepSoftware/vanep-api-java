@@ -16,7 +16,9 @@ import br.com.vanep.dependent.repository.DependentRepository;
 import br.com.vanep.dependent.repository.DependentSchoolDayRepository;
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
+import br.com.vanep.proposal.dto.ProposalSummaryResponseDTO;
 import br.com.vanep.proposal.enums.ProposalStatus;
+import br.com.vanep.proposal.mapper.ProposalMapper;
 import br.com.vanep.proposal.repository.ProposalRepository;
 import br.com.vanep.school.model.SchoolModel;
 import br.com.vanep.school.repository.SchoolRepository;
@@ -63,8 +65,11 @@ import org.springframework.web.server.ResponseStatusException;
 @Service
 public class ServiceRequestService {
 
-  static final Duration ANSWER_WINDOW = Duration.ofHours(72);
+  public static final Duration ANSWER_WINDOW = Duration.ofHours(72);
   static final int OPEN_LIMIT_PER_CLIENT = 5;
+
+  private static final Set<ServiceRequestStatus> WITH_CURRENT_PROPOSAL =
+      Set.of(ServiceRequestStatus.ANSWERED, ServiceRequestStatus.CONVERTED);
 
   private final ServiceRequestRepository requests;
   private final ProposalRepository proposals;
@@ -81,6 +86,7 @@ public class ServiceRequestService {
   private final ServiceRequestItemsPolicy itemsPolicy;
   private final ServiceRequestTransitionPolicy transitionPolicy;
   private final ServiceRequestMapper mapper;
+  private final ProposalMapper proposalMapper;
   private final MessageSource messages;
 
   public ServiceRequestService(
@@ -99,6 +105,7 @@ public class ServiceRequestService {
       ServiceRequestItemsPolicy itemsPolicy,
       ServiceRequestTransitionPolicy transitionPolicy,
       ServiceRequestMapper mapper,
+      ProposalMapper proposalMapper,
       MessageSource messages) {
     this.requests = requests;
     this.proposals = proposals;
@@ -115,6 +122,7 @@ public class ServiceRequestService {
     this.itemsPolicy = itemsPolicy;
     this.transitionPolicy = transitionPolicy;
     this.mapper = mapper;
+    this.proposalMapper = proposalMapper;
     this.messages = messages;
   }
 
@@ -137,7 +145,7 @@ public class ServiceRequestService {
     ensureBelowOpenLimit(client);
     draft.setClientDriver(link);
     ServiceRequestModel saved = keepingOneOpenRequestPerPair(() -> requests.saveAndFlush(draft));
-    return mapper.toClientResponse(saved, tokensById(chosen));
+    return mapper.toClientResponse(saved, tokensById(chosen), null);
   }
 
   @Transactional(readOnly = true)
@@ -155,7 +163,11 @@ public class ServiceRequestService {
             client.getId(), statusesMatching(statuses), pageable);
     Map<Long, ServiceRequestModel> withItems = withItems(page.getContent());
     Map<Long, String> tokens = dependentTokensOf(withItems.values());
-    return page.map(request -> mapper.toClientResponse(withItems.get(request.getId()), tokens));
+    Map<Long, ProposalSummaryResponseDTO> current = currentProposalsOf(withItems.values());
+    return page.map(
+        request ->
+            mapper.toClientResponse(
+                withItems.get(request.getId()), tokens, current.get(request.getId())));
   }
 
   @Transactional(readOnly = true)
@@ -173,9 +185,12 @@ public class ServiceRequestService {
             driver.getId(), statusesMatching(statuses), pageable);
     Map<Long, ServiceRequestModel> withItems = withItems(page.getContent());
     Map<Long, String> tokens = dependentTokensOf(withItems.values());
+    Map<Long, ProposalSummaryResponseDTO> current = currentProposalsOf(withItems.values());
     LocalDate today = today();
     return page.map(
-        request -> mapper.toDriverResponse(withItems.get(request.getId()), tokens, today));
+        request ->
+            mapper.toDriverResponse(
+                withItems.get(request.getId()), tokens, today, current.get(request.getId())));
   }
 
   @Transactional
@@ -420,11 +435,33 @@ public class ServiceRequestService {
   }
 
   ServiceRequestClientResponseDTO toClientResponse(ServiceRequestModel request) {
-    return mapper.toClientResponse(request, dependentTokensOf(List.of(request)));
+    return mapper.toClientResponse(
+        request,
+        dependentTokensOf(List.of(request)),
+        currentProposalsOf(List.of(request)).get(request.getId()));
   }
 
   ServiceRequestDriverResponseDTO toDriverResponse(ServiceRequestModel request) {
-    return mapper.toDriverResponse(request, dependentTokensOf(List.of(request)), today());
+    return mapper.toDriverResponse(
+        request,
+        dependentTokensOf(List.of(request)),
+        today(),
+        currentProposalsOf(List.of(request)).get(request.getId()));
+  }
+
+  Map<Long, ProposalSummaryResponseDTO> currentProposalsOf(Collection<ServiceRequestModel> loaded) {
+    List<Long> ids =
+        loaded.stream()
+            .filter(request -> WITH_CURRENT_PROPOSAL.contains(request.getStatus()))
+            .map(request -> request.getId())
+            .toList();
+    if (ids.isEmpty()) {
+      return Map.of();
+    }
+    return proposals.findCurrentByServiceRequestIdIn(ids).stream()
+        .collect(
+            Collectors.toMap(
+                row -> row.getServiceRequestId(), row -> proposalMapper.toSummaryResponse(row)));
   }
 
   LocalDate today() {

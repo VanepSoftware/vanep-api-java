@@ -84,7 +84,7 @@ class ServiceRequestMapperTest {
   @Test
   void theDriverSeesFirstNamesAndAgesInWholeYears() {
     ServiceRequestDriverResponseDTO view =
-        mapper.toDriverResponse(request, Map.of(21L, "lucas", 22L, "ana"), TODAY);
+        mapper.toDriverResponse(request, Map.of(21L, "lucas", 22L, "ana"), TODAY, null);
 
     assertThat(view.clientFirstName()).isEqualTo("Maria");
     assertThat(view.items())
@@ -106,7 +106,7 @@ class ServiceRequestMapperTest {
     String json =
         JsonMapper.builder()
             .build()
-            .writeValueAsString(mapper.toDriverResponse(request, Map.of(), TODAY));
+            .writeValueAsString(mapper.toDriverResponse(request, Map.of(), TODAY, null));
 
     assertThat(json)
         .doesNotContain("Souza", "Lima", "2016")
@@ -117,7 +117,7 @@ class ServiceRequestMapperTest {
   @Test
   void theClientSeesTheFullNameAndBirthDateAsSent() {
     ServiceRequestClientResponseDTO view =
-        mapper.toClientResponse(request, Map.of(21L, "lucas", 22L, "ana"));
+        mapper.toClientResponse(request, Map.of(21L, "lucas", 22L, "ana"), null);
 
     assertThat(view.driverToken()).isEqualTo("carlos");
     assertThat(view.driverName()).isEqualTo("Carlos Pereira");
@@ -134,7 +134,7 @@ class ServiceRequestMapperTest {
 
   @Test
   void theDaysComeMondayFirst() {
-    ServiceRequestClientResponseDTO view = mapper.toClientResponse(request, Map.of());
+    ServiceRequestClientResponseDTO view = mapper.toClientResponse(request, Map.of(), null);
 
     assertThat(view.items().getFirst().days())
         .extracting(day -> day.weekday(), day -> day.schoolShift())

@@ -430,12 +430,14 @@ end_contract "$(jq -r .token <<<"$RESP_BODY")"
 request POST /api/contracts "$ADMIN" "$(theo '.dueDay = 28 | .installments = 1')"
 expect L3 "due day 28 and a single installment" 201
 end_contract "$(jq -r .token <<<"$RESP_BODY")"
-request POST /api/contracts "$ADMIN" "$(theo '.items[0].slots[0].windowEnd = "06:41" | .totalAmount = 0.01 | .items[0].monthlyAmount = 0.01')"
-expect L4 "one-minute window and one-cent amounts" 201
+request POST /api/contracts "$ADMIN" "$(theo '.items[0].slots[0].windowEnd = "06:41" | .totalAmount = 0.12 | .items[0].monthlyAmount = 0.01')"
+expect L4 "one-minute window, a one-cent price and one cent per installment" 201
 end_contract "$(jq -r .token <<<"$RESP_BODY")"
 request POST /api/contracts "$ADMIN" "$(theo '.birthDate = "2015-01-01" | .status = "ENDED" | .items[0].pickupStreet = "Rua Falsa"')"
 expect L5 "unknown and read-only fields in the body are ignored" 201 '.status == "ACTIVE" and .items[0].pickupStreet == "Rua dos Ipês"'
 end_contract "$(jq -r .token <<<"$RESP_BODY")"
+request POST /api/contracts "$ADMIN" "$(theo '.totalAmount = 0.11')"
+expect L6 "a total below one cent per installment, pt-BR message" 422 '.detail == "O valor total precisa cobrir pelo menos um centavo por parcela."'
 
 table "Weekday and leg collisions"
 request POST /api/contracts "$ADMIN" "$(contract_body "$BRUNO_GUSTAVO" 2027-02-01 2027-12-17 "[$(item "$PEDRO" "$MONDAY_OUTBOUND")]")"

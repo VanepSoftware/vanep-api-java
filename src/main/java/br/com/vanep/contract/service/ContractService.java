@@ -86,7 +86,7 @@ public class ContractService {
   public ContractResponseDTO create(ContractCreateRequestDTO request) {
     ClientDriverModel link = requireLink(request.clientDriverToken());
     ensureLinkCanBeContracted(link);
-    ensureValidPeriod(request);
+    ensureValidTerms(request);
     ensureDistinctDependents(request.items());
     ensureNoActiveContract(link);
 
@@ -245,9 +245,10 @@ public class ContractService {
     }
   }
 
-  void ensureValidPeriod(ContractCreateRequestDTO request) {
+  void ensureValidTerms(ContractCreateRequestDTO request) {
     termsPolicy
-        .validate(request.startsOn(), request.endsOn())
+        .validate(
+            request.startsOn(), request.endsOn(), request.totalAmount(), request.installments())
         .ifPresent(
             violation -> {
               throw unprocessableEntity(messageKey(violation));
@@ -258,6 +259,7 @@ public class ContractService {
     return switch (violation) {
       case PERIOD_INVALID -> "contract.period.invalid";
       case PERIOD_TOO_LONG -> "contract.period.too_long";
+      case INSTALLMENT_BELOW_ONE_CENT -> "contract.installments.below_one_cent";
     };
   }
 

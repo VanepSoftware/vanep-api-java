@@ -34,5 +34,5 @@ public class ScheduleSlotPolicy {
     return distinctWeekdayLegs < slots.size();
   }
 
-  record WeekdayLeg(DayOfWeek weekday, RouteLeg leg) {}
+  public record WeekdayLeg(DayOfWeek weekday, RouteLeg leg) {}
 }
