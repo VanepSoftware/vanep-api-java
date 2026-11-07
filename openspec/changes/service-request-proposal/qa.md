@@ -1,6 +1,6 @@
 # QA — service-request-proposal (constitution rule 55)
 
-Latest run: on the stack tip, `VAN-30/13-pickup-time-and-price`, which contains this branch: every scenario below passed there (see the `qa.md` of PR 13 for the date and the counts). This file keeps the scenarios of PRs 1 to 8.
+Latest run: on the stack tip, `VAN-30/13-pickup-time-and-price`, which contains this branch: every scenario below passed there except B44 and B39 as written here (`windowStart`), which PR 13 removes and renames; those two passed on the tip's previous run, on 2026-11-01 (see the `qa.md` of PR 13 for the date and the counts). This file keeps the scenarios of PRs 1 to 9.
 
 ## How to run
 
@@ -538,6 +538,164 @@ For the approval scenarios (V1 to V12), Fabio is put back `UNDER_REVIEW` with `i
 | J17 | declining a CONVERTED request | 409 | PASS |
 | J18 | it stays CONVERTED | CONVERTED | PASS |
 
+### Proposals over HTTP — driver
+| id | scenario | expected | result |
+|---|---|---|---|
+| X1 | Gustavo sends the first version, with the token of the vehicle and no price per item | 201 | PASS |
+| X2 | the driver's view has no surname |  | PASS |
+| X3 | valid for 7 days by default, and the request is ANSWERED | 7 ANSWERED | PASS |
+| X4 | a second version for exactly twelve months, at the lower limits (1 installment, due day 1, 1 day) | 201 | PASS |
+| X5 | version 2 points to version 1, now SUPERSEDED, and is valid for one day | 896e04d6e3ac4f1ebfdd61658 SUPERSEDED 1 | PASS |
+| X6 | Gustavo lists the chain, oldest first | 200 | PASS |
+| X7 | Gustavo reads version 2 | 200 | PASS |
+| X8 | Gustavo withdraws version 2 to correct the offer | 200 | PASS |
+| X9 | the request is OPEN again, for 72 hours | OPEN 72 | PASS |
+| X10 | withdrawing it again | 409 | PASS |
+| X11 | the next version after the withdrawal, with a zero enrollment fee and no message | 201 | PASS |
+| X12 | version 3 points to the withdrawn version 2, which stays WITHDRAWN | 890eab1a990948619129448f3 WITHDRAWN ANSWERED | PASS |
+| X13 | a proposal for a request the driver declined | 409 | PASS |
+| X14 | a proposal for an OPEN request past its deadline, before the sweep | 409 | PASS |
+| X15 | nothing was sent and the request is still OPEN | 0 OPEN | PASS |
+
+### Proposals over HTTP — misuse
+| id | scenario | expected | result |
+|---|---|---|---|
+| B1 | the nine routes without a token | 401 401 401 401 401 401 401 401 401 | PASS |
+| B2 | the nine routes with an invalid token | 401 401 401 401 401 401 401 401 401 | PASS |
+| B3 | the admin on both surfaces | 403 403 403 403 403 403 403 403 403 | PASS |
+| B4 | the client on the driver routes | 403 403 403 403 | PASS |
+| B5 | the driver on the client routes | 403 403 403 403 403 | PASS |
+| B6 | another driver: the request and the proposal are not found | 404 404 404 404 | PASS |
+| B7 | another client: the request and the proposal are not found | 404 404 404 404 404 | PASS |
+| B8 | another client's proposal, with its message | 404 | PASS |
+| B9 | an unknown proposal | 404 | PASS |
+| B10 | a proposal for an unknown request | 404 | PASS |
+| B11 | no route changed the chain | 6 0 SUPERSEDED,WITHDRAWN,SENT ANSWERED | PASS |
+| B12 | without startsOn | 400 | PASS |
+| B13 | startsOn yesterday | 400 | PASS |
+| B14 | startsOn that is not a date | 400 | PASS |
+| B15 | without endsOn | 400 | PASS |
+| B16 | totalAmount zero | 400 | PASS |
+| B17 | a negative totalAmount | 400 | PASS |
+| B18 | totalAmount with three decimals | 400 | PASS |
+| B19 | totalAmount as text | 400 | PASS |
+| B20 | zero installments | 400 | PASS |
+| B21 | 13 installments | 400 | PASS |
+| B22 | installments as text | 400 | PASS |
+| B23 | due day 0 | 400 | PASS |
+| B24 | due day 29 | 400 | PASS |
+| B25 | a negative enrollment fee | 400 | PASS |
+| B26 | an adjustment policy that does not exist | 400 | PASS |
+| B27 | without cancellationPolicy | 400 | PASS |
+| B28 | without vehicleToken | 400 | PASS |
+| B29 | a blank vehicleToken | 400 | PASS |
+| B30 | validDays 0 | 400 | PASS |
+| B31 | validDays 8 | 400 | PASS |
+| B32 | a message with 1001 characters | 400 | PASS |
+| B33 | an empty item list | 400 | PASS |
+| B34 | without items | 400 | PASS |
+| B35 | items that are not a list | 400 | PASS |
+| B37 | an item without dependentToken | 400 | PASS |
+| B38 | an item with no slots | 400 | PASS |
+| B39 | a slot without windowStart | 400 | PASS |
+| B40 | a shift that does not exist | 400 | PASS |
+| B41 | a weekday that does not exist | 400 | PASS |
+| B42 | a time that is not a time | 400 | PASS |
+| B43 | the same weekday and leg twice | 400 | PASS |
+| B44 | a window that ends before it starts | 400 | PASS |
+| B45 | malformed JSON | 400 | PASS |
+| B46 | no body | 400 | PASS |
+| B47 | endsOn on startsOn | 422 | PASS |
+| B48 | endsOn before startsOn | 422 | PASS |
+| B49 | twelve months and one day | 422 | PASS |
+| B50 | one item too many: Lucas twice | 422 | PASS |
+| B51 | an item for an unknown dependent instead of Lucas | 422 | PASS |
+| B52 | the vehicle of another driver | 404 | PASS |
+| B53 | an unknown vehicle | 404 | PASS |
+| B54 | an inactive vehicle of his own | 404 | PASS |
+| B55 | no refusal sent a version or touched the chain | 6 0 SUPERSEDED,WITHDRAWN,SENT ANSWERED | PASS |
+| B56 | every field at its upper limit (12 installments, due day 28, 7 days, 1000 characters) | 201 | PASS |
+| B57 | one item too few: only Lucas for Lucas and Nina | 422 | PASS |
+| B58 | an item for Nina, who is not in Gustavo's request | 422 | PASS |
+| B59 | a dependent of the request removed since (set by SQL: the API refuses it during a negotiation) | 422 | PASS |
+| B60 | Fabio's request has no proposal and is still OPEN | 0 OPEN | PASS |
+| B61 | a proposal cannot be edited or removed on either surface | 405 405 405 405 405 405 | PASS |
+| B62 | a slot on Saturday, a day the request did not ask for | 422 | PASS |
+| B63 | it sent no version | 7 0 SUPERSEDED,WITHDRAWN,SUPERSEDED,SENT ANSWERED | PASS |
+| B64 | the return on Monday for Nina, when the request asked only the outbound (set by SQL) | 422 | PASS |
+| B65 | Fabio's request still has no proposal and is OPEN | 0 OPEN | PASS |
+| B66 | fewer legs than requested: only Tuesday's return for Lucas | 201 | PASS |
+| B67 | a total below one cent per installment | 422 | PASS |
+
+### Proposals over HTTP — client
+| id | scenario | expected | result |
+|---|---|---|---|
+| Y1 | Ana lists the four versions, oldest first, with Lucas's full name | 200 | PASS |
+| Y2 | Ana reads the current version, with the vehicle it was sent with and a null token | 200 | PASS |
+| Y3 | Ana asks to lower the price | 201 | PASS |
+| Y4 | and for another time, with a note only | 201 | PASS |
+| Y39 | Ana's list carries version 4 as the request's current proposal, with an adjustment pending | 200 | PASS |
+| Y40 | and so does Gustavo's | 200 | PASS |
+| Y5 | without field | 400 | PASS |
+| Y6 | a field that does not exist | 400 | PASS |
+| Y7 | a field that is an object | 400 | PASS |
+| Y8 | a suggested value with 101 characters | 400 | PASS |
+| Y9 | a note with 501 characters | 400 | PASS |
+| Y10 | malformed JSON | 400 | PASS |
+| Y11 | no body | 400 | PASS |
+| Y12 | neither a value nor a note | 422 | PASS |
+| Y13 | a blank value and a blank note | 422 | PASS |
+| Y14 | the refusals saved no adjustment | 2 | PASS |
+| Y15 | a suggested value with exactly 100 characters | 201 | PASS |
+| Y16 | a note with exactly 500 characters | 201 | PASS |
+| Y17 | Gustavo sees the four adjustments, in order | 200 | PASS |
+| Y18 | accepting version 1, superseded | 409 | PASS |
+| Y19 | declining version 2, withdrawn | 409 | PASS |
+| Y20 | asking to adjust version 3, superseded | 409 | PASS |
+| Y21 | a decline reason with 501 characters | 400 | PASS |
+| Y22 | a decline reason that is not text | 400 | PASS |
+| Y23 | the old versions and the current one did not change | SUPERSEDED,WITHDRAWN,SUPERSEDED,SENT ANSWERED 4 | PASS |
+| Y24 | Ana accepts version 4 | 200 | PASS |
+| Y25 | the request is CONVERTED, no contract was created and the link status did not change | CONVERTED 0 PENDING | PASS |
+| Y41 | the CONVERTED request carries the accepted version, with nothing pending | 200 | PASS |
+| Y26 | Ana reads the accepted proposal exactly as it was sent | {
+| Y27 | and so does Gustavo | {
+| Y28 | accept, decline, adjustment and withdrawal after the accept | 409 409 409 409 | PASS |
+| Y29 | a new version for the converted request | 409 | PASS |
+| Y30 | Fabio's proposal for both siblings | 200 | PASS |
+| Y31 | Fabio sees them by first name only | 200 | PASS |
+| Y32 | Ana declines it with a reason | 200 | PASS |
+| Y33 | the request is WITHDRAWN | WITHDRAWN | PASS |
+| Y42 | and has no current proposal | 200 | PASS |
+| Y34 | Fabio reads it declined, with the reason | 200 | PASS |
+| Y35 | a new version after the decline | 409 | PASS |
+| Y36 | accepting a proposal past its validity, before the sweep | 409 | PASS |
+| Y37 | it is still SENT and the request ANSWERED | SENT ANSWERED | PASS |
+| Y38 | Helena withdraws it | 200 | PASS |
+| Y43 | the request the withdrawal reopened has no current proposal either | 200 | PASS |
+| Y44 | Helena sends 1,000.00 in three installments, starting a day after the desired date: each installment is 333.33, the cents truncated, and the last takes 333.34 | 201 | PASS |
+| Y45 | and Ana's list shows the same installments and the start Helena proposed, not the one Ana asked for | 200 | PASS |
+| Y46 | the open tab (OPEN and ANSWERED) in one call: a summary on every ANSWERED request, none on the OPEN ones | 200 | PASS |
+| Y47 | Helena withdraws it, and the request is OPEN again | 200 | PASS |
+
+### Proposals over HTTP — races and the re-check on accept
+| id | scenario | expected | result |
+|---|---|---|---|
+| Z1 | Helena changes the plate of the offered van | 200 | PASS |
+| Z2 | Ana accepts after the plate changed | 409 | PASS |
+| Z3 | the proposal is still SENT and shows the plate it was sent with | 200 | PASS |
+| Z4 | Ana declines it with a reason of exactly 500 characters | 200 | PASS |
+| Z5 | the family moves Lucas to another neighborhood after the proposal | 200 | PASS |
+| Z6 | Ana accepts after the move | 409 | PASS |
+| Z7 | the proposal stays SENT and the request ANSWERED | SENT ANSWERED | PASS |
+| Z8 | Ana corrects Lucas's name, phone and birth date | 200 | PASS |
+| Z9 | two accepts at once after the correction: one 200, one 409 | 200 409 | PASS |
+| Z10 | the corrected name did not block it: ACCEPTED, the request CONVERTED | ACCEPTED CONVERTED | PASS |
+| Z11 | two new versions at once: one 201, one 409 | 201 409 | PASS |
+| Z12 | the pair has a single SENT proposal, version 2 | 1 2 | PASS |
+| Z13 | Ana accepts while Gustavo sends a new version: exactly one wins, the other gets 409 | ok | PASS |
+| Z14 | never an ACCEPTED and a SENT proposal for the request | 1 SENT ANSWERED | PASS |
+
 ### Regression: contract-core
 
 `scripts/qa/contract-core/qa.sh`, now sourcing `scripts/qa/lib.sh`, passed 269/269 against `main` before this change and 267/267 against this branch. Its B13 now expects the new message (`driver_rating.link.never_contracted`): the scenario is the same (a link without contract cannot rate), and only the text changed in PR 1. Since PR 2, every link it creates sends `origin`, and V39 blocks its link with a blocker and a block time, as the `V61` checks require. Since PR 3 the seeded dependents carry a school grid, which no `contract-core` scenario reads, and `V62` drops `dependent.shift`: S19 to S21, which tested that field, are gone, S25 checks only `trip.shift`, and S22 re-applies `V56` with the column added back for the duration, because `V56` comments it. `V63` drops `address.district_id`, `contract_item.pickup_district_id` and `school.district_id`, and no `contract-core` scenario reads these columns, `pickupDistrictName` or the school's `districtName`. Since PR 6 the seed sends a service request from Ana to Gustavo, which creates that link: the setup accepts the second seeded link and reuses it as Ana – Gustavo instead of creating it. A1 used to move Marina while she had contracts in progress, which D17 now refuses: A1 checks the refusal, the script ends her `ACTIVE` contracts through the admin, and A2 and A3 move her and check that the contracts still pick up at the old address. Since PR 8 the total must cover one cent per installment: L4 sends 0.12 in twelve, and L6 checks that 0.11 is refused with its pt-BR message.
@@ -563,3 +721,12 @@ For the approval scenarios (V1 to V12), Fabio is put back `UNDER_REVIEW` with `i
 - A request body that fails Bean Validation on the service request routes gets the generic `Invalid request content.` detail (U6 to U19, J5): the field keys (`service_request.items.required`, `service_request.notes.too_long`…) are in place for the global change on validation errors. Since `api-validation-errors` (VAN-55) is in `main`, the same bodies return the field message in pt-BR in `detail`, with `field` and `errors[]`; the script only checks the status there, so it is unchanged. The same dependent twice, the same weekday twice and a day without legs are service errors and carry their pt-BR message (U21 to U23).
 - An `OPEN` request past `expiresAt` is already closed for both parties before the sweep runs: withdrawing it gives `409 service_request.not_open` and leaves it `OPEN` for the sweep to expire (E29, E30).
 - A `sort` on a field that does not exist (`?sort=bogus`) gives HTTP 500 on the two lists, as on every paginated list of the API (`/api/contracts` included): Spring Data appends the field to the query and Hibernate rejects it. Not covered by the script; it is a change for all the lists at once.
+- Sending a new version reads the current `SENT` proposal and the latest version before the conditional write on the request locks it; a version sent by someone else in between makes the supersede or the insert miss, which is `409 proposal.sent_conflict`. Two versions sent one after the other both go through, each superseding the previous one (X4, X11); two sent at once give one 201 and one 409, and the pair keeps a single `SENT` (Z11, Z12).
+- A request body that fails Bean Validation on the proposal routes gets the generic `Invalid request content.` detail (B12 to B42, Y5 to Y9, Y21): the field keys (`proposal.starts_on.past`, `proposal.valid_days.invalid`…) are in place for the global change on validation errors. Since `api-validation-errors` (VAN-55) is in `main`, the same bodies return the field message in pt-BR in `detail`, with `field` and `errors[]`; the script only checks the status there, so it is unchanged. The duplicate slot and the window that ends before it starts come from the schedule service and carry their pt-BR message (B43, B44), as do every 422, 404 and 409 of the service.
+- As with the link origin, `"field": 1` in an adjustment is read as the enum index and saved as `SCHEDULE`; Y7 sends an object instead, which the API refuses.
+- When the accept and a new version race, either side may win, and the run records only that exactly one did (Z13) and that the request never holds an `ACCEPTED` and a `SENT` proposal at once (Z14). The accept locks the dependents and the vehicle before its conditional writes, so a version sent meanwhile makes the accept miss with `409 proposal.not_current`, and an accept that commits first makes the version miss with `409 proposal.request.not_open`.
+- Each request carries `currentProposal` (D22): the `SENT` proposal while `ANSWERED`, the `ACCEPTED` one once `CONVERTED`, and `null` otherwise, also on the `OPEN` request a withdrawal reopened (Y43). A page reads every summary in one query, a projection with the adjustment's `exists` in the `select`, and only for its `ANSWERED` and `CONVERTED` requests (`ServiceRequestServiceTest`).
+- `installmentAmount` is `totalAmount / installments` with the cents truncated, and `lastInstallmentAmount` takes the remainder (Y44: 1,000.00 in three is 333.33 and a last 333.34); a total below one cent per installment is refused (B67); the items carry no price, so the total and the installments are the whole agreement.
+- The summary carries the start the driver proposed (`startsOn`), which can differ from the request's `desiredStartDate` (Y45), and the client's view carries the driver's rating as `driver.rating` stores it (E36, E37).
+- The `status` filter of both lists takes several statuses, comma-separated or with the parameter repeated (E33, E34, Y46); one unknown status in the list gives 400 (E35).
+- An expired proposal that the sweep has not closed yet can still be withdrawn by the driver (Y38), which reopens the request; the sweep would have done the same.
