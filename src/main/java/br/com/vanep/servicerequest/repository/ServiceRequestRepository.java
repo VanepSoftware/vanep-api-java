@@ -83,6 +83,27 @@ public interface ServiceRequestRepository extends JpaRepository<ServiceRequestMo
       Long driverId, Collection<ServiceRequestStatus> statuses, Pageable pageable);
 
   @Query(
+      value =
+          """
+          select request from ServiceRequestModel request
+          join fetch request.clientDriver link
+          join fetch link.client client
+          join fetch client.user
+          join fetch link.driver driver
+          join fetch driver.user
+          where client.id = :clientId and driver.id = :driverId and request.status in :statuses
+          order by request.createdAt desc, request.id desc
+          """,
+      countQuery =
+          """
+          select count(request) from ServiceRequestModel request
+          where request.clientDriver.client.id = :clientId
+            and request.clientDriver.driver.id = :driverId and request.status in :statuses
+          """)
+  Page<ServiceRequestModel> findPageByPairAndStatusIn(
+      Long clientId, Long driverId, Collection<ServiceRequestStatus> statuses, Pageable pageable);
+
+  @Query(
       """
       select distinct request from ServiceRequestModel request
       join fetch request.items item

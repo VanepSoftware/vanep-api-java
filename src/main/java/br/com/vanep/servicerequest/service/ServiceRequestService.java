@@ -10,6 +10,8 @@ import br.com.vanep.clientdriver.service.ClientDriverService;
 import br.com.vanep.contract.enums.ContractStatus;
 import br.com.vanep.contract.repository.ContractRepository;
 import br.com.vanep.contractreadiness.service.ContractReadinessService;
+import br.com.vanep.conversation.model.ConversationModel;
+import br.com.vanep.conversation.service.ConversationService;
 import br.com.vanep.dependent.model.DependentModel;
 import br.com.vanep.dependent.model.DependentSchoolDayModel;
 import br.com.vanep.dependent.repository.DependentRepository;
@@ -50,6 +52,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
@@ -82,6 +85,7 @@ public class ServiceRequestService {
   private final ServiceRequestRepository requests;
   private final ProposalRepository proposals;
   private final ClientDriverService linkService;
+  private final ConversationService conversationService;
   private final ContractRepository contracts;
   private final ContractReadinessService readiness;
   private final UserService users;
@@ -103,6 +107,7 @@ public class ServiceRequestService {
       ServiceRequestRepository requests,
       ProposalRepository proposals,
       ClientDriverService linkService,
+      ConversationService conversationService,
       ContractRepository contracts,
       ContractReadinessService readiness,
       UserService users,
@@ -122,6 +127,7 @@ public class ServiceRequestService {
     this.requests = requests;
     this.proposals = proposals;
     this.linkService = linkService;
+    this.conversationService = conversationService;
     this.contracts = contracts;
     this.readiness = readiness;
     this.users = users;
@@ -159,9 +165,10 @@ public class ServiceRequestService {
     ensureBelowOpenLimit(client);
     draft.setClientDriver(link);
     ServiceRequestModel saved = keepingOneOpenRequestPerPair(() -> requests.saveAndFlush(draft));
+    ConversationModel conversation = conversationService.findOrCreateForRequest(client, driver);
     events.publishEvent(
         new ServiceRequestEvent.Sent(saved.getToken(), driver.getUser().getToken()));
-    return mapper.toClientResponse(saved, tokensById(chosen), null);
+    return mapper.toClientResponse(saved, tokensById(chosen), null, conversation.getToken());
   }
 
   @Transactional(readOnly = true)
@@ -172,18 +179,31 @@ public class ServiceRequestService {
 
   @Transactional(readOnly = true)
   public Page<ServiceRequestClientResponseDTO> findPageForClient(
-      String callerUid, Set<ServiceRequestStatus> statuses, Pageable pageable) {
+      String callerUid,
+      Set<ServiceRequestStatus> statuses,
+      String conversationToken,
+      Pageable pageable) {
     ClientModel client = requireCallerClient(callerUid);
+    Set<ServiceRequestStatus> matching = statusesMatching(statuses);
     Page<ServiceRequestModel> page =
-        requests.findPageByClientIdAndStatusIn(
-            client.getId(), statusesMatching(statuses), pageable);
+        conversationToken == null
+            ? requests.findPageByClientIdAndStatusIn(client.getId(), matching, pageable)
+            : findPageOfConversation(
+                conversationToken,
+                pair -> pair.clientId().equals(client.getId()),
+                matching,
+                pageable);
     Map<Long, ServiceRequestModel> withItems = withItems(page.getContent());
     Map<Long, String> tokens = dependentTokensOf(withItems.values());
     Map<Long, ProposalSummaryResponseDTO> current = currentProposalsOf(withItems.values());
+    Map<Long, String> conversationTokens = conversationTokensOf(withItems.values());
     return page.map(
         request ->
             mapper.toClientResponse(
-                withItems.get(request.getId()), tokens, current.get(request.getId())));
+                withItems.get(request.getId()),
+                tokens,
+                current.get(request.getId()),
+                conversationTokens.get(request.getId())));
   }
 
   @Transactional(readOnly = true)
@@ -194,19 +214,33 @@ public class ServiceRequestService {
 
   @Transactional(readOnly = true)
   public Page<ServiceRequestDriverResponseDTO> findPageForDriver(
-      String callerUid, Set<ServiceRequestStatus> statuses, Pageable pageable) {
+      String callerUid,
+      Set<ServiceRequestStatus> statuses,
+      String conversationToken,
+      Pageable pageable) {
     DriverModel driver = requireCallerDriver(callerUid);
+    Set<ServiceRequestStatus> matching = statusesMatching(statuses);
     Page<ServiceRequestModel> page =
-        requests.findPageByDriverIdAndStatusIn(
-            driver.getId(), statusesMatching(statuses), pageable);
+        conversationToken == null
+            ? requests.findPageByDriverIdAndStatusIn(driver.getId(), matching, pageable)
+            : findPageOfConversation(
+                conversationToken,
+                pair -> pair.driverId().equals(driver.getId()),
+                matching,
+                pageable);
     Map<Long, ServiceRequestModel> withItems = withItems(page.getContent());
     Map<Long, String> tokens = dependentTokensOf(withItems.values());
     Map<Long, ProposalSummaryResponseDTO> current = currentProposalsOf(withItems.values());
+    Map<Long, String> conversationTokens = conversationTokensOf(withItems.values());
     LocalDate today = today();
     return page.map(
         request ->
             mapper.toDriverResponse(
-                withItems.get(request.getId()), tokens, today, current.get(request.getId())));
+                withItems.get(request.getId()),
+                tokens,
+                today,
+                current.get(request.getId()),
+                conversationTokens.get(request.getId())));
   }
 
   @Transactional
@@ -452,6 +486,21 @@ public class ServiceRequestService {
         : Set.copyOf(statuses);
   }
 
+  Page<ServiceRequestModel> findPageOfConversation(
+      String conversationToken,
+      Predicate<ConversationService.Pair> ofCaller,
+      Set<ServiceRequestStatus> statuses,
+      Pageable pageable) {
+    return conversationService
+        .findPairByToken(conversationToken)
+        .filter(ofCaller)
+        .map(
+            pair ->
+                requests.findPageByPairAndStatusIn(
+                    pair.clientId(), pair.driverId(), statuses, pageable))
+        .orElseGet(() -> Page.empty(pageable));
+  }
+
   Map<Long, ServiceRequestModel> withItems(List<ServiceRequestModel> page) {
     if (page.isEmpty()) {
       return Map.of();
@@ -493,7 +542,8 @@ public class ServiceRequestService {
     return mapper.toClientResponse(
         request,
         dependentTokensOf(List.of(request)),
-        currentProposalsOf(List.of(request)).get(request.getId()));
+        currentProposalsOf(List.of(request)).get(request.getId()),
+        conversationTokensOf(List.of(request)).get(request.getId()));
   }
 
   ServiceRequestDriverResponseDTO toDriverResponse(ServiceRequestModel request) {
@@ -501,7 +551,26 @@ public class ServiceRequestService {
         request,
         dependentTokensOf(List.of(request)),
         today(),
-        currentProposalsOf(List.of(request)).get(request.getId()));
+        currentProposalsOf(List.of(request)).get(request.getId()),
+        conversationTokensOf(List.of(request)).get(request.getId()));
+  }
+
+  Map<Long, String> conversationTokensOf(Collection<ServiceRequestModel> loaded) {
+    if (loaded.isEmpty()) {
+      return Map.of();
+    }
+    Map<ConversationService.Pair, String> byPair =
+        conversationService.findTokensOfPairs(
+            loaded.stream().map(request -> pairOf(request)).collect(Collectors.toSet()));
+    return loaded.stream()
+        .filter(request -> byPair.containsKey(pairOf(request)))
+        .collect(
+            Collectors.toMap(request -> request.getId(), request -> byPair.get(pairOf(request))));
+  }
+
+  ConversationService.Pair pairOf(ServiceRequestModel request) {
+    ClientDriverModel link = request.getClientDriver();
+    return new ConversationService.Pair(link.getClient().getId(), link.getDriver().getId());
   }
 
   Map<Long, ProposalSummaryResponseDTO> currentProposalsOf(Collection<ServiceRequestModel> loaded) {
