@@ -1,6 +1,18 @@
 # QA — service-request-proposal (constitution rule 55)
 
-Latest run: on the stack tip, `VAN-30/13-pickup-time-and-price`, which contains this branch: every scenario below passed there except B44 and B39 as written here (`windowStart`), which PR 13 removes and renames; those two passed on the tip's previous run, on 2026-11-01 (see the `qa.md` of PR 13 for the date and the counts). This file keeps the scenarios of PRs 1 to 12.
+Latest run: API built from `VAN-30/13-pickup-time-and-price` (PR 13) on `main` with `strict-json-types` (VAN-94), `fixed-pt-br-locale` (VAN-77) and `api-validation-errors` (VAN-55), with the review fixes of PRs 6, 8 and 10: today is the service zone's today in `@FutureOrPresent`, a contract `AWAITING_SIGNATURES` is a contract in progress for the request and the block, another client's proposal is not found before an empty adjustment is checked, and the block and the contract creation lock the link. The API ran with `-Duser.timezone=Etc/GMT+12` just past midnight in Brasília, so the JVM's date was the day before Brasília's and U9, B13, TZ1 and TZ2 only pass with the service zone. Run date: 2026-11-07. Result: `qa.sh` **563/563 passed** (U36, U37, Y48, BL36 to BL38 and TZ1 to TZ4 are new; BL38 saw both orders, the contract first and the block first), and the `contract-core` script as a regression **261/261 passed**, unchanged. The e-mail, sweep and conversation scripts were not run again: no fix touches them.
+
+Previous run: API built from `VAN-30/13-pickup-time-and-price` (PR 13), with the review fixes of PRs 8 and 9 (the last installment in the responses and one cent per installment at least) and PR 13 (one `pickupTime` per slot, the contract without a price per item and with its installments, D24). Run date: 2026-11-02. Result: `qa.sh` **553/553 passed** (B44, the window that ends before it starts, is gone; B67 is new; Y44 and Y45 check the last installment; every slot sends `pickupTime`), the e-mail script **26/26 passed**, and the `contract-core` script as a regression **261/261 passed** (see its note below). The change touches neither the conversation nor the chat, so those scripts were not run again.
+
+Previous run: API built from `VAN-30/12-conversation-on-request` (PR 12), with the price per item removed from the proposal (PRs 5, 8, 9 and 11), 2026-11-01: `qa.sh` **553/553 passed** (P19 and B36 are gone; S10 no longer reads an item price; X1 checks that the item carries none) and the e-mail script **26/26 passed**. The change touches neither the conversation nor the chat, so those scripts were not run again.
+
+Previous run: the same branch with the two proposal fixes of PR 8 asked by the app (a slot the request did not ask for is refused; the driver's view carries the vehicle token), 2026-10-31: `qa.sh` **555/555 passed** (X1 and Y2 now check the vehicle token; B62 to B66 are new) and the e-mail script **26/26 passed**. The fixes touch neither the conversation nor the chat, so those scripts were not run again.
+
+Previous run: the same branch with the list filter by conversation, 2026-10-30: the conversation script **48/48 passed**, and as a regression on the same build `qa.sh` **550/550 passed**.
+
+Previous run: the same branch before the list filter, 2026-10-26: the conversation script **36/36 passed**, and as a regression `qa.sh` **550/550 passed**, the e-mail script **26/26 passed** and the `client-driver-chat` script **56/56 passed** (its 13 scenarios of the direct open left with the `POST`; the open is now covered by the conversation script). The filter touches neither the e-mails nor the chat, so these two were not run again.
+
+Previous run: API built from `VAN-30/11-email` (PR 11), 2026-10-25: **550/550 passed** (66 from PR 1, 42 from PR 2, 105 from PR 3, 15 from PR 4, 27 from PR 5, 24 from PR 6, 89 from PR 7, 9 from PR 8, 137 from PR 9, 36 from PR 10), the sweep script **9/9 passed** (PR 10) and the e-mail script **26/26 passed** (PR 11), plus the `contract-core` script as a regression on the same build, with the sweep on: **267/267 passed**, and the `client-driver-chat` script, since the sweep brings its own scheduler next to the STOMP broker's: **69/69 passed**.
 
 ## How to run
 
@@ -22,7 +34,10 @@ set -a; . ./.env; set +a
 SPRING_PROFILES_ACTIVE=local SERVER_PORT=8081 POSTGRES_PORT=5433 POSTGRES_USER=vanep \
   POSTGRES_PASSWORD=vanep POSTGRES_DB=vanep VANEP_MAIL_ENABLED=false VANEP_SEED_ENABLED=true \
   EXPIRY_SWEEP_ENABLED=false VANEP_OAUTH_ISSUER= GOOGLE_PLACES_BASE_URL=http://127.0.0.1:18090 GOOGLE_PLACES_API_KEY=qa-fake-key \
-  java -jar target/vanep-0.0.1-SNAPSHOT.jar
+  java -Duser.timezone=Etc/GMT+12 -jar target/vanep-0.0.1-SNAPSHOT.jar
+#    The JVM zone must give a date other than Brasília's, as the UTC container does from 21h:
+#    Etc/GMT+12 before 9h in Brasília, Pacific/Kiritimati from 7h. U9, B13, TZ1 and TZ2 then fail
+#    unless the validator compares with Brasília's today.
 
 # 4. The QA (needs curl, jq and docker), once the seed log shows both the cities and the trips
 QA_DB_CONTAINER=vanep-srp-qa-db BASE_URL=http://localhost:8081 scripts/qa/service-request-proposal/qa.sh
@@ -495,6 +510,8 @@ For the approval scenarios (V1 to V12), Fabio is put back `UNDER_REVIEW` with `i
 | U33 | a blocked link | 422 | PASS |
 | U34 | a pair with an ACTIVE contract | 422 | PASS |
 | U35 | no refusal created a request or a link | 2 11 | PASS |
+| U36 | a pair with a contract awaiting signatures | 422 | PASS |
+| U37 | that refusal created no request either | 2 11 | PASS |
 
 ### Service requests over HTTP — client
 | id | scenario | expected | result |
@@ -618,12 +635,11 @@ For the approval scenarios (V1 to V12), Fabio is put back `UNDER_REVIEW` with `i
 | B35 | items that are not a list | 400 | PASS |
 | B37 | an item without dependentToken | 400 | PASS |
 | B38 | an item with no slots | 400 | PASS |
-| B39 | a slot without windowStart | 400 | PASS |
+| B39 | a slot without pickupTime | 400 | PASS |
 | B40 | a shift that does not exist | 400 | PASS |
 | B41 | a weekday that does not exist | 400 | PASS |
 | B42 | a time that is not a time | 400 | PASS |
 | B43 | the same weekday and leg twice | 400 | PASS |
-| B44 | a window that ends before it starts | 400 | PASS |
 | B45 | malformed JSON | 400 | PASS |
 | B46 | no body | 400 | PASS |
 | B47 | endsOn on startsOn | 422 | PASS |
@@ -666,6 +682,7 @@ For the approval scenarios (V1 to V12), Fabio is put back `UNDER_REVIEW` with `i
 | Y11 | no body | 400 | PASS |
 | Y12 | neither a value nor a note | 422 | PASS |
 | Y13 | a blank value and a blank note | 422 | PASS |
+| Y48 | another client sends an empty adjustment: the proposal is not found before the content is checked | 404 | PASS |
 | Y14 | the refusals saved no adjustment | 2 | PASS |
 | Y15 | a suggested value with exactly 100 characters | 201 | PASS |
 | Y16 | a note with exactly 500 characters | 201 | PASS |
@@ -750,11 +767,23 @@ For the approval scenarios (V1 to V12), Fabio is put back `UNDER_REVIEW` with `i
 | BL28 | Bruno blocks a link with an ACTIVE contract | 422 | PASS |
 | BL29 | and so does Gustavo | 422 | PASS |
 | BL30 | the link stays ACTIVE with no blocker | ACTIVE - f | PASS |
+| BL36 | Carla blocks a link whose contract awaits signatures | 422 | PASS |
+| BL37 | the link did not change | INACTIVE - f | PASS |
 | BL31 | three blocks at once by the same party: one 200, two 409 | 200 409 409 | PASS |
 | BL32 | Ana and Helena block each other at once: exactly one wins | ok | PASS |
 | BL33 | the negotiation was closed once, with the statuses of the side that won | CLIENT WITHDRAWN DECLINED | PASS |
 | BL34 | the winner unblocks | 200 | PASS |
 | BL35 | ten rounds of Ana asking Helena for a quote while Helena blocks her: every block gets 200, and the request is refused or closed by it | (none) | PASS |
+| BL38 | ten rounds of the admin creating a contract while Ana blocks the link: one side always refuses the other | (none) | PASS |
+
+### Today in Brasília, whatever the JVM's zone
+
+| id | scenario | expected | result |
+|---|---|---|---|
+| TZ1 | Ana asks Helena for a quote starting today in Brasília | 201 | PASS |
+| TZ2 | Helena proposes to start today in Brasília | 201 | PASS |
+| TZ3 | Ana withdraws it, so the pair has no open negotiation left | 200 | PASS |
+| TZ4 | the request is WITHDRAWN | WITHDRAWN | PASS |
 
 ### Expiry sweep turned off (EXPIRY_SWEEP_ENABLED=false)
 | id | scenario | expected | result |
@@ -861,10 +890,11 @@ For the approval scenarios (V1 to V12), Fabio is put back `UNDER_REVIEW` with `i
 
 ### Regression: contract-core
 
-`scripts/qa/contract-core/qa.sh`, now sourcing `scripts/qa/lib.sh`, passed 269/269 against `main` before this change and 267/267 against this branch. Its B13 now expects the new message (`driver_rating.link.never_contracted`): the scenario is the same (a link without contract cannot rate), and only the text changed in PR 1. Since PR 2, every link it creates sends `origin`, and V39 blocks its link with a blocker and a block time, as the `V61` checks require. Since PR 3 the seeded dependents carry a school grid, which no `contract-core` scenario reads, and `V62` drops `dependent.shift`: S19 to S21, which tested that field, are gone, S25 checks only `trip.shift`, and S22 re-applies `V56` with the column added back for the duration, because `V56` comments it. `V63` drops `address.district_id`, `contract_item.pickup_district_id` and `school.district_id`, and no `contract-core` scenario reads these columns, `pickupDistrictName` or the school's `districtName`. Since PR 6 the seed sends a service request from Ana to Gustavo, which creates that link: the setup accepts the second seeded link and reuses it as Ana – Gustavo instead of creating it. A1 used to move Marina while she had contracts in progress, which D17 now refuses: A1 checks the refusal, the script ends her `ACTIVE` contracts through the admin, and A2 and A3 move her and check that the contracts still pick up at the old address. Since PR 8 the total must cover one cent per installment: L4 sends 0.12 in twelve, and L6 checks that 0.11 is refused with its pt-BR message.
+`scripts/qa/contract-core/qa.sh`, now sourcing `scripts/qa/lib.sh`, passed 269/269 against `main` before this change and 267/267 against this branch. Its B13 now expects the new message (`driver_rating.link.never_contracted`): the scenario is the same (a link without contract cannot rate), and only the text changed in PR 1. Since PR 2, every link it creates sends `origin`, and V39 blocks its link with a blocker and a block time, as the `V61` checks require. Since PR 3 the seeded dependents carry a school grid, which no `contract-core` scenario reads, and `V62` drops `dependent.shift`: S19 to S21, which tested that field, are gone, S25 checks only `trip.shift`, and S22 re-applies `V56` with the column added back for the duration, because `V56` comments it. `V63` drops `address.district_id`, `contract_item.pickup_district_id` and `school.district_id`, and no `contract-core` scenario reads these columns, `pickupDistrictName` or the school's `districtName`. Since PR 6 the seed sends a service request from Ana to Gustavo, which creates that link: the setup accepts the second seeded link and reuses it as Ana – Gustavo instead of creating it. A1 used to move Marina while she had contracts in progress, which D17 now refuses: A1 checks the refusal, the script ends her `ACTIVE` contracts through the admin, and A2 and A3 move her and check that the contracts still pick up at the old address. Since PR 8 the total must cover one cent per installment: L4 sends 0.12 in twelve, and L6 checks that 0.11 is refused with its pt-BR message. PR 13 takes the window and the item price out: D4, D5, V27, V28, N15 and W19 (the window) and K12 and V16 (the item price) are gone, D6 sends only the pickup time, every body sends `pickupTime`, H3 checks that no `windowEnd` comes back, H4 that the siblings share one contract priced as a whole with its installment, L4 that a `windowEnd` and a `monthlyAmount` in the body are ignored, and V43 that a total with three decimal places is refused.
 
 ## Behaviors worth knowing
 
+- Fired together, the admin's contract always reached the database before Ana's block, so BL38's even rounds give the block a 20 ms head start: the run saw the contract win (the block gets 422 `client_driver.block.has_contract`) and the block win (the contract gets 422 `contract.link.blocked`), and never a blocked link with an `ACTIVE` contract. Both sides lock the link row before reading it, so whichever comes second sees the first.
 - The client rating keeps no minimum link age (R21): only the driver rating has the five-minute rule, as before.
 - The link status does not decide eligibility: an `INACTIVE` link whose contract ended still allows rating (R6 to R8).
 - The profile of a driver who is not accepting new students stays reachable and reports `available = false` (A10, A11); only search and recommended hide them.
@@ -885,7 +915,7 @@ For the approval scenarios (V1 to V12), Fabio is put back `UNDER_REVIEW` with `i
 - An `OPEN` request past `expiresAt` is already closed for both parties before the sweep runs: withdrawing it gives `409 service_request.not_open` and leaves it `OPEN` for the sweep to expire (E29, E30).
 - A `sort` on a field that does not exist (`?sort=bogus`) gives HTTP 500 on the two lists, as on every paginated list of the API (`/api/contracts` included): Spring Data appends the field to the query and Hibernate rejects it. Not covered by the script; it is a change for all the lists at once.
 - Sending a new version reads the current `SENT` proposal and the latest version before the conditional write on the request locks it; a version sent by someone else in between makes the supersede or the insert miss, which is `409 proposal.sent_conflict`. Two versions sent one after the other both go through, each superseding the previous one (X4, X11); two sent at once give one 201 and one 409, and the pair keeps a single `SENT` (Z11, Z12).
-- A request body that fails Bean Validation on the proposal routes gets the generic `Invalid request content.` detail (B12 to B42, Y5 to Y9, Y21): the field keys (`proposal.starts_on.past`, `proposal.valid_days.invalid`…) are in place for the global change on validation errors. Since `api-validation-errors` (VAN-55) is in `main`, the same bodies return the field message in pt-BR in `detail`, with `field` and `errors[]`; the script only checks the status there, so it is unchanged. The duplicate slot and the window that ends before it starts come from the schedule service and carry their pt-BR message (B43, B44), as do every 422, 404 and 409 of the service.
+- A request body that fails Bean Validation on the proposal routes gets the generic `Invalid request content.` detail (B12 to B42, Y5 to Y9, Y21): the field keys (`proposal.starts_on.past`, `proposal.valid_days.invalid`…) are in place for the global change on validation errors. Since `api-validation-errors` (VAN-55) is in `main`, the same bodies return the field message in pt-BR in `detail`, with `field` and `errors[]`; the script only checks the status there, so it is unchanged. The duplicate slot comes from the schedule service and carries its pt-BR message (B43), as do every 422, 404 and 409 of the service.
 - As with the link origin, `"field": 1` in an adjustment is read as the enum index and saved as `SCHEDULE`; Y7 sends an object instead, which the API refuses.
 - When the accept and a new version race, either side may win, and the run records only that exactly one did (Z13) and that the request never holds an `ACCEPTED` and a `SENT` proposal at once (Z14). The accept locks the dependents and the vehicle before its conditional writes, so a version sent meanwhile makes the accept miss with `409 proposal.not_current`, and an accept that commits first makes the version miss with `409 proposal.request.not_open`.
 - Each request carries `currentProposal` (D22): the `SENT` proposal while `ANSWERED`, the `ACCEPTED` one once `CONVERTED`, and `null` otherwise, also on the `OPEN` request a withdrawal reopened (Y43). A page reads every summary in one query, a projection with the adjustment's `exists` in the `select`, and only for its `ANSWERED` and `CONVERTED` requests (`ServiceRequestServiceTest`).

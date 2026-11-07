@@ -122,7 +122,6 @@ class ProposalSlotsPolicyTest {
   }
 
   private ScheduleSlotRequestDTO slot(DayOfWeek weekday, RouteLeg leg) {
-    return new ScheduleSlotRequestDTO(
-        weekday, leg, OperationShift.MORNING, LocalTime.of(6, 40), null);
+    return new ScheduleSlotRequestDTO(weekday, leg, OperationShift.MORNING, LocalTime.of(6, 40));
   }
 }

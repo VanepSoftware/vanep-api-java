@@ -12,21 +12,19 @@ source "$SCRIPT_DIR/../lib.sh"
 WEEKDAYS=(MONDAY TUESDAY WEDNESDAY THURSDAY FRIDAY)
 
 slots() {
-  local leg=$1 shift_name=$2 start=$3 end=$4
-  shift 4
-  jq -nc --arg leg "$leg" --arg sh "$shift_name" --arg s "$start" --arg e "$end" \
-    '$ARGS.positional | map({weekday: ., leg: $leg, shift: $sh, windowStart: $s}
-      + (if $e == "-" then {} else {windowEnd: $e} end))' --args "$@"
+  local leg=$1 shift_name=$2 start=$3
+  shift 3
+  jq -nc --arg leg "$leg" --arg sh "$shift_name" --arg s "$start" \
+    '$ARGS.positional | map({weekday: ., leg: $leg, shift: $sh, pickupTime: $s})' --args "$@"
 }
 
 weekday_round_trip() {
-  jq -nc --argjson out "$(slots OUTBOUND MORNING 06:40 06:50 "${WEEKDAYS[@]}")" \
-    --argjson back "$(slots RETURN AFTERNOON 12:30 - "${WEEKDAYS[@]}")" '$out + $back'
+  jq -nc --argjson out "$(slots OUTBOUND MORNING 06:40 "${WEEKDAYS[@]}")" \
+    --argjson back "$(slots RETURN AFTERNOON 12:30 "${WEEKDAYS[@]}")" '$out + $back'
 }
 
 item() {
-  jq -nc --arg d "$1" --argjson slots "$2" --argjson m "${3:-350}" \
-    '{dependentToken: $d, monthlyAmount: $m, slots: $slots}'
+  jq -nc --arg d "$1" --argjson slots "$2" '{dependentToken: $d, slots: $slots}'
 }
 
 contract_body() {
@@ -162,22 +160,18 @@ check S25 "trip.shift is documented" "yes" \
 
 table "V57: schedule, schedule_slot and unlinked_passenger (database checks)"
 NEW_SCHEDULE="insert into schedule default values"
-SLOT="insert into schedule_slot (schedule_id, weekday, leg, shift, window_start, window_end) values"
+SLOT="insert into schedule_slot (schedule_id, weekday, leg, shift, pickup_time) values"
 LAST_SCHEDULE="(select max(id) from schedule)"
 check_sql_rejected D1 "the same weekday and leg twice in one schedule" schedule_slot_weekday_leg_active_key \
-  "$NEW_SCHEDULE; $SLOT ($LAST_SCHEDULE, 'MONDAY', 'OUTBOUND', 'MORNING', '06:40', null); $SLOT ($LAST_SCHEDULE, 'MONDAY', 'OUTBOUND', 'MORNING', '07:00', null)"
+  "$NEW_SCHEDULE; $SLOT ($LAST_SCHEDULE, 'MONDAY', 'OUTBOUND', 'MORNING', '06:40'); $SLOT ($LAST_SCHEDULE, 'MONDAY', 'OUTBOUND', 'MORNING', '07:00')"
 check_sql_accepted D2 "outbound and return on the same weekday" \
-  "$NEW_SCHEDULE; $SLOT ($LAST_SCHEDULE, 'MONDAY', 'OUTBOUND', 'MORNING', '06:40', null); $SLOT ($LAST_SCHEDULE, 'MONDAY', 'RETURN', 'AFTERNOON', '12:30', null)"
+  "$NEW_SCHEDULE; $SLOT ($LAST_SCHEDULE, 'MONDAY', 'OUTBOUND', 'MORNING', '06:40'); $SLOT ($LAST_SCHEDULE, 'MONDAY', 'RETURN', 'AFTERNOON', '12:30')"
 check_sql_accepted D3 "a soft-deleted slot frees its weekday and leg" \
-  "$NEW_SCHEDULE; $SLOT ($LAST_SCHEDULE, 'MONDAY', 'OUTBOUND', 'MORNING', '06:40', null); update schedule_slot set deleted_at = now() where schedule_id = $LAST_SCHEDULE; $SLOT ($LAST_SCHEDULE, 'MONDAY', 'OUTBOUND', 'MORNING', '07:00', null)"
-check_sql_rejected D4 "window end before its start" schedule_slot_window_check \
-  "$NEW_SCHEDULE; $SLOT ($LAST_SCHEDULE, 'MONDAY', 'OUTBOUND', 'MORNING', '07:00', '06:50')"
-check_sql_rejected D5 "window end equal to its start" schedule_slot_window_check \
-  "$NEW_SCHEDULE; $SLOT ($LAST_SCHEDULE, 'MONDAY', 'OUTBOUND', 'MORNING', '07:00', '07:00')"
-check_sql_accepted D6 "window without an end" \
-  "$NEW_SCHEDULE; $SLOT ($LAST_SCHEDULE, 'MONDAY', 'RETURN', 'AFTERNOON', '12:30', null)"
+  "$NEW_SCHEDULE; $SLOT ($LAST_SCHEDULE, 'MONDAY', 'OUTBOUND', 'MORNING', '06:40'); update schedule_slot set deleted_at = now() where schedule_id = $LAST_SCHEDULE; $SLOT ($LAST_SCHEDULE, 'MONDAY', 'OUTBOUND', 'MORNING', '07:00')"
+check_sql_accepted D6 "a slot with its time only" \
+  "$NEW_SCHEDULE; $SLOT ($LAST_SCHEDULE, 'MONDAY', 'RETURN', 'AFTERNOON', '12:30')"
 check_sql_rejected D7 "a slot that points to no schedule" schedule_slot_schedule_id_fkey \
-  "$SLOT (-1, 'MONDAY', 'OUTBOUND', 'MORNING', '06:40', null)"
+  "$SLOT (-1, 'MONDAY', 'OUTBOUND', 'MORNING', '06:40')"
 PASSENGER="insert into unlinked_passenger (token, driver_id, name, school_id, school_shift, address_id, schedule_id) select"
 DRIVER_ID="(select min(id) from driver)"
 SCHOOL_ID="(select min(id) from school)"
@@ -212,16 +206,14 @@ check_sql_rejected K7 "zero installments" contract_installments_check "$QA_LINK;
 check_sql_rejected K8 "due day 29" contract_due_day_check "$QA_LINK; $(ended qac1 2027-02-01 2027-12-17 4200 12 29)"
 check_sql_accepted K9 "due day 28 and one installment" "$QA_LINK; $(ended qac1 2027-02-01 2027-12-17 4200 1 28)"
 check_sql_rejected K10 "two live contracts with the same token" contract_token_active_key "$QA_LINK; $(ended qac1); $(ended qac1)"
-ITEM="insert into contract_item (token, contract_id, dependent_id, school_id, pickup_city_id, pickup_street, monthly_amount, schedule_id) select"
-item_row() { echo "$ITEM '$1', (select id from contract where token = 'qac1'), d.id, d.school_id, a.city_id, $2, $3, $4 from dependent d join address a on a.id = d.address_id order by d.id limit 1"; }
+ITEM="insert into contract_item (token, contract_id, dependent_id, school_id, pickup_city_id, pickup_street, schedule_id) select"
+item_row() { echo "$ITEM '$1', (select id from contract where token = 'qac1'), d.id, d.school_id, a.city_id, $2, $3 from dependent d join address a on a.id = d.address_id order by d.id limit 1"; }
 check_sql_rejected K11 "two items sharing one schedule" contract_item_schedule_id_active_key \
-  "$QA_LINK; $ACTIVE_CONTRACT; $NEW_SCHEDULE; $(item_row qai1 a.street 350 "$LAST_SCHEDULE"); $(item_row qai2 a.street 350 "$LAST_SCHEDULE")"
-check_sql_rejected K12 "an item priced at zero" contract_item_monthly_amount_check \
-  "$QA_LINK; $ACTIVE_CONTRACT; $NEW_SCHEDULE; $(item_row qai1 a.street 0 "$LAST_SCHEDULE")"
+  "$QA_LINK; $ACTIVE_CONTRACT; $NEW_SCHEDULE; $(item_row qai1 a.street "$LAST_SCHEDULE"); $(item_row qai2 a.street "$LAST_SCHEDULE")"
 check_sql_rejected K13 "an item without a pickup street" pickup_street \
-  "$QA_LINK; $ACTIVE_CONTRACT; $NEW_SCHEDULE; $(item_row qai1 null 350 "$LAST_SCHEDULE")"
+  "$QA_LINK; $ACTIVE_CONTRACT; $NEW_SCHEDULE; $(item_row qai1 null "$LAST_SCHEDULE")"
 check_sql_accepted K14 "a valid item copying the dependent's school and address" \
-  "$QA_LINK; $ACTIVE_CONTRACT; $NEW_SCHEDULE; $(item_row qai1 a.street 350 "$LAST_SCHEDULE")"
+  "$QA_LINK; $ACTIVE_CONTRACT; $NEW_SCHEDULE; $(item_row qai1 a.street "$LAST_SCHEDULE")"
 check K15 "the rolled-back checks left no contract behind" "$CONTRACTS_BEFORE_CHECKS" "$(count contract)"
 
 table "V59: contract permissions of the ADMIN bundle"
@@ -265,17 +257,17 @@ BRUNO_FABIO=$(create_link "$BRUNO_CLIENT" "$FABIO_DRIVER")
 CARLA_GUSTAVO=$(create_link "$CARLA_CLIENT" "$GUSTAVO_DRIVER")
 ROUND_TRIP=$(weekday_round_trip)
 if [[ $(count contract) == 0 ]]; then
-  SEED_SLOTS=$(jq -nc --argjson out "$(slots OUTBOUND MORNING 06:40 - "${WEEKDAYS[@]}")" \
-    --argjson back "$(slots RETURN AFTERNOON 12:10 - "${WEEKDAYS[@]}")" '$out + $back')
+  SEED_SLOTS=$(jq -nc --argjson out "$(slots OUTBOUND MORNING 06:40 "${WEEKDAYS[@]}")" \
+    --argjson back "$(slots RETURN AFTERNOON 12:10 "${WEEKDAYS[@]}")" '$out + $back')
   request POST /api/contracts "$ADMIN" "$(contract_body "$SEED_LINK" "$(date +%Y-%m-01)" \
     "$(date -v+11m +%Y-%m-01 2>/dev/null || date -d "+11 months" +%Y-%m-01)" "[$(item "$LUCAS" "$SEED_SLOTS")]")"
   [[ $RESP_STATUS == 201 ]] || { echo "SETUP FAIL | baseline contract | HTTP $RESP_STATUS $RESP_BODY" >&2; exit 1; }
 fi
 request GET /api/contracts "$ADMIN"
 SEED_CONTRACT=$(jq -r '.content[0].token' <<<"$RESP_BODY")
-OUTBOUND_WEEK=$(slots OUTBOUND MORNING 06:40 06:50 "${WEEKDAYS[@]}")
-RETURN_WEEK=$(slots RETURN AFTERNOON 12:30 - "${WEEKDAYS[@]}")
-MONDAY_OUTBOUND=$(slots OUTBOUND MORNING 06:40 06:50 MONDAY)
+OUTBOUND_WEEK=$(slots OUTBOUND MORNING 06:40 "${WEEKDAYS[@]}")
+RETURN_WEEK=$(slots RETURN AFTERNOON 12:30 "${WEEKDAYS[@]}")
+MONDAY_OUTBOUND=$(slots OUTBOUND MORNING 06:40 MONDAY)
 THEO_BODY=$(contract_body "$BRUNO_GUSTAVO" 2027-02-01 2027-12-17 "[$(item "$THEO" "$MONDAY_OUTBOUND")]")
 end_contract() {
   request PATCH "/api/contracts/$1" "$ADMIN" '{"status":"ENDED"}'
@@ -322,10 +314,10 @@ expect H1 "outbound Monday to Friday with one driver" 201 \
 MARINA_OUTBOUND=$(jq -r .token <<<"$RESP_BODY")
 check H2 "creating the contract activated the pending link" ACTIVE "$(link_status "$ANA_GUSTAVO")"
 request POST /api/contracts "$ADMIN" "$(contract_body "$ANA_HELENA" 2027-02-01 2027-12-17 "[$(item "$MARINA" "$RETURN_WEEK")]")"
-expect H3 "the same student, return only, with another driver" 201 '.items[0].slots | all(.leg == "RETURN" and .windowEnd == null)'
+expect H3 "the same student, return only, with another driver" 201 '.items[0].slots | all(.leg == "RETURN" and (has("windowEnd") | not))'
 MARINA_RETURN=$(jq -r .token <<<"$RESP_BODY")
-request POST /api/contracts "$ADMIN" "$(contract_body "$BRUNO_HELENA" 2027-02-01 2027-12-17 "[$(item "$PEDRO" "$ROUND_TRIP" 350), $(item "$JULIA" "$ROUND_TRIP" 300)]")"
-expect H4 "siblings share one contract with their own prices" 201 '(.items | length) == 2 and ([.items[].monthlyAmount] | sort) == [300, 350]'
+request POST /api/contracts "$ADMIN" "$(contract_body "$BRUNO_HELENA" 2027-02-01 2027-12-17 "[$(item "$PEDRO" "$ROUND_TRIP"), $(item "$JULIA" "$ROUND_TRIP")]")"
+expect H4 "siblings share one contract priced as a whole" 201 '(.items | length) == 2 and .installmentAmount == 350 and (.items | all(has("monthlyAmount") | not))'
 SIBLINGS=$(jq -r .token <<<"$RESP_BODY")
 check H5 "the siblings contract stored two items and twenty slots" "2 20" \
   "$(sql "select count(distinct i.id) || ' ' || count(s.id) from contract_item i join contract c on c.id = i.contract_id join schedule_slot s on s.schedule_id = i.schedule_id where c.token = '$SIBLINGS'")"
@@ -359,12 +351,12 @@ request POST /api/contracts "$ADMIN" "$(theo '.totalAmount = -10')"
 expect V12 "negative total amount" 400
 request POST /api/contracts "$ADMIN" "$(theo '.totalAmount = "abc"')"
 expect V13 "total amount with the wrong JSON type" 400
+request POST /api/contracts "$ADMIN" "$(theo '.totalAmount = 4200.009')"
+expect V43 "a total with three decimal places" 400
 request POST /api/contracts "$ADMIN" "$(theo '.items = []')"
 expect V14 "no items" 400
 request POST /api/contracts "$ADMIN" "$(theo 'del(.items)')"
 expect V15 "missing items" 400
-request POST /api/contracts "$ADMIN" "$(theo '.items[0].monthlyAmount = 0')"
-expect V16 "item priced at zero" 400
 request POST /api/contracts "$ADMIN" "$(theo '.items += .items')"
 expect V17 "the same dependent twice, pt-BR message" 400 '.detail == "O mesmo dependente não pode aparecer duas vezes no contrato."'
 request POST /api/contracts "$ADMIN" "$(jq -c --arg d "$LUCAS" '.items[0].dependentToken = $d' <<<"$THEO_BODY")"
@@ -385,17 +377,13 @@ request POST /api/contracts "$ADMIN" "$(theo 'del(.items[0].slots)')"
 expect V25 "missing schedule" 400 '.detail == "A agenda precisa de pelo menos um horário."'
 request POST /api/contracts "$ADMIN" "$(theo '.items[0].slots += .items[0].slots')"
 expect V26 "the same weekday and leg twice, pt-BR message" 400 '.detail == "O mesmo dia e trecho não pode aparecer duas vezes na agenda."'
-request POST /api/contracts "$ADMIN" "$(theo '.items[0].slots[0].windowEnd = "06:30"')"
-expect V27 "window end before its start, pt-BR message" 400 '.detail == "O fim da janela deve ser posterior ao início."'
-request POST /api/contracts "$ADMIN" "$(theo '.items[0].slots[0].windowEnd = "06:40"')"
-expect V28 "window end equal to its start" 400 '.detail == "O fim da janela deve ser posterior ao início."'
 request POST /api/contracts "$ADMIN" "$(theo 'del(.items[0].slots[0].shift)')"
 expect V29 "a slot without shift (never derived from the time)" 400
 request POST /api/contracts "$ADMIN" "$(theo '.items[0].slots[0].shift = "FULLTIME"')"
 expect V30 "a slot with the FULLTIME shift" 400
 request POST /api/contracts "$ADMIN" "$(theo '.items[0].slots[0].weekday = "FUNDAY"')"
 expect V31 "unknown weekday" 400
-request POST /api/contracts "$ADMIN" "$(theo '.items[0].slots[0].windowStart = "25:00"')"
+request POST /api/contracts "$ADMIN" "$(theo '.items[0].slots[0].pickupTime = "25:00"')"
 expect V32 "impossible time" 400
 request POST /api/contracts "$ADMIN" '{"clientDriverToken":'
 expect V33 "malformed JSON" 400
@@ -415,7 +403,7 @@ sql "update client_driver set status = 'BLOCKED', blocked_at = now(), blocked_by
 request POST /api/contracts "$ADMIN" "$THEO_BODY"
 expect V39 "a blocked link, pt-BR message" 422 '.detail == "Um vínculo bloqueado não pode ser contratado."'
 sql "update client_driver set status = 'PENDING', blocked_at = null, blocked_by = null where token = '$BRUNO_GUSTAVO'" >/dev/null
-request POST /api/contracts "$ADMIN" "$(contract_body "$SEED_LINK" 2027-02-01 2027-12-17 "[$(item "$LUCAS" "$(slots RETURN NIGHT 22:00 - SATURDAY)")]")"
+request POST /api/contracts "$ADMIN" "$(contract_body "$SEED_LINK" 2027-02-01 2027-12-17 "[$(item "$LUCAS" "$(slots RETURN NIGHT 22:00 SATURDAY)")]")"
 expect V40 "a second active contract on the same link, pt-BR message" 409 '.detail == "Este vínculo já tem um contrato ativo."'
 check V41 "the rejected creates stored nothing" "$CONTRACTS_BEFORE" "$(count contract) $(count contract_item) $(count schedule) $(count schedule_slot)"
 check V42 "and left the link pending" PENDING "$(link_status "$BRUNO_GUSTAVO")"
@@ -431,7 +419,9 @@ request POST /api/contracts "$ADMIN" "$(theo '.dueDay = 28 | .installments = 1')
 expect L3 "due day 28 and a single installment" 201
 end_contract "$(jq -r .token <<<"$RESP_BODY")"
 request POST /api/contracts "$ADMIN" "$(theo '.items[0].slots[0].windowEnd = "06:41" | .totalAmount = 0.12 | .items[0].monthlyAmount = 0.01')"
-expect L4 "one-minute window, a one-cent price and one cent per installment" 201
+expect L4 "one cent per installment, and a windowEnd and a monthlyAmount in the body are ignored" 201 \
+  '.installmentAmount == 0.01 and .lastInstallmentAmount == 0.01 and (.items[0] | has("monthlyAmount") | not)
+   and (.items[0].slots | all(has("windowEnd") | not))'
 end_contract "$(jq -r .token <<<"$RESP_BODY")"
 request POST /api/contracts "$ADMIN" "$(theo '.birthDate = "2015-01-01" | .status = "ENDED" | .items[0].pickupStreet = "Rua Falsa"')"
 expect L5 "unknown and read-only fields in the body are ignored" 201 '.status == "ACTIVE" and .items[0].pickupStreet == "Rua dos Ipês"'
@@ -449,7 +439,7 @@ request POST /api/contracts "$ADMIN" "$(contract_body "$BRUNO_GUSTAVO" 2027-02-0
 expect X4 "a suspended contract still reserves its slots" 409
 request PATCH "/api/contracts/$SIBLINGS" "$ADMIN" '{"status":"ACTIVE"}'
 expect X5 "reactivating the suspended contract never collides" 200 '.status == "ACTIVE"'
-request POST /api/contracts "$ADMIN" "$(contract_body "$BRUNO_GUSTAVO" 2027-02-01 2027-12-17 "[$(item "$PEDRO" "$(slots OUTBOUND NIGHT 18:00 - SATURDAY)")]")"
+request POST /api/contracts "$ADMIN" "$(contract_body "$BRUNO_GUSTAVO" 2027-02-01 2027-12-17 "[$(item "$PEDRO" "$(slots OUTBOUND NIGHT 18:00 SATURDAY)")]")"
 expect X6 "a weekday the dependent does not ride yet" 201
 end_contract "$(jq -r .token <<<"$RESP_BODY")"
 
@@ -522,7 +512,7 @@ request POST /api/contracts/doesnotexist/restore "$ADMIN"
 expect R13 "restoring an unknown contract" 404
 request DELETE "/api/contracts/$MARINA_OUTBOUND" "$ADMIN"
 expect R14 "the admin deletes it again" 204
-request POST /api/contracts "$ADMIN" "$(contract_body "$ANA_GUSTAVO" 2027-02-01 2027-12-17 "[$(item "$MARINA" "$(slots OUTBOUND MORNING 07:00 - MONDAY)")]")"
+request POST /api/contracts "$ADMIN" "$(contract_body "$ANA_GUSTAVO" 2027-02-01 2027-12-17 "[$(item "$MARINA" "$(slots OUTBOUND MORNING 07:00 MONDAY)")]")"
 expect R15 "a newer active contract on the same link" 201
 NEWER=$(jq -r .token <<<"$RESP_BODY")
 request POST "/api/contracts/$MARINA_OUTBOUND/restore" "$ADMIN"
@@ -577,12 +567,12 @@ check Z3 "two concurrent reactivations on one link: one 200, one 409" "200 409" 
   "$(in_parallel PATCH "$ADMIN" '{"status":"ACTIVE"}' "/api/contracts/$CAIO_A" "/api/contracts/$CAIO_B")"
 check Z4 "a single contract of the link is ACTIVE" 1 \
   "$(sql "select count(*) from contract c join client_driver l on l.id = c.client_driver_id where l.token = '$CARLA_GUSTAVO' and c.status = 'ACTIVE' and c.deleted_at is null")"
-request POST /api/contracts "$ADMIN" "$(contract_body "$BRUNO_FABIO" 2027-02-01 2027-12-17 "[$(item "$THEO" "$(slots RETURN NIGHT 22:00 - SATURDAY)")]")"
+request POST /api/contracts "$ADMIN" "$(contract_body "$BRUNO_FABIO" 2027-02-01 2027-12-17 "[$(item "$THEO" "$(slots RETURN NIGHT 22:00 SATURDAY)")]")"
 expect Z5a "an active contract on another link" 201
 THEO_C=$(jq -r .token <<<"$RESP_BODY")
 request DELETE "/api/contracts/$THEO_C" "$ADMIN"
 expect Z5b "deleted" 204
-request POST /api/contracts "$ADMIN" "$(contract_body "$BRUNO_FABIO" 2027-02-01 2027-12-17 "[$(item "$THEO" "$(slots RETURN NIGHT 22:00 - SUNDAY)")]")"
+request POST /api/contracts "$ADMIN" "$(contract_body "$BRUNO_FABIO" 2027-02-01 2027-12-17 "[$(item "$THEO" "$(slots RETURN NIGHT 22:00 SUNDAY)")]")"
 expect Z5c "a second active contract on that link" 201
 THEO_D=$(jq -r .token <<<"$RESP_BODY")
 request DELETE "/api/contracts/$THEO_D" "$ADMIN"
@@ -702,8 +692,6 @@ request POST "$UP" "$GUSTAVO" "$(rafael 'del(.slots)')"
 expect N13 "missing schedule" 400
 request POST "$UP" "$GUSTAVO" "$(rafael '.slots += [.slots[0]]')"
 expect N14 "the same weekday and leg twice" 400 '.detail == "O mesmo dia e trecho não pode aparecer duas vezes na agenda."'
-request POST "$UP" "$GUSTAVO" "$(rafael '.slots[0].windowEnd = "06:00"')"
-expect N15 "window end before its start" 400 '.detail == "O fim da janela deve ser posterior ao início."'
 request POST "$UP" "$GUSTAVO" "$(rafael '.slots[0].shift = "FULLTIME"')"
 expect N16 "a slot with the FULLTIME shift" 400
 request POST "$UP" "$GUSTAVO" "$(rafael '.name = 42')"
@@ -765,19 +753,17 @@ expect W12 "the rejected patches changed nothing" 200 '.name == "Rafael Prado" a
 request PATCH "$UP/$RAFAEL" "$GUSTAVO" "$(jq -nc --argjson a "$(address "Rua Nova" 5)" '{name: "Rafael P. Prado", schoolShift: "AFTERNOON", address: $a}')"
 expect W13 "name, school shift and address patched together" 200 \
   '.name == "Rafael P. Prado" and .schoolShift == "AFTERNOON" and .address.street == "Rua Nova" and (.slots | length) == 10'
-request PUT "$UP/$RAFAEL/schedule" "$GUSTAVO" "$(jq -nc --argjson s "$(slots OUTBOUND MORNING 06:40 - MONDAY TUESDAY WEDNESDAY THURSDAY FRIDAY)" '{slots: $s}')"
+request PUT "$UP/$RAFAEL/schedule" "$GUSTAVO" "$(jq -nc --argjson s "$(slots OUTBOUND MORNING 06:40 MONDAY TUESDAY WEDNESDAY THURSDAY FRIDAY)" '{slots: $s}')"
 expect W14 "the schedule is replaced by five outbound slots" 200 '(.slots | length) == 5 and all(.slots[]; .leg == "OUTBOUND")'
-request PUT "$UP/$RAFAEL/schedule" "$GUSTAVO" "$(jq -nc --argjson s "$(slots OUTBOUND MORNING 07:00 - MONDAY WEDNESDAY FRIDAY)" '{slots: $s}')"
-expect W15 "then by three" 200 '[.slots[].weekday] == ["MONDAY", "WEDNESDAY", "FRIDAY"] and all(.slots[]; .windowStart == "07:00:00")'
+request PUT "$UP/$RAFAEL/schedule" "$GUSTAVO" "$(jq -nc --argjson s "$(slots OUTBOUND MORNING 07:00 MONDAY WEDNESDAY FRIDAY)" '{slots: $s}')"
+expect W15 "then by three" 200 '[.slots[].weekday] == ["MONDAY", "WEDNESDAY", "FRIDAY"] and all(.slots[]; .pickupTime == "07:00:00")'
 check W16 "the previous fifteen slots remain soft-deleted, three are live" "15 3" \
   "$(sql "select count(*) filter (where s.deleted_at is not null) || ' ' || count(*) filter (where s.deleted_at is null) from schedule_slot s join unlinked_passenger p on p.schedule_id = s.schedule_id where p.token = '$RAFAEL'")"
 request PUT "$UP/$RAFAEL/schedule" "$GUSTAVO" '{"slots":[]}'
 expect W17 "an empty schedule" 400
 request PUT "$UP/$RAFAEL/schedule" "$GUSTAVO" '{}'
 expect W18 "a body without slots" 400
-request PUT "$UP/$RAFAEL/schedule" "$GUSTAVO" "$(jq -nc --argjson s "$(slots OUTBOUND MORNING 07:00 06:00 MONDAY)" '{slots: $s}')"
-expect W19 "a window ending before it starts" 400
-request PUT "$UP/$RAFAEL/schedule" "$GUSTAVO" "$(jq -nc --argjson s "$(slots OUTBOUND MORNING 07:00 - MONDAY MONDAY)" '{slots: $s}')"
+request PUT "$UP/$RAFAEL/schedule" "$GUSTAVO" "$(jq -nc --argjson s "$(slots OUTBOUND MORNING 07:00 MONDAY MONDAY)" '{slots: $s}')"
 expect W20 "the same weekday and leg twice" 400
 request GET "$UP/$RAFAEL" "$GUSTAVO"
 expect W21 "the rejected replacements kept the three slots" 200 '(.slots | length) == 3'

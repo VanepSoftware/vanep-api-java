@@ -121,9 +121,12 @@ class ContractControllerTest {
         .andExpect(jsonPath("$.token").isNotEmpty())
         .andExpect(jsonPath("$.status").value("ACTIVE"))
         .andExpect(jsonPath("$.clientDriverToken").value(link.getToken()))
+        .andExpect(jsonPath("$.installmentAmount").value(350.0))
+        .andExpect(jsonPath("$.lastInstallmentAmount").value(350.0))
         .andExpect(jsonPath("$.items.length()").value(1))
         .andExpect(jsonPath("$.items[0].dependentToken").value(lucas.getToken()))
         .andExpect(jsonPath("$.items[0].pickupStreet").value("Rua A"))
+        .andExpect(jsonPath("$.items[0].monthlyAmount").doesNotExist())
         .andExpect(jsonPath("$.items[0].slots[0].leg").value("OUTBOUND"));
   }
 
@@ -312,6 +315,18 @@ class ContractControllerTest {
   }
 
   @Test
+  void rejectsATotalWithMoreThanTwoDecimalPlaces() throws Exception {
+    Map<String, Object> request = createRequest();
+    request.put("totalAmount", new BigDecimal("4200.009"));
+
+    mockMvc
+        .perform(postContract(request, adminJwt()))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.field").value("totalAmount"))
+        .andExpect(jsonPath("$.detail").value(message("contract.amount.scale")));
+  }
+
+  @Test
   void rejectsAnEndDateOnTheStartDate() throws Exception {
     Map<String, Object> request = createRequest();
     request.put("endsOn", request.get("startsOn"));
@@ -387,7 +402,6 @@ class ContractControllerTest {
   private Map<String, Object> createRequest(Map<String, Object> slot) {
     Map<String, Object> item = new LinkedHashMap<>();
     item.put("dependentToken", lucas.getToken());
-    item.put("monthlyAmount", new BigDecimal("350.00"));
     item.put("slots", List.of(slot));
 
     Map<String, Object> request = new LinkedHashMap<>();
@@ -406,7 +420,7 @@ class ContractControllerTest {
     slot.put("weekday", "MONDAY");
     slot.put("leg", "OUTBOUND");
     slot.put("shift", "MORNING");
-    slot.put("windowStart", "06:40");
+    slot.put("pickupTime", "06:40");
     return slot;
   }
 

@@ -25,8 +25,8 @@ import org.springframework.context.ApplicationContext;
 
 public class ProposalControllerFixtures {
 
-  private static final LocalTime OUTBOUND_WINDOW_START = LocalTime.of(6, 40);
-  private static final LocalTime RETURN_WINDOW_START = LocalTime.of(12, 10);
+  private static final LocalTime OUTBOUND_PICKUP_TIME = LocalTime.of(6, 40);
+  private static final LocalTime RETURN_PICKUP_TIME = LocalTime.of(12, 10);
 
   private final VehicleRepository vehicles;
   private final ProposalService service;
@@ -102,7 +102,7 @@ public class ProposalControllerFixtures {
                         "weekday", slot.weekday().name(),
                         "leg", slot.leg().name(),
                         "shift", slot.shift().name(),
-                        "windowStart", slot.windowStart().toString()))
+                        "pickupTime", slot.pickupTime().toString()))
             .toList());
   }
 
@@ -120,17 +120,9 @@ public class ProposalControllerFixtures {
             weekday ->
                 Stream.of(
                     new ScheduleSlotRequestDTO(
-                        weekday,
-                        RouteLeg.OUTBOUND,
-                        OperationShift.MORNING,
-                        OUTBOUND_WINDOW_START,
-                        null),
+                        weekday, RouteLeg.OUTBOUND, OperationShift.MORNING, OUTBOUND_PICKUP_TIME),
                     new ScheduleSlotRequestDTO(
-                        weekday,
-                        RouteLeg.RETURN,
-                        OperationShift.AFTERNOON,
-                        RETURN_WINDOW_START,
-                        null)))
+                        weekday, RouteLeg.RETURN, OperationShift.AFTERNOON, RETURN_PICKUP_TIME)))
         .toList();
   }
 }

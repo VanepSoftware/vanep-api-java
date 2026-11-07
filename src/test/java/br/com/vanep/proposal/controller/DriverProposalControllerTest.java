@@ -218,7 +218,7 @@ class DriverProposalControllerTest {
     List<Object> slots = new ArrayList<>((List<?>) item.get("slots"));
     slots.add(
         Map.of(
-            "weekday", "SATURDAY", "leg", "OUTBOUND", "shift", "MORNING", "windowStart", "06:40"));
+            "weekday", "SATURDAY", "leg", "OUTBOUND", "shift", "MORNING", "pickupTime", "06:40"));
     item.put("slots", slots);
 
     mockMvc

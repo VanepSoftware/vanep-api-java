@@ -235,11 +235,11 @@
 > Depends on: PR 12 | Parallel with: —
 > Order: test → migration → model → DTO → mapper → service → seeder → mensagens
 
-- [ ] 13.1 Criar branch `VAN-30/13-pickup-time-and-price` de dentro da branch do PR 12
-- [ ] 13.2 Testes: `ScheduleSlotPolicy` sem a regra da janela (lista vazia e `(dia, trecho)` repetido continuam recusados); slot gravado e lido com `pickupTime`; passageiros da rota ordenados pelo `pickupTime`; item do contrato sem preço; `installmentAmount` e `lastInstallmentAmount` na resposta do contrato; total com mais de duas casas → 400 `contract.amount.scale`
-- [ ] 13.3 `V67`: tira o `check` da janela e a coluna `window_end` de `schedule_slot` e renomeia `window_start` para `pickup_time`; `V68`: tira o `check` e a coluna `monthly_amount` de `contract_item` e o preço por item do comment de `contract.total_amount`
-- [ ] 13.4 `windowEnd` sai do `ScheduleSlotRequestDTO`, do `ScheduleSlotResponseDTO`, do `RoutePassengerDTO` e das consultas de passageiros, e `windowStart` vira `pickupTime` em todos eles; sai a chave `schedule.slot.window_invalid`
-- [ ] 13.5 `monthlyAmount` sai do `ContractItemRequestDTO`, do `ContractItemResponseDTO` e do `ContractItemModel`; o `ContractResponseDTO` ganha `installmentAmount` e `lastInstallmentAmount` pelo `InstallmentMapper`; `totalAmount` com `@Digits(fraction = 2)` e a chave `contract.amount.scale`
-- [ ] 13.6 Seeds do contrato e da proposta sem preço por item e com `pickupTime`
-- [ ] 13.7 `make lint` + `./mvnw verify -B`
-- [ ] 13.8 QA da regra 55: o `qa.sh` e o `email.sh` desta change e o `qa.sh` da `contract-core` com `pickupTime` nos corpos; a resposta sem `windowEnd` e sem `monthlyAmount` mesmo quando o corpo os manda; a parcela e a última parcela do contrato; total com três casas → 400; um centavo por parcela aceito e menos que isso → 422
+- [x] 13.1 Criar branch `VAN-30/13-pickup-time-and-price` de dentro da branch do PR 12
+- [x] 13.2 Testes: `ScheduleSlotPolicy` sem a regra da janela (lista vazia e `(dia, trecho)` repetido continuam recusados); slot gravado e lido com `pickupTime`; passageiros da rota ordenados pelo `pickupTime`; item do contrato sem preço; `installmentAmount` e `lastInstallmentAmount` na resposta do contrato; total com mais de duas casas → 400 `contract.amount.scale`
+- [x] 13.3 `V67`: tira o `check` da janela e a coluna `window_end` de `schedule_slot` e renomeia `window_start` para `pickup_time`; `V68`: tira o `check` e a coluna `monthly_amount` de `contract_item` e o preço por item do comment de `contract.total_amount`
+- [x] 13.4 `windowEnd` sai do `ScheduleSlotRequestDTO`, do `ScheduleSlotResponseDTO`, do `RoutePassengerDTO` e das consultas de passageiros, e `windowStart` vira `pickupTime` em todos eles; sai a chave `schedule.slot.window_invalid`
+- [x] 13.5 `monthlyAmount` sai do `ContractItemRequestDTO`, do `ContractItemResponseDTO` e do `ContractItemModel`; o `ContractResponseDTO` ganha `installmentAmount` e `lastInstallmentAmount` pelo `InstallmentMapper`; `totalAmount` com `@Digits(fraction = 2)` e a chave `contract.amount.scale`
+- [x] 13.6 Seeds do contrato e da proposta sem preço por item e com `pickupTime`
+- [x] 13.7 `make lint` + `./mvnw verify -B`
+- [x] 13.8 QA da regra 55: o `qa.sh` e o `email.sh` desta change e o `qa.sh` da `contract-core` com `pickupTime` nos corpos; a resposta sem `windowEnd` e sem `monthlyAmount` mesmo quando o corpo os manda; a parcela e a última parcela do contrato; total com três casas → 400; um centavo por parcela aceito e menos que isso → 422

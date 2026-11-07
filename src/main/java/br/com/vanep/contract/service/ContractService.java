@@ -206,7 +206,6 @@ public class ContractService {
     item.setDependent(dependent);
     item.setSchool(school);
     copyPickupAddress(address, item);
-    item.setMonthlyAmount(request.monthlyAmount());
     item.setSchedule(schedules.create(request.slots()));
     ensureNoSlotConflict(item);
     return item;

@@ -43,9 +43,9 @@ public class ProposalSeeder {
 
   private static final Logger log = LoggerFactory.getLogger(ProposalSeeder.class);
   private static final String SEED_CLIENT_EMAIL = "ana.souza@seed.vanep.com.br";
-  private static final LocalTime OUTBOUND_WINDOW_START = LocalTime.of(6, 40);
-  private static final LocalTime RETURN_WINDOW_START = LocalTime.of(12, 10);
-  private static final LocalTime FULLTIME_RETURN_WINDOW_START = LocalTime.of(17, 20);
+  private static final LocalTime OUTBOUND_PICKUP_TIME = LocalTime.of(6, 40);
+  private static final LocalTime RETURN_PICKUP_TIME = LocalTime.of(12, 10);
+  private static final LocalTime FULLTIME_RETURN_PICKUP_TIME = LocalTime.of(17, 20);
   private static final BigDecimal INSTALLMENT_PER_DEPENDENT = new BigDecimal("420.00");
   private static final int INSTALLMENTS = 10;
 
@@ -153,8 +153,7 @@ public class ProposalSeeder {
                         day.getWeekday(),
                         RouteLeg.OUTBOUND,
                         OperationShift.MORNING,
-                        OUTBOUND_WINDOW_START,
-                        null));
+                        OUTBOUND_PICKUP_TIME));
               }
               if (day.isNeedsReturn()) {
                 slots.add(
@@ -162,16 +161,15 @@ public class ProposalSeeder {
                         day.getWeekday(),
                         RouteLeg.RETURN,
                         OperationShift.AFTERNOON,
-                        returnWindowStartOf(day),
-                        null));
+                        returnPickupTimeOf(day)));
               }
             });
     return slots;
   }
 
-  LocalTime returnWindowStartOf(ServiceRequestDayModel day) {
+  LocalTime returnPickupTimeOf(ServiceRequestDayModel day) {
     return day.getSchoolShift() == SchoolShift.FULLTIME
-        ? FULLTIME_RETURN_WINDOW_START
-        : RETURN_WINDOW_START;
+        ? FULLTIME_RETURN_PICKUP_TIME
+        : RETURN_PICKUP_TIME;
   }
 }

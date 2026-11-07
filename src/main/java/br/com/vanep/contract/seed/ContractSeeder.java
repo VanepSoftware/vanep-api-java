@@ -28,11 +28,11 @@ import org.springframework.transaction.annotation.Transactional;
 public class ContractSeeder {
 
   private static final Logger log = LoggerFactory.getLogger(ContractSeeder.class);
-  private static final BigDecimal MONTHLY_AMOUNT = new BigDecimal("350.00");
+  private static final BigDecimal INSTALLMENT_AMOUNT = new BigDecimal("350.00");
   private static final int INSTALLMENTS = 12;
   private static final int DUE_DAY = 5;
-  private static final LocalTime OUTBOUND_WINDOW_START = LocalTime.of(6, 40);
-  private static final LocalTime RETURN_WINDOW_START = LocalTime.of(12, 10);
+  private static final LocalTime OUTBOUND_PICKUP_TIME = LocalTime.of(6, 40);
+  private static final LocalTime RETURN_PICKUP_TIME = LocalTime.of(12, 10);
 
   private final ContractService contractService;
   private final ContractRepository contracts;
@@ -77,12 +77,12 @@ public class ContractSeeder {
   ContractCreateRequestDTO createRequest(ClientDriverModel link, DependentModel dependent) {
     LocalDate startsOn = LocalDate.now().withDayOfMonth(1);
     ContractItemRequestDTO item =
-        new ContractItemRequestDTO(dependent.getToken(), MONTHLY_AMOUNT, weekdayRoundTrip());
+        new ContractItemRequestDTO(dependent.getToken(), weekdayRoundTrip());
     return new ContractCreateRequestDTO(
         link.getToken(),
         startsOn,
         startsOn.plusMonths(INSTALLMENTS - 1),
-        MONTHLY_AMOUNT.multiply(BigDecimal.valueOf(INSTALLMENTS)),
+        INSTALLMENT_AMOUNT.multiply(BigDecimal.valueOf(INSTALLMENTS)),
         INSTALLMENTS,
         DUE_DAY,
         List.of(item));
@@ -94,17 +94,9 @@ public class ContractSeeder {
             weekday ->
                 Stream.of(
                     new ScheduleSlotRequestDTO(
-                        weekday,
-                        RouteLeg.OUTBOUND,
-                        OperationShift.MORNING,
-                        OUTBOUND_WINDOW_START,
-                        null),
+                        weekday, RouteLeg.OUTBOUND, OperationShift.MORNING, OUTBOUND_PICKUP_TIME),
                     new ScheduleSlotRequestDTO(
-                        weekday,
-                        RouteLeg.RETURN,
-                        OperationShift.AFTERNOON,
-                        RETURN_WINDOW_START,
-                        null)))
+                        weekday, RouteLeg.RETURN, OperationShift.AFTERNOON, RETURN_PICKUP_TIME)))
         .toList();
   }
 }

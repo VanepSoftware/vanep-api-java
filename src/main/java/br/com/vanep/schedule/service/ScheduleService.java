@@ -61,7 +61,6 @@ public class ScheduleService {
   String messageKey(ScheduleSlotViolation violation) {
     return switch (violation) {
       case SLOTS_REQUIRED -> "schedule.slots.required";
-      case WINDOW_INVALID -> "schedule.slot.window_invalid";
       case SLOT_DUPLICATE -> "schedule.slot.duplicate";
     };
   }
@@ -75,8 +74,7 @@ public class ScheduleService {
     slot.setWeekday(request.weekday());
     slot.setLeg(request.leg());
     slot.setShift(request.shift());
-    slot.setWindowStart(request.windowStart());
-    slot.setWindowEnd(request.windowEnd());
+    slot.setPickupTime(request.pickupTime());
     return slot;
   }
 }

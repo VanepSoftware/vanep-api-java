@@ -71,7 +71,7 @@ p_body() {
     totalAmount: 4200.00, installments: 10, dueDay: 5, adjustmentPolicy: "NONE",
     cancellationPolicy: "NOTICE_30_DAYS", vehicleToken: $v,
     items: [{dependentToken: $l, slots: [("MONDAY", "TUESDAY", "WEDNESDAY",
-      "THURSDAY", "FRIDAY") | {weekday: ., leg: "OUTBOUND", shift: "MORNING", windowStart: "06:40"}]}]}'
+      "THURSDAY", "FRIDAY") | {weekday: ., leg: "OUTBOUND", shift: "MORNING", pickupTime: "06:40"}]}]}'
 }
 
 send_request() {

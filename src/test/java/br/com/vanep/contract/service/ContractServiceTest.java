@@ -44,6 +44,7 @@ import br.com.vanep.school.model.SchoolModel;
 import br.com.vanep.school.repository.SchoolRepository;
 import br.com.vanep.shared.enums.OperationShift;
 import br.com.vanep.shared.enums.RouteLeg;
+import br.com.vanep.shared.mapper.InstallmentMapper;
 import br.com.vanep.user.model.UserModel;
 import java.math.BigDecimal;
 import java.time.DayOfWeek;
@@ -114,7 +115,7 @@ class ContractServiceTest {
             new ContractTermsPolicy(),
             new ContractTransitionPolicy(),
             new LinkStatusPolicy(),
-            new ContractMapper(new ScheduleMapper()),
+            new ContractMapper(new ScheduleMapper(), new InstallmentMapper()),
             messages);
 
     campinas = new CityModel();
@@ -251,7 +252,7 @@ class ContractServiceTest {
         .thenReturn(List.of(takenSlot(DayOfWeek.MONDAY, RouteLeg.OUTBOUND)));
     ScheduleSlotRequestDTO mondayReturn =
         new ScheduleSlotRequestDTO(
-            DayOfWeek.MONDAY, RouteLeg.RETURN, OperationShift.AFTERNOON, LocalTime.of(17, 0), null);
+            DayOfWeek.MONDAY, RouteLeg.RETURN, OperationShift.AFTERNOON, LocalTime.of(17, 0));
 
     service.create(createRequest(item("lucas", mondayReturn)));
 
@@ -549,16 +550,12 @@ class ContractServiceTest {
   }
 
   private ContractItemRequestDTO item(String dependentToken, ScheduleSlotRequestDTO slot) {
-    return new ContractItemRequestDTO(dependentToken, new BigDecimal("350.00"), List.of(slot));
+    return new ContractItemRequestDTO(dependentToken, List.of(slot));
   }
 
   private ScheduleSlotRequestDTO outbound() {
     return new ScheduleSlotRequestDTO(
-        DayOfWeek.MONDAY,
-        RouteLeg.OUTBOUND,
-        OperationShift.MORNING,
-        LocalTime.of(6, 40),
-        LocalTime.of(6, 50));
+        DayOfWeek.MONDAY, RouteLeg.OUTBOUND, OperationShift.MORNING, LocalTime.of(6, 40));
   }
 
   private ContractUpdateRequestDTO statusPatch(ContractStatus status) {
@@ -577,6 +574,8 @@ class ContractServiceTest {
     contract.setStatus(status);
     contract.setStartsOn(STARTS_ON);
     contract.setEndsOn(ENDS_ON);
+    contract.setTotalAmount(new BigDecimal("4200.00"));
+    contract.setInstallments(12);
     when(contracts.findByToken(token)).thenReturn(Optional.of(contract));
     return contract;
   }
@@ -598,7 +597,7 @@ class ContractServiceTest {
   private ContractItemModel restoredItem(ContractModel contract) {
     ScheduleSlotModel ownSlot = takenSlot(DayOfWeek.MONDAY, RouteLeg.OUTBOUND, 40L);
     ownSlot.setShift(OperationShift.MORNING);
-    ownSlot.setWindowStart(LocalTime.of(6, 40));
+    ownSlot.setPickupTime(LocalTime.of(6, 40));
     ContractItemModel item = new ContractItemModel();
     item.setContract(contract);
     item.setDependent(dependents.findByToken("lucas").orElseThrow());

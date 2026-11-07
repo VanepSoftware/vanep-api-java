@@ -18,6 +18,8 @@ public record ContractResponseDTO(
     LocalDate endsOn,
     BigDecimal totalAmount,
     Integer installments,
+    BigDecimal installmentAmount,
+    BigDecimal lastInstallmentAmount,
     Integer dueDay,
     List<ContractItemResponseDTO> items,
     Instant createdAt,
