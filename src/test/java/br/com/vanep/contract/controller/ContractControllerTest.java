@@ -322,7 +322,8 @@ class ContractControllerTest {
     mockMvc
         .perform(postContract(request, adminJwt()))
         .andExpect(status().isBadRequest())
-        .andExpect(fieldErrorMessage("totalAmount", message("contract.amount.scale")));
+        .andExpect(jsonPath("$.field").value("totalAmount"))
+        .andExpect(jsonPath("$.detail").value(message("contract.amount.scale")));
   }
 
   @Test
