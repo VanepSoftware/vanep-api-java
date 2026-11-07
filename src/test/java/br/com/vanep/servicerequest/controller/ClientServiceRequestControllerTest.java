@@ -15,6 +15,7 @@ import br.com.vanep.client.model.ClientModel;
 import br.com.vanep.dependent.model.DependentModel;
 import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.shared.enums.SchoolShift;
+import br.com.vanep.trip.service.TripService;
 import br.com.vanep.user.model.UserModel;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.DayOfWeek;
@@ -194,7 +195,8 @@ class ClientServiceRequestControllerTest {
     expectBadRequest(bodyWith("driverToken", " "));
     expectBadRequest(bodyWith("desiredStartDate", null));
     expectFieldError(
-        bodyWith("desiredStartDate", LocalDate.now().minusDays(1).toString()),
+        bodyWith(
+            "desiredStartDate", LocalDate.now(TripService.SERVICE_ZONE).minusDays(1).toString()),
         "desiredStartDate",
         "service_request.desired_start_date.past");
     expectBadRequest(bodyWith("notes", "a".repeat(1001)));
