@@ -18,9 +18,9 @@ public class ValidationProblemDetailsFactory {
   private static final Set<String> REQUIRED_CONSTRAINTS = Set.of("NotBlank", "NotEmpty", "NotNull");
 
   private static final Comparator<ValidationError> VALIDATION_ERROR_ORDER =
-      Comparator.comparingInt(ValidationError::priority)
-          .thenComparing(ValidationError::field, Comparator.nullsLast(Comparator.naturalOrder()))
-          .thenComparing(ValidationError::message);
+      Comparator.comparingInt((ValidationError error) -> error.priority())
+          .thenComparing(error -> error.field(), Comparator.nullsLast(Comparator.naturalOrder()))
+          .thenComparing(error -> error.message());
 
   public ProblemDetail create(MethodArgumentNotValidException exception) {
     List<ValidationError> errors =
@@ -34,7 +34,7 @@ public class ValidationProblemDetailsFactory {
     if (selected.field() != null) {
       problem.setProperty("field", selected.field());
     }
-    problem.setProperty("errors", errors.stream().map(ValidationError::response).toList());
+    problem.setProperty("errors", errors.stream().map(error -> error.response()).toList());
     return problem;
   }
 
