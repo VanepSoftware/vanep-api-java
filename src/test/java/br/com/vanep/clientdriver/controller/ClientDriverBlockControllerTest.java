@@ -121,7 +121,11 @@ class ClientDriverBlockControllerTest {
             ResponseStatusException.class,
             e -> {
               assertThat(e.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
-              assertThat(e.getReason()).isEqualTo(message("service_request.link.blocked"));
+              // Called outside a request, the service speaks the thread's locale, not the API's.
+              assertThat(e.getReason())
+                  .isEqualTo(
+                      messages.getMessage(
+                          "service_request.link.blocked", null, LocaleContextHolder.getLocale()));
             });
   }
 
@@ -221,6 +225,6 @@ class ClientDriverBlockControllerTest {
   }
 
   private String message(String key) {
-    return messages.getMessage(key, null, LocaleContextHolder.getLocale());
+    return messages.getMessage(key, null, java.util.Locale.forLanguageTag("pt-BR"));
   }
 }
