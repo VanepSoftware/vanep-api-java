@@ -1,6 +1,8 @@
 # QA — service-request-proposal (constitution rule 55)
 
-Latest run: API built from `VAN-30/13-pickup-time-and-price` (PR 13), with the review fixes of PRs 8 and 9 (the last installment in the responses and one cent per installment at least) and PR 13 (one `pickupTime` per slot, the contract without a price per item and with its installments, D24). Run date: 2026-11-02. Result: `qa.sh` **553/553 passed** (B44, the window that ends before it starts, is gone; B67 is new; Y44 and Y45 check the last installment; every slot sends `pickupTime`), the e-mail script **26/26 passed**, and the `contract-core` script as a regression **261/261 passed** (see its note below). The change touches neither the conversation nor the chat, so those scripts were not run again.
+Latest run: API built from `VAN-30/13-pickup-time-and-price` (PR 13) on `main` with `strict-json-types` (VAN-94), `fixed-pt-br-locale` (VAN-77) and `api-validation-errors` (VAN-55), with the review fixes of PRs 6, 8 and 10: today is the service zone's today in `@FutureOrPresent`, a contract `AWAITING_SIGNATURES` is a contract in progress for the request and the block, another client's proposal is not found before an empty adjustment is checked, and the block and the contract creation lock the link. The API ran with `-Duser.timezone=Etc/GMT+12` just past midnight in Brasília, so the JVM's date was the day before Brasília's and U9, B13, TZ1 and TZ2 only pass with the service zone. Run date: 2026-11-07. Result: `qa.sh` **563/563 passed** (U36, U37, Y48, BL36 to BL38 and TZ1 to TZ4 are new; BL38 saw both orders, the contract first and the block first), and the `contract-core` script as a regression **261/261 passed**, unchanged. The e-mail, sweep and conversation scripts were not run again: no fix touches them.
+
+Previous run: API built from `VAN-30/13-pickup-time-and-price` (PR 13), with the review fixes of PRs 8 and 9 (the last installment in the responses and one cent per installment at least) and PR 13 (one `pickupTime` per slot, the contract without a price per item and with its installments, D24). Run date: 2026-11-02. Result: `qa.sh` **553/553 passed** (B44, the window that ends before it starts, is gone; B67 is new; Y44 and Y45 check the last installment; every slot sends `pickupTime`), the e-mail script **26/26 passed**, and the `contract-core` script as a regression **261/261 passed** (see its note below). The change touches neither the conversation nor the chat, so those scripts were not run again.
 
 Previous run: API built from `VAN-30/12-conversation-on-request` (PR 12), with the price per item removed from the proposal (PRs 5, 8, 9 and 11), 2026-11-01: `qa.sh` **553/553 passed** (P19 and B36 are gone; S10 no longer reads an item price; X1 checks that the item carries none) and the e-mail script **26/26 passed**. The change touches neither the conversation nor the chat, so those scripts were not run again.
 
@@ -32,7 +34,10 @@ set -a; . ./.env; set +a
 SPRING_PROFILES_ACTIVE=local SERVER_PORT=8081 POSTGRES_PORT=5433 POSTGRES_USER=vanep \
   POSTGRES_PASSWORD=vanep POSTGRES_DB=vanep VANEP_MAIL_ENABLED=false VANEP_SEED_ENABLED=true \
   EXPIRY_SWEEP_ENABLED=false VANEP_OAUTH_ISSUER= GOOGLE_PLACES_BASE_URL=http://127.0.0.1:18090 GOOGLE_PLACES_API_KEY=qa-fake-key \
-  java -jar target/vanep-0.0.1-SNAPSHOT.jar
+  java -Duser.timezone=Etc/GMT+12 -jar target/vanep-0.0.1-SNAPSHOT.jar
+#    The JVM zone must give a date other than Brasília's, as the UTC container does from 21h:
+#    Etc/GMT+12 before 9h in Brasília, Pacific/Kiritimati from 7h. U9, B13, TZ1 and TZ2 then fail
+#    unless the validator compares with Brasília's today.
 
 # 4. The QA (needs curl, jq and docker), once the seed log shows both the cities and the trips
 QA_DB_CONTAINER=vanep-srp-qa-db BASE_URL=http://localhost:8081 scripts/qa/service-request-proposal/qa.sh
@@ -505,6 +510,8 @@ For the approval scenarios (V1 to V12), Fabio is put back `UNDER_REVIEW` with `i
 | U33 | a blocked link | 422 | PASS |
 | U34 | a pair with an ACTIVE contract | 422 | PASS |
 | U35 | no refusal created a request or a link | 2 11 | PASS |
+| U36 | a pair with a contract awaiting signatures | 422 | PASS |
+| U37 | that refusal created no request either | 2 11 | PASS |
 
 ### Service requests over HTTP — client
 | id | scenario | expected | result |
@@ -675,6 +682,7 @@ For the approval scenarios (V1 to V12), Fabio is put back `UNDER_REVIEW` with `i
 | Y11 | no body | 400 | PASS |
 | Y12 | neither a value nor a note | 422 | PASS |
 | Y13 | a blank value and a blank note | 422 | PASS |
+| Y48 | another client sends an empty adjustment: the proposal is not found before the content is checked | 404 | PASS |
 | Y14 | the refusals saved no adjustment | 2 | PASS |
 | Y15 | a suggested value with exactly 100 characters | 201 | PASS |
 | Y16 | a note with exactly 500 characters | 201 | PASS |
@@ -759,11 +767,23 @@ For the approval scenarios (V1 to V12), Fabio is put back `UNDER_REVIEW` with `i
 | BL28 | Bruno blocks a link with an ACTIVE contract | 422 | PASS |
 | BL29 | and so does Gustavo | 422 | PASS |
 | BL30 | the link stays ACTIVE with no blocker | ACTIVE - f | PASS |
+| BL36 | Carla blocks a link whose contract awaits signatures | 422 | PASS |
+| BL37 | the link did not change | INACTIVE - f | PASS |
 | BL31 | three blocks at once by the same party: one 200, two 409 | 200 409 409 | PASS |
 | BL32 | Ana and Helena block each other at once: exactly one wins | ok | PASS |
 | BL33 | the negotiation was closed once, with the statuses of the side that won | CLIENT WITHDRAWN DECLINED | PASS |
 | BL34 | the winner unblocks | 200 | PASS |
 | BL35 | ten rounds of Ana asking Helena for a quote while Helena blocks her: every block gets 200, and the request is refused or closed by it | (none) | PASS |
+| BL38 | ten rounds of the admin creating a contract while Ana blocks the link: one side always refuses the other | (none) | PASS |
+
+### Today in Brasília, whatever the JVM's zone
+
+| id | scenario | expected | result |
+|---|---|---|---|
+| TZ1 | Ana asks Helena for a quote starting today in Brasília | 201 | PASS |
+| TZ2 | Helena proposes to start today in Brasília | 201 | PASS |
+| TZ3 | Ana withdraws it, so the pair has no open negotiation left | 200 | PASS |
+| TZ4 | the request is WITHDRAWN | WITHDRAWN | PASS |
 
 ### Expiry sweep turned off (EXPIRY_SWEEP_ENABLED=false)
 | id | scenario | expected | result |
@@ -874,6 +894,7 @@ For the approval scenarios (V1 to V12), Fabio is put back `UNDER_REVIEW` with `i
 
 ## Behaviors worth knowing
 
+- Fired together, the admin's contract always reached the database before Ana's block, so BL38's even rounds give the block a 20 ms head start: the run saw the contract win (the block gets 422 `client_driver.block.has_contract`) and the block win (the contract gets 422 `contract.link.blocked`), and never a blocked link with an `ACTIVE` contract. Both sides lock the link row before reading it, so whichever comes second sees the first.
 - The client rating keeps no minimum link age (R21): only the driver rating has the five-minute rule, as before.
 - The link status does not decide eligibility: an `INACTIVE` link whose contract ended still allows rating (R6 to R8).
 - The profile of a driver who is not accepting new students stays reachable and reports `available = false` (A10, A11); only search and recommended hide them.
