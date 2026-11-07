@@ -59,7 +59,7 @@ Quando a proposta vigente é retirada pelo motorista ou expira, a solicitação 
 
 **Até 5 abertas por cliente** é regra do serviço (`count` antes de gravar). Duas solicitações simultâneas do mesmo cliente para motoristas diferentes podem passar juntas e chegar a 6. Aceito: o limite é contra spam, não um invariante (R4).
 
-**Par com contrato assinado e não encerrado não abre solicitação** (`422 service_request.link.has_contract`). Um irmão novo ou uma mudança nesse par é aditivo, que é da fase 8 (`proposal.source_contract_id`).
+**Par com contrato em andamento não abre solicitação** (`422 service_request.link.has_contract`). Em andamento é `ContractStatus.IN_PROGRESS` (`AWAITING_SIGNATURES`, `SIGNED`, `ACTIVE`, `SUSPENDED`), a mesma regra da trava do dependente (D17) e da recusa do bloqueio: um contrato aguardando assinatura já é o contrato do par. Um irmão novo ou uma mudança nesse par é aditivo, que é da fase 8 (`proposal.source_contract_id`).
 
 ### D3 — O pedido é uma grade por dia; o horário é da proposta
 

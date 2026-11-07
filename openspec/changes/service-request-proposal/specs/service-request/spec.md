@@ -30,7 +30,7 @@ Service requests MUST be reached only through the `/me` surfaces below, with the
 
 ### Requirement: Sending a service request
 
-The body MUST carry `driverToken`, `desiredStartDate` (today or later), optional `notes` (up to 1000 characters) and `items`: one or more entries, each with `dependentToken` and `days`, a non-empty list where each day has `weekday` (`DayOfWeek`) and the booleans `needsOutbound` and `needsReturn`. Missing fields, an empty list, a past date, the same dependent twice, the same weekday twice in one item, or a day with neither `needsOutbound` nor `needsReturn` MUST return HTTP 400.
+The body MUST carry `driverToken`, `desiredStartDate` (today or later, today in `America/Sao_Paulo`), optional `notes` (up to 1000 characters) and `items`: one or more entries, each with `dependentToken` and `days`, a non-empty list where each day has `weekday` (`DayOfWeek`) and the booleans `needsOutbound` and `needsReturn`. Missing fields, an empty list, a past date, the same dependent twice, the same weekday twice in one item, or a day with neither `needsOutbound` nor `needsReturn` MUST return HTTP 400.
 
 The client MUST NOT send the school period, boarding times or route shifts. The school period of each day MUST come from the dependent's weekly school grid; boarding times and route shifts are the driver's answer, in the proposal.
 
@@ -44,7 +44,7 @@ The system MUST refuse, creating nothing:
 | a requested weekday that is not in the dependent's school grid | HTTP 422 `service_request.day.no_school` |
 | contract data missing (`contract-readiness`) | HTTP 422 `service_request.not_ready` |
 | link `BLOCKED` | HTTP 422 `service_request.link.blocked` |
-| link with a `SIGNED`, `ACTIVE` or `SUSPENDED` contract | HTTP 422 `service_request.link.has_contract` |
+| link with a contract in progress (`AWAITING_SIGNATURES`, `SIGNED`, `ACTIVE` or `SUSPENDED`) | HTTP 422 `service_request.link.has_contract` |
 | the pair already has an open request (`OPEN` or `ANSWERED`), including a concurrent one | HTTP 409 `service_request.open_exists` |
 | the client already has 5 open requests | HTTP 422 `service_request.open_limit` |
 
@@ -93,6 +93,11 @@ Each item MUST store a copy of the dependent's name, birth date, school and pick
 #### Scenario: A pair that already has a contract
 
 - **WHEN** a client sends a request to a driver with whom they have an `ACTIVE` contract
+- **THEN** the system returns HTTP 422 with the message of `service_request.link.has_contract`
+
+#### Scenario: A pair whose contract awaits signatures
+
+- **WHEN** a client sends a request to a driver with whom they have an `AWAITING_SIGNATURES` contract
 - **THEN** the system returns HTTP 422 with the message of `service_request.link.has_contract`
 
 #### Scenario: Editing the dependent does not change the request

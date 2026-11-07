@@ -41,7 +41,7 @@ The body MUST carry:
 
 | Field | Rule (HTTP 400 when broken) |
 |---|---|
-| `startsOn`, `endsOn` | required; `startsOn` today or later |
+| `startsOn`, `endsOn` | required; `startsOn` today or later, today in `America/Sao_Paulo` |
 | `totalAmount` | required, greater than zero, two decimals |
 | `installments` | required, 1 to 12 |
 | `dueDay` | required, 1 to 28 |

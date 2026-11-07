@@ -8,7 +8,7 @@ Either party of a link can block the other, the block records who did it, and on
 
 `POST /api/client-drivers/{token}/block` MUST be allowed only to the client or the driver of the link. The admin and any other user MUST get HTTP 403. On success the link becomes `BLOCKED`, `blocked_by` stores the caller's user and `blocked_at` the time, and the response says which party blocked (`blockedBy`: `CLIENT` or `DRIVER`).
 
-Blocking MUST be refused with HTTP 422 `client_driver.block.has_contract` while the link has a contract that is `SIGNED`, `ACTIVE` or `SUSPENDED`; that relationship ends through the contract, not through a block. Blocking a link that is already `BLOCKED` MUST return HTTP 409 `client_driver.already_blocked`.
+Blocking MUST be refused with HTTP 422 `client_driver.block.has_contract` while the link has a contract in progress (`AWAITING_SIGNATURES`, `SIGNED`, `ACTIVE` or `SUSPENDED`); that relationship ends through the contract, not through a block. The block MUST lock the link before it reads the contracts, and creating a contract MUST lock the same link, so one of the two always sees the other; recomputing the link status from its contracts MUST never take a link out of `BLOCKED` nor clear `blocked_by` and `blocked_at`. Blocking a link that is already `BLOCKED` MUST return HTTP 409 `client_driver.already_blocked`.
 
 Blocking MUST close the pair's open negotiation in the same transaction:
 
@@ -26,6 +26,12 @@ Blocking MUST close the pair's open negotiation in the same transaction:
 #### Scenario: Blocking with a running contract
 
 - **WHEN** a party blocks a link that has an `ACTIVE` contract
+- **THEN** the system returns HTTP 422 with the message of `client_driver.block.has_contract`
+- **AND** the link status does not change
+
+#### Scenario: Blocking with a contract awaiting signatures
+
+- **WHEN** a party blocks a link that has an `AWAITING_SIGNATURES` contract
 - **THEN** the system returns HTTP 422 with the message of `client_driver.block.has_contract`
 - **AND** the link status does not change
 
