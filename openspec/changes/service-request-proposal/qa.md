@@ -1,6 +1,6 @@
 # QA — service-request-proposal (constitution rule 55)
 
-Latest run: on the stack tip, `VAN-30/13-pickup-time-and-price`, which contains this branch: every scenario below passed there (see the `qa.md` of PR 13 for the date and the counts). This file keeps the scenarios of PRs 1 to 6.
+Latest run: on the stack tip, `VAN-30/13-pickup-time-and-price`, which contains this branch: every scenario below passed there (see the `qa.md` of PR 13 for the date and the counts). This file keeps the scenarios of PRs 1 to 7.
 
 ## How to run
 
@@ -57,6 +57,8 @@ For the `V64` scenarios (Q1 to Q15), every insert runs inside a transaction that
 For the `V65` scenarios (P1 to P27), each check runs in a rolled-back transaction that first inserts the requests it needs (Diego – Gustavo `ANSWERED`, Bruno – Helena) and a `SENT` version 1 on Diego – Gustavo; the vehicle is the first seeded one, with its plate and capacity in the snapshot and the resulting contract the seeded one. P10 walks every numeric range to both of its limits on the same proposal; P11 to P18 go one step beyond each. P23 sets the pair index aside inside its transaction: with an empty table the planner has no reason to prefer one `SENT` index over the other.
 
 For the dependent locks (T1 to T18), Ana creates Rafa Souza; SQL gives him Lucas's school and a pickup address of his own, and the API his grid. T2 to T4 use a request inserted by SQL on Ana – Fabio, `OPEN` and then `ANSWERED`, set `WITHDRAWN` before the contract. T5 is a real `POST /api/contracts` by the admin on the same link, whose seeded contract already ended.
+
+For the service request routes (U1 to U35, E1 to E37, J1 to J17), the script adds four approved and available drivers by SQL (Igor, Julia, Kaio and Lara, who never log in), so that Ana can reach five open requests and race on a pair without a link. Ana is the only ready client; Bruno, without phone and address, gets a dependent of his own (Davi) through the API for the readiness refusal. U1 to U5 call the seven routes in a row with each kind of caller. The block, the `ACTIVE` contract, the `ANSWERED` and `CONVERTED` statuses, the overdue deadline and the `SENT` proposals are set by SQL, because the routes that reach them come in later PRs (proposal, block, sweep); each is undone right after its scenario. Marina gets an address and a Monday-to-Friday grid through the API (E2, E3) before the request for the two siblings, and is removed after it is withdrawn (E24).
 
 For the approval scenarios (V1 to V12), Fabio is put back `UNDER_REVIEW` with `is_available = false` by SQL, as a driver who just finished the onboarding. The cleanup restores every seeded driver to `APPROVED` and available.
 
@@ -424,6 +426,107 @@ For the approval scenarios (V1 to V12), Fabio is put back `UNDER_REVIEW` with `i
 | T17 | the ended contract stays readable, without the removed dependent's item until phase 3 (R14) | 200 | PASS |
 | T18 | another client still cannot remove the dependent | 403 | PASS |
 
+### Service requests over HTTP — misuse
+| id | scenario | expected | result |
+|---|---|---|---|
+| U1 | the seven routes without a token | 401 401 401 401 401 401 401 | PASS |
+| U2 | the seven routes with an invalid token | 401 401 401 401 401 401 401 | PASS |
+| U3 | the admin on both surfaces | 403 403 403 403 403 403 403 | PASS |
+| U4 | a driver: the client routes are forbidden, another driver's request is not found | 403 403 403 403 200 404 404 | PASS |
+| U5 | another client: Lucas and Ana's request are not found, the driver routes are forbidden | 404 200 404 404 403 403 403 | PASS |
+| U6 | without driverToken | 400 | PASS |
+| U7 | a blank driverToken | 400 | PASS |
+| U8 | without desiredStartDate | 400 | PASS |
+| U9 | desiredStartDate yesterday | 400 | PASS |
+| U10 | desiredStartDate that is not a date | 400 | PASS |
+| U11 | notes with 1001 characters | 400 | PASS |
+| U12 | an empty item list | 400 | PASS |
+| U13 | without items | 400 | PASS |
+| U14 | items that are not a list | 400 | PASS |
+| U15 | an item with no days | 400 | PASS |
+| U16 | a blank dependentToken | 400 | PASS |
+| U17 | a day without needsReturn | 400 | PASS |
+| U18 | needsOutbound that is not a boolean | 400 | PASS |
+| U19 | a weekday that does not exist | 400 | PASS |
+| U20 | malformed JSON | 400 | PASS |
+| U21 | the same dependent twice | 400 | PASS |
+| U22 | the same weekday twice in one item | 400 | PASS |
+| U23 | a day that needs no van | 400 | PASS |
+| U24 | nothing above created a request or a link, and the seeded request is still ANSWERED | 2 11 ANSWERED | PASS |
+| U25 | an unknown driver | 404 | PASS |
+| U26 | a driver under review | 404 | PASS |
+| U27 | a driver not taking new students | 422 | PASS |
+| U28 | an unknown dependent | 404 | PASS |
+| U29 | another client's dependent | 404 | PASS |
+| U30 | a client without phone and address | 422 | PASS |
+| U31 | a dependent without address | 422 | PASS |
+| U32 | a day without school | 422 | PASS |
+| U33 | a blocked link | 422 | PASS |
+| U34 | a pair with an ACTIVE contract | 422 | PASS |
+| U35 | no refusal created a request or a link | 2 11 | PASS |
+
+### Service requests over HTTP — client
+| id | scenario | expected | result |
+|---|---|---|---|
+| E1 | Lucas is full time on Tuesday and Thursday | 200 | PASS |
+| E2 | Marina gets an address | 200 | PASS |
+| E3 | and mornings from Monday to Friday | 200 | PASS |
+| E4 | two siblings, Monday to Friday, both ways | 201 | PASS |
+| E5 | it expires 72 hours after it was sent, on a new PENDING link from the search | 72 PENDING CLIENT_SEARCH 12 | PASS |
+| E6 | full time on some days only, no return on Wednesday | 201 | PASS |
+| E7 | the ended pair's link is reused, with its origin | cfbdafbce82e48d584c1f2813 CLIENT_SEARCH 12 | PASS |
+| E8 | editing the grid does not change the request: Thursday is still full time | 200 | PASS |
+| E9 | editing the dependent does not change the request: the school it was sent with | 200 | PASS |
+| E10 | notes with exactly 1000 characters | 201 | PASS |
+| E11 | a second request to a driver whose request is ANSWERED (the seeded one) | 409 | PASS |
+| E12 | nothing was created | 5 13 | PASS |
+| E13 | the fifth open request | 201 | PASS |
+| E14 | the sixth open request | 422 | PASS |
+| E15 | the refused request left no link | 0 | PASS |
+| E16 | the list shows every request of Ana, newest first | 200 | PASS |
+| E17 | filtered by OPEN (the seeded one is ANSWERED) | 200 | PASS |
+| E18 | paginated | 200 | PASS |
+| E19 | a status that does not exist | 400 | PASS |
+| E20 | reads one of her requests | 200 | PASS |
+| E21 | an unknown token | 404 | PASS |
+| E22 | withdraws the request for the two siblings | 200 | PASS |
+| E23 | withdrawing it again | 409 | PASS |
+| E24 | Marina is removed after the request closed | 204 | PASS |
+| E25 | Ana still reads both items, Marina with the name and birth date she was sent with | 200 | PASS |
+| E26 | and so does Helena | 200 | PASS |
+| E27 | withdraws a request while a proposal is waiting | 200 | PASS |
+| E28 | the proposal is DECLINED | DECLINED | PASS |
+| E29 | an OPEN request past its deadline, before the sweep | 409 | PASS |
+| E30 | it was not withdrawn | OPEN | PASS |
+| E31 | two requests to the same new driver at once: one 201, one 409 | 201 409 | PASS |
+| E32 | one link and one request for the pair | 1 1 | PASS |
+| E33 | filtered by two statuses, comma-separated | 200 | PASS |
+| E34 | and with the parameter repeated | 200 | PASS |
+| E35 | a list with a status that does not exist | 400 | PASS |
+| E36 | every request in Ana's list carries its driver's rating, as stored | 200 | PASS |
+| E37 | and so does the detail | 200 | PASS |
+
+### Service requests over HTTP — driver
+| id | scenario | expected | result |
+|---|---|---|---|
+| J1 | Fabio lists his OPEN requests | 200 | PASS |
+| J2 | Fabio reads the client's first name and the dependent's first name and age | 200 | PASS |
+| J3 | the response has no surname, birth date, street, zip code, document, phone or e-mail |  | PASS |
+| J4 | another driver's request | 404 | PASS |
+| J5 | a reason with 501 characters | 400 | PASS |
+| J6 | a reason that is not text | 400 | PASS |
+| J7 | malformed JSON | 400 | PASS |
+| J8 | the request is still OPEN | OPEN | PASS |
+| J9 | Fabio declines with a reason | 200 | PASS |
+| J10 | Ana reads it declined, with the reason | 200 | PASS |
+| J11 | declining it again | 409 | PASS |
+| J12 | a reason with exactly 500 characters, on the seeded request | 200 | PASS |
+| J13 | the seeded proposal is WITHDRAWN with it | WITHDRAWN | PASS |
+| J14 | Helena declines without a body | 200 | PASS |
+| J15 | Helena declines while her proposal is waiting | 200 | PASS |
+| J16 | her proposal is WITHDRAWN | WITHDRAWN | PASS |
+| J17 | declining a CONVERTED request | 409 | PASS |
+
 ### Regression: contract-core
 
 `scripts/qa/contract-core/qa.sh`, now sourcing `scripts/qa/lib.sh`, passed 269/269 against `main` before this change and 267/267 against this branch. Its B13 now expects the new message (`driver_rating.link.never_contracted`): the scenario is the same (a link without contract cannot rate), and only the text changed in PR 1. Since PR 2, every link it creates sends `origin`, and V39 blocks its link with a blocker and a block time, as the `V61` checks require. Since PR 3 the seeded dependents carry a school grid, which no `contract-core` scenario reads, and `V62` drops `dependent.shift`: S19 to S21, which tested that field, are gone, S25 checks only `trip.shift`, and S22 re-applies `V56` with the column added back for the duration, because `V56` comments it. `V63` drops `address.district_id`, `contract_item.pickup_district_id` and `school.district_id`, and no `contract-core` scenario reads these columns, `pickupDistrictName` or the school's `districtName`. Since PR 6 the seed sends a service request from Ana to Gustavo, which creates that link: the setup accepts the second seeded link and reuses it as Ana – Gustavo instead of creating it. A1 used to move Marina while she had contracts in progress, which D17 now refuses: A1 checks the refusal, the script ends her `ACTIVE` contracts through the admin, and A2 and A3 move her and check that the contracts still pick up at the old address.
@@ -446,3 +549,6 @@ For the approval scenarios (V1 to V12), Fabio is put back `UNDER_REVIEW` with `i
 - The lock on the school, the address and the grid looks at the field, not at its value: resending the current school is refused too (T8). The app sends only the fields the person changed.
 - Removing a dependent locks its row, as the service request and the contract item do: two removals at once give one 204 and one 404 (T16).
 - Once the contract ended and the dependent left, the contract is still read, but without the dependent's item (T17): `contract_item` points to the dependent by association, and Hibernate hides the removed row. The plain ids come in phase 3 (R14).
+- A request body that fails Bean Validation on the service request routes gets the generic `Invalid request content.` detail (U6 to U19, J5): the field keys (`service_request.items.required`, `service_request.notes.too_long`…) are in place for the global change on validation errors. Since `api-validation-errors` (VAN-55) is in `main`, the same bodies return the field message in pt-BR in `detail`, with `field` and `errors[]`; the script only checks the status there, so it is unchanged. The same dependent twice, the same weekday twice and a day without legs are service errors and carry their pt-BR message (U21 to U23).
+- An `OPEN` request past `expiresAt` is already closed for both parties before the sweep runs: withdrawing it gives `409 service_request.not_open` and leaves it `OPEN` for the sweep to expire (E29, E30).
+- A `sort` on a field that does not exist (`?sort=bogus`) gives HTTP 500 on the two lists, as on every paginated list of the API (`/api/contracts` included): Spring Data appends the field to the query and Hibernate rejects it. Not covered by the script; it is a change for all the lists at once.
