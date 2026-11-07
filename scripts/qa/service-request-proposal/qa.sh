@@ -1129,6 +1129,11 @@ request POST "$CLIENT_SR" "$ANA" "$(sr_body "$FABIO_D" "" "$LUCAS_WEEK")"
 expect U34 "a pair with an ACTIVE contract" 422 '.detail == "Você já tem um contrato em andamento com este motorista."'
 sql "update contract set status = 'ENDED' where token = 'qasrhttpcontract'" >/dev/null
 check U35 "no refusal created a request or a link" "$ROWS_BEFORE" "$(request_rows)"
+insert_contract "$ANA_FABIO" AWAITING_SIGNATURES qasrhttpawaiting
+request POST "$CLIENT_SR" "$ANA" "$(sr_body "$FABIO_D" "" "$LUCAS_WEEK")"
+expect U36 "a pair with a contract awaiting signatures" 422 '.detail == "Você já tem um contrato em andamento com este motorista."'
+sql "update contract set status = 'CANCELLED' where token = 'qasrhttpawaiting'" >/dev/null
+check U37 "that refusal created no request either" "$ROWS_BEFORE" "$(request_rows)"
 
 table "Service requests over HTTP — client"
 request PUT "/api/dependent/$LUCAS/school-days" "$ANA" \
@@ -1363,6 +1368,7 @@ race() {
   dir="$(mktemp -d)"
   curl -s -o /dev/null -w '%{http_code}' -X POST "$BASE_URL$1" -H "Authorization: Bearer $2" \
     -H "Content-Type: application/json" ${3:+--data-binary "$3"} >"$dir/first" &
+  if [[ -n ${7-} ]]; then sleep "$7"; fi
   curl -s -o /dev/null -w '%{http_code}' -X POST "$BASE_URL$4" -H "Authorization: Bearer $5" \
     -H "Content-Type: application/json" ${6:+--data-binary "$6"} >"$dir/second" &
   wait
@@ -1611,6 +1617,9 @@ expect Y11 "no body" 400
 EMPTY_ADJUSTMENT='.detail == "Diga o que você gostaria de mudar: um valor sugerido, uma observação ou os dois."'
 expect_bad_adjustment Y12 "neither a value nor a note" '{"field": "PRICE"}' 422 "$EMPTY_ADJUSTMENT"
 expect_bad_adjustment Y13 "a blank value and a blank note" '{"field": "PRICE", "suggestedValue": " ", "note": "  "}' 422 "$EMPTY_ADJUSTMENT"
+request POST "$CLIENT_P/$G_P4/adjustments" "$BRUNO" '{"field": "PRICE"}'
+expect Y48 "another client sends an empty adjustment: the proposal is not found before the content is checked" 404 \
+  '.detail == "Proposta não encontrada."'
 check Y14 "the refusals saved no adjustment" 2 "$(adjustments_of "$G_P4")"
 request POST "$CLIENT_P/$G_P4/adjustments" "$ANA" "$(jq -nc '{field: "PRICE", suggestedValue: ("1" * 100)}')"
 expect Y15 "a suggested value with exactly 100 characters" 201 '(.adjustments[2].suggestedValue | length) == 100'
@@ -1796,6 +1805,38 @@ request_against_block() {
   done | sort -u
 }
 
+saturday_contract() {
+  jq -nc --arg l "$1" --arg d "$LUCAS" '{clientDriverToken: $l, startsOn: "2027-02-01", endsOn: "2027-12-17",
+    totalAmount: 4200, installments: 12, dueDay: 5,
+    items: [{dependentToken: $d, slots: [{weekday: "SATURDAY", leg: "OUTBOUND", shift: "MORNING", pickupTime: "07:00"}]}]}'
+}
+
+active_contracts_on() {
+  sql "select count(*) from contract where status = 'ACTIVE' and deleted_at is null
+       and client_driver_id = (select id from client_driver where token = '$1')"
+}
+
+contract_against_block() {
+  local round codes contract block create
+  for round in $(seq 1 10); do
+    # Fired together, the contract reaches the database first; even rounds give the block a few
+    # milliseconds of head start, so both orders get a turn.
+    if (( round % 2 )); then
+      codes=$(race /api/contracts "$ADMIN" "$(saturday_contract "$ANA_KAIO")" "/api/client-drivers/$ANA_KAIO/block" "$ANA" "")
+    else
+      read -r block create <<<"$(race "/api/client-drivers/$ANA_KAIO/block" "$ANA" "" /api/contracts "$ADMIN" "$(saturday_contract "$ANA_KAIO")" 0.02)"
+      codes="$create $block"
+    fi
+    echo "$codes $(link_state "$ANA_KAIO") $(active_contracts_on "$ANA_KAIO")"
+    contract=$(sql "select token from contract where status = 'ACTIVE' and deleted_at is null
+                    and client_driver_id = (select id from client_driver where token = '$ANA_KAIO')")
+    if [[ -n $contract ]]; then request PATCH "/api/contracts/$contract" "$ADMIN" '{"status":"ENDED"}'; fi
+    if [[ $(link_state "$ANA_KAIO") == BLOCKED* ]]; then request POST "/api/client-drivers/$ANA_KAIO/unblock" "$ANA"; fi
+    [[ $(link_state "$ANA_KAIO") != BLOCKED* && $(active_contracts_on "$ANA_KAIO") == 0 ]] \
+      || { echo "SETUP FAIL | reset Ana – Kaio | $(link_state "$ANA_KAIO")" >&2; return 1; }
+  done | sort -u
+}
+
 BLOCKED_BY_YOU='.detail == "Este motorista não pode receber solicitações suas."'
 ALREADY_BLOCKED='.detail == "Este vínculo já está bloqueado."'
 NOT_BLOCKED='.detail == "Este vínculo não está bloqueado."'
@@ -1862,6 +1903,13 @@ expect BL28 "Bruno blocks a link with an ACTIVE contract" 422 \
 request POST "/api/client-drivers/$BRUNO_GUSTAVO/block" "$GUSTAVO"
 expect BL29 "and so does Gustavo" 422
 check BL30 "the link stays ACTIVE with no blocker" "ACTIVE - f" "$(link_state "$BRUNO_GUSTAVO")"
+CARLA_GUSTAVO_STATE=$(link_state "$CARLA_GUSTAVO")
+insert_contract "$CARLA_GUSTAVO" AWAITING_SIGNATURES qablockawaiting
+request POST "/api/client-drivers/$CARLA_GUSTAVO/block" "$CARLA"
+expect BL36 "Carla blocks a link whose contract awaits signatures" 422 \
+  '.detail == "Há um contrato em andamento com esta pessoa. Ele termina pelo contrato, não por bloqueio."'
+check BL37 "the link did not change" "$CARLA_GUSTAVO_STATE" "$(link_state "$CARLA_GUSTAVO")"
+sql "update contract set status = 'CANCELLED' where token = 'qablockawaiting'" >/dev/null
 check BL31 "three blocks at once by the same party: one 200, two 409" "200 409 409" \
   "$(in_parallel POST "$ANA" "" "/api/client-drivers/$ANA_HELENA/block" "/api/client-drivers/$ANA_HELENA/block" \
      "/api/client-drivers/$ANA_HELENA/block")"
@@ -1881,6 +1929,22 @@ expect BL34 "the winner unblocks" 200 '.status == "PENDING"'
 ROUNDS=$(request_against_block)
 check BL35 "ten rounds of Ana asking Helena for a quote while Helena blocks her: every block gets 200, and the request is refused or closed by it" "" \
   "$(grep -vxE '(422|201) 200 0' <<<"$ROUNDS" | paste -sd, - || true)"
+ROUNDS=$(contract_against_block)
+check BL38 "ten rounds of the admin creating a contract while Ana blocks the link: one side always refuses the other" "" \
+  "$(grep -vxE '201 422 ACTIVE - f 1|422 200 BLOCKED CLIENT t 0' <<<"$ROUNDS" | paste -sd, - || true)"
+echo "BL38 outcomes: $(paste -sd, - <<<"$ROUNDS")"
+
+table "Today in Brasília, whatever the JVM's zone"
+TODAY=$(sql "select (now() at time zone 'America/Sao_Paulo')::date")
+request POST "$CLIENT_SR" "$ANA" "$(jq -c --arg t "$TODAY" '.desiredStartDate = $t' <<<"$(sr_body "$HELENA_D" "" "$LUCAS_WEEK")")"
+expect TZ1 "Ana asks Helena for a quote starting today in Brasília" 201 ".desiredStartDate == \"$TODAY\""
+TODAY_REQ=$(jq -r .token <<<"$RESP_BODY")
+request POST "$DRIVER_SR/$TODAY_REQ/proposals" "$HELENA" \
+  "$(jq -c --arg t "$TODAY" '.startsOn = $t' <<<"$(p_body "$HELENA_VAN" "$LUCAS_ITEM")")"
+expect TZ2 "Helena proposes to start today in Brasília" 201 ".startsOn == \"$TODAY\""
+request POST "$CLIENT_SR/$TODAY_REQ/withdraw" "$ANA"
+expect TZ3 "Ana withdraws it, so the pair has no open negotiation left" 200
+check TZ4 "the request is WITHDRAWN" WITHDRAWN "$(request_status "$TODAY_REQ")"
 
 table "Expiry sweep turned off (EXPIRY_SWEEP_ENABLED=false)"
 IDLE_REQ=$(send_request "$(sr_body "$KAIO_D" "" "$LUCAS_WEEK")")
