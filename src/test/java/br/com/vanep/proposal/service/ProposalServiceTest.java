@@ -851,6 +851,18 @@ class ProposalServiceTest {
   }
 
   @Test
+  void anotherClientsProposalIsNotFoundBeforeTheAdjustmentIsChecked() {
+    expectRefusal(
+        () ->
+            service.requestAdjustment(
+                ANA_UID,
+                "other",
+                new ProposalAdjustmentRequestDTO(ProposalAdjustmentField.OTHER, null, null)),
+        HttpStatus.NOT_FOUND,
+        "proposal.not_found");
+  }
+
+  @Test
   void aDriverIsForbiddenBeforeTheAdjustmentIsChecked() {
     when(users.requireByTokenAndType(CARLOS_UID, UserType.CLIENT))
         .thenThrow(new ResponseStatusException(HttpStatus.FORBIDDEN, "user.type.forbidden"));

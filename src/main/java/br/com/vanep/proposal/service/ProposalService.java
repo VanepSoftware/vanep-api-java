@@ -226,10 +226,10 @@ public class ProposalService {
   public ProposalResponseDTO requestAdjustment(
       String callerUid, String token, ProposalAdjustmentRequestDTO body) {
     ClientModel client = requireCallerClient(callerUid);
+    ProposalModel proposal = requireOfClient(client, token);
     if (!StringUtils.hasText(body.suggestedValue()) && !StringUtils.hasText(body.note())) {
       throw unprocessableContent("proposal.adjustment.empty");
     }
-    ProposalModel proposal = requireOfClient(client, token);
     ensureCurrent(proposal);
 
     ensureChanged(proposals.touchSent(proposal.getId()), "proposal.not_current");
