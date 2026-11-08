@@ -11,11 +11,11 @@ ENV_FILE = .env
 ENV_EXAMPLE = .env.example
 
 .PHONY: up down nuke restart rebuild logs shell test test-coverage check boot-run build clean \
-	docker-build lint lint-fix db-up db-down db-logs db-psql db-migrate db-seed up-build dev setup-env \
+	docker-build lint lint-fix check-migrations db-up db-down db-logs db-psql db-migrate db-seed up-build dev setup-env \
 	mail-up mail-down mail-logs install clean-install env pr
 
 # Gera um `.env` pronto para dev a partir do `.env.example`, com os segredos
-# obrigatórios (pepper + remember-me) gerados via `openssl rand -hex 32`.
+# obrigatórios (pepper, remember-me, segredo OAuth e chave do chat) gerados via `openssl rand -hex 32`.
 # Idempotente: não sobrescreve um `.env` existente (evita trocar o pepper de quem já tem usuários).
 env:
 	@if [ -f $(ENV_FILE) ]; then \
@@ -25,6 +25,7 @@ env:
 		sed -i "s|^VANEP_PASSWORD_PEPPER=.*|VANEP_PASSWORD_PEPPER=$$(openssl rand -hex 32)|" $(ENV_FILE); \
 		sed -i "s|^VANEP_REMEMBER_ME_KEY=.*|VANEP_REMEMBER_ME_KEY=$$(openssl rand -hex 32)|" $(ENV_FILE); \
 		sed -i "s|^VANEP_OAUTH_CLIENT_SECRET=.*|VANEP_OAUTH_CLIENT_SECRET=$$(openssl rand -hex 32)|" $(ENV_FILE); \
+		sed -i "s|^VANEP_CHAT_ENCRYPTION_KEY=.*|VANEP_CHAT_ENCRYPTION_KEY=$$(openssl rand -hex 32)|" $(ENV_FILE); \
 		echo "=> $(ENV_FILE) criado com segredos gerados. Pronto para 'make dev'."; \
 	fi
 
@@ -112,7 +113,13 @@ test:
 test-coverage:
 	$(MVNW) verify
 
-check: test-coverage
+check: check-migrations test-coverage
+
+# Versão de migration repetida ou atrás da main derruba o boot do Flyway em produção.
+# A CI roda o mesmo script; aqui ele compara com a origin/main recém-buscada.
+check-migrations:
+	@git fetch --quiet origin main || true
+	@bash scripts/check-migrations.sh
 
 boot-run: setup-env
 	@bash -euo pipefail -c 'set -a && . ./$(ENV_FILE) && set +a && $(MVNW) spring-boot:run'

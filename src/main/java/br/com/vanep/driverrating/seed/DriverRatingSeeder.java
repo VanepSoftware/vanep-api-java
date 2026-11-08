@@ -4,6 +4,7 @@ import br.com.vanep.clientdriver.model.ClientDriverModel;
 import br.com.vanep.clientdriver.repository.ClientDriverRepository;
 import br.com.vanep.driverrating.model.DriverRatingModel;
 import br.com.vanep.driverrating.repository.DriverRatingRepository;
+import br.com.vanep.driverrating.service.DriverRatingService;
 import java.math.BigDecimal;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,11 +18,15 @@ public class DriverRatingSeeder {
 
   private final DriverRatingRepository driverRatingRepository;
   private final ClientDriverRepository linkRepository;
+  private final DriverRatingService driverRatingService;
 
   public DriverRatingSeeder(
-      DriverRatingRepository driverRatingRepository, ClientDriverRepository linkRepository) {
+      DriverRatingRepository driverRatingRepository,
+      ClientDriverRepository linkRepository,
+      DriverRatingService driverRatingService) {
     this.driverRatingRepository = driverRatingRepository;
     this.linkRepository = linkRepository;
+    this.driverRatingService = driverRatingService;
   }
 
   public void seed() {
@@ -38,6 +43,7 @@ public class DriverRatingSeeder {
     rating.setComment("Excelente motorista! Muito pontual e atencioso.");
 
     driverRatingRepository.save(rating);
+    driverRatingService.recalculateDriverAverage(link.getDriver());
     log.info("Seed: driver rating created for link {}.", link.getToken());
   }
 }

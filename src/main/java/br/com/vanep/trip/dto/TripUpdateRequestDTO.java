@@ -1,12 +1,12 @@
 package br.com.vanep.trip.dto;
 
-import br.com.vanep.shared.enums.Shift;
+import br.com.vanep.shared.enums.OperationShift;
 import br.com.vanep.trip.enums.TripStatus;
 import java.time.Instant;
 import org.openapitools.jackson.nullable.JsonNullable;
 
 public record TripUpdateRequestDTO(
-    JsonNullable<Shift> shift,
+    JsonNullable<OperationShift> shift,
     JsonNullable<TripStatus> status,
     JsonNullable<Instant> startedAt,
     JsonNullable<Instant> finishedAt) {

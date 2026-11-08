@@ -4,11 +4,12 @@ import br.com.vanep.client.model.ClientModel;
 import br.com.vanep.client.repository.ClientRepository;
 import br.com.vanep.clientdriver.dto.ClientDriverCreateRequestDTO;
 import br.com.vanep.clientdriver.dto.ClientDriverResponseDTO;
-import br.com.vanep.clientdriver.dto.ClientDriverUpdateRequestDTO;
+import br.com.vanep.clientdriver.enums.LinkOrigin;
 import br.com.vanep.clientdriver.enums.RelationshipStatus;
 import br.com.vanep.clientdriver.mapper.ClientDriverMapper;
 import br.com.vanep.clientdriver.model.ClientDriverModel;
 import br.com.vanep.clientdriver.repository.ClientDriverRepository;
+import br.com.vanep.driver.DriverApprovalStatus;
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.user.enums.UserType;
@@ -17,6 +18,7 @@ import br.com.vanep.user.service.UserService;
 import java.util.List;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -60,18 +62,45 @@ public class ClientDriverService {
             .findByToken(request.driverToken())
             .orElseThrow(() -> notFound("client_driver.driver.not_found"));
 
+    if (driver.getApprovalStatus() != DriverApprovalStatus.APPROVED) {
+      throw unprocessableEntity("client_driver.driver.not_approved");
+    }
+
     links
         .findByPair(client.getId(), driver.getId())
         .ifPresent(
-            existing -> {
+            _ -> {
               throw conflict("client_driver.duplicate_pair");
             });
 
+    return mapper.toResponse(insertLink(newLink(client, driver, request.origin())));
+  }
+
+  // The lock makes a block of the same pair wait for the request, or the request see the block. A
+  // concurrent first request of the same pair fails on the pair's unique index at flush; the caller
+  // turns that violation into its own conflict.
+  @Transactional
+  public ClientDriverModel findOrCreateForRequest(ClientModel client, DriverModel driver) {
+    return links
+        .lockByPair(client.getId(), driver.getId())
+        .orElseGet(() -> links.saveAndFlush(newLink(client, driver, LinkOrigin.CLIENT_SEARCH)));
+  }
+
+  ClientDriverModel newLink(ClientModel client, DriverModel driver, LinkOrigin origin) {
     ClientDriverModel link = new ClientDriverModel();
     link.setClient(client);
     link.setDriver(driver);
-    link.setStatus(request.status() != null ? request.status() : RelationshipStatus.PENDING);
-    return mapper.toResponse(links.save(link));
+    link.setStatus(RelationshipStatus.PENDING);
+    link.setOrigin(origin);
+    return link;
+  }
+
+  ClientDriverModel insertLink(ClientDriverModel link) {
+    try {
+      return links.saveAndFlush(link);
+    } catch (DataIntegrityViolationException concurrentCreation) {
+      throw conflict("client_driver.duplicate_pair");
+    }
   }
 
   @Transactional(readOnly = true)
@@ -92,21 +121,6 @@ public class ClientDriverService {
             ? links.findByDriverUserId(caller.getId())
             : links.findByClientUserId(caller.getId());
     return mine.stream().map(mapper::toResponse).toList();
-  }
-
-  @Transactional
-  public ClientDriverResponseDTO update(String token, ClientDriverUpdateRequestDTO request) {
-    ClientDriverModel link = requireLink(token);
-
-    if (request.status().isPresent()) {
-      RelationshipStatus status = request.status().get();
-      if (status == null) {
-        throw badRequest("client_driver.status.required");
-      }
-      link.setStatus(status);
-    }
-
-    return mapper.toResponse(links.save(link));
   }
 
   @Transactional
@@ -135,8 +149,8 @@ public class ClientDriverService {
     return new ResponseStatusException(HttpStatus.NOT_FOUND, message(key));
   }
 
-  ResponseStatusException badRequest(String key) {
-    return new ResponseStatusException(HttpStatus.BAD_REQUEST, message(key));
+  ResponseStatusException unprocessableEntity(String key) {
+    return new ResponseStatusException(HttpStatus.UNPROCESSABLE_CONTENT, message(key));
   }
 
   String message(String key) {

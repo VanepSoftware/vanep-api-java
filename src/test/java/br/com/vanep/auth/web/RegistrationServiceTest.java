@@ -186,4 +186,38 @@ class RegistrationServiceTest {
 
     verify(users, never()).save(any(UserModel.class));
   }
+
+  @Test
+  void createRoleRecordForDriverWithNullDriverFieldsSafeguardsAgainstNpeAndSetsPendingStatus() {
+    RegistrationService service = service();
+    UserModel user = new UserModel();
+
+    service.createRoleRecord(user, UserType.DRIVER, null);
+
+    ArgumentCaptor<DriverModel> driver = ArgumentCaptor.forClass(DriverModel.class);
+    verify(drivers).save(driver.capture());
+    assertThat(driver.getValue().getUser()).isSameAs(user);
+    assertThat(driver.getValue().getBasePrice()).isNull();
+    assertThat(driver.getValue().getApprovalStatus()).isEqualTo(DriverApprovalStatus.PENDING);
+  }
+
+  @Test
+  void createRoleRecordForDriverSetsFieldsAndPendingStatus() {
+    RegistrationService service = service();
+    UserModel user = new UserModel();
+    DriverSignupRequestDTO request = new DriverSignupRequestDTO();
+    request.setCnpj("12345678000199");
+    request.setExperienceYears(3);
+    request.setBasePrice(new BigDecimal("150.00"));
+
+    service.createRoleRecord(user, UserType.DRIVER, request);
+
+    ArgumentCaptor<DriverModel> driver = ArgumentCaptor.forClass(DriverModel.class);
+    verify(drivers).save(driver.capture());
+    assertThat(driver.getValue().getUser()).isSameAs(user);
+    assertThat(driver.getValue().getCnpj()).isEqualTo("12345678000199");
+    assertThat(driver.getValue().getExperienceYears()).isEqualTo(3);
+    assertThat(driver.getValue().getBasePrice()).isEqualByComparingTo("150.00");
+    assertThat(driver.getValue().getApprovalStatus()).isEqualTo(DriverApprovalStatus.PENDING);
+  }
 }

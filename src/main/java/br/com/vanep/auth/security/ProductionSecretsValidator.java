@@ -11,27 +11,32 @@ public class ProductionSecretsValidator implements InitializingBean {
 
   private static final String DEFAULT_REMEMBER_ME_KEY = "vanep-remember-me-change-me";
   private static final String DEFAULT_PEPPER = "dev-pepper-please-change";
+  private static final String DEFAULT_CHAT_ENCRYPTION_KEY = "0".repeat(64);
 
   private final String rememberMeKey;
   private final String pepper;
   private final String jwkPrivateKey;
   private final String oauthClientSecret;
+  private final String chatEncryptionKey;
 
   public ProductionSecretsValidator(
       @Value("${vanep.remember-me.key:}") String rememberMeKey,
       @Value("${vanep.password.pepper:}") String pepper,
       @Value("${vanep.oauth.jwk.private-key:}") String jwkPrivateKey,
-      @Value("${vanep.oauth.client.secret:}") String oauthClientSecret) {
+      @Value("${vanep.oauth.client.secret:}") String oauthClientSecret,
+      @Value("${vanep.chat.encryption-key:}") String chatEncryptionKey) {
     this.rememberMeKey = rememberMeKey;
     this.pepper = pepper;
     this.jwkPrivateKey = jwkPrivateKey;
     this.oauthClientSecret = oauthClientSecret;
+    this.chatEncryptionKey = chatEncryptionKey;
   }
 
   @Override
   public void afterPropertiesSet() {
     requireSecret("vanep.remember-me.key", rememberMeKey, DEFAULT_REMEMBER_ME_KEY);
     requireSecret("vanep.password.pepper", pepper, DEFAULT_PEPPER);
+    requireSecret("vanep.chat.encryption-key", chatEncryptionKey, DEFAULT_CHAT_ENCRYPTION_KEY);
     if (jwkPrivateKey == null || jwkPrivateKey.isBlank()) {
       throw new IllegalStateException(
           "Em produção configure vanep.oauth.jwk.private-key (chave de assinatura RSA estável).");

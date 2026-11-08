@@ -9,7 +9,6 @@ import br.com.vanep.auth.dto.DriverSignupFields;
 import br.com.vanep.auth.dto.DriverSignupRequestDTO;
 import br.com.vanep.auth.enums.AuthErrorCode;
 import br.com.vanep.auth.exception.SignupDuplicateException;
-import br.com.vanep.auth.validation.CpfValidator;
 import br.com.vanep.auth.verification.EmailVerificationService;
 import br.com.vanep.client.model.ClientModel;
 import br.com.vanep.client.repository.ClientRepository;
@@ -18,6 +17,7 @@ import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.role.RoleName;
 import br.com.vanep.role.repository.RoleRepository;
+import br.com.vanep.shared.validation.CpfValidator;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
@@ -88,9 +88,11 @@ public class RegistrationService {
       case DRIVER -> {
         DriverModel driver = new DriverModel();
         driver.setUser(user);
-        driver.setCnpj(driverFields.getCnpj());
-        driver.setExperienceYears(driverFields.getExperienceYears());
-        driver.setBasePrice(driverFields.getBasePrice());
+        if (driverFields != null) {
+          driver.setCnpj(driverFields.getCnpj());
+          driver.setExperienceYears(driverFields.getExperienceYears());
+          driver.setBasePrice(driverFields.getBasePrice());
+        }
         driver.setApprovalStatus(DriverApprovalStatus.PENDING);
         drivers.save(driver);
       }

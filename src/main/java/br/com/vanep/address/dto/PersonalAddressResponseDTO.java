@@ -6,10 +6,8 @@ public record PersonalAddressResponseDTO(
     String number,
     String complement,
     String zipCode,
-    String districtName,
-    String districtToken,
+    String neighborhood,
     String cityName,
     String cityToken,
     String stateUf,
-    String countryIsoCode,
-    String googlePlaceId) {}
+    String countryIsoCode) {}

@@ -2,16 +2,20 @@ package br.com.vanep.address.service;
 
 import br.com.vanep.address.dto.AddressRequestDTO;
 import br.com.vanep.address.dto.AddressResponseDTO;
+import br.com.vanep.address.dto.DependentAddressRequestDTO;
 import br.com.vanep.address.mapper.AddressMapper;
 import br.com.vanep.address.model.AddressModel;
 import br.com.vanep.address.repository.AddressRepository;
 import br.com.vanep.dependent.model.DependentModel;
 import br.com.vanep.dependent.repository.DependentRepository;
+import br.com.vanep.places.dto.PlaceDetailsResponseDTO;
 import br.com.vanep.school.model.SchoolModel;
 import br.com.vanep.school.repository.SchoolRepository;
+import br.com.vanep.unlinkedpassenger.model.UnlinkedPassengerModel;
 import java.util.Collection;
 import java.util.Map;
-import java.util.function.LongConsumer;
+import java.util.Optional;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
@@ -24,6 +28,7 @@ import org.springframework.web.server.ResponseStatusException;
 public class AddressService {
   private final AddressRepository addressRepository;
   private final AddressPlaceResolverService placeResolver;
+  private final AddressCatalogResolverService catalogResolver;
   private final AddressMapper mapper;
   private final MessageSource messages;
   private final DependentRepository dependents;
@@ -32,12 +37,14 @@ public class AddressService {
   public AddressService(
       AddressRepository addressRepository,
       AddressPlaceResolverService placeResolver,
+      AddressCatalogResolverService catalogResolver,
       AddressMapper mapper,
       MessageSource messages,
       DependentRepository dependents,
       SchoolRepository schools) {
     this.addressRepository = addressRepository;
     this.placeResolver = placeResolver;
+    this.catalogResolver = catalogResolver;
     this.mapper = mapper;
     this.messages = messages;
     this.dependents = dependents;
@@ -64,19 +71,38 @@ public class AddressService {
   }
 
   @Transactional
-  public AddressResponseDTO upsertForDependent(Long dependentId, AddressRequestDTO request) {
+  public AddressResponseDTO upsertForDependent(
+      Long dependentId, DependentAddressRequestDTO request) {
     DependentModel dependent = requireDependent(dependentId);
+    Consumer<AddressModel> writeCatalogAddress = catalogAddressWriter(request);
     return upsertOwnedAddress(
         dependent.getAddressId(),
-        request,
+        writeCatalogAddress,
+        writeCatalogAddress,
         () ->
             rejectIfOwnedByAnotherActiveOwner(
                 dependents.countByAddressIdAndIdNot(dependent.getAddressId(), dependent.getId()),
                 schools.countByAddressId(dependent.getAddressId())),
-        savedId -> {
-          dependent.setAddressId(savedId);
+        saved -> {
+          dependent.setAddressId(saved.getId());
           dependents.save(dependent);
         });
+  }
+
+  @Transactional
+  public AddressResponseDTO upsertForUnlinkedPassenger(
+      UnlinkedPassengerModel passenger, DependentAddressRequestDTO request) {
+    Long currentAddressId = passenger.getAddress() == null ? null : passenger.getAddress().getId();
+    Consumer<AddressModel> writeCatalogAddress = catalogAddressWriter(request);
+    return upsertOwnedAddress(
+        currentAddressId,
+        writeCatalogAddress,
+        writeCatalogAddress,
+        () ->
+            rejectIfOwnedByAnotherActiveOwner(
+                dependents.countByAddressId(currentAddressId),
+                schools.countByAddressId(currentAddressId)),
+        saved -> passenger.setAddress(saved));
   }
 
   @Transactional
@@ -84,15 +110,47 @@ public class AddressService {
     SchoolModel school = requireSchool(schoolId);
     return upsertOwnedAddress(
         school.getAddressId(),
-        request,
+        address -> applyToNewAddress(address, request),
+        address -> {
+          applyToExistingAddress(address, request);
+          followAddressCity(school, address);
+        },
         () ->
             rejectIfOwnedByAnotherActiveOwner(
                 dependents.countByAddressId(school.getAddressId()),
                 schools.countByAddressIdAndIdNot(school.getAddressId(), school.getId())),
-        savedId -> {
-          school.setAddressId(savedId);
+        saved -> {
+          school.setAddressId(saved.getId());
+          school.setCity(saved.getCity());
           schools.save(school);
         });
+  }
+
+  // The school keeps its own city for when its place has no street; once it has an address, a new
+  // place moves both, so the two cities never disagree.
+  void followAddressCity(SchoolModel school, AddressModel address) {
+    Long schoolCityId = school.getCity() == null ? null : school.getCity().getId();
+    if (!address.getCity().getId().equals(schoolCityId)) {
+      school.setCity(address.getCity());
+      schools.save(school);
+    }
+  }
+
+  @Transactional
+  public Optional<AddressResponseDTO> createForSchoolFromPlace(
+      SchoolModel school, PlaceDetailsResponseDTO details) {
+    return placeResolver
+        .buildFromPlace(details, school.getCity())
+        .map(address -> attachToSchool(school.getId(), address));
+  }
+
+  AddressResponseDTO attachToSchool(Long schoolId, AddressModel address) {
+    AddressModel saved = addressRepository.save(address);
+    if (schools.attachAddressWhenMissing(schoolId, saved.getId()) == 1) {
+      return mapper.toResponse(saved);
+    }
+    addressRepository.delete(saved);
+    return toResponseOrNull(requireSchool(schoolId).getAddressId());
   }
 
   @Transactional
@@ -103,6 +161,11 @@ public class AddressService {
       dependent.setAddressId(null);
       dependents.save(dependent);
     }
+  }
+
+  @Transactional
+  public void clearForUnlinkedPassenger(UnlinkedPassengerModel passenger) {
+    softDeleteOwnedAddress(passenger.getAddress().getId());
   }
 
   @Transactional
@@ -117,9 +180,10 @@ public class AddressService {
 
   private AddressResponseDTO upsertOwnedAddress(
       Long currentAddressId,
-      AddressRequestDTO request,
+      Consumer<AddressModel> writeToNewAddress,
+      Consumer<AddressModel> writeToExistingAddress,
       Runnable rejectIfOwnedByAnother,
-      LongConsumer linkToOwner) {
+      Consumer<AddressModel> linkToOwner) {
     if (currentAddressId != null) {
       rejectIfOwnedByAnother.run();
       AddressModel address =
@@ -129,14 +193,14 @@ public class AddressService {
                   () ->
                       new ResponseStatusException(
                           HttpStatus.NOT_FOUND, message("address.not_found")));
-      applyToExistingAddress(address, request);
+      writeToExistingAddress.accept(address);
       return mapper.toResponse(addressRepository.save(address));
     }
 
     AddressModel address = new AddressModel();
-    applyToNewAddress(address, request);
+    writeToNewAddress.accept(address);
     AddressModel saved = addressRepository.save(address);
-    linkToOwner.accept(saved.getId());
+    linkToOwner.accept(saved);
     return mapper.toResponse(saved);
   }
 
@@ -157,8 +221,12 @@ public class AddressService {
     return dependents
         .findById(dependentId)
         .orElseThrow(
-            () ->
-                new ResponseStatusException(HttpStatus.NOT_FOUND, message("dependent.not_found")));
+            () -> {
+              ResponseStatusException exception =
+                  new ResponseStatusException(HttpStatus.NOT_FOUND, message("dependent.not_found"));
+              exception.getBody().setProperty("code", "dependent.not_found");
+              return exception;
+            });
   }
 
   private SchoolModel requireSchool(Long schoolId) {
@@ -166,6 +234,18 @@ public class AddressService {
         .findById(schoolId)
         .orElseThrow(
             () -> new ResponseStatusException(HttpStatus.NOT_FOUND, message("school.not_found")));
+  }
+
+  private Consumer<AddressModel> catalogAddressWriter(DependentAddressRequestDTO request) {
+    return address ->
+        catalogResolver.applyCity(
+            address,
+            request.cityToken(),
+            request.street(),
+            request.zipCode(),
+            request.number(),
+            request.complement(),
+            request.neighborhood());
   }
 
   private void applyToNewAddress(AddressModel address, AddressRequestDTO request) {

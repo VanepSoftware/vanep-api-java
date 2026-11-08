@@ -3,10 +3,11 @@ package br.com.vanep.trip.service;
 import br.com.vanep.driver.DriverApprovalStatus;
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
-import br.com.vanep.shared.enums.Shift;
+import br.com.vanep.shared.enums.OperationShift;
 import br.com.vanep.trip.dto.TripCreateRequestDTO;
 import br.com.vanep.trip.dto.TripResponseDTO;
 import br.com.vanep.trip.dto.TripUpdateRequestDTO;
+import br.com.vanep.trip.enums.TripCoherenceViolation;
 import br.com.vanep.trip.enums.TripStatus;
 import br.com.vanep.trip.mapper.TripMapper;
 import br.com.vanep.trip.model.TripModel;
@@ -63,7 +64,7 @@ public class TripService {
   }
 
   @Transactional
-  public TripResponseDTO startToday(String callerUid, Shift shift) {
+  public TripResponseDTO startToday(String callerUid, OperationShift shift) {
     DriverModel driver = requireApprovedDriver(callerUid);
     LocalDate serviceDate = today();
 
@@ -85,7 +86,7 @@ public class TripService {
   }
 
   @Transactional
-  public TripResponseDTO finishToday(String callerUid, Shift shift) {
+  public TripResponseDTO finishToday(String callerUid, OperationShift shift) {
     DriverModel driver = requireApprovedDriver(callerUid);
     TripModel trip =
         trips
@@ -120,7 +121,7 @@ public class TripService {
     trips
         .findByDriverAndServiceDateAndShift(driver.getId(), request.serviceDate(), request.shift())
         .ifPresent(
-            existing -> {
+            _ -> {
               throw conflict("trip.duplicate_slot");
             });
 
@@ -156,7 +157,7 @@ public class TripService {
     TripModel trip = requireTrip(token);
 
     if (request.shift().isPresent()) {
-      Shift shift = request.shift().get();
+      OperationShift shift = request.shift().get();
       if (shift == null) {
         throw badRequest("trip.field.null");
       }
@@ -197,14 +198,24 @@ public class TripService {
   private void requireCoherent(TripStatus status, Instant startedAt, Instant finishedAt) {
     coherence
         .validate(status, startedAt, finishedAt)
-        .map(violation -> violation.messageKey())
+        .map(violation -> messageKey(violation))
         .ifPresent(
             key -> {
               throw badRequest(key);
             });
   }
 
-  TripModel insertOrReread(DriverModel driver, LocalDate serviceDate, Shift shift) {
+  String messageKey(TripCoherenceViolation violation) {
+    return switch (violation) {
+      case STARTED_AT_REQUIRED -> "trip.coherence.started_at_required";
+      case STARTED_AT_FORBIDDEN -> "trip.coherence.started_at_forbidden";
+      case FINISHED_AT_REQUIRED -> "trip.coherence.finished_at_required";
+      case FINISHED_AT_FORBIDDEN -> "trip.coherence.finished_at_forbidden";
+      case FINISHED_BEFORE_STARTED -> "trip.coherence.finished_before_started";
+    };
+  }
+
+  TripModel insertOrReread(DriverModel driver, LocalDate serviceDate, OperationShift shift) {
     TripModel trip = new TripModel();
     trip.setDriver(driver);
     trip.setServiceDate(serviceDate);

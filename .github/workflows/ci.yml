@@ -77,6 +77,13 @@ jobs:
       - name: Checkout
         if: needs.changes.outputs.code == 'true'
         uses: actions/checkout@v4
+        with:
+          # 2 commits: HEAD^1 é a main antes deste PR/merge, a base da checagem das migrations.
+          fetch-depth: 2
+
+      - name: Numeração das migrations (sem versão repetida nem atrás da main)
+        if: needs.changes.outputs.code == 'true'
+        run: bash scripts/check-migrations.sh HEAD^1
 
       - name: Set up JDK 25
         if: needs.changes.outputs.code == 'true'

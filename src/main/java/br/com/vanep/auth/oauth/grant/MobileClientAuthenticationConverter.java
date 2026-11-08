@@ -57,8 +57,12 @@ public final class MobileClientAuthenticationConverter implements Authentication
   }
 
   private boolean isSupportedTokenRequest(HttpServletRequest request) {
-    return tokenEndpointMatcher.matches(request)
-        && SUPPORTED_GRANT_TYPES.contains(request.getParameter(OAuth2ParameterNames.GRANT_TYPE));
+    if (!tokenEndpointMatcher.matches(request)) {
+      return false;
+    }
+    // Set.of(...).contains(null) throws NPE, which would turn a missing grant_type into a 500.
+    String grantType = request.getParameter(OAuth2ParameterNames.GRANT_TYPE);
+    return grantType != null && SUPPORTED_GRANT_TYPES.contains(grantType);
   }
 
   private boolean isRevocationRequest(HttpServletRequest request) {

@@ -32,7 +32,7 @@ public class LoginAttemptService {
     Instant now = Instant.now();
     attempts.compute(
         normalized,
-        (k, current) ->
+        (_, current) ->
             current == null || current.isExpired(now, lockDuration)
                 ? new Attempt(1, now)
                 : new Attempt(current.count() + 1, now));

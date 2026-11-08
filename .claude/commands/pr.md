@@ -1,12 +1,12 @@
 # PR Description Generator
 
-Please generate a comprehensive Pull Request description that follows the structure defined in `docs/pull_request_template.md`.
+Please generate a comprehensive Pull Request description that follows the structure defined in `.github/pull_request_template.md`.
 
 ## Instructions
 
 1. **Analyze the changes**: Compare the current branch against the `main` branch to understand what was modified, added, or removed. Ignore merge commits, use git diff to see what are the real changes.
 
-2. **Generate the PR title**: Format as `[N-XX](github issue prefix) Feature | Change Request | Bug` (ask me for the ticket number if not obvious from commit messages).
+2. **Generate the PR title**: Format as `[VAN-XX] Feature | Change Request | Bug — <short title>`, where `VAN-XX` is the Genwork task key (board prefix + task number; ask me for it if it is not obvious from the branch name or the commit messages). Genwork links the PR to the task through this key, so it must appear in the title.
 
 3. **Write a clear description**: 
    - Explain what the PR does and why

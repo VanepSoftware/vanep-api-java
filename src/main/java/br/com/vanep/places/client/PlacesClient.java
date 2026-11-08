@@ -100,12 +100,12 @@ public class PlacesClient {
               .retrieve()
               .onStatus(
                   status -> status.value() == 400 || status.value() == 404,
-                  (request, clientResponse) -> {
+                  (_, _) -> {
                     throw new PlaceNotFoundException(placeId);
                   })
               .onStatus(
                   status -> status.isError(),
-                  (request, clientResponse) -> {
+                  (_, clientResponse) -> {
                     throw new PlaceLookupException(
                         "Google Places respondeu " + clientResponse.getStatusCode() + ".");
                   })

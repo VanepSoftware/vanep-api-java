@@ -215,6 +215,18 @@ class DriverTripControllerTest {
         .andExpect(status().isBadRequest());
   }
 
+  @Test
+  void aFullTimeShiftIsRejectedAndNoTripIsCreated() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/drivers/me/trips/start")
+                .with(driverJwt(approvedUid))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"shift\":\"FULLTIME\"}"))
+        .andExpect(status().isBadRequest());
+    assertThat(trips.findAll()).isEmpty();
+  }
+
   private String start(String uid) throws Exception {
     return mockMvc
         .perform(

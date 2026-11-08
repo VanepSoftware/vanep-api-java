@@ -1,6 +1,7 @@
 package br.com.vanep.driverdocument.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.startsWith;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -144,7 +145,7 @@ class DriverDocumentFileControllerTest {
     mockMvc
         .perform(get("/api/driver-documents/" + documentToken).with(ownerJwt()))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.fileUrl").value(path()));
+        .andExpect(jsonPath("$.fileUrl").value(startsWith(path() + "?v=")));
   }
 
   @Test

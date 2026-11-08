@@ -14,9 +14,21 @@ public interface SchoolRepository extends JpaRepository<SchoolModel, Long> {
 
   boolean existsByName(String name);
 
+  Optional<SchoolModel> findFirstByName(String name);
+
   long countByAddressId(Long addressId);
 
   long countByAddressIdAndIdNot(Long addressId, Long id);
+
+  // Two resolves completing the same school race here: only the first address is attached.
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query(
+      """
+      update SchoolModel school
+      set school.addressId = :addressId, school.updatedAt = instant
+      where school.id = :schoolId and school.addressId is null
+      """)
+  int attachAddressWhenMissing(Long schoolId, Long addressId);
 
   @Modifying
   @Query(value = "UPDATE school SET deleted_at = NULL WHERE token = :token", nativeQuery = true)

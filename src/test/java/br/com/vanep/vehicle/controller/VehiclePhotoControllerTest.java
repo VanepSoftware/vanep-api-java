@@ -1,6 +1,7 @@
 package br.com.vanep.vehicle.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.startsWith;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -152,9 +153,10 @@ class VehiclePhotoControllerTest {
     mockMvc
         .perform(get("/api/vehicles/" + vehicleToken).with(adminJwt()))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.photoFrontUrl").value(path("photo-front")))
-        .andExpect(jsonPath("$.photoSideUrl").value(path("photo-side")))
-        .andExpect(jsonPath("$.photoDocumentUrl").value(path("photo-document")));
+        .andExpect(jsonPath("$.photoFrontUrl").value(startsWith(path("photo-front") + "?v=")))
+        .andExpect(jsonPath("$.photoSideUrl").value(startsWith(path("photo-side") + "?v=")))
+        .andExpect(
+            jsonPath("$.photoDocumentUrl").value(startsWith(path("photo-document") + "?v=")));
   }
 
   @Test
@@ -164,7 +166,7 @@ class VehiclePhotoControllerTest {
     mockMvc
         .perform(get("/api/vehicles/" + vehicleToken).with(adminJwt()))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.photoFrontUrl").value(path("photo-front")))
+        .andExpect(jsonPath("$.photoFrontUrl").value(startsWith(path("photo-front") + "?v=")))
         .andExpect(jsonPath("$.photoSideUrl").doesNotExist())
         .andExpect(jsonPath("$.photoDocumentUrl").doesNotExist());
   }

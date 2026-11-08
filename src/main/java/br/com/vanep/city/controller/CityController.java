@@ -10,6 +10,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -22,15 +23,17 @@ public class CityController {
   }
 
   @GetMapping
-  @PreAuthorize("hasAuthority('list_cities')")
+  @PreAuthorize("isAuthenticated()")
   public Page<CityResponseDTO> list(
+      @RequestParam(required = false) String uf,
+      @RequestParam(required = false) String search,
       @PageableDefault(size = 20, sort = "name", direction = Sort.Direction.ASC)
           Pageable pageable) {
-    return service.findAll(pageable);
+    return service.findByUf(uf, search, pageable);
   }
 
   @GetMapping("/{token}")
-  @PreAuthorize("hasAuthority('show_city')")
+  @PreAuthorize("isAuthenticated()")
   public CityResponseDTO get(@PathVariable String token) {
     return service.findByToken(token);
   }

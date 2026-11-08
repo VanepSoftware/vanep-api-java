@@ -12,9 +12,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import br.com.vanep.client.model.ClientModel;
 import br.com.vanep.client.repository.ClientRepository;
+import br.com.vanep.clientdriver.enums.LinkOrigin;
 import br.com.vanep.clientdriver.enums.RelationshipStatus;
 import br.com.vanep.clientdriver.model.ClientDriverModel;
 import br.com.vanep.clientdriver.repository.ClientDriverRepository;
+import br.com.vanep.contract.enums.ContractStatus;
+import br.com.vanep.contract.model.ContractModel;
+import br.com.vanep.contract.repository.ContractRepository;
 import br.com.vanep.driver.DriverApprovalStatus;
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
@@ -24,13 +28,18 @@ import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
 import java.math.BigDecimal;
+import java.sql.Timestamp;
+import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.MessageSource;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor;
 import org.springframework.test.context.ActiveProfiles;
@@ -50,14 +59,20 @@ class DriverRatingControllerTest {
   @Autowired private DriverRepository drivers;
   @Autowired private DriverRatingRepository driverRatings;
   @Autowired private ClientDriverRepository links;
+  @Autowired private JdbcTemplate jdbc;
+  @Autowired private ContractRepository contracts;
+  @Autowired private MessageSource messages;
 
   private MockMvc mockMvc;
 
   private String driverToken;
+  private String driverUserUid;
   private String clientUserEmail;
   private String clientUserUid;
   private String ratingToken;
   private String clientToken;
+  private ClientModel client;
+  private int documentSequence;
 
   @BeforeEach
   void setUp() {
@@ -79,6 +94,7 @@ class DriverRatingControllerTest {
     driver.setApprovalStatus(DriverApprovalStatus.APPROVED);
     driver = drivers.save(driver);
     driverToken = driver.getToken();
+    driverUserUid = driverUser.getToken();
 
     // Client
     UserModel clientUser = new UserModel();
@@ -93,7 +109,7 @@ class DriverRatingControllerTest {
     clientUserEmail = clientUser.getEmail();
     clientUserUid = clientUser.getToken();
 
-    ClientModel client = new ClientModel();
+    client = new ClientModel();
     client.setUser(clientUser);
     client = clients.save(client);
     clientToken = client.getToken();
@@ -101,8 +117,10 @@ class DriverRatingControllerTest {
     ClientDriverModel link = new ClientDriverModel();
     link.setClient(client);
     link.setDriver(driver);
+    link.setOrigin(LinkOrigin.CLIENT_SEARCH);
     link.setStatus(RelationshipStatus.ACTIVE);
     link = links.save(link);
+    giveTheLinkAContract(link, ContractStatus.ACTIVE);
 
     // Initial Rating
     DriverRatingModel rating = new DriverRatingModel();
@@ -121,7 +139,6 @@ class DriverRatingControllerTest {
             new SimpleGrantedAuthority("list_driver_ratings"),
             new SimpleGrantedAuthority("show_driver_rating"),
             new SimpleGrantedAuthority("create_driver_rating"),
-            new SimpleGrantedAuthority("update_driver_rating"),
             new SimpleGrantedAuthority("delete_driver_rating"));
   }
 
@@ -134,9 +151,21 @@ class DriverRatingControllerTest {
                     .claim("roles", List.of("ROLE_CLIENT")))
         .authorities(
             new SimpleGrantedAuthority("ROLE_CLIENT"),
-            new SimpleGrantedAuthority("create_driver_rating"),
-            new SimpleGrantedAuthority("list_driver_ratings"),
-            new SimpleGrantedAuthority("show_driver_rating"));
+            new SimpleGrantedAuthority("create_driver_rating"));
+  }
+
+  private JwtRequestPostProcessor driverJwt() {
+    return jwt()
+        .jwt(
+            t ->
+                t.claim("uid", driverUserUid)
+                    .subject("driver@vanep.com")
+                    .claim("roles", List.of("ROLE_DRIVER")))
+        .authorities(
+            new SimpleGrantedAuthority("ROLE_DRIVER"),
+            new SimpleGrantedAuthority("create_client_rating"),
+            new SimpleGrantedAuthority("list_client_ratings"),
+            new SimpleGrantedAuthority("show_client_rating"));
   }
 
   private JwtRequestPostProcessor otherClientJwt() {
@@ -148,8 +177,7 @@ class DriverRatingControllerTest {
                     .claim("roles", List.of("ROLE_CLIENT")))
         .authorities(
             new SimpleGrantedAuthority("ROLE_CLIENT"),
-            new SimpleGrantedAuthority("create_driver_rating"),
-            new SimpleGrantedAuthority("list_driver_ratings"));
+            new SimpleGrantedAuthority("create_driver_rating"));
   }
 
   @Test
@@ -192,9 +220,196 @@ class DriverRatingControllerTest {
   @Test
   void listFilterByDriverToken() throws Exception {
     mockMvc
-        .perform(get("/api/driver-ratings?driverToken=" + driverToken).with(clientJwt()))
+        .perform(get("/api/driver-ratings?driverToken=" + driverToken).with(adminJwt()))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.content[0].driverToken").value(driverToken));
+  }
+
+  @Test
+  void theRatedDriverCannotListTheirRatings() throws Exception {
+    mockMvc
+        .perform(get("/api/driver-ratings?driverToken=" + driverToken).with(driverJwt()))
+        .andExpect(status().isForbidden());
+    mockMvc.perform(get("/api/driver-ratings").with(driverJwt())).andExpect(status().isForbidden());
+  }
+
+  @Test
+  void theRatedDriverCannotOpenARating() throws Exception {
+    mockMvc
+        .perform(get("/api/driver-ratings/" + ratingToken).with(driverJwt()))
+        .andExpect(status().isForbidden());
+  }
+
+  @Test
+  void aClientCannotListTheRatingsOfOtherClients() throws Exception {
+    mockMvc
+        .perform(get("/api/driver-ratings?driverToken=" + driverToken).with(otherClientJwt()))
+        .andExpect(status().isForbidden());
+    mockMvc
+        .perform(get("/api/driver-ratings/" + ratingToken).with(otherClientJwt()))
+        .andExpect(status().isForbidden());
+  }
+
+  @Test
+  void theDriverLinksDoNotRevealWhoRated() throws Exception {
+    mockMvc
+        .perform(get("/api/client-drivers/me").with(driverJwt()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[0].clientToken").value(clientToken))
+        .andExpect(jsonPath("$[0].rated").doesNotExist())
+        .andExpect(jsonPath("$[0].canRate").doesNotExist())
+        .andExpect(jsonPath("$[0].rating").doesNotExist());
+  }
+
+  @Test
+  void aLinkWithoutContractCannotRateAndTheStatusSaysSo() throws Exception {
+    String pendingDriverToken = linkTheClientToANewDriver(RelationshipStatus.PENDING);
+
+    mockMvc
+        .perform(
+            get("/api/driver-ratings/status?driverToken=" + pendingDriverToken).with(clientJwt()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.canRate").value(false));
+
+    mockMvc
+        .perform(
+            post("/api/driver-ratings")
+                .with(clientJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(ratingBody(pendingDriverToken)))
+        .andExpect(status().isUnprocessableContent())
+        .andExpect(jsonPath("$.detail").value(message("driver_rating.link.never_contracted")));
+
+    assertThat(driverRatings.count()).isEqualTo(1);
+  }
+
+  @Test
+  void aContractThatWasCancelledBeforeStartingDoesNotLetTheClientRate() throws Exception {
+    String driverWithCancelledContract =
+        linkTheClientToANewDriver(RelationshipStatus.INACTIVE, ContractStatus.CANCELLED);
+
+    mockMvc
+        .perform(
+            post("/api/driver-ratings")
+                .with(clientJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(ratingBody(driverWithCancelledContract)))
+        .andExpect(status().isUnprocessableContent());
+
+    assertThat(driverRatings.count()).isEqualTo(1);
+  }
+
+  @Test
+  void aDeletedContractDoesNotLetTheClientRate() throws Exception {
+    String driverWithDeletedContract = linkTheClientToANewDriver(RelationshipStatus.INACTIVE);
+    ClientDriverModel link =
+        links
+            .findByPair(
+                client.getId(), drivers.findByToken(driverWithDeletedContract).get().getId())
+            .orElseThrow();
+    ContractModel contract = giveTheLinkAContract(link, ContractStatus.ACTIVE);
+    contracts.delete(contracts.findByToken(contract.getToken()).orElseThrow());
+
+    mockMvc
+        .perform(
+            post("/api/driver-ratings")
+                .with(clientJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(ratingBody(driverWithDeletedContract)))
+        .andExpect(status().isUnprocessableContent());
+
+    assertThat(driverRatings.count()).isEqualTo(1);
+  }
+
+  @Test
+  void anInactiveLinkWhoseContractEndedCanRate() throws Exception {
+    String driverWithEndedContract =
+        linkTheClientToANewDriver(RelationshipStatus.INACTIVE, ContractStatus.ENDED);
+
+    mockMvc
+        .perform(
+            post("/api/driver-ratings")
+                .with(clientJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(ratingBody(driverWithEndedContract)))
+        .andExpect(status().isCreated());
+
+    assertThat(driverRatings.count()).isEqualTo(2);
+  }
+
+  @Test
+  void aLinkYoungerThanFiveMinutesCannotRateYet() throws Exception {
+    String newDriverToken =
+        linkTheClientToANewDriver(RelationshipStatus.ACTIVE, Duration.ZERO, ContractStatus.ACTIVE);
+
+    mockMvc
+        .perform(get("/api/driver-ratings/status?driverToken=" + newDriverToken).with(clientJwt()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.rated").value(false))
+        .andExpect(jsonPath("$.canRate").value(false));
+
+    mockMvc
+        .perform(
+            post("/api/driver-ratings")
+                .with(clientJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(ratingBody(newDriverToken)))
+        .andExpect(status().isUnprocessableContent());
+
+    assertThat(driverRatings.count()).isEqualTo(1);
+  }
+
+  @Test
+  void theStatusTellsTheClientTheyAlreadyRated() throws Exception {
+    mockMvc
+        .perform(get("/api/driver-ratings/status?driverToken=" + driverToken).with(clientJwt()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.rated").value(true))
+        .andExpect(jsonPath("$.canRate").value(false));
+  }
+
+  @Test
+  void aClientRatesAnActiveLinkOnceAndTheButtonGoesAway() throws Exception {
+    String newDriverToken =
+        linkTheClientToANewDriver(RelationshipStatus.ACTIVE, ContractStatus.ACTIVE);
+    String statusUrl = "/api/driver-ratings/status?driverToken=" + newDriverToken;
+
+    mockMvc
+        .perform(get(statusUrl).with(clientJwt()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.rated").value(false))
+        .andExpect(jsonPath("$.canRate").value(true));
+
+    mockMvc
+        .perform(
+            post("/api/driver-ratings")
+                .with(clientJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(ratingBody(newDriverToken)))
+        .andExpect(status().isCreated());
+
+    mockMvc
+        .perform(get(statusUrl).with(clientJwt()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.rated").value(true))
+        .andExpect(jsonPath("$.canRate").value(false));
+    assertThat(drivers.findByToken(newDriverToken))
+        .get()
+        .satisfies(driver -> assertThat(driver.getRating()).isEqualByComparingTo("4.00"));
+  }
+
+  @Test
+  void theDriverCannotAskTheRatingStatus() throws Exception {
+    mockMvc
+        .perform(get("/api/driver-ratings/status?driverToken=" + driverToken).with(driverJwt()))
+        .andExpect(status().isForbidden());
+  }
+
+  @Test
+  void theRatingStatusRequiresAuthentication() throws Exception {
+    mockMvc
+        .perform(get("/api/driver-ratings/status?driverToken=" + driverToken))
+        .andExpect(status().isUnauthorized());
   }
 
   @Test
@@ -207,87 +422,57 @@ class DriverRatingControllerTest {
   }
 
   @Test
-  void updateReturns200ForOwner() throws Exception {
-    String requestBody =
-        """
-        {
-          "rating": 4.00,
-          "comment": "Updated feedback"
-        }
-        """;
-
-    mockMvc
-        .perform(
-            put("/api/driver-ratings/" + ratingToken)
-                .with(clientJwt())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(requestBody))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.rating").value(4.0))
-        .andExpect(jsonPath("$.comment").value("Updated feedback"));
-  }
-
-  @Test
-  void updateForbidsOtherClient() throws Exception {
+  void aRatingCannotBeEdited() throws Exception {
     String requestBody =
         """
         {
           "rating": 1.00,
-          "comment": "Malicious edit"
+          "comment": "Changed my mind"
         }
         """;
 
     mockMvc
         .perform(
             put("/api/driver-ratings/" + ratingToken)
-                .with(otherClientJwt())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(requestBody))
-        .andExpect(status().isForbidden());
-  }
-
-  @Test
-  void deleteReturns204ForOwner() throws Exception {
-    mockMvc
-        .perform(delete("/api/driver-ratings/" + ratingToken).with(clientJwt()))
-        .andExpect(status().isNoContent());
-  }
-
-  @Test
-  void deletingRemovesTheRowPhysically() throws Exception {
-    mockMvc
-        .perform(delete("/api/driver-ratings/" + ratingToken).with(clientJwt()))
-        .andExpect(status().isNoContent());
-
-    assertThat(driverRatings.count()).isZero();
-  }
-
-  @Test
-  void aPairCanBeRatedAgainAfterItsRatingIsDeleted() throws Exception {
-    mockMvc
-        .perform(delete("/api/driver-ratings/" + ratingToken).with(clientJwt()))
-        .andExpect(status().isNoContent());
-
-    String requestBody =
-        """
-        {
-          "driverToken": "%s",
-          "rating": 3.00,
-          "comment": "Mudei de ideia"
-        }
-        """
-            .formatted(driverToken);
-
-    mockMvc
-        .perform(
-            post("/api/driver-ratings")
                 .with(clientJwt())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(requestBody))
-        .andExpect(status().isCreated())
-        .andExpect(jsonPath("$.rating").value(3.0));
+        .andExpect(status().isMethodNotAllowed());
+
+    assertThat(driverRatings.findByToken(ratingToken))
+        .get()
+        .satisfies(
+            rating -> {
+              assertThat(rating.getRating()).isEqualByComparingTo("5.00");
+              assertThat(rating.getComment()).isEqualTo("Great trip!");
+            });
+  }
+
+  @Test
+  void theAuthorCannotDeleteTheirRating() throws Exception {
+    mockMvc
+        .perform(delete("/api/driver-ratings/" + ratingToken).with(clientJwt()))
+        .andExpect(status().isForbidden());
 
     assertThat(driverRatings.count()).isEqualTo(1);
+  }
+
+  @Test
+  void anotherClientCannotDeleteTheRating() throws Exception {
+    mockMvc
+        .perform(delete("/api/driver-ratings/" + ratingToken).with(otherClientJwt()))
+        .andExpect(status().isForbidden());
+
+    assertThat(driverRatings.count()).isEqualTo(1);
+  }
+
+  @Test
+  void theAdminRemovesTheRowPhysically() throws Exception {
+    mockMvc
+        .perform(delete("/api/driver-ratings/" + ratingToken).with(adminJwt()))
+        .andExpect(status().isNoContent());
+
+    assertThat(driverRatings.count()).isZero();
   }
 
   @Test
@@ -301,6 +486,71 @@ class DriverRatingControllerTest {
         .andExpect(jsonPath("$.clientName").value("Client Name"))
         .andExpect(jsonPath("$.id").doesNotExist())
         .andExpect(jsonPath("$.clientDriverId").doesNotExist());
+  }
+
+  private String linkTheClientToANewDriver(
+      RelationshipStatus status, ContractStatus... contractStatuses) {
+    return linkTheClientToANewDriver(status, Duration.ofDays(1), contractStatuses);
+  }
+
+  private String linkTheClientToANewDriver(
+      RelationshipStatus status, Duration linkAge, ContractStatus... contractStatuses) {
+    UserModel driverUser = new UserModel();
+    driverUser.setType(UserType.DRIVER);
+    driverUser.setName("Linked Driver");
+    driverUser.setEmail("linked" + (++documentSequence) + "@vanep.com");
+    driverUser.setDocument(String.format("4%010d", documentSequence));
+    driverUser.setVerified(true);
+    driverUser.setTermsAcceptedAt(Instant.now());
+    driverUser = users.save(driverUser);
+
+    DriverModel driver = new DriverModel();
+    driver.setUser(driverUser);
+    driver.setBasePrice(BigDecimal.valueOf(50));
+    driver.setApprovalStatus(DriverApprovalStatus.APPROVED);
+    driver = drivers.save(driver);
+
+    ClientDriverModel link = new ClientDriverModel();
+    link.setClient(client);
+    link.setDriver(driver);
+    link.setOrigin(LinkOrigin.CLIENT_SEARCH);
+    link.setStatus(status);
+    link = links.save(link);
+    jdbc.update(
+        "update client_driver set created_at = ? where id = ?",
+        Timestamp.from(Instant.now().minus(linkAge)),
+        link.getId());
+    for (ContractStatus contractStatus : contractStatuses) {
+      giveTheLinkAContract(link, contractStatus);
+    }
+    return driver.getToken();
+  }
+
+  private ContractModel giveTheLinkAContract(ClientDriverModel link, ContractStatus status) {
+    ContractModel contract = new ContractModel();
+    contract.setClientDriver(link);
+    contract.setStatus(status);
+    contract.setStartsOn(LocalDate.of(2027, 2, 1));
+    contract.setEndsOn(LocalDate.of(2027, 12, 1));
+    contract.setTotalAmount(new BigDecimal("4200.00"));
+    contract.setInstallments(12);
+    contract.setDueDay(5);
+    return contracts.save(contract);
+  }
+
+  private String message(String key) {
+    return messages.getMessage(key, null, java.util.Locale.forLanguageTag("pt-BR"));
+  }
+
+  private String ratingBody(String driverToken) {
+    return """
+        {
+          "driverToken": "%s",
+          "rating": 4.00,
+          "comment": "Pontual"
+        }
+        """
+        .formatted(driverToken);
   }
 
   @Test

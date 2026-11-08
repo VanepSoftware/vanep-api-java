@@ -13,7 +13,7 @@ public class AddressMapper {
         address.getStreet(),
         address.getNumber(),
         address.getComplement(),
-        address.getDistrict() == null ? null : address.getDistrict().getName(),
+        address.getNeighborhood(),
         address.getCity().getToken(),
         address.getCity().getName(),
         address.getCity().getState().getUf(),

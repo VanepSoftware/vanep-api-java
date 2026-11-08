@@ -1,7 +1,7 @@
 package br.com.vanep.dependent.dto;
 
-import br.com.vanep.address.dto.AddressRequestDTO;
-import br.com.vanep.shared.enums.Shift;
+import br.com.vanep.address.dto.DependentAddressRequestDTO;
+import br.com.vanep.shared.validation.Cpf;
 import br.com.vanep.user.enums.Gender;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
@@ -23,7 +23,7 @@ public class DependentCreateDTO {
 
   private Gender gender;
 
-  @Size(max = 64, message = "{dependent.document.too_long}")
+  @Cpf(message = "{dependent.document.invalid}")
   private String document;
 
   @Size(max = 32, message = "{dependent.phone.too_long}")
@@ -37,11 +37,9 @@ public class DependentCreateDTO {
 
   private Boolean isDefault;
 
-  private Shift shift;
-
   private String schoolToken;
 
-  @Valid private AddressRequestDTO address;
+  @Valid private DependentAddressRequestDTO address;
 
   private String clientToken;
 }

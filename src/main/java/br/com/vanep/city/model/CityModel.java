@@ -45,8 +45,8 @@ public class CityModel {
   @Column(name = "normalized_name", nullable = false, length = 128)
   private String normalizedName;
 
-  @Column(name = "google_place_id", length = 255)
-  private String googlePlaceId;
+  @Column(name = "ibge_code", unique = true, length = 7)
+  private String ibgeCode;
 
   @Column(name = "requires_district")
   private Boolean requiresDistrict;

@@ -13,11 +13,12 @@ import br.com.vanep.client.model.ClientModel;
 import br.com.vanep.client.repository.ClientRepository;
 import br.com.vanep.clientdriver.dto.ClientDriverCreateRequestDTO;
 import br.com.vanep.clientdriver.dto.ClientDriverResponseDTO;
-import br.com.vanep.clientdriver.dto.ClientDriverUpdateRequestDTO;
+import br.com.vanep.clientdriver.enums.LinkOrigin;
 import br.com.vanep.clientdriver.enums.RelationshipStatus;
 import br.com.vanep.clientdriver.mapper.ClientDriverMapper;
 import br.com.vanep.clientdriver.model.ClientDriverModel;
 import br.com.vanep.clientdriver.repository.ClientDriverRepository;
+import br.com.vanep.driver.DriverApprovalStatus;
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.user.enums.UserType;
@@ -28,6 +29,8 @@ import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.InjectMocks;
@@ -35,8 +38,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
-import org.openapitools.jackson.nullable.JsonNullable;
 import org.springframework.context.MessageSource;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
 @ExtendWith(MockitoExtension.class)
@@ -68,49 +72,100 @@ class ClientDriverServiceTest {
     carlos = new DriverModel();
     carlos.setId(2L);
     carlos.setUser(user(20L, "carlos-uid", UserType.DRIVER));
+    carlos.setApprovalStatus(DriverApprovalStatus.APPROVED);
 
     when(clients.findByToken("cli")).thenReturn(Optional.of(maria));
     when(drivers.findByToken("drv")).thenReturn(Optional.of(carlos));
     when(links.findByPair(anyLong(), anyLong())).thenReturn(Optional.empty());
-    when(links.save(any())).thenAnswer(call -> call.getArgument(0));
+    when(links.lockByPair(anyLong(), anyLong())).thenReturn(Optional.empty());
+    when(links.saveAndFlush(any())).thenAnswer(call -> call.getArgument(0));
     when(mapper.toResponse(any())).thenAnswer(call -> response(call.getArgument(0)));
   }
 
-  @Test
-  void createsTheLinkAsPending() {
-    service.create(new ClientDriverCreateRequestDTO("cli", "drv", null));
+  @ParameterizedTest
+  @EnumSource(LinkOrigin.class)
+  void createsTheLinkAsPendingWithTheRequestedOrigin(LinkOrigin origin) {
+    service.create(new ClientDriverCreateRequestDTO("cli", "drv", origin));
 
-    verify(links).save(saved.capture());
+    verify(links).saveAndFlush(saved.capture());
     assertThat(saved.getValue().getStatus()).isEqualTo(RelationshipStatus.PENDING);
+    assertThat(saved.getValue().getOrigin()).isEqualTo(origin);
     assertThat(saved.getValue().getClient()).isSameAs(maria);
     assertThat(saved.getValue().getDriver()).isSameAs(carlos);
   }
 
   @Test
-  void honoursAnExplicitStatusOnCreate() {
-    service.create(new ClientDriverCreateRequestDTO("cli", "drv", RelationshipStatus.ACTIVE));
+  void theFirstRequestOfAPairCreatesAPendingLinkFromTheSearch() {
+    ClientDriverModel link = service.findOrCreateForRequest(maria, carlos);
 
-    verify(links).save(saved.capture());
-    assertThat(saved.getValue().getStatus()).isEqualTo(RelationshipStatus.ACTIVE);
+    verify(links).saveAndFlush(saved.capture());
+    assertThat(link).isSameAs(saved.getValue());
+    assertThat(link.getStatus()).isEqualTo(RelationshipStatus.PENDING);
+    assertThat(link.getOrigin()).isEqualTo(LinkOrigin.CLIENT_SEARCH);
+    assertThat(link.getClient()).isSameAs(maria);
+    assertThat(link.getDriver()).isSameAs(carlos);
+  }
+
+  @Test
+  void aRequestOfAnExistingPairReusesTheLinkAndKeepsItsOrigin() {
+    ClientDriverModel invited = link(RelationshipStatus.INACTIVE);
+    invited.setOrigin(LinkOrigin.DRIVER_INVITE);
+    when(links.lockByPair(1L, 2L)).thenReturn(Optional.of(invited));
+
+    ClientDriverModel link = service.findOrCreateForRequest(maria, carlos);
+
+    assertThat(link).isSameAs(invited);
+    assertThat(link.getOrigin()).isEqualTo(LinkOrigin.DRIVER_INVITE);
+    assertThat(link.getStatus()).isEqualTo(RelationshipStatus.INACTIVE);
+    verify(links, never()).saveAndFlush(any());
+  }
+
+  @Test
+  void aConcurrentFirstRequestReachesTheCallerAsTheIndexViolation() {
+    when(links.saveAndFlush(any()))
+        .thenThrow(new DataIntegrityViolationException("client_driver_pair_active_key"));
+
+    assertThatThrownBy(() -> service.findOrCreateForRequest(maria, carlos))
+        .isInstanceOf(DataIntegrityViolationException.class);
   }
 
   @Test
   void refusesADuplicatePair() {
     when(links.findByPair(1L, 2L)).thenReturn(Optional.of(link(RelationshipStatus.ACTIVE)));
 
-    assertThatThrownBy(() -> service.create(new ClientDriverCreateRequestDTO("cli", "drv", null)))
+    assertThatThrownBy(
+            () ->
+                service.create(
+                    new ClientDriverCreateRequestDTO("cli", "drv", LinkOrigin.CLIENT_SEARCH)))
         .isInstanceOf(ResponseStatusException.class)
         .hasMessageContaining("409")
         .hasMessageContaining("client_driver.duplicate_pair");
 
-    verify(links, never()).save(any());
+    verify(links, never()).saveAndFlush(any());
+  }
+
+  @Test
+  void aPairCreatedConcurrentlyIsRefusedAsADuplicate() {
+    when(links.saveAndFlush(any()))
+        .thenThrow(new DataIntegrityViolationException("client_driver_pair_active_key"));
+
+    assertThatThrownBy(
+            () ->
+                service.create(
+                    new ClientDriverCreateRequestDTO("cli", "drv", LinkOrigin.CLIENT_SEARCH)))
+        .isInstanceOf(ResponseStatusException.class)
+        .hasMessageContaining("409")
+        .hasMessageContaining("client_driver.duplicate_pair");
   }
 
   @Test
   void refusesAnUnknownClient() {
     when(clients.findByToken("ghost")).thenReturn(Optional.empty());
 
-    assertThatThrownBy(() -> service.create(new ClientDriverCreateRequestDTO("ghost", "drv", null)))
+    assertThatThrownBy(
+            () ->
+                service.create(
+                    new ClientDriverCreateRequestDTO("ghost", "drv", LinkOrigin.CLIENT_SEARCH)))
         .isInstanceOf(ResponseStatusException.class)
         .hasMessageContaining("404")
         .hasMessageContaining("client_driver.client.not_found");
@@ -120,47 +175,51 @@ class ClientDriverServiceTest {
   void refusesAnUnknownDriver() {
     when(drivers.findByToken("ghost")).thenReturn(Optional.empty());
 
-    assertThatThrownBy(() -> service.create(new ClientDriverCreateRequestDTO("cli", "ghost", null)))
+    assertThatThrownBy(
+            () ->
+                service.create(
+                    new ClientDriverCreateRequestDTO("cli", "ghost", LinkOrigin.CLIENT_SEARCH)))
         .isInstanceOf(ResponseStatusException.class)
         .hasMessageContaining("404")
         .hasMessageContaining("client_driver.driver.not_found");
   }
 
   @Test
-  void patchingTheStatusIsPersisted() {
-    ClientDriverModel stored = link(RelationshipStatus.PENDING);
-    when(links.findByToken("lnk")).thenReturn(Optional.of(stored));
+  void refusesCreateWhenDriverIsNotApproved() {
+    for (DriverApprovalStatus unapprovedStatus :
+        List.of(
+            DriverApprovalStatus.PENDING,
+            DriverApprovalStatus.UNDER_REVIEW,
+            DriverApprovalStatus.REJECTED)) {
+      carlos.setApprovalStatus(unapprovedStatus);
 
-    service.update(
-        "lnk", new ClientDriverUpdateRequestDTO(JsonNullable.of(RelationshipStatus.ACTIVE)));
+      assertThatThrownBy(
+              () ->
+                  service.create(
+                      new ClientDriverCreateRequestDTO("cli", "drv", LinkOrigin.CLIENT_SEARCH)))
+          .isInstanceOf(ResponseStatusException.class)
+          .satisfies(
+              e -> {
+                ResponseStatusException ex = (ResponseStatusException) e;
+                assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
+                assertThat(ex.getReason()).isEqualTo("client_driver.driver.not_approved");
+              });
+    }
 
-    assertThat(stored.getStatus()).isEqualTo(RelationshipStatus.ACTIVE);
-  }
-
-  @Test
-  void anEmptyPatchChangesNothing() {
-    ClientDriverModel stored = link(RelationshipStatus.ACTIVE);
-    when(links.findByToken("lnk")).thenReturn(Optional.of(stored));
-
-    service.update("lnk", new ClientDriverUpdateRequestDTO(JsonNullable.undefined()));
-
-    assertThat(stored.getStatus()).isEqualTo(RelationshipStatus.ACTIVE);
-    assertThat(stored.getClient()).isSameAs(maria);
-    assertThat(stored.getDriver()).isSameAs(carlos);
-  }
-
-  @Test
-  void clearingTheStatusIsRefused() {
-    ClientDriverModel stored = link(RelationshipStatus.ACTIVE);
-    when(links.findByToken("lnk")).thenReturn(Optional.of(stored));
-
+    carlos.setApprovalStatus(null);
     assertThatThrownBy(
-            () -> service.update("lnk", new ClientDriverUpdateRequestDTO(JsonNullable.of(null))))
+            () ->
+                service.create(
+                    new ClientDriverCreateRequestDTO("cli", "drv", LinkOrigin.CLIENT_SEARCH)))
         .isInstanceOf(ResponseStatusException.class)
-        .hasMessageContaining("400")
-        .hasMessageContaining("client_driver.status.required");
+        .satisfies(
+            e -> {
+              ResponseStatusException ex = (ResponseStatusException) e;
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
+              assertThat(ex.getReason()).isEqualTo("client_driver.driver.not_approved");
+            });
 
-    assertThat(stored.getStatus()).isEqualTo(RelationshipStatus.ACTIVE);
+    verify(links, never()).saveAndFlush(any());
   }
 
   @Test
@@ -238,6 +297,7 @@ class ClientDriverServiceTest {
     ClientDriverModel link = new ClientDriverModel();
     link.setClient(maria);
     link.setDriver(carlos);
+    link.setOrigin(LinkOrigin.CLIENT_SEARCH);
     link.setStatus(status);
     return link;
   }
@@ -250,6 +310,8 @@ class ClientDriverServiceTest {
         link.getDriver().getToken(),
         link.getDriver().getUser().getName(),
         link.getStatus(),
+        link.getOrigin(),
+        null,
         link.getCreatedAt(),
         link.getUpdatedAt());
   }

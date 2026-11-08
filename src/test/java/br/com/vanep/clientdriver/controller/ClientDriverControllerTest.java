@@ -12,9 +12,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import br.com.vanep.client.model.ClientModel;
 import br.com.vanep.client.repository.ClientRepository;
+import br.com.vanep.clientdriver.enums.LinkOrigin;
 import br.com.vanep.clientdriver.enums.RelationshipStatus;
 import br.com.vanep.clientdriver.model.ClientDriverModel;
 import br.com.vanep.clientdriver.repository.ClientDriverRepository;
+import br.com.vanep.driver.DriverApprovalStatus;
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.user.enums.UserType;
@@ -74,16 +76,101 @@ class ClientDriverControllerTest {
   }
 
   @Test
-  void adminCreatesTheLinkAsPending() throws Exception {
+  void adminCreatesTheLinkAsPendingWithTheGivenOrigin() throws Exception {
     mockMvc
         .perform(
             post("/api/client-drivers")
                 .with(adminJwt())
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(createBody(maria.getToken(), carlos.getToken())))
+                .content(createBody(maria.getToken(), carlos.getToken(), "DRIVER_INVITE")))
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.status").value("PENDING"))
+        .andExpect(jsonPath("$.origin").value("DRIVER_INVITE"))
         .andExpect(jsonPath("$.token").isNotEmpty());
+
+    assertThat(links.findByPair(maria.getId(), carlos.getId()))
+        .get()
+        .extracting(link -> link.getOrigin())
+        .isEqualTo(LinkOrigin.DRIVER_INVITE);
+  }
+
+  @Test
+  void createRequiresAnOrigin() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/client-drivers")
+                .with(adminJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"clientToken\":\""
+                        + maria.getToken()
+                        + "\",\"driverToken\":\""
+                        + carlos.getToken()
+                        + "\"}"))
+        .andExpect(status().isBadRequest());
+
+    assertThat(links.findAll()).isEmpty();
+  }
+
+  @Test
+  void createRejectsAnUnknownOrigin() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/client-drivers")
+                .with(adminJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(createBody(maria.getToken(), carlos.getToken(), "WALK_IN")))
+        .andExpect(status().isBadRequest());
+
+    assertThat(links.findAll()).isEmpty();
+  }
+
+  @Test
+  void aStatusSentOnCreationIsIgnored() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/client-drivers")
+                .with(adminJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"clientToken\":\""
+                        + maria.getToken()
+                        + "\",\"driverToken\":\""
+                        + carlos.getToken()
+                        + "\",\"origin\":\"CLIENT_SEARCH\",\"status\":\"ACTIVE\"}"))
+        .andExpect(status().isCreated())
+        .andExpect(jsonPath("$.status").value("PENDING"));
+  }
+
+  @Test
+  void aPartyCannotActivateItsOwnLink() throws Exception {
+    ClientDriverModel link = persistLink(RelationshipStatus.PENDING);
+
+    mockMvc
+        .perform(
+            patch("/api/client-drivers/" + link.getToken())
+                .with(partyJwt(mariaUid, "CLIENT"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"status\":\"ACTIVE\"}"))
+        .andExpect(status().isMethodNotAllowed());
+
+    assertThat(links.findByToken(link.getToken()).orElseThrow().getStatus())
+        .isEqualTo(RelationshipStatus.PENDING);
+  }
+
+  @Test
+  void rejectsCreateWhenDriverIsNotApproved() throws Exception {
+    DriverModel pendingDriver = createDriver("pendente@vanep.com", "98765432100");
+    pendingDriver.setApprovalStatus(DriverApprovalStatus.UNDER_REVIEW);
+    drivers.save(pendingDriver);
+
+    mockMvc
+        .perform(
+            post("/api/client-drivers")
+                .with(adminJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(createBody(maria.getToken(), pendingDriver.getToken(), "CLIENT_SEARCH")))
+        .andExpect(status().isUnprocessableContent());
   }
 
   @Test
@@ -95,7 +182,7 @@ class ClientDriverControllerTest {
             post("/api/client-drivers")
                 .with(adminJwt())
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(createBody(maria.getToken(), carlos.getToken())))
+                .content(createBody(maria.getToken(), carlos.getToken(), "CLIENT_SEARCH")))
         .andExpect(status().isConflict());
   }
 
@@ -106,7 +193,7 @@ class ClientDriverControllerTest {
             post("/api/client-drivers")
                 .with(adminJwt())
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(createBody("naoexiste", carlos.getToken())))
+                .content(createBody("naoexiste", carlos.getToken(), "CLIENT_SEARCH")))
         .andExpect(status().isNotFound());
   }
 
@@ -128,7 +215,8 @@ class ClientDriverControllerTest {
     mockMvc
         .perform(get("/api/client-drivers/" + link.getToken()).with(partyJwt(mariaUid, "CLIENT")))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.token").value(link.getToken()));
+        .andExpect(jsonPath("$.token").value(link.getToken()))
+        .andExpect(jsonPath("$.origin").value("CLIENT_SEARCH"));
   }
 
   @Test
@@ -183,58 +271,14 @@ class ClientDriverControllerTest {
   }
 
   @Test
-  void patchingTheStatusIsPersisted() throws Exception {
-    ClientDriverModel link = persistLink(RelationshipStatus.PENDING);
-
-    mockMvc
-        .perform(
-            patch("/api/client-drivers/" + link.getToken())
-                .with(adminJwt())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"status\":\"ACTIVE\"}"))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.status").value("ACTIVE"));
-  }
-
-  @Test
-  void anEmptyPatchLeavesEveryStoredFieldUnchanged() throws Exception {
-    ClientDriverModel link = persistLink(RelationshipStatus.ACTIVE);
-
-    mockMvc
-        .perform(
-            patch("/api/client-drivers/" + link.getToken())
-                .with(adminJwt())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{}"))
-        .andExpect(status().isOk());
-
-    ClientDriverModel stored = links.findByToken(link.getToken()).orElseThrow();
-    assertThat(stored.getStatus()).isEqualTo(RelationshipStatus.ACTIVE);
-    assertThat(stored.getClient().getToken()).isEqualTo(maria.getToken());
-    assertThat(stored.getDriver().getToken()).isEqualTo(carlos.getToken());
-  }
-
-  @Test
-  void clearingTheStatusIsRefused() throws Exception {
-    ClientDriverModel link = persistLink(RelationshipStatus.ACTIVE);
-
-    mockMvc
-        .perform(
-            patch("/api/client-drivers/" + link.getToken())
-                .with(adminJwt())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"status\":null}"))
-        .andExpect(status().isBadRequest());
-  }
-
-  @Test
   void eachPartyListsItsOwnLinks() throws Exception {
     persistLink(RelationshipStatus.ACTIVE);
 
     mockMvc
         .perform(get("/api/client-drivers/me").with(partyJwt(mariaUid, "CLIENT")))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.length()").value(1));
+        .andExpect(jsonPath("$.length()").value(1))
+        .andExpect(jsonPath("$[0].origin").value("CLIENT_SEARCH"));
 
     mockMvc
         .perform(get("/api/client-drivers/me").with(partyJwt(carlosUid, "DRIVER")))
@@ -264,14 +308,21 @@ class ClientDriverControllerTest {
         .andExpect(jsonPath("$.driverToken").value(carlos.getToken()));
   }
 
-  private String createBody(String clientToken, String driverToken) {
-    return "{\"clientToken\":\"" + clientToken + "\",\"driverToken\":\"" + driverToken + "\"}";
+  private String createBody(String clientToken, String driverToken, String origin) {
+    return "{\"clientToken\":\""
+        + clientToken
+        + "\",\"driverToken\":\""
+        + driverToken
+        + "\",\"origin\":\""
+        + origin
+        + "\"}";
   }
 
   private ClientDriverModel persistLink(RelationshipStatus status) {
     ClientDriverModel link = new ClientDriverModel();
     link.setClient(maria);
     link.setDriver(carlos);
+    link.setOrigin(LinkOrigin.CLIENT_SEARCH);
     link.setStatus(status);
     return links.save(link);
   }
@@ -297,6 +348,7 @@ class ClientDriverControllerTest {
     DriverModel driver = new DriverModel();
     driver.setUser(createUser(UserType.DRIVER, "Motorista", email, document));
     driver.setBasePrice(new BigDecimal("100.00"));
+    driver.setApprovalStatus(DriverApprovalStatus.APPROVED);
     return drivers.save(driver);
   }
 
@@ -308,7 +360,6 @@ class ClientDriverControllerTest {
             new SimpleGrantedAuthority("list_client_drivers"),
             new SimpleGrantedAuthority("show_client_driver"),
             new SimpleGrantedAuthority("create_client_driver"),
-            new SimpleGrantedAuthority("update_client_driver"),
             new SimpleGrantedAuthority("delete_client_driver"),
             new SimpleGrantedAuthority("restore_client_driver"));
   }

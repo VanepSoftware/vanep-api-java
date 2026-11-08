@@ -105,14 +105,20 @@ jobs:
             docker compose up -d --no-build
             docker image prune -af --filter "until=168h"
 
-            # Health check: /login é público; espera até ~2 min pela subida do Spring.
+            # Health check: /login é público; espera até ~5 min pela subida do Spring
+            # (na VPS o boot passa de 2 min). Aborta antes se o container cair.
             APP_PORT=$(grep -E '^APP_PORT=' .env | cut -d= -f2)
-            for i in $(seq 1 24); do
+            for i in $(seq 1 60); do
               STATUS=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:${APP_PORT:-8080}/login" || true)
               if [ "$STATUS" -ge 200 ] && [ "$STATUS" -lt 400 ]; then
-                echo "Deploy de $DEPLOY_SHA concluído — API respondendo com status $STATUS"
+                echo "Deploy de $DEPLOY_SHA concluído — API respondendo com status $STATUS (após ~$((i * 5))s)"
                 exit 0
               fi
+              STATE=$(docker inspect -f '{{.State.Status}} {{.RestartCount}}' "$(docker compose ps -aq vanep)" 2>/dev/null || true)
+              case "$STATE" in
+                "running 0") ;;
+                *) echo "Container da API não está saudável (estado: ${STATE:-desconhecido})"; break ;;
+              esac
               sleep 5
             done
 

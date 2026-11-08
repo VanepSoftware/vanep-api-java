@@ -1,7 +1,7 @@
 package br.com.vanep.trip.model;
 
 import br.com.vanep.driver.model.DriverModel;
-import br.com.vanep.shared.enums.Shift;
+import br.com.vanep.shared.enums.OperationShift;
 import br.com.vanep.trip.enums.TripStatus;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -47,7 +47,7 @@ public class TripModel {
 
   @Enumerated(EnumType.STRING)
   @Column(nullable = false, length = 16)
-  private Shift shift;
+  private OperationShift shift;
 
   @Enumerated(EnumType.STRING)
   @Column(nullable = false, length = 16)

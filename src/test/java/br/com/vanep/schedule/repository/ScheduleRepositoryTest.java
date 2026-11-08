@@ -1,0 +1,129 @@
+package br.com.vanep.schedule.repository;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.groups.Tuple.tuple;
+
+import br.com.vanep.schedule.dto.ScheduleSlotRequestDTO;
+import br.com.vanep.schedule.model.ScheduleModel;
+import br.com.vanep.schedule.model.ScheduleSlotModel;
+import br.com.vanep.schedule.service.ScheduleService;
+import br.com.vanep.shared.enums.OperationShift;
+import br.com.vanep.shared.enums.RouteLeg;
+import java.time.DayOfWeek;
+import java.time.LocalTime;
+import java.util.List;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.jdbc.Sql;
+import org.springframework.transaction.support.TransactionTemplate;
+
+@SpringBootTest
+@ActiveProfiles("test")
+@Sql(scripts = "/db/clean.sql", executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
+class ScheduleRepositoryTest {
+
+  @Autowired private ScheduleRepository schedules;
+  @Autowired private JdbcTemplate jdbc;
+  @Autowired private TransactionTemplate transactions;
+  @Autowired private ScheduleService scheduleService;
+
+  @Test
+  void savesAScheduleWithItsSlotsAndReadsThemBack() {
+    ScheduleModel saved = schedules.save(fullTimeMonday());
+
+    ScheduleModel reread = schedules.findWithSlotsById(saved.getId()).orElseThrow();
+
+    assertThat(reread.getSlots())
+        .extracting(
+            slot -> slot.getWeekday(),
+            slot -> slot.getLeg(),
+            slot -> slot.getShift(),
+            slot -> slot.getPickupTime())
+        .containsExactlyInAnyOrder(
+            tuple(DayOfWeek.MONDAY, RouteLeg.OUTBOUND, OperationShift.MORNING, LocalTime.of(6, 40)),
+            tuple(
+                DayOfWeek.MONDAY, RouteLeg.RETURN, OperationShift.AFTERNOON, LocalTime.of(17, 0)));
+  }
+
+  @Test
+  void aSlotRemovedFromTheScheduleIsSoftDeletedNotErased() {
+    ScheduleModel saved = schedules.save(fullTimeMonday());
+    ScheduleModel loaded = schedules.findWithSlotsById(saved.getId()).orElseThrow();
+
+    loaded.getSlots().removeIf(slot -> slot.getLeg() == RouteLeg.RETURN);
+    schedules.save(loaded);
+
+    assertThat(schedules.findWithSlotsById(saved.getId()).orElseThrow().getSlots())
+        .extracting(slot -> slot.getLeg())
+        .containsExactly(RouteLeg.OUTBOUND);
+    assertThat(countSoftDeletedSlots()).isEqualTo(1);
+    assertThat(countAllSlots()).isEqualTo(2);
+  }
+
+  @Test
+  void replacingTheSlotsSoftDeletesTheOldOnesAndKeepsOnlyTheNewOnes() {
+    ScheduleModel saved = schedules.save(fullTimeMonday());
+    ScheduleModel loaded = schedules.findWithSlotsById(saved.getId()).orElseThrow();
+
+    loaded.getSlots().clear();
+    loaded.addSlot(
+        slot(DayOfWeek.TUESDAY, RouteLeg.OUTBOUND, OperationShift.MORNING, LocalTime.of(7, 0)));
+    schedules.save(loaded);
+
+    assertThat(schedules.findWithSlotsById(saved.getId()).orElseThrow().getSlots())
+        .extracting(slot -> slot.getWeekday())
+        .containsExactly(DayOfWeek.TUESDAY);
+    assertThat(countSoftDeletedSlots()).isEqualTo(2);
+    assertThat(countAllSlots()).isEqualTo(3);
+  }
+
+  @Test
+  void replacingTheSameWeekdayAndLegThroughTheServiceKeepsOnlyTheNewSlot() {
+    ScheduleModel saved = schedules.save(fullTimeMonday());
+    ScheduleSlotRequestDTO laterMondayOutbound =
+        new ScheduleSlotRequestDTO(
+            DayOfWeek.MONDAY, RouteLeg.OUTBOUND, OperationShift.MORNING, LocalTime.of(7, 10));
+
+    transactions.executeWithoutResult(
+        status ->
+            scheduleService.replace(
+                schedules.findWithSlotsById(saved.getId()).orElseThrow(),
+                List.of(laterMondayOutbound)));
+
+    assertThat(schedules.findWithSlotsById(saved.getId()).orElseThrow().getSlots())
+        .extracting(slot -> slot.getWeekday(), slot -> slot.getLeg(), slot -> slot.getPickupTime())
+        .containsExactly(tuple(DayOfWeek.MONDAY, RouteLeg.OUTBOUND, LocalTime.of(7, 10)));
+    assertThat(countSoftDeletedSlots()).isEqualTo(2);
+  }
+
+  private ScheduleModel fullTimeMonday() {
+    ScheduleModel schedule = new ScheduleModel();
+    schedule.addSlot(
+        slot(DayOfWeek.MONDAY, RouteLeg.OUTBOUND, OperationShift.MORNING, LocalTime.of(6, 40)));
+    schedule.addSlot(
+        slot(DayOfWeek.MONDAY, RouteLeg.RETURN, OperationShift.AFTERNOON, LocalTime.of(17, 0)));
+    return schedule;
+  }
+
+  private ScheduleSlotModel slot(
+      DayOfWeek weekday, RouteLeg leg, OperationShift shift, LocalTime pickupTime) {
+    ScheduleSlotModel slot = new ScheduleSlotModel();
+    slot.setWeekday(weekday);
+    slot.setLeg(leg);
+    slot.setShift(shift);
+    slot.setPickupTime(pickupTime);
+    return slot;
+  }
+
+  private Integer countAllSlots() {
+    return jdbc.queryForObject("select count(*) from schedule_slot", Integer.class);
+  }
+
+  private Integer countSoftDeletedSlots() {
+    return jdbc.queryForObject(
+        "select count(*) from schedule_slot where deleted_at is not null", Integer.class);
+  }
+}

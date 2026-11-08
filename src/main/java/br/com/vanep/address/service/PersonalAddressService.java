@@ -4,7 +4,6 @@ import br.com.vanep.address.dto.PersonalAddressRequestDTO;
 import br.com.vanep.address.dto.PersonalAddressResponseDTO;
 import br.com.vanep.address.model.AddressModel;
 import br.com.vanep.address.repository.AddressRepository;
-import br.com.vanep.district.model.DistrictModel;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
 import java.util.Optional;
@@ -17,17 +16,17 @@ import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class PersonalAddressService {
-  private final AddressPlaceResolverService placeResolver;
+  private final AddressCatalogResolverService catalogResolver;
   private final AddressRepository addresses;
   private final UserRepository users;
   private final MessageSource messages;
 
   public PersonalAddressService(
-      AddressPlaceResolverService placeResolver,
+      AddressCatalogResolverService catalogResolver,
       AddressRepository addresses,
       UserRepository users,
       MessageSource messages) {
-    this.placeResolver = placeResolver;
+    this.catalogResolver = catalogResolver;
     this.addresses = addresses;
     this.users = users;
     this.messages = messages;
@@ -37,14 +36,19 @@ public class PersonalAddressService {
   public PersonalAddressResponseDTO replaceMyAddress(
       String callerUid, PersonalAddressRequestDTO request) {
     UserModel caller = requireCaller(callerUid);
-
     AddressModel address =
         Optional.ofNullable(caller.getAddressId())
             .flatMap(addresses::findById)
             .orElseGet(AddressModel::new);
 
-    placeResolver.applyPlace(
-        address, request.placeId(), request.sessionToken(), request.number(), request.complement());
+    catalogResolver.applyCity(
+        address,
+        request.cityToken(),
+        request.street(),
+        request.zipCode(),
+        request.number(),
+        request.complement(),
+        request.neighborhood());
 
     AddressModel saved = addresses.save(address);
     caller.setAddressId(saved.getId());
@@ -84,20 +88,17 @@ public class PersonalAddressService {
   }
 
   PersonalAddressResponseDTO toResponse(AddressModel address) {
-    DistrictModel district = address.getDistrict();
     return new PersonalAddressResponseDTO(
         address.getToken(),
         address.getStreet(),
         address.getNumber(),
         address.getComplement(),
         address.getZipCode(),
-        district == null ? null : district.getName(),
-        district == null ? null : district.getToken(),
+        address.getNeighborhood(),
         address.getCity().getName(),
         address.getCity().getToken(),
         address.getCity().getState().getUf(),
-        address.getCity().getState().getCountry().getIsoCode(),
-        address.getGooglePlaceId());
+        address.getCity().getState().getCountry().getIsoCode());
   }
 
   private String message(String key) {

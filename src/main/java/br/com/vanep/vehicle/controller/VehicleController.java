@@ -1,5 +1,6 @@
 package br.com.vanep.vehicle.controller;
 
+import br.com.vanep.auth.security.SecurityHelper;
 import br.com.vanep.media.enums.MediaSlot;
 import br.com.vanep.media.web.MediaResponder;
 import br.com.vanep.vehicle.dto.VehicleRequestDTO;
@@ -13,6 +14,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -48,6 +50,21 @@ public class VehicleController {
   public VehicleResponseDTO create(
       @Valid @RequestBody VehicleRequestDTO request, @AuthenticationPrincipal Jwt jwt) {
     return service.create(request, jwt.getSubject());
+  }
+
+  // A driver manages their own vans here; the caller is the owner, so no permission is needed.
+  @GetMapping("/me")
+  @PreAuthorize("isAuthenticated()")
+  public List<VehicleResponseDTO> listMine(Authentication authentication) {
+    return service.findMine(SecurityHelper.requireCallerUid(authentication));
+  }
+
+  @PostMapping("/me")
+  @ResponseStatus(HttpStatus.CREATED)
+  @PreAuthorize("isAuthenticated()")
+  public VehicleResponseDTO createMine(
+      Authentication authentication, @Valid @RequestBody VehicleRequestDTO request) {
+    return service.createMine(SecurityHelper.requireCallerUid(authentication), request);
   }
 
   @GetMapping
@@ -91,7 +108,9 @@ public class VehicleController {
   }
 
   @GetMapping("/{token}/photo-front")
-  @PreAuthorize("hasAuthority('show_vehicle') or @sec.isVehicleOwner(#token, authentication)")
+  @PreAuthorize(
+      "hasAuthority('show_vehicle') or @sec.isVehicleOwner(#token, authentication)"
+          + " or @sec.isVehicleOfSearchableDriver(#token)")
   public ResponseEntity<InputStreamResource> downloadPhotoFront(@PathVariable String token) {
     return mediaResponder.respond(photoService.require(token, MediaSlot.VEHICLE_PHOTO_FRONT));
   }
@@ -104,7 +123,9 @@ public class VehicleController {
   }
 
   @GetMapping("/{token}/photo-side")
-  @PreAuthorize("hasAuthority('show_vehicle') or @sec.isVehicleOwner(#token, authentication)")
+  @PreAuthorize(
+      "hasAuthority('show_vehicle') or @sec.isVehicleOwner(#token, authentication)"
+          + " or @sec.isVehicleOfSearchableDriver(#token)")
   public ResponseEntity<InputStreamResource> downloadPhotoSide(@PathVariable String token) {
     return mediaResponder.respond(photoService.require(token, MediaSlot.VEHICLE_PHOTO_SIDE));
   }

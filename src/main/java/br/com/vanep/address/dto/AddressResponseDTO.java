@@ -8,7 +8,7 @@ public record AddressResponseDTO(
     String street,
     String number,
     String complement,
-    String district,
+    String neighborhood,
     String cityToken,
     String cityName,
     String stateUf,

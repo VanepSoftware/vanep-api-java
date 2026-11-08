@@ -1,12 +1,13 @@
 package br.com.vanep.seed;
 
+import br.com.vanep.address.seed.PersonalAddressSeeder;
 import br.com.vanep.auth.security.PermissionEnum;
 import br.com.vanep.auth.security.PermissionRegistry;
 import br.com.vanep.client.model.ClientModel;
 import br.com.vanep.client.repository.ClientRepository;
 import br.com.vanep.clientdriver.seed.ClientDriverSeeder;
 import br.com.vanep.clientrating.seed.ClientRatingSeeder;
-import br.com.vanep.country.seed.CountrySeeder;
+import br.com.vanep.contract.seed.ContractSeeder;
 import br.com.vanep.dependent.seed.DependentSeeder;
 import br.com.vanep.driver.DriverApprovalStatus;
 import br.com.vanep.driver.DriverRepository;
@@ -14,20 +15,24 @@ import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.drivercnh.seed.DriverCnhSeeder;
 import br.com.vanep.driverdocument.seed.DriverDocumentSeeder;
 import br.com.vanep.driverrating.seed.DriverRatingSeeder;
+import br.com.vanep.proposal.seed.ProposalSeeder;
 import br.com.vanep.role.RoleName;
 import br.com.vanep.role.model.RoleModel;
 import br.com.vanep.role.repository.RoleRepository;
 import br.com.vanep.rolepermission.model.RolePermissionModel;
 import br.com.vanep.rolepermission.repository.RolePermissionRepository;
-import br.com.vanep.state.seed.StateSeeder;
+import br.com.vanep.school.seed.SchoolSeeder;
+import br.com.vanep.servicerequest.seed.ServiceRequestSeeder;
 import br.com.vanep.trip.seed.TripSeeder;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
+import br.com.vanep.vehicle.seed.VehicleSeeder;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -49,15 +54,19 @@ public class DataSeeder implements ApplicationRunner {
   private final DriverRepository drivers;
   private final RoleRepository roles;
   private final RolePermissionRepository rolePermissions;
+  private final SchoolSeeder schoolSeeder;
+  private final PersonalAddressSeeder personalAddressSeeder;
   private final DependentSeeder dependentSeeder;
   private final DriverCnhSeeder driverCnhSeeder;
   private final DriverDocumentSeeder driverDocumentSeeder;
-  private final CountrySeeder countrySeeder;
-  private final StateSeeder stateSeeder;
   private final DriverRatingSeeder driverRatingSeeder;
   private final ClientRatingSeeder clientRatingSeeder;
   private final TripSeeder tripSeeder;
   private final ClientDriverSeeder clientDriverSeeder;
+  private final VehicleSeeder vehicleSeeder;
+  private final ContractSeeder contractSeeder;
+  private final ServiceRequestSeeder serviceRequestSeeder;
+  private final ProposalSeeder proposalSeeder;
   private final PasswordEncoder passwordEncoder;
 
   @Value("${vanep.seed.enabled:false}")
@@ -81,30 +90,38 @@ public class DataSeeder implements ApplicationRunner {
       DriverRepository drivers,
       RoleRepository roles,
       RolePermissionRepository rolePermissions,
+      SchoolSeeder schoolSeeder,
+      PersonalAddressSeeder personalAddressSeeder,
       DependentSeeder dependentSeeder,
       DriverCnhSeeder driverCnhSeeder,
       DriverDocumentSeeder driverDocumentSeeder,
-      CountrySeeder countrySeeder,
-      StateSeeder stateSeeder,
       DriverRatingSeeder driverRatingSeeder,
       ClientRatingSeeder clientRatingSeeder,
       TripSeeder tripSeeder,
       ClientDriverSeeder clientDriverSeeder,
+      VehicleSeeder vehicleSeeder,
+      ContractSeeder contractSeeder,
+      ServiceRequestSeeder serviceRequestSeeder,
+      ProposalSeeder proposalSeeder,
       PasswordEncoder passwordEncoder) {
     this.users = users;
     this.clients = clients;
     this.drivers = drivers;
     this.roles = roles;
     this.rolePermissions = rolePermissions;
+    this.schoolSeeder = schoolSeeder;
+    this.personalAddressSeeder = personalAddressSeeder;
     this.dependentSeeder = dependentSeeder;
     this.driverCnhSeeder = driverCnhSeeder;
     this.driverDocumentSeeder = driverDocumentSeeder;
-    this.countrySeeder = countrySeeder;
-    this.stateSeeder = stateSeeder;
     this.driverRatingSeeder = driverRatingSeeder;
     this.clientRatingSeeder = clientRatingSeeder;
     this.tripSeeder = tripSeeder;
     this.clientDriverSeeder = clientDriverSeeder;
+    this.vehicleSeeder = vehicleSeeder;
+    this.contractSeeder = contractSeeder;
+    this.serviceRequestSeeder = serviceRequestSeeder;
+    this.proposalSeeder = proposalSeeder;
     this.passwordEncoder = passwordEncoder;
   }
 
@@ -121,13 +138,16 @@ public class DataSeeder implements ApplicationRunner {
     seedAdmin();
     seedClients();
     seedDrivers();
+    schoolSeeder.seed();
+    personalAddressSeeder.seed();
     dependentSeeder.seed();
     driverCnhSeeder.seed();
     driverDocumentSeeder.seed();
-    countrySeeder.seed();
-
-    stateSeeder.seed();
+    vehicleSeeder.seed();
     clientDriverSeeder.seed();
+    contractSeeder.seed();
+    serviceRequestSeeder.seed();
+    proposalSeeder.seed();
     driverRatingSeeder.seed();
     clientRatingSeeder.seed();
     tripSeeder.seed();
@@ -191,15 +211,19 @@ public class DataSeeder implements ApplicationRunner {
       bundle = rolePermissions.save(bundle);
       clientRole.setRolePermission(bundle);
       roles.save(clientRole);
-      log.info("Seed: CLIENT bundle created with dependents and driver read permissions.");
+      log.info(
+          "Seed: CLIENT bundle created with dependents, driver rating and conversation"
+              + " permissions.");
     }
   }
 
   static List<String> clientPermissions() {
-    List<String> permissions = new java.util.ArrayList<>(PermissionEnum.crudFor("dependents"));
-    permissions.add(PermissionEnum.LIST_DRIVERS.value());
-    permissions.add(PermissionEnum.SHOW_DRIVER.value());
-    return List.copyOf(permissions);
+    return Stream.concat(
+            PermissionEnum.crudFor("dependents").stream(),
+            Stream.of(
+                PermissionEnum.CREATE_DRIVER_RATING.value(),
+                PermissionEnum.LIST_CLIENT_CONVERSATIONS.value()))
+        .toList();
   }
 
   private void seedAssistantPermissions() {
@@ -246,7 +270,8 @@ public class DataSeeder implements ApplicationRunner {
               PermissionEnum.FINISH_TRIP.value(),
               PermissionEnum.CREATE_CLIENT_RATING.value(),
               PermissionEnum.LIST_CLIENT_RATINGS.value(),
-              PermissionEnum.SHOW_CLIENT_RATING.value()));
+              PermissionEnum.SHOW_CLIENT_RATING.value(),
+              PermissionEnum.LIST_DRIVER_CONVERSATIONS.value()));
       bundle = rolePermissions.save(bundle);
       driverRole.setRolePermission(bundle);
       roles.save(driverRole);
@@ -284,14 +309,15 @@ public class DataSeeder implements ApplicationRunner {
   }
 
   private void seedClients() {
-    record ClientSeed(String name, String email, String document) {}
+    record ClientSeed(String name, String email, String document, String phone) {}
     List<ClientSeed> seeds =
         List.of(
-            new ClientSeed("Ana Souza", "ana.souza@seed.vanep.com.br", "39053344705"),
-            new ClientSeed("Bruno Lima", "bruno.lima@seed.vanep.com.br", "52998224725"),
-            new ClientSeed("Carla Nunes", "carla.nunes@seed.vanep.com.br", "11144477735"),
-            new ClientSeed("Diego Alves", "diego.alves@seed.vanep.com.br", "12345678909"),
-            new ClientSeed("Elena Rocha", "elena.rocha@seed.vanep.com.br", "86288366757"));
+            new ClientSeed(
+                "Ana Souza", "ana.souza@seed.vanep.com.br", "39053344705", "11987650001"),
+            new ClientSeed("Bruno Lima", "bruno.lima@seed.vanep.com.br", "52998224725", null),
+            new ClientSeed("Carla Nunes", "carla.nunes@seed.vanep.com.br", "11144477735", null),
+            new ClientSeed("Diego Alves", "diego.alves@seed.vanep.com.br", "12345678909", null),
+            new ClientSeed("Elena Rocha", "elena.rocha@seed.vanep.com.br", "86288366757", null));
 
     RoleModel clientRole = roles.findByRoleName(RoleName.CLIENT).orElseThrow();
     for (ClientSeed seed : seeds) {
@@ -302,6 +328,7 @@ public class DataSeeder implements ApplicationRunner {
       user.setName(seed.name());
       user.setEmail(seed.email());
       user.setDocument(seed.document());
+      user.setPhone(seed.phone());
       user.setPassword(passwordEncoder.encode("password"));
       user.setVerified(true);
       user.setTermsAcceptedAt(Instant.now());
@@ -348,6 +375,7 @@ public class DataSeeder implements ApplicationRunner {
       driver.setCnpj(seed.cnpj());
       driver.setBasePrice(BigDecimal.valueOf(50));
       driver.setApprovalStatus(DriverApprovalStatus.APPROVED);
+      driver.setAvailable(true);
       drivers.save(driver);
       log.info("Seed: driver created ({}).", seed.email());
     }

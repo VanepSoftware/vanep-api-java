@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+  <head>
+    <meta charset="utf-8" />
+  </head>
+  <body style="font-family: Arial, Helvetica, sans-serif; color: #111">
+    <h2>Atualização sobre seu cadastro</h2>
+    <p th:text="'Olá, ' + ${name} + '!'">Olá!</p>
+    <p>
+      Agradecemos seu interesse na plataforma Vanep. Infelizmente, após análise da sua documentação, seu cadastro não foi aprovado neste momento.
+    </p>
+    <p><strong>Motivo informado pela equipe de moderação:</strong></p>
+    <blockquote
+      style="
+        margin: 16px 0;
+        padding: 12px 16px;
+        background-color: #f7f7f7;
+        border-left: 4px solid #e53e3e;
+        color: #333;
+      "
+      th:text="${reason}"
+    >
+      Motivo da rejeição
+    </blockquote>
+    <p>
+      Você pode acessar o aplicativo Vanep para atualizar suas informações e reenviar os documentos para uma nova análise.
+    </p>
+    <p style="color: #666; font-size: 12px">
+      Equipe Vanep.
+    </p>
+  </body>
+</html>

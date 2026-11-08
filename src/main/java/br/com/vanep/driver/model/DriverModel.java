@@ -81,6 +81,19 @@ public class DriverModel {
   @Column(name = "approval_status", nullable = false, length = 16)
   private DriverApprovalStatus approvalStatus = DriverApprovalStatus.PENDING;
 
+  @Column(name = "submitted_at")
+  private Instant submittedAt;
+
+  @Column(name = "rejection_reason")
+  private String rejectionReason;
+
+  @Column(name = "reviewed_at")
+  private Instant reviewedAt;
+
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "reviewed_by")
+  private UserModel reviewedBy;
+
   @Column(name = "is_active", nullable = false)
   private boolean active = true;
 

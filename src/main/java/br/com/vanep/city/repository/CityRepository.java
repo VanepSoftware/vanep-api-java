@@ -3,6 +3,9 @@ package br.com.vanep.city.repository;
 import br.com.vanep.city.model.CityModel;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -15,11 +18,19 @@ public interface CityRepository extends JpaRepository<CityModel, Long> {
 
   List<CityModel> findByStateId(Long stateId);
 
+  Page<CityModel> findByStateIdAndActiveTrue(Long stateId, Pageable pageable);
+
+  Page<CityModel> findByStateIdAndActiveTrueAndNormalizedNameContaining(
+      Long stateId, String normalizedName, Pageable pageable);
+
   Optional<CityModel> findByStateIdAndNormalizedName(Long stateId, String normalizedName);
 
-  Optional<CityModel> findByGooglePlaceId(String googlePlaceId);
+  Optional<CityModel> findByIbgeCode(String ibgeCode);
 
   boolean existsByNameIgnoreCaseAndStateId(String name, Long stateId);
+
+  @Query("select c.ibgeCode from CityModel c")
+  Set<String> findAllIbgeCodes();
 
   @Modifying
   @Query(value = "UPDATE city SET deleted_at = NULL WHERE token = :token", nativeQuery = true)

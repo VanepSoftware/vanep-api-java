@@ -36,6 +36,10 @@
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-websocket</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-thymeleaf</artifactId>
 		</dependency>
 		<dependency>
@@ -45,6 +49,10 @@
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-security</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-actuator</artifactId>
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
@@ -175,6 +183,7 @@
 						<configuration>
 							<excludes>
 								<exclude>br/com/vanep/VanepApplication.class</exclude>
+								<exclude>br/com/vanep/**/seed/**</exclude>
 							</excludes>
 						</configuration>
 					</execution>
@@ -187,6 +196,7 @@
 						<configuration>
 							<excludes>
 								<exclude>br/com/vanep/VanepApplication.class</exclude>
+								<exclude>br/com/vanep/**/seed/**</exclude>
 							</excludes>
 							<rules>
 								<rule>

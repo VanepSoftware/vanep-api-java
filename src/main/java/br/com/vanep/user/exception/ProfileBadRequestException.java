@@ -1,10 +1,13 @@
 package br.com.vanep.user.exception;
 
 import br.com.vanep.user.enums.ProfileErrorCode;
+import java.io.Serial;
 import org.springframework.http.HttpStatus;
 
 /** Structured HTTP 400 for profile-edit validation (same envelope as 409). */
 public class ProfileBadRequestException extends ProfileErrorException {
+
+  @Serial private static final long serialVersionUID = 1L;
 
   private ProfileBadRequestException(String message, ProfileErrorCode code, String field) {
     super(message, HttpStatus.BAD_REQUEST, code, field, null);

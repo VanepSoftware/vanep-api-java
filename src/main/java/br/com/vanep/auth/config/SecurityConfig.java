@@ -207,6 +207,8 @@ public class SecurityConfig {
                     .permitAll()
                     .requestMatchers("/actuator/health", "/actuator/info", "/actuator/mappings")
                     .permitAll()
+                    .requestMatchers("/actuator/metrics/**")
+                    .hasRole("ADMIN")
                     .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html")
                     .permitAll()
                     .anyRequest()

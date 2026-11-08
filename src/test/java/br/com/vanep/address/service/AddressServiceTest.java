@@ -12,6 +12,7 @@ import static org.mockito.Mockito.when;
 
 import br.com.vanep.address.dto.AddressRequestDTO;
 import br.com.vanep.address.dto.AddressResponseDTO;
+import br.com.vanep.address.dto.DependentAddressRequestDTO;
 import br.com.vanep.address.mapper.AddressMapper;
 import br.com.vanep.address.model.AddressModel;
 import br.com.vanep.address.repository.AddressRepository;
@@ -19,9 +20,11 @@ import br.com.vanep.city.model.CityModel;
 import br.com.vanep.country.model.CountryModel;
 import br.com.vanep.dependent.model.DependentModel;
 import br.com.vanep.dependent.repository.DependentRepository;
+import br.com.vanep.places.dto.PlaceDetailsResponseDTO;
 import br.com.vanep.school.model.SchoolModel;
 import br.com.vanep.school.repository.SchoolRepository;
 import br.com.vanep.state.model.StateModel;
+import br.com.vanep.unlinkedpassenger.model.UnlinkedPassengerModel;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -31,11 +34,14 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.MessageSource;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 
 @ExtendWith(MockitoExtension.class)
 class AddressServiceTest {
   @Mock private AddressRepository addressRepository;
   @Mock private AddressPlaceResolverService placeResolver;
+  @Mock private AddressCatalogResolverService catalogResolver;
   @Mock private AddressMapper mapper;
   @Mock private MessageSource messages;
   @Mock private DependentRepository dependents;
@@ -46,7 +52,14 @@ class AddressServiceTest {
   @BeforeEach
   void setUp() {
     service =
-        new AddressService(addressRepository, placeResolver, mapper, messages, dependents, schools);
+        new AddressService(
+            addressRepository,
+            placeResolver,
+            catalogResolver,
+            mapper,
+            messages,
+            dependents,
+            schools);
     lenient().when(messages.getMessage(any(), any(), any())).thenAnswer(inv -> inv.getArgument(0));
     lenient().when(dependents.countByAddressId(anyLong())).thenReturn(0L);
     lenient().when(dependents.countByAddressIdAndIdNot(anyLong(), anyLong())).thenReturn(0L);
@@ -84,6 +97,65 @@ class AddressServiceTest {
     return address;
   }
 
+  private SchoolModel schoolInCampinas() {
+    SchoolModel school = new SchoolModel();
+    school.setId(7L);
+    school.setCity(city());
+    return school;
+  }
+
+  private PlaceDetailsResponseDTO schoolPlace() {
+    return new PlaceDetailsResponseDTO("school-place", "Rua Barão de Jaguara, 1481", List.of());
+  }
+
+  @Test
+  void createsTheSchoolAddressFromThePlaceAlreadyFetched() {
+    SchoolModel school = schoolInCampinas();
+    AddressModel built = addressWithToken("addr-school");
+    built.setId(50L);
+    when(placeResolver.buildFromPlace(schoolPlace(), school.getCity()))
+        .thenReturn(Optional.of(built));
+    when(addressRepository.save(built)).thenReturn(built);
+    when(schools.attachAddressWhenMissing(7L, 50L)).thenReturn(1);
+    when(mapper.toResponse(built)).thenReturn(responseFor("addr-school"));
+
+    assertThat(service.createForSchoolFromPlace(school, schoolPlace()))
+        .contains(responseFor("addr-school"));
+    verify(addressRepository, never()).delete(any());
+  }
+
+  @Test
+  void createsNoSchoolAddressFromAPlaceWithoutAStreet() {
+    SchoolModel school = schoolInCampinas();
+    when(placeResolver.buildFromPlace(schoolPlace(), school.getCity()))
+        .thenReturn(Optional.empty());
+
+    assertThat(service.createForSchoolFromPlace(school, schoolPlace())).isEmpty();
+    verifyNoInteractions(addressRepository);
+    verify(schools, never()).attachAddressWhenMissing(anyLong(), anyLong());
+  }
+
+  @Test
+  void keepsTheAddressOfTheResolveThatAttachedFirst() {
+    SchoolModel school = schoolInCampinas();
+    AddressModel built = addressWithToken("addr-late");
+    built.setId(51L);
+    AddressModel first = addressWithToken("addr-first");
+    SchoolModel attached = schoolInCampinas();
+    attached.setAddressId(49L);
+    when(placeResolver.buildFromPlace(schoolPlace(), school.getCity()))
+        .thenReturn(Optional.of(built));
+    when(addressRepository.save(built)).thenReturn(built);
+    when(schools.attachAddressWhenMissing(7L, 51L)).thenReturn(0);
+    when(schools.findById(7L)).thenReturn(Optional.of(attached));
+    when(addressRepository.findById(49L)).thenReturn(Optional.of(first));
+    when(mapper.toResponse(first)).thenReturn(responseFor("addr-first"));
+
+    assertThat(service.createForSchoolFromPlace(school, schoolPlace()))
+        .contains(responseFor("addr-first"));
+    verify(addressRepository).delete(built);
+  }
+
   private AddressResponseDTO responseFor(String token) {
     return new AddressResponseDTO(
         token,
@@ -97,6 +169,26 @@ class AddressServiceTest {
         "SP",
         true,
         null);
+  }
+
+  private DependentAddressRequestDTO catalogRequest() {
+    return new DependentAddressRequestDTO(
+        "city-campinas", "Rua Barão de Jaguara", "13015904", "1481", null, "Centro");
+  }
+
+  private void applyCityInto(String street) {
+    org.mockito.BDDMockito.willAnswer(
+            inv -> {
+              AddressModel address = inv.getArgument(0);
+              address.setCity(city());
+              address.setStreet(street);
+              address.setZipCode(inv.getArgument(3));
+              address.setNumber(inv.getArgument(4));
+              address.setNeighborhood(inv.getArgument(6));
+              return null;
+            })
+        .given(catalogResolver)
+        .applyCity(any(), any(), any(), any(), any(), any(), any());
   }
 
   private AddressRequestDTO placeRequest(String placeId) {
@@ -163,7 +255,7 @@ class AddressServiceTest {
     DependentModel dependent = dependentWithId(2L);
     AddressResponseDTO response = responseFor("dep-tok");
     when(dependents.findById(2L)).thenReturn(Optional.of(dependent));
-    resolvePlaceInto("Rua Barão de Jaguara");
+    applyCityInto("Rua Barão de Jaguara");
     when(addressRepository.save(any(AddressModel.class)))
         .thenAnswer(
             inv -> {
@@ -174,11 +266,21 @@ class AddressServiceTest {
             });
     when(mapper.toResponse(any(AddressModel.class))).thenReturn(response);
 
-    AddressResponseDTO result = service.upsertForDependent(2L, placeRequest("place-campinas"));
+    AddressResponseDTO result = service.upsertForDependent(2L, catalogRequest());
 
     assertThat(result).isEqualTo(response);
     assertThat(dependent.getAddressId()).isEqualTo(20L);
     verify(dependents).save(dependent);
+    verify(catalogResolver)
+        .applyCity(
+            any(AddressModel.class),
+            org.mockito.ArgumentMatchers.eq("city-campinas"),
+            org.mockito.ArgumentMatchers.eq("Rua Barão de Jaguara"),
+            org.mockito.ArgumentMatchers.eq("13015904"),
+            org.mockito.ArgumentMatchers.eq("1481"),
+            org.mockito.ArgumentMatchers.isNull(),
+            org.mockito.ArgumentMatchers.eq("Centro"));
+    verifyNoInteractions(placeResolver);
   }
 
   @Test
@@ -201,11 +303,12 @@ class AddressServiceTest {
 
     assertThat(result).isEqualTo(response);
     assertThat(school.getAddressId()).isEqualTo(30L);
+    assertThat(school.getCity().getToken()).isEqualTo("city-campinas");
     verify(schools).save(school);
   }
 
   @Test
-  void upsertForDependentUpdatesSameRowOnSecondSave() {
+  void upsertForDependentOverwritesTheSameRowOnResend() {
     DependentModel dependent = dependentWithId(2L);
     dependent.setAddressId(20L);
     AddressModel existing = addressWithToken("dep-tok");
@@ -213,20 +316,47 @@ class AddressServiceTest {
     AddressResponseDTO response = responseFor("dep-tok");
     when(dependents.findById(2L)).thenReturn(Optional.of(dependent));
     when(addressRepository.findById(20L)).thenReturn(Optional.of(existing));
-    resolvePlaceInto("Avenida Nova");
+    applyCityInto("Avenida Nova");
     when(addressRepository.save(existing)).thenReturn(existing);
     when(mapper.toResponse(existing)).thenReturn(response);
 
-    service.upsertForDependent(2L, placeRequest("place-nova"));
+    service.upsertForDependent(2L, catalogRequest());
 
     assertThat(existing.getStreet()).isEqualTo("Avenida Nova");
+    assertThat(existing.getId()).isEqualTo(20L);
     assertThat(dependent.getAddressId()).isEqualTo(20L);
     verify(dependents, never()).save(any());
+    verifyNoInteractions(placeResolver);
+  }
+
+  @Test
+  void upsertForSchoolMovesTheSchoolCityWithANewPlace() {
+    SchoolModel school = schoolWithId(3L);
+    CityModel sorocaba = new CityModel();
+    sorocaba.setId(20L);
+    sorocaba.setToken("city-sorocaba");
+    school.setCity(sorocaba);
+    school.setAddressId(30L);
+    AddressModel existing = addressWithToken("sch-tok");
+    existing.setId(30L);
+    existing.setCity(sorocaba);
+    when(schools.findById(3L)).thenReturn(Optional.of(school));
+    when(addressRepository.findById(30L)).thenReturn(Optional.of(existing));
+    resolvePlaceInto("Rua Barão de Jaguara");
+    when(addressRepository.save(existing)).thenReturn(existing);
+    when(mapper.toResponse(existing)).thenReturn(responseFor("sch-tok"));
+
+    service.upsertForSchool(3L, placeRequest("place-campinas"));
+
+    assertThat(existing.getCity().getToken()).isEqualTo("city-campinas");
+    assertThat(school.getCity().getToken()).isEqualTo("city-campinas");
+    verify(schools).save(school);
   }
 
   @Test
   void upsertForSchoolUpdatesSameRowOnSecondSave() {
     SchoolModel school = schoolWithId(3L);
+    school.setCity(city());
     school.setAddressId(30L);
     AddressModel existing = addressWithToken("sch-tok");
     existing.setId(30L);
@@ -277,19 +407,19 @@ class AddressServiceTest {
   }
 
   @Test
-  void amendingAnExistingAddressKeepsTheResolvedPlace() {
-    DependentModel dependent = dependentWithId(2L);
-    dependent.setAddressId(20L);
-    AddressModel existing = addressWithToken("dep-tok");
-    existing.setId(20L);
+  void amendingAnExistingSchoolAddressKeepsTheResolvedPlace() {
+    SchoolModel school = schoolWithId(3L);
+    school.setAddressId(30L);
+    AddressModel existing = addressWithToken("sch-tok");
+    existing.setId(30L);
     existing.setGooglePlaceId("place-original");
-    AddressResponseDTO response = responseFor("dep-tok");
-    when(dependents.findById(2L)).thenReturn(Optional.of(dependent));
-    when(addressRepository.findById(20L)).thenReturn(Optional.of(existing));
+    AddressResponseDTO response = responseFor("sch-tok");
+    when(schools.findById(3L)).thenReturn(Optional.of(school));
+    when(addressRepository.findById(30L)).thenReturn(Optional.of(existing));
     when(addressRepository.save(existing)).thenReturn(existing);
     when(mapper.toResponse(existing)).thenReturn(response);
 
-    service.upsertForDependent(2L, amendRequest("340", "Apartamento 22"));
+    service.upsertForSchool(3L, amendRequest("340", "Apartamento 22"));
 
     assertThat(existing.getNumber()).isEqualTo("340");
     assertThat(existing.getComplement()).isEqualTo("Apartamento 22");
@@ -300,11 +430,11 @@ class AddressServiceTest {
   }
 
   @Test
-  void creatingAnAddressWithoutAPlaceIsRejected() {
-    DependentModel dependent = dependentWithId(2L);
-    when(dependents.findById(2L)).thenReturn(Optional.of(dependent));
+  void creatingASchoolAddressWithoutAPlaceIsRejected() {
+    SchoolModel school = schoolWithId(3L);
+    when(schools.findById(3L)).thenReturn(Optional.of(school));
 
-    assertThatThrownBy(() -> service.upsertForDependent(2L, amendRequest("340", null)))
+    assertThatThrownBy(() -> service.upsertForSchool(3L, amendRequest("340", null)))
         .hasMessageContaining("address.place_required");
 
     verify(addressRepository, never()).save(any(AddressModel.class));
@@ -321,6 +451,104 @@ class AddressServiceTest {
         .hasMessageContaining("address.place_required");
 
     verify(addressRepository, never()).save(any(AddressModel.class));
+  }
+
+  @Test
+  void upsertForDependentIsRejectedWhenASchoolOwnsTheSameAddress() {
+    DependentModel dependent = dependentWithId(2L);
+    dependent.setAddressId(20L);
+    when(dependents.findById(2L)).thenReturn(Optional.of(dependent));
+    when(schools.countByAddressId(20L)).thenReturn(1L);
+
+    assertThatThrownBy(() -> service.upsertForDependent(2L, catalogRequest()))
+        .isInstanceOfSatisfying(
+            ResponseStatusException.class,
+            ex -> {
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+              assertThat(ex.getReason()).isEqualTo("address.already_owned");
+            });
+
+    verify(addressRepository, never()).save(any(AddressModel.class));
+    verifyNoInteractions(catalogResolver);
+  }
+
+  @Test
+  void upsertForDependentDoesNotPersistWhenTheCityIsUnknown() {
+    DependentModel dependent = dependentWithId(2L);
+    when(dependents.findById(2L)).thenReturn(Optional.of(dependent));
+    org.mockito.BDDMockito.willThrow(new ResponseStatusException(HttpStatus.NOT_FOUND, "city"))
+        .given(catalogResolver)
+        .applyCity(any(), any(), any(), any(), any(), any(), any());
+
+    assertThatThrownBy(() -> service.upsertForDependent(2L, catalogRequest()))
+        .isInstanceOf(ResponseStatusException.class);
+
+    verify(addressRepository, never()).save(any(AddressModel.class));
+    verify(dependents, never()).save(any());
+  }
+
+  @Test
+  void upsertForUnlinkedPassengerCreatesTheAddressAndSetsItOnThePassenger() {
+    UnlinkedPassengerModel passenger = new UnlinkedPassengerModel();
+    applyCityInto("Rua Barão de Jaguara");
+    when(addressRepository.save(any(AddressModel.class)))
+        .thenAnswer(
+            inv -> {
+              AddressModel saved = inv.getArgument(0);
+              saved.setId(40L);
+              return saved;
+            });
+
+    service.upsertForUnlinkedPassenger(passenger, catalogRequest());
+
+    assertThat(passenger.getAddress().getId()).isEqualTo(40L);
+    assertThat(passenger.getAddress().getStreet()).isEqualTo("Rua Barão de Jaguara");
+    verifyNoInteractions(placeResolver);
+  }
+
+  @Test
+  void upsertForUnlinkedPassengerOverwritesItsOwnAddress() {
+    AddressModel existing = addressWithToken("passenger-address");
+    existing.setId(40L);
+    UnlinkedPassengerModel passenger = new UnlinkedPassengerModel();
+    passenger.setAddress(existing);
+    when(addressRepository.findById(40L)).thenReturn(Optional.of(existing));
+    applyCityInto("Avenida Nova");
+    when(addressRepository.save(existing)).thenReturn(existing);
+
+    service.upsertForUnlinkedPassenger(passenger, catalogRequest());
+
+    assertThat(existing.getStreet()).isEqualTo("Avenida Nova");
+    assertThat(passenger.getAddress()).isSameAs(existing);
+  }
+
+  @Test
+  void upsertForUnlinkedPassengerIsRejectedWhenADependentOwnsTheSameAddress() {
+    AddressModel existing = addressWithToken("shared-address");
+    existing.setId(40L);
+    UnlinkedPassengerModel passenger = new UnlinkedPassengerModel();
+    passenger.setAddress(existing);
+    when(dependents.countByAddressId(40L)).thenReturn(1L);
+
+    assertThatThrownBy(() -> service.upsertForUnlinkedPassenger(passenger, catalogRequest()))
+        .isInstanceOfSatisfying(
+            ResponseStatusException.class,
+            ex -> assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.CONFLICT));
+
+    verifyNoInteractions(catalogResolver);
+  }
+
+  @Test
+  void clearForUnlinkedPassengerSoftDeletesItsAddress() {
+    AddressModel existing = addressWithToken("passenger-address");
+    existing.setId(40L);
+    UnlinkedPassengerModel passenger = new UnlinkedPassengerModel();
+    passenger.setAddress(existing);
+    when(addressRepository.findById(40L)).thenReturn(Optional.of(existing));
+
+    service.clearForUnlinkedPassenger(passenger);
+
+    verify(addressRepository).delete(existing);
   }
 
   private DependentModel dependentWithId(Long id) {

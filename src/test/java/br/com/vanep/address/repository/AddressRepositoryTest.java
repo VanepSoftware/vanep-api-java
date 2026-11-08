@@ -9,6 +9,7 @@ import br.com.vanep.country.model.CountryModel;
 import br.com.vanep.country.repository.CountryRepository;
 import br.com.vanep.state.model.StateModel;
 import br.com.vanep.state.repository.StateRepository;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,6 +26,7 @@ class AddressRepositoryTest {
   @Autowired private CityRepository cities;
   @Autowired private StateRepository states;
   @Autowired private CountryRepository countries;
+  @Autowired private EntityManager entityManager;
 
   private CityModel city;
 
@@ -56,6 +58,20 @@ class AddressRepositoryTest {
     address.setStreet(street);
     address.setNumber(number);
     return address;
+  }
+
+  @Test
+  void persistsNeighborhoodOnAddress() {
+    AddressModel address = newAddress("Quadra 1 Conjunto A", "10");
+    address.setNeighborhood("Asa Sul");
+    AddressModel saved = repository.saveAndFlush(address);
+
+    entityManager.clear();
+
+    AddressModel loaded = repository.findById(saved.getId()).orElseThrow();
+
+    assertThat(loaded.getNeighborhood()).isEqualTo("Asa Sul");
+    assertThat(loaded.getStreet()).isEqualTo("Quadra 1 Conjunto A");
   }
 
   @Test

@@ -1,0 +1,111 @@
+[
+  {
+    "id": 5206206,
+    "nome": "Cristalina",
+    "microrregiao": {
+      "id": 52012,
+      "nome": "Entorno de Brasília",
+      "mesorregiao": {
+        "id": 5204,
+        "nome": "Leste Goiano",
+        "UF": {
+          "id": 52,
+          "sigla": "GO",
+          "nome": "Goiás",
+          "regiao": {
+            "id": 5,
+            "sigla": "CO",
+            "nome": "Centro-Oeste"
+          }
+        }
+      }
+    },
+    "regiao-imediata": {
+      "id": 520019,
+      "nome": "Luziânia",
+      "regiao-intermediaria": {
+        "id": 5206,
+        "nome": "Luziânia - Águas Lindas de Goiás",
+        "UF": {
+          "id": 52,
+          "sigla": "GO",
+          "nome": "Goiás",
+          "regiao": {
+            "id": 5,
+            "sigla": "CO",
+            "nome": "Centro-Oeste"
+          }
+        }
+      }
+    }
+  },
+  {
+    "id": 5300108,
+    "nome": "Brasília",
+    "microrregiao": {
+      "id": 53001,
+      "nome": "Brasília",
+      "mesorregiao": {
+        "id": 5301,
+        "nome": "Distrito Federal",
+        "UF": {
+          "id": 53,
+          "sigla": "DF",
+          "nome": "Distrito Federal",
+          "regiao": {
+            "id": 5,
+            "sigla": "CO",
+            "nome": "Centro-Oeste"
+          }
+        }
+      }
+    },
+    "regiao-imediata": {
+      "id": 530001,
+      "nome": "Distrito Federal",
+      "regiao-intermediaria": {
+        "id": 5301,
+        "nome": "Distrito Federal",
+        "UF": {
+          "id": 53,
+          "sigla": "DF",
+          "nome": "Distrito Federal",
+          "regiao": {
+            "id": 5,
+            "sigla": "CO",
+            "nome": "Centro-Oeste"
+          }
+        }
+      }
+    }
+  },
+  {
+    "id": 5101837,
+    "nome": "Boa Esperança do Norte",
+    "microrregiao": null,
+    "regiao-imediata": {
+      "id": 510008,
+      "nome": "Sorriso",
+      "regiao-intermediaria": {
+        "id": 5103,
+        "nome": "Sinop",
+        "UF": {
+          "id": 51,
+          "sigla": "MT",
+          "nome": "Mato Grosso",
+          "regiao": {
+            "id": 5,
+            "sigla": "CO",
+            "nome": "Centro-Oeste"
+          }
+        }
+      }
+    }
+  },
+  {
+    "id": 9999999,
+    "nome": "Município sem recorte",
+    "microrregiao": null,
+    "regiao-imediata": null
+  }
+]
