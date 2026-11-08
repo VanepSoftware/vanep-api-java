@@ -1,6 +1,7 @@
 package br.com.vanep.familyinvite.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -21,7 +22,9 @@ import br.com.vanep.familyinvite.StudentFamilyFixtures;
 import br.com.vanep.school.model.SchoolModel;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -87,10 +90,18 @@ class FamilyInviteControllerTest {
     assertThat(first.get("inviteUrl").asText()).endsWith("/" + first.get("code").asText());
     assertThat(second.get("code").asText()).isEqualTo(first.get("code").asText());
     assertThat(second.get("sentAt").asText()).isGreaterThanOrEqualTo(first.get("sentAt").asText());
-    mockMvc
-        .perform(get(PASSENGERS + "/" + passenger).with(as(carlosUid)))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.invitedAt").value(second.get("sentAt").asText()));
+    String passengerView =
+        mockMvc
+            .perform(get(PASSENGERS + "/" + passenger).with(as(carlosUid)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.invitedAt").isNotEmpty())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    // The invite response still has Instant.now() nanos; invitedAt is that value read back from
+    // timestamptz, which keeps microseconds.
+    assertThat(Instant.parse(objectMapper.readTree(passengerView).get("invitedAt").asText()))
+        .isCloseTo(Instant.parse(second.get("sentAt").asText()), within(1, ChronoUnit.MICROS));
   }
 
   @Test
