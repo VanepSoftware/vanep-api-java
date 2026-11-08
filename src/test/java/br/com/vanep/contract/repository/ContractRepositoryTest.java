@@ -465,7 +465,7 @@ class ContractRepositoryTest {
           slot.setWeekday(weekday);
           slot.setLeg(leg);
           slot.setShift(shift);
-          slot.setWindowStart(LocalTime.of(7, 0));
+          slot.setPickupTime(LocalTime.of(7, 0));
           schedule.addSlot(slot);
         }
       }
