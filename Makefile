@@ -10,7 +10,7 @@ MAILPIT_SERVICE = mailpit
 ENV_FILE = .env
 ENV_EXAMPLE = .env.example
 
-.PHONY: up down nuke restart rebuild logs shell test test-coverage check boot-run build clean \
+.PHONY: up down nuke restart rebuild logs shell test test-coverage audit-n-plus-one check boot-run build clean \
 	docker-build lint lint-fix check-migrations db-up db-down db-logs db-psql db-migrate db-seed up-build dev setup-env \
 	mail-up mail-down mail-logs install clean-install env pr
 
@@ -109,6 +109,9 @@ dev: db-up mail-up setup-env
 
 test:
 	$(MVNW) test
+
+audit-n-plus-one:
+	$(MVNW) -Dtest=NPlusOneRepositoryAuditTest test
 
 test-coverage:
 	$(MVNW) verify
