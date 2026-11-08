@@ -1,5 +1,6 @@
 package br.com.vanep.driver.controller;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -330,7 +331,7 @@ class DriverControllerTest {
         .andExpect(jsonPath("$.user.document").value("66666666666"))
         .andExpect(jsonPath("$.user.type").value("DRIVER"))
         .andExpect(jsonPath("$.bio").doesNotExist())
-        .andExpect(jsonPath("$.basePrice").doesNotExist());
+        .andExpect(jsonPath("$.basePrice").value(50));
   }
 
   @Test
@@ -351,5 +352,77 @@ class DriverControllerTest {
                         .jwt(t -> t.claim("uid", clientUid).claim("roles", List.of("ROLE_CLIENT")))
                         .authorities(new SimpleGrantedAuthority("ROLE_CLIENT"))))
         .andExpect(status().isForbidden());
+  }
+
+  @Test
+  void updateMyAvailabilityRequiresAuthentication() throws Exception {
+    mockMvc
+        .perform(
+            put("/api/drivers/me/availability")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"available\":true}"))
+        .andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  void updateMyAvailabilityTurnsTheFlagOnAndOffForTheOwner() throws Exception {
+    mockMvc
+        .perform(
+            put("/api/drivers/me/availability")
+                .with(ownerJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"available\":true}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.token").value(driverToken))
+        .andExpect(jsonPath("$.available").value(true))
+        .andExpect(jsonPath("$.basePrice").value(50));
+    assertThat(drivers.findByToken(driverToken).orElseThrow().isAvailable()).isTrue();
+
+    mockMvc
+        .perform(
+            put("/api/drivers/me/availability")
+                .with(ownerJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"available\":false}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.available").value(false));
+    assertThat(drivers.findByToken(driverToken).orElseThrow().isAvailable()).isFalse();
+  }
+
+  @Test
+  void updateMyAvailabilityRejectsAMissingNullOrWronglyTypedFlag() throws Exception {
+    for (String body : List.of("{}", "{\"available\":null}", "{\"available\":\"maybe\"}", "{")) {
+      mockMvc
+          .perform(
+              put("/api/drivers/me/availability")
+                  .with(ownerJwt())
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(body))
+          .andExpect(status().isBadRequest());
+    }
+    assertThat(drivers.findByToken(driverToken).orElseThrow().isAvailable()).isFalse();
+  }
+
+  @Test
+  void updateMyAvailabilityForbidsAClient() throws Exception {
+    UserModel clientUser = new UserModel();
+    clientUser.setType(UserType.CLIENT);
+    clientUser.setName("Client");
+    clientUser.setEmail("client-availability@vanep.com");
+    clientUser.setDocument("22222222222");
+    clientUser.setVerified(true);
+    final String clientUid = users.save(clientUser).getToken();
+
+    mockMvc
+        .perform(
+            put("/api/drivers/me/availability")
+                .with(
+                    jwt()
+                        .jwt(t -> t.claim("uid", clientUid).claim("roles", List.of("ROLE_CLIENT")))
+                        .authorities(new SimpleGrantedAuthority("ROLE_CLIENT")))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"available\":true}"))
+        .andExpect(status().isForbidden());
+    assertThat(drivers.findByToken(driverToken).orElseThrow().isAvailable()).isFalse();
   }
 }
