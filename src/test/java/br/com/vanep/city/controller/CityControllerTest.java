@@ -20,7 +20,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.MessageSource;
-import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor;
 import org.springframework.test.context.ActiveProfiles;
@@ -110,7 +109,7 @@ class CityControllerTest {
   }
 
   private String message(String key) {
-    return messages.getMessage(key, null, LocaleContextHolder.getLocale());
+    return messages.getMessage(key, null, java.util.Locale.forLanguageTag("pt-BR"));
   }
 
   @Test

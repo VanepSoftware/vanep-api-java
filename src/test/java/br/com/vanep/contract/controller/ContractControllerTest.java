@@ -50,17 +50,14 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.MessageSource;
-import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.ResultMatcher;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.context.WebApplicationContext;
 
 @SpringBootTest
@@ -306,7 +303,11 @@ class ContractControllerTest {
     mockMvc
         .perform(postContract(request, adminJwt()))
         .andExpect(status().isBadRequest())
-        .andExpect(fieldErrorMessage(field, message(key)));
+        .andExpect(jsonPath("$.detail").value(message(key)))
+        .andExpect(jsonPath("$.field").value(field))
+        .andExpect(jsonPath("$.errors.length()").value(1))
+        .andExpect(jsonPath("$.errors[0].field").value(field))
+        .andExpect(jsonPath("$.errors[0].message").value(message(key)));
   }
 
   @Test
@@ -408,17 +409,8 @@ class ContractControllerTest {
     return slot;
   }
 
-  private ResultMatcher fieldErrorMessage(String field, String expected) {
-    return result -> {
-      MethodArgumentNotValidException exception =
-          (MethodArgumentNotValidException) result.getResolvedException();
-      assertThat(exception.getBindingResult().getFieldError(field).getDefaultMessage())
-          .isEqualTo(expected);
-    };
-  }
-
   private String message(String key) {
-    return messages.getMessage(key, null, LocaleContextHolder.getLocale());
+    return messages.getMessage(key, null, java.util.Locale.forLanguageTag("pt-BR"));
   }
 
   private ClientDriverModel createLink(ClientModel client, DriverModel driver) {
