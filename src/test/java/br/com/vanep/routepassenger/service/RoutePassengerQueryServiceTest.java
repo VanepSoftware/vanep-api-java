@@ -77,6 +77,7 @@ class RoutePassengerQueryServiceTest {
         source,
         name.toLowerCase(),
         name,
+        null,
         "school",
         "Escola Municipal",
         RouteLeg.OUTBOUND,

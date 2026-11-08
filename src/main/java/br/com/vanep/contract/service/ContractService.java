@@ -24,6 +24,8 @@ import br.com.vanep.schedule.model.ScheduleSlotModel;
 import br.com.vanep.schedule.service.ScheduleService;
 import br.com.vanep.school.model.SchoolModel;
 import br.com.vanep.school.repository.SchoolRepository;
+import br.com.vanep.unlinkedpassenger.service.UnlinkedPassengerService;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -53,6 +55,7 @@ public class ContractService {
   private final ContractTransitionPolicy transitionPolicy;
   private final LinkStatusPolicy linkStatusPolicy;
   private final ContractMapper mapper;
+  private final UnlinkedPassengerService unlinkedPassengers;
   private final MessageSource messages;
 
   public ContractService(
@@ -67,6 +70,7 @@ public class ContractService {
       ContractTransitionPolicy transitionPolicy,
       LinkStatusPolicy linkStatusPolicy,
       ContractMapper mapper,
+      UnlinkedPassengerService unlinkedPassengers,
       MessageSource messages) {
     this.contracts = contracts;
     this.items = items;
@@ -79,6 +83,7 @@ public class ContractService {
     this.transitionPolicy = transitionPolicy;
     this.linkStatusPolicy = linkStatusPolicy;
     this.mapper = mapper;
+    this.unlinkedPassengers = unlinkedPassengers;
     this.messages = messages;
   }
 
@@ -106,6 +111,7 @@ public class ContractService {
 
     ContractModel saved = writeKeepingOneActiveContract(() -> contracts.save(contract));
     recomputeLinkStatus(link);
+    retireMergedPassengers(saved, saved.getItems());
     return mapper.toResponse(saved, saved.getItems());
   }
 
@@ -181,6 +187,15 @@ public class ContractService {
     contract.setStatus(target);
     writeKeepingOneActiveContract(() -> contracts.saveAndFlush(contract));
     recomputeLinkStatus(contract.getClientDriver());
+    if (target == ContractStatus.ACTIVE) {
+      retireMergedPassengers(contract, items.findByContractIdIn(List.of(contract.getId())));
+    }
+  }
+
+  void retireMergedPassengers(ContractModel contract, Collection<ContractItemModel> contractItems) {
+    unlinkedPassengers.retireMergedPassengers(
+        contract.getClientDriver().getDriver().getId(),
+        contractItems.stream().map(item -> item.getDependent().getId()).toList());
   }
 
   <T> T writeKeepingOneActiveContract(Supplier<T> write) {

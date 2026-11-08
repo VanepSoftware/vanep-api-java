@@ -19,6 +19,8 @@ import br.com.vanep.city.model.CityModel;
 import br.com.vanep.driver.DriverApprovalStatus;
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
+import br.com.vanep.familyinvite.model.FamilyInviteModel;
+import br.com.vanep.familyinvite.repository.FamilyInviteRepository;
 import br.com.vanep.schedule.dto.ScheduleSlotRequestDTO;
 import br.com.vanep.schedule.mapper.ScheduleMapper;
 import br.com.vanep.schedule.model.ScheduleModel;
@@ -33,6 +35,7 @@ import br.com.vanep.shared.enums.RouteLeg;
 import br.com.vanep.shared.enums.SchoolShift;
 import br.com.vanep.state.model.StateModel;
 import br.com.vanep.unlinkedpassenger.dto.UnlinkedPassengerCreateRequestDTO;
+import br.com.vanep.unlinkedpassenger.dto.UnlinkedPassengerFamilyDTO;
 import br.com.vanep.unlinkedpassenger.dto.UnlinkedPassengerResponseDTO;
 import br.com.vanep.unlinkedpassenger.dto.UnlinkedPassengerScheduleRequestDTO;
 import br.com.vanep.unlinkedpassenger.dto.UnlinkedPassengerUpdateRequestDTO;
@@ -42,8 +45,11 @@ import br.com.vanep.unlinkedpassenger.repository.UnlinkedPassengerRepository;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.service.UserService;
+import br.com.vanep.vehicle.model.VehicleModel;
+import br.com.vanep.vehicle.repository.VehicleRepository;
 import java.time.DayOfWeek;
 import java.time.LocalTime;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -74,6 +80,9 @@ class UnlinkedPassengerServiceTest {
   @Mock private AddressService addresses;
   @Mock private ScheduleRepository scheduleRepository;
   @Mock private MessageSource messages;
+  @Mock private VehicleRepository vehicles;
+  @Mock private FamilyInviteRepository invites;
+  @Mock private UnlinkedPassengerFamilyService families;
 
   @Captor private ArgumentCaptor<UnlinkedPassengerModel> savedPassenger;
 
@@ -96,8 +105,13 @@ class UnlinkedPassengerServiceTest {
             schools,
             addresses,
             new ScheduleService(scheduleRepository, new ScheduleSlotPolicy(), messages),
+            vehicles,
+            invites,
+            families,
             new UnlinkedPassengerMapper(new AddressMapper(), new ScheduleMapper()),
             messages);
+    when(families.findFamily(any())).thenReturn(UnlinkedPassengerFamilyDTO.NONE);
+    when(families.findFamilies(any())).thenReturn(new HashMap<>());
 
     UserModel user = new UserModel();
     user.setId(1L);
@@ -180,7 +194,8 @@ class UnlinkedPassengerServiceTest {
             SchoolShift.MORNING,
             addressRequest("Rua das Flores"),
             null,
-            slots());
+            slots(),
+            null);
 
     assertThatThrownBy(() -> service.create(CALLER, request))
         .isInstanceOfSatisfying(
@@ -201,7 +216,8 @@ class UnlinkedPassengerServiceTest {
             SchoolShift.MORNING,
             addressRequest("Rua das Flores"),
             null,
-            List.of());
+            List.of(),
+            null);
 
     assertThatThrownBy(() -> service.create(CALLER, request))
         .isInstanceOfSatisfying(
@@ -279,6 +295,7 @@ class UnlinkedPassengerServiceTest {
             JsonNullable.of("Lucas Silva"),
             JsonNullable.of("other-school"),
             JsonNullable.of(SchoolShift.AFTERNOON),
+            null,
             null,
             null));
 
@@ -366,6 +383,121 @@ class UnlinkedPassengerServiceTest {
   }
 
   @Test
+  void deletingAPassengerAlsoDeletesItsFamilyInvite() {
+    UnlinkedPassengerModel passenger = passenger("lucas");
+    passenger.setId(40L);
+    FamilyInviteModel invite = new FamilyInviteModel();
+    when(passengers.findByTokenAndDriverId("lucas", 2L)).thenReturn(Optional.of(passenger));
+    when(invites.findByUnlinkedPassengerId(40L)).thenReturn(Optional.of(invite));
+
+    service.delete(CALLER, "lucas");
+
+    verify(invites).delete(invite);
+    verify(passengers).delete(passenger);
+  }
+
+  @Test
+  void retiringMergedPassengersDeletesThoseOfTheContractedDependents() {
+    UnlinkedPassengerModel merged = passenger("lucas");
+    when(passengers.findByDriverIdAndDependentIdIn(2L, List.of(9L))).thenReturn(List.of(merged));
+
+    service.retireMergedPassengers(2L, List.of(9L));
+
+    verify(passengers).delete(merged);
+    verify(addresses).clearForUnlinkedPassenger(merged);
+  }
+
+  @Test
+  void retiringWithoutDependentsTouchesNothing() {
+    service.retireMergedPassengers(2L, List.of());
+
+    verifyNoInteractions(passengers);
+  }
+
+  @Test
+  void createsAPassengerInOneOfTheDriversActiveVans() {
+    when(vehicles.findByToken("van-a")).thenReturn(Optional.of(van(30L, carlos, true)));
+    UnlinkedPassengerCreateRequestDTO request =
+        new UnlinkedPassengerCreateRequestDTO(
+            "Lucas",
+            "school",
+            SchoolShift.MORNING,
+            addressRequest("Rua das Flores"),
+            null,
+            slots(),
+            "van-a");
+
+    service.create(CALLER, request);
+
+    verify(passengers).save(savedPassenger.capture());
+    assertThat(savedPassenger.getValue().getVehicleId()).isEqualTo(30L);
+  }
+
+  @Test
+  void aVanOfAnotherDriverOrInactiveIsRefusedWithoutSaving() {
+    DriverModel other = new DriverModel();
+    other.setId(99L);
+    when(vehicles.findByToken("other-van")).thenReturn(Optional.of(van(31L, other, true)));
+    when(vehicles.findByToken("old-van")).thenReturn(Optional.of(van(32L, carlos, false)));
+
+    for (String vanToken : List.of("other-van", "old-van", "missing-van")) {
+      UnlinkedPassengerCreateRequestDTO request =
+          new UnlinkedPassengerCreateRequestDTO(
+              "Lucas",
+              "school",
+              SchoolShift.MORNING,
+              addressRequest("Rua das Flores"),
+              null,
+              slots(),
+              vanToken);
+      assertThatThrownBy(() -> service.create(CALLER, request))
+          .isInstanceOfSatisfying(
+              ResponseStatusException.class,
+              exception -> {
+                assertThat(exception.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
+                assertThat(exception.getReason()).isEqualTo("unlinked_passenger.vehicle.not_owned");
+              });
+    }
+    verify(passengers, never()).save(any());
+  }
+
+  @Test
+  void aVehicleOnlyPatchKeepsEveryOtherField() {
+    UnlinkedPassengerModel passenger = passenger("lucas");
+    passenger.setNotes("Portão azul");
+    when(passengers.findByTokenAndDriverId("lucas", 2L)).thenReturn(Optional.of(passenger));
+    when(vehicles.findByToken("van-a")).thenReturn(Optional.of(van(30L, carlos, true)));
+
+    service.update(CALLER, "lucas", patch().withVehicleToken(JsonNullable.of("van-a")));
+
+    assertThat(passenger.getVehicleId()).isEqualTo(30L);
+    assertThat(passenger.getName()).isEqualTo("Lucas");
+    assertThat(passenger.getSchool()).isSameAs(school);
+    assertThat(passenger.getSchoolShift()).isEqualTo(SchoolShift.MORNING);
+    assertThat(passenger.getNotes()).isEqualTo("Portão azul");
+    verify(addresses, never()).upsertForUnlinkedPassenger(any(), any());
+  }
+
+  @Test
+  void aNullVehicleClearsTheVan() {
+    UnlinkedPassengerModel passenger = passenger("lucas");
+    passenger.setVehicleId(30L);
+    when(passengers.findByTokenAndDriverId("lucas", 2L)).thenReturn(Optional.of(passenger));
+
+    service.update(CALLER, "lucas", patch().withVehicleToken(JsonNullable.of(null)));
+
+    assertThat(passenger.getVehicleId()).isNull();
+  }
+
+  VehicleModel van(Long id, DriverModel owner, boolean active) {
+    VehicleModel van = new VehicleModel();
+    van.setId(id);
+    van.setDriver(owner);
+    van.setActive(active);
+    return van;
+  }
+
+  @Test
   void deletingAnotherDriversPassengerIsNotFound() {
     when(passengers.findByTokenAndDriverId("someone-else", 2L)).thenReturn(Optional.empty());
 
@@ -387,11 +519,17 @@ class UnlinkedPassengerServiceTest {
 
   UnlinkedPassengerCreateRequestDTO createRequest() {
     return new UnlinkedPassengerCreateRequestDTO(
-        "Lucas", "school", SchoolShift.MORNING, addressRequest("Rua das Flores"), null, slots());
+        "Lucas",
+        "school",
+        SchoolShift.MORNING,
+        addressRequest("Rua das Flores"),
+        null,
+        slots(),
+        null);
   }
 
   PatchBuilder patch() {
-    return new PatchBuilder(null, null, null, null, null);
+    return new PatchBuilder(null, null, null, null, null, null);
   }
 
   record PatchBuilder(
@@ -399,26 +537,37 @@ class UnlinkedPassengerServiceTest {
       JsonNullable<String> schoolToken,
       JsonNullable<SchoolShift> schoolShift,
       JsonNullable<DependentAddressRequestDTO> address,
-      JsonNullable<String> notes) {
+      JsonNullable<String> notes,
+      JsonNullable<String> vehicleToken) {
 
     UnlinkedPassengerUpdateRequestDTO withName(JsonNullable<String> value) {
-      return new UnlinkedPassengerUpdateRequestDTO(value, schoolToken, schoolShift, address, notes);
+      return new UnlinkedPassengerUpdateRequestDTO(
+          value, schoolToken, schoolShift, address, notes, vehicleToken);
     }
 
     UnlinkedPassengerUpdateRequestDTO withSchoolToken(JsonNullable<String> value) {
-      return new UnlinkedPassengerUpdateRequestDTO(name, value, schoolShift, address, notes);
+      return new UnlinkedPassengerUpdateRequestDTO(
+          name, value, schoolShift, address, notes, vehicleToken);
     }
 
     UnlinkedPassengerUpdateRequestDTO withSchoolShift(JsonNullable<SchoolShift> value) {
-      return new UnlinkedPassengerUpdateRequestDTO(name, schoolToken, value, address, notes);
+      return new UnlinkedPassengerUpdateRequestDTO(
+          name, schoolToken, value, address, notes, vehicleToken);
     }
 
     UnlinkedPassengerUpdateRequestDTO withAddress(JsonNullable<DependentAddressRequestDTO> value) {
-      return new UnlinkedPassengerUpdateRequestDTO(name, schoolToken, schoolShift, value, notes);
+      return new UnlinkedPassengerUpdateRequestDTO(
+          name, schoolToken, schoolShift, value, notes, vehicleToken);
+    }
+
+    UnlinkedPassengerUpdateRequestDTO withVehicleToken(JsonNullable<String> value) {
+      return new UnlinkedPassengerUpdateRequestDTO(
+          name, schoolToken, schoolShift, address, notes, value);
     }
 
     UnlinkedPassengerUpdateRequestDTO withNotes(JsonNullable<String> value) {
-      return new UnlinkedPassengerUpdateRequestDTO(name, schoolToken, schoolShift, address, value);
+      return new UnlinkedPassengerUpdateRequestDTO(
+          name, schoolToken, schoolShift, address, value, vehicleToken);
     }
   }
 

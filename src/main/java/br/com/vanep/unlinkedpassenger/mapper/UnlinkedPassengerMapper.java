@@ -2,6 +2,7 @@ package br.com.vanep.unlinkedpassenger.mapper;
 
 import br.com.vanep.address.mapper.AddressMapper;
 import br.com.vanep.schedule.mapper.ScheduleMapper;
+import br.com.vanep.unlinkedpassenger.dto.UnlinkedPassengerFamilyDTO;
 import br.com.vanep.unlinkedpassenger.dto.UnlinkedPassengerResponseDTO;
 import br.com.vanep.unlinkedpassenger.model.UnlinkedPassengerModel;
 import org.springframework.stereotype.Component;
@@ -17,7 +18,8 @@ public class UnlinkedPassengerMapper {
     this.scheduleMapper = scheduleMapper;
   }
 
-  public UnlinkedPassengerResponseDTO toResponse(UnlinkedPassengerModel passenger) {
+  public UnlinkedPassengerResponseDTO toResponse(
+      UnlinkedPassengerModel passenger, UnlinkedPassengerFamilyDTO family) {
     return new UnlinkedPassengerResponseDTO(
         passenger.getToken(),
         passenger.getName(),
@@ -27,6 +29,10 @@ public class UnlinkedPassengerMapper {
         addressMapper.toResponse(passenger.getAddress()),
         passenger.getNotes(),
         scheduleMapper.toSlotResponses(passenger.getSchedule()),
+        family.vehicleToken(),
+        family.dependentToken(),
+        family.invitedAt(),
+        family.familyMatch(),
         passenger.getCreatedAt(),
         passenger.getUpdatedAt());
   }

@@ -6,6 +6,8 @@ import static org.assertj.core.groups.Tuple.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -45,6 +47,7 @@ import br.com.vanep.school.repository.SchoolRepository;
 import br.com.vanep.shared.enums.OperationShift;
 import br.com.vanep.shared.enums.RouteLeg;
 import br.com.vanep.shared.mapper.InstallmentMapper;
+import br.com.vanep.unlinkedpassenger.service.UnlinkedPassengerService;
 import br.com.vanep.user.model.UserModel;
 import java.math.BigDecimal;
 import java.time.DayOfWeek;
@@ -81,6 +84,7 @@ class ContractServiceTest {
   @Mock private AddressRepository addresses;
   @Mock private ScheduleRepository scheduleRepository;
   @Mock private MessageSource messages;
+  @Mock private UnlinkedPassengerService unlinkedPassengers;
 
   @Captor private ArgumentCaptor<ContractModel> savedContract;
 
@@ -116,6 +120,7 @@ class ContractServiceTest {
             new ContractTransitionPolicy(),
             new LinkStatusPolicy(),
             new ContractMapper(new ScheduleMapper(), new InstallmentMapper()),
+            unlinkedPassengers,
             messages);
 
     campinas = new CityModel();
@@ -176,6 +181,17 @@ class ContractServiceTest {
     assertThat(response.items()).hasSize(2);
     verify(links).updateStatusUnlessBlocked(3L, "ACTIVE");
     verify(links, never()).save(any());
+  }
+
+  @Test
+  void activatingAContractRetiresTheMergedPassengersOfItsDependents() {
+    when(contracts.findStatusesByClientDriverId(3L)).thenReturn(List.of(ContractStatus.ACTIVE));
+
+    service.create(createRequest(item("lucas", outbound()), item("ana", outbound())));
+
+    verify(unlinkedPassengers)
+        .retireMergedPassengers(
+            eq(link.getDriver().getId()), argThat(dependentIds -> dependentIds.size() == 2));
   }
 
   @Test

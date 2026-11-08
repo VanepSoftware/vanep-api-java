@@ -17,4 +17,5 @@ public record UnlinkedPassengerCreateRequestDTO(
     @NotNull SchoolShift schoolShift,
     @NotNull @Valid DependentAddressRequestDTO address,
     @Size(max = 500, message = "{unlinked_passenger.notes.too_long}") String notes,
-    List<@Valid ScheduleSlotRequestDTO> slots) {}
+    List<@Valid ScheduleSlotRequestDTO> slots,
+    String vehicleToken) {}
