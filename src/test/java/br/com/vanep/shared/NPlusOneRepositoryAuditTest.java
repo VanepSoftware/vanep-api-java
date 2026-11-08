@@ -188,6 +188,20 @@ class NPlusOneRepositoryAuditTest {
         },
         reporter);
 
+    List<Long> clientIds = new ArrayList<>();
+    recordHotspot(
+        counter,
+        hotspots,
+        "ClientRepository.findTokensByIdIn — admin dependent list, one client per row",
+        () -> clientIds.add(createClient(0)),
+        () -> clients.findTokensByIdIn(List.copyOf(clientIds)).forEach(row -> row.getToken()),
+        () -> {
+          clientIds.add(createClient(1));
+          clientIds.add(createClient(2));
+          clientIds.add(createClient(3));
+        },
+        reporter);
+
     hotspots.forEach(hotspot -> reporter.publishEntry("n-plus-one-hotspot", hotspot));
 
     assertThat(hotspots)
@@ -262,6 +276,12 @@ class NPlusOneRepositoryAuditTest {
     document.setReviewedBy(
         saveUser("reviewer" + index + "@vanep.com", UserType.ADMIN, "reviewer-" + index));
     documents.save(document);
+  }
+
+  private Long createClient(int index) {
+    ClientModel other = new ClientModel();
+    other.setUser(saveUser("other" + index + "@vanep.com", UserType.CLIENT, "other-" + index));
+    return clients.save(other).getId();
   }
 
   private void createDocumentForNewDriver(int index) {

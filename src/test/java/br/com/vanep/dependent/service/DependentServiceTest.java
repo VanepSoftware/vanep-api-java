@@ -627,13 +627,10 @@ class DependentServiceTest {
     second.setSchoolId(8L);
     SchoolModel firstSchool = school();
     SchoolModel secondSchool = school(8L, "school-b", "Escola B");
-    ClientModel client = new ClientModel();
-    client.setId(CLIENT_ID);
-    client.setToken("ctok");
 
     stubOwnershipResolution();
     when(dependents.findByClientId(CLIENT_ID)).thenReturn(List.of(first, second));
-    when(clients.findAllById(List.of(CLIENT_ID))).thenReturn(List.of(client));
+    when(clients.findTokensByIdIn(List.of(CLIENT_ID))).thenReturn(List.of(clientToken()));
     when(schools.findAllById(List.of(SCHOOL_ID, 8L)))
         .thenReturn(List.of(firstSchool, secondSchool));
     when(addressService.toResponsesByIds(List.of())).thenReturn(Map.of());
@@ -657,15 +654,12 @@ class DependentServiceTest {
     first.setAddressId(10L);
     SchoolModel firstSchool = school();
     firstSchool.setAddressId(20L);
-    ClientModel client = new ClientModel();
-    client.setId(CLIENT_ID);
-    client.setToken("ctok");
     AddressResponseDTO home = addressResponse();
     AddressResponseDTO schoolAddress = schoolAddressResponse();
 
     stubOwnershipResolution();
     when(dependents.findByClientId(CLIENT_ID)).thenReturn(List.of(first));
-    when(clients.findAllById(List.of(CLIENT_ID))).thenReturn(List.of(client));
+    when(clients.findTokensByIdIn(List.of(CLIENT_ID))).thenReturn(List.of(clientToken()));
     when(schools.findAllById(List.of(SCHOOL_ID))).thenReturn(List.of(firstSchool));
     when(addressService.toResponsesByIds(List.of(10L, 20L)))
         .thenReturn(Map.of(10L, home, 20L, schoolAddress));
@@ -1171,5 +1165,19 @@ class DependentServiceTest {
               DependentSchoolDayRequestDTO day = call.getArgument(1);
               return schoolDay(day.weekday(), day.schoolShift());
             });
+  }
+
+  private static ClientRepository.IdAndToken clientToken() {
+    return new ClientRepository.IdAndToken() {
+      @Override
+      public Long getId() {
+        return CLIENT_ID;
+      }
+
+      @Override
+      public String getToken() {
+        return "ctok";
+      }
+    };
   }
 }

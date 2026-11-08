@@ -10,7 +10,7 @@ MAILPIT_SERVICE = mailpit
 ENV_FILE = .env
 ENV_EXAMPLE = .env.example
 
-.PHONY: up down nuke restart rebuild logs shell test test-coverage audit-n-plus-one check boot-run build clean \
+.PHONY: up down nuke restart rebuild logs shell test test-coverage audit-n-plus-one audit-n-plus-one-suite check boot-run build clean \
 	docker-build lint lint-fix check-migrations db-up db-down db-logs db-psql db-migrate db-seed up-build dev setup-env \
 	mail-up mail-down mail-logs install clean-install env pr
 
@@ -112,6 +112,15 @@ test:
 
 audit-n-plus-one:
 	$(MVNW) -Dtest=NPlusOneRepositoryAuditTest test
+
+# Roda a suíte inteira com o detector de N+1 ligado: toda sessão do Hibernate que repete o mesmo
+# select vai para target/n-plus-one-report.txt (contagem, call site, teste, SQL).
+audit-n-plus-one-suite:
+	@rm -f target/n-plus-one-report.txt
+	$(MVNW) test \
+		-Dspring.jpa.properties.hibernate.session_factory.statement_inspector=br.com.vanep.shared.nplusone.NPlusOneDetector \
+		-Dspring.jpa.properties.hibernate.session.events.auto=br.com.vanep.shared.nplusone.NPlusOneSessionListener
+	@test -f target/n-plus-one-report.txt && sort -t$$'\t' -k2,2 -u target/n-plus-one-report.txt | sort -rn || echo "=> nenhum select repetido numa sessão"
 
 test-coverage:
 	$(MVNW) verify

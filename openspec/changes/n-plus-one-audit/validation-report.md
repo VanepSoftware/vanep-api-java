@@ -53,6 +53,26 @@ A rodada 1 mascarava casos: associações `EAGER` vazias (`null`) não geram sel
 
 O audit agora falha (`isEmpty()`) se qualquer sonda crescer.
 
+## Rodada 4 — varredura da suíte inteira
+
+As sondas só cobrem as listas escolhidas. Para cobrir o resto, `make audit-n-plus-one-suite` roda os 2075 testes com um detector (`br.com.vanep.shared.nplusone`): um `StatementInspector` mais um `SessionEventListener` do Hibernate registram os selects de cada sessão (uma transação de service, já que `open-in-view=false`). Todo select que se repete na mesma sessão vai para `target/n-plus-one-report.txt`, com o call site e o teste. Assim entra tudo o que roda nos testes: endpoint, service, mapper e listener.
+
+411 sessões repetiram algum select. Triagem por call site:
+
+| Call site | Repetições | Veredito |
+|-----------|-----------:|----------|
+| `DependentService.clientTokensById` (lista do admin) | 1 select de `users` por cliente | **N+1**, corrigido |
+| `LocationResolverService.findDistrict` | até 4 | loop pelos níveis de bairro do endereço (2 a 4), cada nível depende do pai; limitado |
+| `NegotiationEmailService` → `UserService.requireByToken`, `ServiceRequestService.*`, `ProposalService.relatedTo` | 2–3 | o fluxo de envio e o e-mail que sai junto buscam o mesmo dado de novo; fixo por request |
+| `SchoolResolveService.resolve` | 2 | `findByGooglePlaceId` antes e depois do Places; fixo |
+| `VehiclePhotoService.require` / `VehicleService.requireByToken` | 3 | as 3 fotos `EAGER` de **um** veículo; fixo |
+| `AssistantInviteService.createInvite`, `ClientDriverService.create`, `OnboardingService`, `require*Of*` | 2 | mesma busca repetida dentro do fluxo; fixo |
+| sem frame da aplicação | 2–3 | código do próprio teste |
+
+**Correção do dependente:** `ClientModel.user` é `EAGER`, e o service só precisava do token do cliente. `clientTokensById` agora usa `ClientRepository.findTokensByIdIn` (projeção id + token, no mesmo padrão de `DependentRepository`/`VehicleRepository`), e ganhou uma sonda no audit.
+
+Repetições em quantidade fixa por request não crescem com N, então não são N+1. Ficam no relatório como candidatas a limpeza, fora do escopo desta task.
+
 ## Já cobertos antes por testes com `SqlStatementCounter`
 
 `ClientDriverRepositoryTest`, `ContractRepositoryTest`, `UnlinkedPassengerRepositoryTest`, `ContractReadinessControllerTest`. Listas com `join fetch` explícito: `ClientDriverRepository`, `ConversationRepository`, `ContractRepository`, `ProposalRepository`, `ServiceRequestRepository`, `TripRepository`, `UnlinkedPassengerRepository`, `DriverServiceAreaRepository`. Batch no service: `DependentService.toResponses`, `ServiceRequestService`.

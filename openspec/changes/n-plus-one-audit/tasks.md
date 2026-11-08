@@ -13,3 +13,11 @@ Issue no Genwork: **VAN-81**. Branch: `VAN-81/n-plus-one-audit`.
 - [x] 2.2 Sonda de regressão por repositório tocado no `NPlusOneRepositoryAuditTest`
 - [x] 2.3 Constitution regra 17: testar a contagem de statements antes de mergear uma query de lista
 - [x] 2.4 Audit falha quando a contagem cresce com N e roda no `make test` / CI
+
+## Fase 3 — Varredura da suíte inteira
+
+- [x] 3.1 Detector por sessão do Hibernate (`NPlusOneDetector` + `NPlusOneSessionListener`) e `make audit-n-plus-one-suite`
+- [x] 3.2 Triagem do relatório (N+1 vs repetição fixa por request)
+- [x] 3.3 Corrigir `DependentService.clientTokensById` (projeção de token) + sonda
+- [x] 3.4 Constitution regra 17 cita a varredura antes de PR com query nova
+
