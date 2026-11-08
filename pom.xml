@@ -7,7 +7,7 @@
 	<parent>
 		<groupId>org.springframework.boot</groupId>
 		<artifactId>spring-boot-starter-parent</artifactId>
-		<version>4.0.6</version>
+		<version>4.1.2</version>
 		<relativePath />
 	</parent>
 
@@ -19,10 +19,10 @@
 
 	<properties>
 		<java.version>25</java.version>
-		<jacoco.version>0.8.14</jacoco.version>
-		<spotless.version>3.4.0</spotless.version>
+		<jacoco.version>0.8.16</jacoco.version>
+		<spotless.version>3.11.0</spotless.version>
 		<google-java-format.version>1.27.0</google-java-format.version>
-		<bouncycastle.version>1.85</bouncycastle.version>
+		<bouncycastle.version>1.86</bouncycastle.version>
 	</properties>
 
 	<dependencies>
@@ -82,12 +82,12 @@
 		<dependency>
 			<groupId>org.springdoc</groupId>
 			<artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
-			<version>3.0.0</version>
+			<version>3.2.0</version>
 		</dependency>
 		<dependency>
 			<groupId>org.openapitools</groupId>
 			<artifactId>jackson-databind-nullable</artifactId>
-			<version>0.2.11</version>
+			<version>0.2.13</version>
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
