@@ -87,7 +87,7 @@ passenger_body() {
     local leg=OUTBOUND start=06:40:00
     if [[ $shift == AFTERNOON ]]; then leg=RETURN; start=17:00:00; fi
     for weekday in MONDAY WEDNESDAY FRIDAY; do
-      slots+="{\"weekday\":\"$weekday\",\"leg\":\"$leg\",\"shift\":\"$shift\",\"windowStart\":\"$start\"},"
+      slots+="{\"weekday\":\"$weekday\",\"leg\":\"$leg\",\"shift\":\"$shift\",\"pickupTime\":\"$start\"},"
     done
   done
   printf '{"name":"%s","schoolToken":"%s","schoolShift":"MORNING","address":{"cityToken":"%s","street":"Rua QA","zipCode":"01001000","number":"1"},"slots":[%s]}' \

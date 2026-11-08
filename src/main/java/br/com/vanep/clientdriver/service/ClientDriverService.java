@@ -4,6 +4,7 @@ import br.com.vanep.client.model.ClientModel;
 import br.com.vanep.client.repository.ClientRepository;
 import br.com.vanep.clientdriver.dto.ClientDriverCreateRequestDTO;
 import br.com.vanep.clientdriver.dto.ClientDriverResponseDTO;
+import br.com.vanep.clientdriver.enums.LinkOrigin;
 import br.com.vanep.clientdriver.enums.RelationshipStatus;
 import br.com.vanep.clientdriver.mapper.ClientDriverMapper;
 import br.com.vanep.clientdriver.model.ClientDriverModel;
@@ -17,6 +18,7 @@ import br.com.vanep.user.service.UserService;
 import java.util.List;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -71,11 +73,34 @@ public class ClientDriverService {
               throw conflict("client_driver.duplicate_pair");
             });
 
+    return mapper.toResponse(insertLink(newLink(client, driver, request.origin())));
+  }
+
+  // The lock makes a block of the same pair wait for the request, or the request see the block. A
+  // concurrent first request of the same pair fails on the pair's unique index at flush; the caller
+  // turns that violation into its own conflict.
+  @Transactional
+  public ClientDriverModel findOrCreateForRequest(ClientModel client, DriverModel driver) {
+    return links
+        .lockByPair(client.getId(), driver.getId())
+        .orElseGet(() -> links.saveAndFlush(newLink(client, driver, LinkOrigin.CLIENT_SEARCH)));
+  }
+
+  ClientDriverModel newLink(ClientModel client, DriverModel driver, LinkOrigin origin) {
     ClientDriverModel link = new ClientDriverModel();
     link.setClient(client);
     link.setDriver(driver);
     link.setStatus(RelationshipStatus.PENDING);
-    return mapper.toResponse(links.save(link));
+    link.setOrigin(origin);
+    return link;
+  }
+
+  ClientDriverModel insertLink(ClientDriverModel link) {
+    try {
+      return links.saveAndFlush(link);
+    } catch (DataIntegrityViolationException concurrentCreation) {
+      throw conflict("client_driver.duplicate_pair");
+    }
   }
 
   @Transactional(readOnly = true)

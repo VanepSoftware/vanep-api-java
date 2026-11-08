@@ -84,9 +84,13 @@ public class ContractService {
 
   @Transactional
   public ContractResponseDTO create(ContractCreateRequestDTO request) {
-    ClientDriverModel link = requireLink(request.clientDriverToken());
+    // The lock makes a block of the same link wait for the contract, or the contract see it.
+    ClientDriverModel link =
+        links
+            .lockByToken(request.clientDriverToken())
+            .orElseThrow(() -> notFound("client_driver.not_found"));
     ensureLinkCanBeContracted(link);
-    ensureValidPeriod(request);
+    ensureValidTerms(request);
     ensureDistinctDependents(request.items());
     ensureNoActiveContract(link);
 
@@ -190,7 +194,7 @@ public class ContractService {
   ContractItemModel createItem(ClientDriverModel link, ContractItemRequestDTO request) {
     DependentModel dependent =
         dependents
-            .findByToken(request.dependentToken())
+            .lockByToken(request.dependentToken())
             .orElseThrow(() -> notFound("dependent.not_found"));
     if (!link.getClient().getId().equals(dependent.getClientId())) {
       throw unprocessableEntity("contract.item.dependent_not_in_link");
@@ -202,7 +206,6 @@ public class ContractService {
     item.setDependent(dependent);
     item.setSchool(school);
     copyPickupAddress(address, item);
-    item.setMonthlyAmount(request.monthlyAmount());
     item.setSchedule(schedules.create(request.slots()));
     ensureNoSlotConflict(item);
     return item;
@@ -233,7 +236,6 @@ public class ContractService {
     item.setPickupNumber(address.getNumber());
     item.setPickupComplement(address.getComplement());
     item.setPickupNeighborhood(address.getNeighborhood());
-    item.setPickupDistrict(address.getDistrict());
     item.setPickupGooglePlaceId(address.getGooglePlaceId());
   }
 
@@ -246,9 +248,10 @@ public class ContractService {
     }
   }
 
-  void ensureValidPeriod(ContractCreateRequestDTO request) {
+  void ensureValidTerms(ContractCreateRequestDTO request) {
     termsPolicy
-        .validate(request.startsOn(), request.endsOn())
+        .validate(
+            request.startsOn(), request.endsOn(), request.totalAmount(), request.installments())
         .ifPresent(
             violation -> {
               throw unprocessableEntity(messageKey(violation));
@@ -259,6 +262,7 @@ public class ContractService {
     return switch (violation) {
       case PERIOD_INVALID -> "contract.period.invalid";
       case PERIOD_TOO_LONG -> "contract.period.too_long";
+      case INSTALLMENT_BELOW_ONE_CENT -> "contract.installments.below_one_cent";
     };
   }
 
@@ -300,10 +304,10 @@ public class ContractService {
   }
 
   void recomputeLinkStatus(ClientDriverModel link) {
-    link.setStatus(
+    RelationshipStatus derived =
         linkStatusPolicy.deriveStatus(
-            link.getStatus(), contracts.findStatusesByClientDriverId(link.getId())));
-    links.save(link);
+            link.getStatus(), contracts.findStatusesByClientDriverId(link.getId()));
+    links.updateStatusUnlessBlocked(link.getId(), derived.name());
   }
 
   ContractResponseDTO toResponse(ContractModel contract) {

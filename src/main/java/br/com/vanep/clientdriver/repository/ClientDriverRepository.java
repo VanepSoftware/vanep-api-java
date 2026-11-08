@@ -1,11 +1,14 @@
 package br.com.vanep.clientdriver.repository;
 
 import br.com.vanep.clientdriver.model.ClientDriverModel;
+import jakarta.persistence.LockModeType;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -22,6 +25,14 @@ public interface ClientDriverRepository extends JpaRepository<ClientDriverModel,
       """)
   Optional<ClientDriverModel> findByPair(Long clientId, Long driverId);
 
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query(
+      """
+      select link from ClientDriverModel link
+      where link.client.id = :clientId and link.driver.id = :driverId
+      """)
+  Optional<ClientDriverModel> lockByPair(Long clientId, Long driverId);
+
   @Query(
       """
       select link from ClientDriverModel link
@@ -32,6 +43,11 @@ public interface ClientDriverRepository extends JpaRepository<ClientDriverModel,
       where link.token = :token
       """)
   Optional<ClientDriverModel> findByToken(String token);
+
+  // No fetch joins: FOR UPDATE would lock the joined client, driver and user rows too.
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("select link from ClientDriverModel link where link.token = :token")
+  Optional<ClientDriverModel> lockByToken(String token);
 
   @Query(
       """
@@ -92,4 +108,44 @@ public interface ClientDriverRepository extends JpaRepository<ClientDriverModel,
           "SELECT u.token FROM client_driver cd JOIN driver d ON cd.driver_id = d.id JOIN users u ON d.user_id = u.id WHERE cd.token = :token",
       nativeQuery = true)
   Optional<String> findDriverUserTokenByLinkToken(@Param("token") String token);
+
+  // Native: an HQL assignment to blockedBy, whose target is soft-deletable, makes Hibernate 7
+  // join the users table and write the parameter into the link's id.
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query(
+      value =
+          """
+          update client_driver
+          set status = 'BLOCKED', blocked_by = :blockerId, blocked_at = :now,
+            updated_at = current_timestamp
+          where id = :id and status <> 'BLOCKED' and deleted_at is null
+          """,
+      nativeQuery = true)
+  int block(@Param("id") Long id, @Param("blockerId") Long blockerId, @Param("now") Instant now);
+
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query(
+      value =
+          """
+          update client_driver
+          set status = :status, blocked_by = null, blocked_at = null,
+            updated_at = current_timestamp
+          where id = :id and status = 'BLOCKED' and blocked_by = :blockerId and deleted_at is null
+          """,
+      nativeQuery = true)
+  int unblock(
+      @Param("id") Long id, @Param("blockerId") Long blockerId, @Param("status") String status);
+
+  // A save of the link loaded earlier would rewrite blocked_by and blocked_at and erase a block
+  // that landed in between; only the status moves, and never out of BLOCKED.
+  @Modifying(flushAutomatically = true)
+  @Query(
+      value =
+          """
+          update client_driver
+          set status = :status, updated_at = current_timestamp
+          where id = :id and status <> 'BLOCKED' and deleted_at is null
+          """,
+      nativeQuery = true)
+  int updateStatusUnlessBlocked(@Param("id") Long id, @Param("status") String status);
 }

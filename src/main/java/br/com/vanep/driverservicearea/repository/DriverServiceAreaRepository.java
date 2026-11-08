@@ -36,6 +36,7 @@ public interface DriverServiceAreaRepository extends JpaRepository<DriverService
       where area.city.id = :cityId
         and (district is null or district.id in :ancestorIds)
         and area.driver.active = true
+        and area.driver.available = true
         and area.driver.approvalStatus = br.com.vanep.driver.DriverApprovalStatus.APPROVED
       """)
   List<Object[]> findDriverMatchesCoveringPoint(Long cityId, Collection<Long> ancestorIds);
@@ -46,6 +47,7 @@ public interface DriverServiceAreaRepository extends JpaRepository<DriverService
       left join area.district district
       where area.city.id = :cityId
         and area.driver.active = true
+        and area.driver.available = true
         and area.driver.approvalStatus = br.com.vanep.driver.DriverApprovalStatus.APPROVED
       """)
   List<Object[]> findDriverMatchesInCity(Long cityId);

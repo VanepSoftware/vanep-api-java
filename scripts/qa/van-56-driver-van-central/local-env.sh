@@ -60,7 +60,7 @@ add_passenger() {
     local leg=OUTBOUND start=06:40:00
     if [[ $shift == AFTERNOON ]]; then leg=RETURN; start=17:00:00; fi
     for weekday in MONDAY TUESDAY WEDNESDAY THURSDAY FRIDAY; do
-      slots+="{\"weekday\":\"$weekday\",\"leg\":\"$leg\",\"shift\":\"$shift\",\"windowStart\":\"$start\"},"
+      slots+="{\"weekday\":\"$weekday\",\"leg\":\"$leg\",\"shift\":\"$shift\",\"pickupTime\":\"$start\"},"
     done
   done
   curl -s -o /dev/null -w '%{http_code}\n' -X POST "$BASE_URL/api/drivers/me/unlinked-passengers" \

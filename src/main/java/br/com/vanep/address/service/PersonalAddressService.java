@@ -4,7 +4,6 @@ import br.com.vanep.address.dto.PersonalAddressRequestDTO;
 import br.com.vanep.address.dto.PersonalAddressResponseDTO;
 import br.com.vanep.address.model.AddressModel;
 import br.com.vanep.address.repository.AddressRepository;
-import br.com.vanep.district.model.DistrictModel;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
 import java.util.Optional;
@@ -89,7 +88,6 @@ public class PersonalAddressService {
   }
 
   PersonalAddressResponseDTO toResponse(AddressModel address) {
-    DistrictModel district = address.getDistrict();
     return new PersonalAddressResponseDTO(
         address.getToken(),
         address.getStreet(),
@@ -97,8 +95,6 @@ public class PersonalAddressService {
         address.getComplement(),
         address.getZipCode(),
         address.getNeighborhood(),
-        district == null ? null : district.getName(),
-        district == null ? null : district.getToken(),
         address.getCity().getName(),
         address.getCity().getToken(),
         address.getCity().getState().getUf(),

@@ -7,8 +7,6 @@ public record PersonalAddressResponseDTO(
     String complement,
     String zipCode,
     String neighborhood,
-    String districtName,
-    String districtToken,
     String cityName,
     String cityToken,
     String stateUf,

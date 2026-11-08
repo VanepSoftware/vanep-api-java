@@ -14,6 +14,7 @@ import br.com.vanep.address.model.AddressModel;
 import br.com.vanep.address.repository.AddressRepository;
 import br.com.vanep.city.model.CityModel;
 import br.com.vanep.client.model.ClientModel;
+import br.com.vanep.clientdriver.enums.LinkOrigin;
 import br.com.vanep.clientdriver.enums.RelationshipStatus;
 import br.com.vanep.clientdriver.model.ClientDriverModel;
 import br.com.vanep.clientdriver.repository.ClientDriverRepository;
@@ -43,6 +44,7 @@ import br.com.vanep.school.model.SchoolModel;
 import br.com.vanep.school.repository.SchoolRepository;
 import br.com.vanep.shared.enums.OperationShift;
 import br.com.vanep.shared.enums.RouteLeg;
+import br.com.vanep.shared.mapper.InstallmentMapper;
 import br.com.vanep.user.model.UserModel;
 import java.math.BigDecimal;
 import java.time.DayOfWeek;
@@ -93,7 +95,7 @@ class ContractServiceTest {
     when(messages.getMessage(anyString(), any(), any())).thenAnswer(call -> call.getArgument(0));
     when(contracts.save(any())).thenAnswer(call -> call.getArgument(0));
     when(contracts.saveAndFlush(any())).thenAnswer(call -> call.getArgument(0));
-    when(links.save(any())).thenAnswer(call -> call.getArgument(0));
+    when(links.updateStatusUnlessBlocked(anyLong(), anyString())).thenReturn(1);
     when(scheduleRepository.save(any())).thenAnswer(call -> call.getArgument(0));
     when(contracts.findActiveByClientDriverId(anyLong())).thenReturn(Optional.empty());
     when(items.findSlotsByDependentIdAndContractStatusIn(anyLong(), any())).thenReturn(List.of());
@@ -113,7 +115,7 @@ class ContractServiceTest {
             new ContractTermsPolicy(),
             new ContractTransitionPolicy(),
             new LinkStatusPolicy(),
-            new ContractMapper(new ScheduleMapper()),
+            new ContractMapper(new ScheduleMapper(), new InstallmentMapper()),
             messages);
 
     campinas = new CityModel();
@@ -139,8 +141,10 @@ class ContractServiceTest {
     link.setToken("link");
     link.setClient(maria);
     link.setDriver(carlos);
+    link.setOrigin(LinkOrigin.CLIENT_SEARCH);
     link.setStatus(RelationshipStatus.PENDING);
     when(links.findByToken("link")).thenReturn(Optional.of(link));
+    when(links.lockByToken("link")).thenReturn(Optional.of(link));
 
     registerDependent("lucas", 11L, 1L, 7L, address(21L, "Rua A", "10"));
     registerDependent("ana", 12L, 1L, 7L, address(22L, "Rua B", "20"));
@@ -170,8 +174,25 @@ class ContractServiceTest {
     assertThat(response.status()).isEqualTo(ContractStatus.ACTIVE);
     assertThat(response.totalAmount()).isEqualByComparingTo("4200.00");
     assertThat(response.items()).hasSize(2);
-    assertThat(link.getStatus()).isEqualTo(RelationshipStatus.ACTIVE);
-    verify(links).save(link);
+    verify(links).updateStatusUnlessBlocked(3L, "ACTIVE");
+    verify(links, never()).save(any());
+  }
+
+  @Test
+  void creatingLocksTheLinkSoABlockCannotInterleave() {
+    service.create(createRequest(item("lucas", outbound())));
+
+    verify(links).lockByToken("link");
+    verify(links, never()).findByToken(anyString());
+  }
+
+  @Test
+  void eachItemLocksItsDependentSoARemovalCannotInterleave() {
+    service.create(createRequest(item("lucas", outbound()), item("ana", outbound())));
+
+    verify(dependents).lockByToken("lucas");
+    verify(dependents).lockByToken("ana");
+    verify(dependents, never()).findByToken(anyString());
   }
 
   @Test
@@ -231,7 +252,7 @@ class ContractServiceTest {
         .thenReturn(List.of(takenSlot(DayOfWeek.MONDAY, RouteLeg.OUTBOUND)));
     ScheduleSlotRequestDTO mondayReturn =
         new ScheduleSlotRequestDTO(
-            DayOfWeek.MONDAY, RouteLeg.RETURN, OperationShift.AFTERNOON, LocalTime.of(17, 0), null);
+            DayOfWeek.MONDAY, RouteLeg.RETURN, OperationShift.AFTERNOON, LocalTime.of(17, 0));
 
     service.create(createRequest(item("lucas", mondayReturn)));
 
@@ -300,6 +321,23 @@ class ContractServiceTest {
   }
 
   @Test
+  void aTotalBelowOneCentPerInstallmentIsRefusedWithTheTermsPolicyKey() {
+    assertRefused(
+        () ->
+            service.create(
+                new ContractCreateRequestDTO(
+                    "link",
+                    STARTS_ON,
+                    ENDS_ON,
+                    new BigDecimal("0.11"),
+                    12,
+                    5,
+                    List.of(item("lucas", outbound())))),
+        "422",
+        "contract.installments.below_one_cent");
+  }
+
+  @Test
   void endingAnActiveContractDeactivatesTheLink() {
     ContractModel contract = contract(ContractStatus.ACTIVE);
     link.setStatus(RelationshipStatus.ACTIVE);
@@ -309,7 +347,7 @@ class ContractServiceTest {
 
     assertThat(contract.getStatus()).isEqualTo(ContractStatus.ENDED);
     assertThat(response.status()).isEqualTo(ContractStatus.ENDED);
-    assertThat(link.getStatus()).isEqualTo(RelationshipStatus.INACTIVE);
+    verify(links).updateStatusUnlessBlocked(3L, "INACTIVE");
   }
 
   @Test
@@ -320,7 +358,7 @@ class ContractServiceTest {
 
     service.update("contract", statusPatch(ContractStatus.SUSPENDED));
 
-    assertThat(link.getStatus()).isEqualTo(RelationshipStatus.ACTIVE);
+    verify(links).updateStatusUnlessBlocked(3L, "ACTIVE");
   }
 
   @Test
@@ -386,7 +424,7 @@ class ContractServiceTest {
 
     assertThat(contract.getStatus()).isEqualTo(ContractStatus.ACTIVE);
     verify(contracts, never()).save(any());
-    verify(links, never()).save(any());
+    verify(links, never()).updateStatusUnlessBlocked(anyLong(), anyString());
   }
 
   @Test
@@ -398,7 +436,7 @@ class ContractServiceTest {
     service.delete("contract");
 
     verify(contracts).delete(contract);
-    assertThat(link.getStatus()).isEqualTo(RelationshipStatus.PENDING);
+    verify(links).updateStatusUnlessBlocked(3L, "PENDING");
   }
 
   @Test
@@ -414,7 +452,7 @@ class ContractServiceTest {
     verify(items).restoreByContractToken("contract");
     verify(items).restoreSchedulesByContractToken("contract");
     verify(items).restoreSlotsByContractToken("contract");
-    assertThat(link.getStatus()).isEqualTo(RelationshipStatus.ACTIVE);
+    verify(links).updateStatusUnlessBlocked(3L, "ACTIVE");
   }
 
   @Test
@@ -512,16 +550,12 @@ class ContractServiceTest {
   }
 
   private ContractItemRequestDTO item(String dependentToken, ScheduleSlotRequestDTO slot) {
-    return new ContractItemRequestDTO(dependentToken, new BigDecimal("350.00"), List.of(slot));
+    return new ContractItemRequestDTO(dependentToken, List.of(slot));
   }
 
   private ScheduleSlotRequestDTO outbound() {
     return new ScheduleSlotRequestDTO(
-        DayOfWeek.MONDAY,
-        RouteLeg.OUTBOUND,
-        OperationShift.MORNING,
-        LocalTime.of(6, 40),
-        LocalTime.of(6, 50));
+        DayOfWeek.MONDAY, RouteLeg.OUTBOUND, OperationShift.MORNING, LocalTime.of(6, 40));
   }
 
   private ContractUpdateRequestDTO statusPatch(ContractStatus status) {
@@ -540,6 +574,8 @@ class ContractServiceTest {
     contract.setStatus(status);
     contract.setStartsOn(STARTS_ON);
     contract.setEndsOn(ENDS_ON);
+    contract.setTotalAmount(new BigDecimal("4200.00"));
+    contract.setInstallments(12);
     when(contracts.findByToken(token)).thenReturn(Optional.of(contract));
     return contract;
   }
@@ -561,7 +597,7 @@ class ContractServiceTest {
   private ContractItemModel restoredItem(ContractModel contract) {
     ScheduleSlotModel ownSlot = takenSlot(DayOfWeek.MONDAY, RouteLeg.OUTBOUND, 40L);
     ownSlot.setShift(OperationShift.MORNING);
-    ownSlot.setWindowStart(LocalTime.of(6, 40));
+    ownSlot.setPickupTime(LocalTime.of(6, 40));
     ContractItemModel item = new ContractItemModel();
     item.setContract(contract);
     item.setDependent(dependents.findByToken("lucas").orElseThrow());
@@ -585,6 +621,7 @@ class ContractServiceTest {
       when(addresses.findById(address.getId())).thenReturn(Optional.of(address));
     }
     when(dependents.findByToken(token)).thenReturn(Optional.of(dependent));
+    when(dependents.lockByToken(token)).thenReturn(Optional.of(dependent));
   }
 
   private AddressModel address(Long id, String street, String number) {

@@ -6,8 +6,4 @@ import java.time.DayOfWeek;
 import java.time.LocalTime;
 
 public record ScheduleSlotResponseDTO(
-    DayOfWeek weekday,
-    RouteLeg leg,
-    OperationShift shift,
-    LocalTime windowStart,
-    LocalTime windowEnd) {}
+    DayOfWeek weekday, RouteLeg leg, OperationShift shift, LocalTime pickupTime) {}

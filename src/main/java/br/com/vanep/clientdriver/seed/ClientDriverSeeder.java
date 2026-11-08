@@ -2,6 +2,7 @@ package br.com.vanep.clientdriver.seed;
 
 import br.com.vanep.client.model.ClientModel;
 import br.com.vanep.client.repository.ClientRepository;
+import br.com.vanep.clientdriver.enums.LinkOrigin;
 import br.com.vanep.clientdriver.enums.RelationshipStatus;
 import br.com.vanep.clientdriver.model.ClientDriverModel;
 import br.com.vanep.clientdriver.repository.ClientDriverRepository;
@@ -47,6 +48,7 @@ public class ClientDriverSeeder {
     link.setClient(client);
     link.setDriver(driver);
     link.setStatus(RelationshipStatus.PENDING);
+    link.setOrigin(LinkOrigin.CLIENT_SEARCH);
     links.save(link);
 
     log.info("Seed: client_driver created ({} <-> {}).", client.getToken(), driver.getToken());

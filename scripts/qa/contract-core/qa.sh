@@ -5,129 +5,26 @@
 # to the change.
 set -euo pipefail
 
-BASE_URL="${BASE_URL:-http://localhost:8081}"
-QA_DB_CONTAINER="${QA_DB_CONTAINER:?set QA_DB_CONTAINER to the throwaway Postgres container}"
-QA_DB_USER="${QA_DB_USER:-vanep}"
-QA_DB_NAME="${QA_DB_NAME:-vanep}"
-SEED_PASSWORD="${SEED_PASSWORD:-password}"
-ADMIN_EMAIL="${ADMIN_EMAIL:-admin@vanep.com.br}"
-MOBILE_CLIENT_ID="${MOBILE_CLIENT_ID:-vanep-mobile}"
-
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-MIGRATIONS="$SCRIPT_DIR/../../../src/main/resources/db/migration"
-BODY_FILE="$(mktemp)"
-RESP_STATUS=""
-RESP_BODY=""
-PASSED=0
+# shellcheck source=../lib.sh
+source "$SCRIPT_DIR/../lib.sh"
+
 WEEKDAYS=(MONDAY TUESDAY WEDNESDAY THURSDAY FRIDAY)
 
-sql() {
-  docker exec "$QA_DB_CONTAINER" psql -U "$QA_DB_USER" -d "$QA_DB_NAME" -Atqc "$1"
-}
-
-sql_error() {
-  docker exec -i "$QA_DB_CONTAINER" psql -U "$QA_DB_USER" -d "$QA_DB_NAME" -Atq -v ON_ERROR_STOP=1 \
-    <<<"begin; $1; rollback;" 2>&1 >/dev/null || true
-}
-
-apply_migration() {
-  docker exec -i "$QA_DB_CONTAINER" psql -U "$QA_DB_USER" -d "$QA_DB_NAME" -q -v ON_ERROR_STOP=1 \
-    <"$(ls "$MIGRATIONS"/"$1"__*.sql)" >/dev/null
-}
-
-fail() {
-  echo "FAIL | $1 | expected: $2 | observed: $3" >&2
-  echo "response body: $RESP_BODY" >&2
-  exit 1
-}
-
-pass() {
-  PASSED=$((PASSED + 1))
-  printf '| %s | %s | %s | PASS |\n' "$1" "$2" "$3"
-}
-
-request() {
-  local method=$1 path=$2 token=$3 body=${4-} content_type=${5:-application/json}
-  local args=(-s -o "$BODY_FILE" -w '%{http_code}' -X "$method" "$BASE_URL$path")
-  if [[ -n $token ]]; then args+=(-H "Authorization: Bearer $token"); fi
-  if [[ -n $body ]]; then args+=(-H "Content-Type: $content_type" --data-binary "$body"); fi
-  RESP_STATUS=$(curl "${args[@]}")
-  RESP_BODY=$(cat "$BODY_FILE")
-}
-
-expect() {
-  local id=$1 scenario=$2 status=$3 assertion=${4-}
-  [[ $RESP_STATUS == "$status" ]] || fail "$id $scenario" "HTTP $status" "HTTP $RESP_STATUS"
-  if [[ -n $assertion ]]; then
-    jq -e "$assertion" <<<"$RESP_BODY" >/dev/null || fail "$id $scenario" "$assertion" "$RESP_BODY"
-  fi
-  pass "$id" "$scenario" "$status"
-}
-
-check() {
-  local id=$1 scenario=$2 expected=$3 observed=$4
-  RESP_BODY="$observed"
-  [[ $observed == "$expected" ]] || fail "$id $scenario" "$expected" "$observed"
-  pass "$id" "$scenario" "$expected"
-}
-
-check_sql_rejected() {
-  local id=$1 scenario=$2 constraint=$3 statement=$4 error
-  error=$(sql_error "$statement")
-  RESP_BODY="$error"
-  [[ $error == *"$constraint"* ]] || fail "$id $scenario" "rejected by $constraint" "${error:-accepted}"
-  pass "$id" "$scenario" "rejected by $constraint"
-}
-
-check_sql_accepted() {
-  local id=$1 scenario=$2 statement=$3 error
-  error=$(sql_error "$statement")
-  RESP_BODY="$error"
-  [[ -z $error ]] || fail "$id $scenario" "accepted" "$error"
-  pass "$id" "$scenario" "accepted"
-}
-
-login() {
-  local response
-  response=$(curl -s -X POST "$BASE_URL/oauth2/token" \
-    -d "grant_type=urn:vanep:params:oauth:grant-type:password" \
-    --data-urlencode "username=$1" -d "password=$SEED_PASSWORD" -d "client_id=$MOBILE_CLIENT_ID")
-  jq -er '.access_token' <<<"$response" 2>/dev/null || {
-    echo "SETUP FAIL | login as $1 | $response" >&2
-    return 1
-  }
-}
-
-claims() {
-  local payload
-  payload=$(cut -d. -f2 <<<"$1" | tr '_-' '/+')
-  while (( ${#payload} % 4 )); do payload="$payload="; done
-  base64 -d <<<"$payload" 2>/dev/null || base64 -D <<<"$payload"
-}
-
-table() {
-  echo
-  echo "== $1"
-  echo "| id | scenario | expected | result |"
-  echo "|---|---|---|---|"
-}
-
 slots() {
-  local leg=$1 shift_name=$2 start=$3 end=$4
-  shift 4
-  jq -nc --arg leg "$leg" --arg sh "$shift_name" --arg s "$start" --arg e "$end" \
-    '$ARGS.positional | map({weekday: ., leg: $leg, shift: $sh, windowStart: $s}
-      + (if $e == "-" then {} else {windowEnd: $e} end))' --args "$@"
+  local leg=$1 shift_name=$2 start=$3
+  shift 3
+  jq -nc --arg leg "$leg" --arg sh "$shift_name" --arg s "$start" \
+    '$ARGS.positional | map({weekday: ., leg: $leg, shift: $sh, pickupTime: $s})' --args "$@"
 }
 
 weekday_round_trip() {
-  jq -nc --argjson out "$(slots OUTBOUND MORNING 06:40 06:50 "${WEEKDAYS[@]}")" \
-    --argjson back "$(slots RETURN AFTERNOON 12:30 - "${WEEKDAYS[@]}")" '$out + $back'
+  jq -nc --argjson out "$(slots OUTBOUND MORNING 06:40 "${WEEKDAYS[@]}")" \
+    --argjson back "$(slots RETURN AFTERNOON 12:30 "${WEEKDAYS[@]}")" '$out + $back'
 }
 
 item() {
-  jq -nc --arg d "$1" --argjson slots "$2" --argjson m "${3:-350}" \
-    '{dependentToken: $d, monthlyAmount: $m, slots: $slots}'
+  jq -nc --arg d "$1" --argjson slots "$2" '{dependentToken: $d, slots: $slots}'
 }
 
 contract_body() {
@@ -154,7 +51,7 @@ create_dependent() {
 }
 
 create_link() {
-  request POST /api/client-drivers "$ADMIN" "$(jq -nc --arg c "$1" --arg d "$2" '{clientToken: $c, driverToken: $d}')"
+  request POST /api/client-drivers "$ADMIN" "$(jq -nc --arg c "$1" --arg d "$2" '{clientToken: $c, driverToken: $d, origin: "CLIENT_SEARCH"}')"
   [[ $RESP_STATUS == 201 ]] || { echo "SETUP FAIL | link | HTTP $RESP_STATUS $RESP_BODY" >&2; return 1; }
   jq -r .token <<<"$RESP_BODY"
 }
@@ -162,10 +59,6 @@ create_link() {
 link_status() {
   request GET "/api/client-drivers/$1" "$ADMIN"
   jq -r .status <<<"$RESP_BODY"
-}
-
-count() {
-  sql "select count(*) from $1"
 }
 
 restore_drivers() {
@@ -179,8 +72,8 @@ cleanup() {
 trap cleanup EXIT
 
 echo "== setup"
-[[ $(count client_driver) == 1 && $(count contract) -le 1 && $(count dependent) == 2 ]] || {
-  echo "SETUP FAIL | needs a database seeded on an empty schema (one link, two dependents)" >&2
+[[ $(count client_driver) == 2 && $(count contract) -le 1 && $(count dependent) == 2 ]] || {
+  echo "SETUP FAIL | needs a database seeded on an empty schema (the seed link and the seeded request's link, two dependents)" >&2
   exit 1
 }
 ADMIN=$(login "$ADMIN_EMAIL")
@@ -214,7 +107,7 @@ GUSTAVO_DRIVER=$(driver_token "Gustavo Santos")
 HELENA_DRIVER=$(driver_token "Helena Costa")
 echo "tokens ok"
 
-table "Operation shift on trips and school shift on dependents"
+table "Operation shift on trips"
 GUSTAVO_TRIPS="select count(*) from trip t join driver d on d.id = t.driver_id join users u on u.id = d.user_id where u.email = 'gustavo.santos@seed.vanep.com.br'"
 request POST /api/drivers/me/trips/start "$GUSTAVO" '{"shift":"MORNING"}'
 expect S1 "a driver starts the morning route" 200 '.shift == "MORNING" and .status == "IN_PROGRESS"'
@@ -253,40 +146,32 @@ request GET "/api/trips/$HELENA_TRIP" "$ADMIN"
 expect S17 "the rejected patches left the shift unchanged" 200 '.shift == "NIGHT"'
 request PATCH "/api/trips/$HELENA_TRIP" "$ADMIN" '{"shift":"AFTERNOON"}'
 expect S18 "the admin moves the trip to another operation shift" 200 '.shift == "AFTERNOON"'
-request POST /api/dependent "$BRUNO" "$(jq -nc '{name: "Davi Lima", shift: "FULLTIME"}')"
-expect S19 "a client creates a FULLTIME dependent" 201 '.shift == "FULLTIME"'
-FULLTIME_DEPENDENT=$(jq -r .token <<<"$RESP_BODY")
-request GET "/api/dependent/$FULLTIME_DEPENDENT" "$BRUNO"
-expect S20 "the dependent reads back as FULLTIME" 200 '.shift == "FULLTIME"'
-request PATCH "/api/dependent/$FULLTIME_DEPENDENT" "$BRUNO" '{"shift":"EVENING"}'
-expect S21 "unknown school shift on a dependent" 400
 sql "insert into trip (token, driver_id, service_date, shift, status) select 'qalegacyfulltime', d.id, date '2027-03-02', 'FULLTIME', 'SCHEDULED' from driver d join users u on u.id = d.user_id where u.email = 'helena.costa@seed.vanep.com.br'" >/dev/null
+# V62 dropped dependent.shift, which V56 comments: the column comes back only while V56 runs again.
+sql "alter table dependent add column shift varchar(16)" >/dev/null
 apply_migration V56
+sql "alter table dependent drop column shift" >/dev/null
 check S22 "re-applying V56 turns a stored FULLTIME trip into MORNING" MORNING "$(sql "select shift from trip where token = 'qalegacyfulltime'")"
 request GET /api/trips/qalegacyfulltime "$ADMIN"
 expect S23 "the converted trip is readable through the API" 200 '.shift == "MORNING"'
 check S24 "V56 left the other shifts alone" AFTERNOON "$(sql "select shift from trip where token = '$HELENA_TRIP'")"
-check S25 "trip.shift and dependent.shift are documented" "yes" \
-  "$(sql "select case when col_description('trip'::regclass, (select attnum from pg_attribute where attrelid = 'trip'::regclass and attname = 'shift')) is not null and col_description('dependent'::regclass, (select attnum from pg_attribute where attrelid = 'dependent'::regclass and attname = 'shift')) is not null then 'yes' else 'no' end")"
+check S25 "trip.shift is documented" "yes" \
+  "$(sql "select case when col_description('trip'::regclass, (select attnum from pg_attribute where attrelid = 'trip'::regclass and attname = 'shift')) is not null then 'yes' else 'no' end")"
 
 table "V57: schedule, schedule_slot and unlinked_passenger (database checks)"
 NEW_SCHEDULE="insert into schedule default values"
-SLOT="insert into schedule_slot (schedule_id, weekday, leg, shift, window_start, window_end) values"
+SLOT="insert into schedule_slot (schedule_id, weekday, leg, shift, pickup_time) values"
 LAST_SCHEDULE="(select max(id) from schedule)"
 check_sql_rejected D1 "the same weekday and leg twice in one schedule" schedule_slot_weekday_leg_active_key \
-  "$NEW_SCHEDULE; $SLOT ($LAST_SCHEDULE, 'MONDAY', 'OUTBOUND', 'MORNING', '06:40', null); $SLOT ($LAST_SCHEDULE, 'MONDAY', 'OUTBOUND', 'MORNING', '07:00', null)"
+  "$NEW_SCHEDULE; $SLOT ($LAST_SCHEDULE, 'MONDAY', 'OUTBOUND', 'MORNING', '06:40'); $SLOT ($LAST_SCHEDULE, 'MONDAY', 'OUTBOUND', 'MORNING', '07:00')"
 check_sql_accepted D2 "outbound and return on the same weekday" \
-  "$NEW_SCHEDULE; $SLOT ($LAST_SCHEDULE, 'MONDAY', 'OUTBOUND', 'MORNING', '06:40', null); $SLOT ($LAST_SCHEDULE, 'MONDAY', 'RETURN', 'AFTERNOON', '12:30', null)"
+  "$NEW_SCHEDULE; $SLOT ($LAST_SCHEDULE, 'MONDAY', 'OUTBOUND', 'MORNING', '06:40'); $SLOT ($LAST_SCHEDULE, 'MONDAY', 'RETURN', 'AFTERNOON', '12:30')"
 check_sql_accepted D3 "a soft-deleted slot frees its weekday and leg" \
-  "$NEW_SCHEDULE; $SLOT ($LAST_SCHEDULE, 'MONDAY', 'OUTBOUND', 'MORNING', '06:40', null); update schedule_slot set deleted_at = now() where schedule_id = $LAST_SCHEDULE; $SLOT ($LAST_SCHEDULE, 'MONDAY', 'OUTBOUND', 'MORNING', '07:00', null)"
-check_sql_rejected D4 "window end before its start" schedule_slot_window_check \
-  "$NEW_SCHEDULE; $SLOT ($LAST_SCHEDULE, 'MONDAY', 'OUTBOUND', 'MORNING', '07:00', '06:50')"
-check_sql_rejected D5 "window end equal to its start" schedule_slot_window_check \
-  "$NEW_SCHEDULE; $SLOT ($LAST_SCHEDULE, 'MONDAY', 'OUTBOUND', 'MORNING', '07:00', '07:00')"
-check_sql_accepted D6 "window without an end" \
-  "$NEW_SCHEDULE; $SLOT ($LAST_SCHEDULE, 'MONDAY', 'RETURN', 'AFTERNOON', '12:30', null)"
+  "$NEW_SCHEDULE; $SLOT ($LAST_SCHEDULE, 'MONDAY', 'OUTBOUND', 'MORNING', '06:40'); update schedule_slot set deleted_at = now() where schedule_id = $LAST_SCHEDULE; $SLOT ($LAST_SCHEDULE, 'MONDAY', 'OUTBOUND', 'MORNING', '07:00')"
+check_sql_accepted D6 "a slot with its time only" \
+  "$NEW_SCHEDULE; $SLOT ($LAST_SCHEDULE, 'MONDAY', 'RETURN', 'AFTERNOON', '12:30')"
 check_sql_rejected D7 "a slot that points to no schedule" schedule_slot_schedule_id_fkey \
-  "$SLOT (-1, 'MONDAY', 'OUTBOUND', 'MORNING', '06:40', null)"
+  "$SLOT (-1, 'MONDAY', 'OUTBOUND', 'MORNING', '06:40')"
 PASSENGER="insert into unlinked_passenger (token, driver_id, name, school_id, school_shift, address_id, schedule_id) select"
 DRIVER_ID="(select min(id) from driver)"
 SCHOOL_ID="(select min(id) from school)"
@@ -304,7 +189,7 @@ check D12 "the rolled-back checks left no passenger behind" 0 "$(count unlinked_
 
 table "V58: contract and contract_item (database checks)"
 CONTRACTS_BEFORE_CHECKS=$(count contract)
-QA_LINK="insert into client_driver (token, client_id, driver_id, status) select 'qalink', c.id, d.id, 'PENDING' from client c join users uc on uc.id = c.user_id, driver d join users ud on ud.id = d.user_id where uc.email = 'bruno.lima@seed.vanep.com.br' and ud.email = 'gustavo.santos@seed.vanep.com.br'"
+QA_LINK="insert into client_driver (token, client_id, driver_id, status, origin) select 'qalink', c.id, d.id, 'PENDING', 'CLIENT_SEARCH' from client c join users uc on uc.id = c.user_id, driver d join users ud on ud.id = d.user_id where uc.email = 'bruno.lima@seed.vanep.com.br' and ud.email = 'gustavo.santos@seed.vanep.com.br'"
 LINK_ID="(select id from client_driver where token = 'qalink')"
 CONTRACT="insert into contract (token, client_driver_id, status, starts_on, ends_on, total_amount, installments, due_day) select"
 ACTIVE_CONTRACT="$CONTRACT 'qac1', $LINK_ID, 'ACTIVE', date '2027-02-01', date '2027-12-17', 4200, 12, 5"
@@ -321,16 +206,14 @@ check_sql_rejected K7 "zero installments" contract_installments_check "$QA_LINK;
 check_sql_rejected K8 "due day 29" contract_due_day_check "$QA_LINK; $(ended qac1 2027-02-01 2027-12-17 4200 12 29)"
 check_sql_accepted K9 "due day 28 and one installment" "$QA_LINK; $(ended qac1 2027-02-01 2027-12-17 4200 1 28)"
 check_sql_rejected K10 "two live contracts with the same token" contract_token_active_key "$QA_LINK; $(ended qac1); $(ended qac1)"
-ITEM="insert into contract_item (token, contract_id, dependent_id, school_id, pickup_city_id, pickup_street, monthly_amount, schedule_id) select"
-item_row() { echo "$ITEM '$1', (select id from contract where token = 'qac1'), d.id, d.school_id, a.city_id, $2, $3, $4 from dependent d join address a on a.id = d.address_id order by d.id limit 1"; }
+ITEM="insert into contract_item (token, contract_id, dependent_id, school_id, pickup_city_id, pickup_street, schedule_id) select"
+item_row() { echo "$ITEM '$1', (select id from contract where token = 'qac1'), d.id, d.school_id, a.city_id, $2, $3 from dependent d join address a on a.id = d.address_id order by d.id limit 1"; }
 check_sql_rejected K11 "two items sharing one schedule" contract_item_schedule_id_active_key \
-  "$QA_LINK; $ACTIVE_CONTRACT; $NEW_SCHEDULE; $(item_row qai1 a.street 350 "$LAST_SCHEDULE"); $(item_row qai2 a.street 350 "$LAST_SCHEDULE")"
-check_sql_rejected K12 "an item priced at zero" contract_item_monthly_amount_check \
-  "$QA_LINK; $ACTIVE_CONTRACT; $NEW_SCHEDULE; $(item_row qai1 a.street 0 "$LAST_SCHEDULE")"
+  "$QA_LINK; $ACTIVE_CONTRACT; $NEW_SCHEDULE; $(item_row qai1 a.street "$LAST_SCHEDULE"); $(item_row qai2 a.street "$LAST_SCHEDULE")"
 check_sql_rejected K13 "an item without a pickup street" pickup_street \
-  "$QA_LINK; $ACTIVE_CONTRACT; $NEW_SCHEDULE; $(item_row qai1 null 350 "$LAST_SCHEDULE")"
+  "$QA_LINK; $ACTIVE_CONTRACT; $NEW_SCHEDULE; $(item_row qai1 null "$LAST_SCHEDULE")"
 check_sql_accepted K14 "a valid item copying the dependent's school and address" \
-  "$QA_LINK; $ACTIVE_CONTRACT; $NEW_SCHEDULE; $(item_row qai1 a.street 350 "$LAST_SCHEDULE")"
+  "$QA_LINK; $ACTIVE_CONTRACT; $NEW_SCHEDULE; $(item_row qai1 a.street "$LAST_SCHEDULE")"
 check K15 "the rolled-back checks left no contract behind" "$CONTRACTS_BEFORE_CHECKS" "$(count contract)"
 
 table "V59: contract permissions of the ADMIN bundle"
@@ -363,7 +246,10 @@ request GET /api/clients/me "$BRUNO"
 BRUNO_CLIENT=$(jq -r .token <<<"$RESP_BODY")
 request GET /api/clients/me "$CARLA"
 CARLA_CLIENT=$(jq -r .token <<<"$RESP_BODY")
-ANA_GUSTAVO=$(create_link "$ANA_CLIENT" "$GUSTAVO_DRIVER")
+# The seeded service request (service-request-proposal) already links Ana to Gustavo, PENDING.
+ANA_GUSTAVO=$(sql "select l.token from client_driver l join client c on c.id = l.client_id join driver d on d.id = l.driver_id
+                   where c.token = '$ANA_CLIENT' and d.token = '$GUSTAVO_DRIVER'")
+[[ -n $ANA_GUSTAVO ]] || { echo "SETUP FAIL | the seeded service request did not link Ana to Gustavo" >&2; exit 1; }
 ANA_HELENA=$(create_link "$ANA_CLIENT" "$HELENA_DRIVER")
 BRUNO_HELENA=$(create_link "$BRUNO_CLIENT" "$HELENA_DRIVER")
 BRUNO_GUSTAVO=$(create_link "$BRUNO_CLIENT" "$GUSTAVO_DRIVER")
@@ -371,17 +257,17 @@ BRUNO_FABIO=$(create_link "$BRUNO_CLIENT" "$FABIO_DRIVER")
 CARLA_GUSTAVO=$(create_link "$CARLA_CLIENT" "$GUSTAVO_DRIVER")
 ROUND_TRIP=$(weekday_round_trip)
 if [[ $(count contract) == 0 ]]; then
-  SEED_SLOTS=$(jq -nc --argjson out "$(slots OUTBOUND MORNING 06:40 - "${WEEKDAYS[@]}")" \
-    --argjson back "$(slots RETURN AFTERNOON 12:10 - "${WEEKDAYS[@]}")" '$out + $back')
+  SEED_SLOTS=$(jq -nc --argjson out "$(slots OUTBOUND MORNING 06:40 "${WEEKDAYS[@]}")" \
+    --argjson back "$(slots RETURN AFTERNOON 12:10 "${WEEKDAYS[@]}")" '$out + $back')
   request POST /api/contracts "$ADMIN" "$(contract_body "$SEED_LINK" "$(date +%Y-%m-01)" \
     "$(date -v+11m +%Y-%m-01 2>/dev/null || date -d "+11 months" +%Y-%m-01)" "[$(item "$LUCAS" "$SEED_SLOTS")]")"
   [[ $RESP_STATUS == 201 ]] || { echo "SETUP FAIL | baseline contract | HTTP $RESP_STATUS $RESP_BODY" >&2; exit 1; }
 fi
 request GET /api/contracts "$ADMIN"
 SEED_CONTRACT=$(jq -r '.content[0].token' <<<"$RESP_BODY")
-OUTBOUND_WEEK=$(slots OUTBOUND MORNING 06:40 06:50 "${WEEKDAYS[@]}")
-RETURN_WEEK=$(slots RETURN AFTERNOON 12:30 - "${WEEKDAYS[@]}")
-MONDAY_OUTBOUND=$(slots OUTBOUND MORNING 06:40 06:50 MONDAY)
+OUTBOUND_WEEK=$(slots OUTBOUND MORNING 06:40 "${WEEKDAYS[@]}")
+RETURN_WEEK=$(slots RETURN AFTERNOON 12:30 "${WEEKDAYS[@]}")
+MONDAY_OUTBOUND=$(slots OUTBOUND MORNING 06:40 MONDAY)
 THEO_BODY=$(contract_body "$BRUNO_GUSTAVO" 2027-02-01 2027-12-17 "[$(item "$THEO" "$MONDAY_OUTBOUND")]")
 end_contract() {
   request PATCH "/api/contracts/$1" "$ADMIN" '{"status":"ENDED"}'
@@ -428,10 +314,10 @@ expect H1 "outbound Monday to Friday with one driver" 201 \
 MARINA_OUTBOUND=$(jq -r .token <<<"$RESP_BODY")
 check H2 "creating the contract activated the pending link" ACTIVE "$(link_status "$ANA_GUSTAVO")"
 request POST /api/contracts "$ADMIN" "$(contract_body "$ANA_HELENA" 2027-02-01 2027-12-17 "[$(item "$MARINA" "$RETURN_WEEK")]")"
-expect H3 "the same student, return only, with another driver" 201 '.items[0].slots | all(.leg == "RETURN" and .windowEnd == null)'
+expect H3 "the same student, return only, with another driver" 201 '.items[0].slots | all(.leg == "RETURN" and (has("windowEnd") | not))'
 MARINA_RETURN=$(jq -r .token <<<"$RESP_BODY")
-request POST /api/contracts "$ADMIN" "$(contract_body "$BRUNO_HELENA" 2027-02-01 2027-12-17 "[$(item "$PEDRO" "$ROUND_TRIP" 350), $(item "$JULIA" "$ROUND_TRIP" 300)]")"
-expect H4 "siblings share one contract with their own prices" 201 '(.items | length) == 2 and ([.items[].monthlyAmount] | sort) == [300, 350]'
+request POST /api/contracts "$ADMIN" "$(contract_body "$BRUNO_HELENA" 2027-02-01 2027-12-17 "[$(item "$PEDRO" "$ROUND_TRIP"), $(item "$JULIA" "$ROUND_TRIP")]")"
+expect H4 "siblings share one contract priced as a whole" 201 '(.items | length) == 2 and .installmentAmount == 350 and (.items | all(has("monthlyAmount") | not))'
 SIBLINGS=$(jq -r .token <<<"$RESP_BODY")
 check H5 "the siblings contract stored two items and twenty slots" "2 20" \
   "$(sql "select count(distinct i.id) || ' ' || count(s.id) from contract_item i join contract c on c.id = i.contract_id join schedule_slot s on s.schedule_id = i.schedule_id where c.token = '$SIBLINGS'")"
@@ -465,12 +351,12 @@ request POST /api/contracts "$ADMIN" "$(theo '.totalAmount = -10')"
 expect V12 "negative total amount" 400
 request POST /api/contracts "$ADMIN" "$(theo '.totalAmount = "abc"')"
 expect V13 "total amount with the wrong JSON type" 400
+request POST /api/contracts "$ADMIN" "$(theo '.totalAmount = 4200.009')"
+expect V43 "a total with three decimal places" 400
 request POST /api/contracts "$ADMIN" "$(theo '.items = []')"
 expect V14 "no items" 400
 request POST /api/contracts "$ADMIN" "$(theo 'del(.items)')"
 expect V15 "missing items" 400
-request POST /api/contracts "$ADMIN" "$(theo '.items[0].monthlyAmount = 0')"
-expect V16 "item priced at zero" 400
 request POST /api/contracts "$ADMIN" "$(theo '.items += .items')"
 expect V17 "the same dependent twice, pt-BR message" 400 '.detail == "O mesmo dependente não pode aparecer duas vezes no contrato."'
 request POST /api/contracts "$ADMIN" "$(jq -c --arg d "$LUCAS" '.items[0].dependentToken = $d' <<<"$THEO_BODY")"
@@ -491,17 +377,13 @@ request POST /api/contracts "$ADMIN" "$(theo 'del(.items[0].slots)')"
 expect V25 "missing schedule" 400 '.detail == "A agenda precisa de pelo menos um horário."'
 request POST /api/contracts "$ADMIN" "$(theo '.items[0].slots += .items[0].slots')"
 expect V26 "the same weekday and leg twice, pt-BR message" 400 '.detail == "O mesmo dia e trecho não pode aparecer duas vezes na agenda."'
-request POST /api/contracts "$ADMIN" "$(theo '.items[0].slots[0].windowEnd = "06:30"')"
-expect V27 "window end before its start, pt-BR message" 400 '.detail == "O fim da janela deve ser posterior ao início."'
-request POST /api/contracts "$ADMIN" "$(theo '.items[0].slots[0].windowEnd = "06:40"')"
-expect V28 "window end equal to its start" 400 '.detail == "O fim da janela deve ser posterior ao início."'
 request POST /api/contracts "$ADMIN" "$(theo 'del(.items[0].slots[0].shift)')"
 expect V29 "a slot without shift (never derived from the time)" 400
 request POST /api/contracts "$ADMIN" "$(theo '.items[0].slots[0].shift = "FULLTIME"')"
 expect V30 "a slot with the FULLTIME shift" 400
 request POST /api/contracts "$ADMIN" "$(theo '.items[0].slots[0].weekday = "FUNDAY"')"
 expect V31 "unknown weekday" 400
-request POST /api/contracts "$ADMIN" "$(theo '.items[0].slots[0].windowStart = "25:00"')"
+request POST /api/contracts "$ADMIN" "$(theo '.items[0].slots[0].pickupTime = "25:00"')"
 expect V32 "impossible time" 400
 request POST /api/contracts "$ADMIN" '{"clientDriverToken":'
 expect V33 "malformed JSON" 400
@@ -517,11 +399,11 @@ sql "update driver set approval_status = 'PENDING' where user_id = (select id fr
 request POST /api/contracts "$ADMIN" "$THEO_BODY"
 expect V38 "a driver pending approval, pt-BR message" 422 '.detail == "O motorista não está aprovado para ser contratado."'
 restore_drivers
-sql "update client_driver set status = 'BLOCKED' where token = '$BRUNO_GUSTAVO'" >/dev/null
+sql "update client_driver set status = 'BLOCKED', blocked_at = now(), blocked_by = (select id from users where email = 'gustavo.santos@seed.vanep.com.br') where token = '$BRUNO_GUSTAVO'" >/dev/null
 request POST /api/contracts "$ADMIN" "$THEO_BODY"
 expect V39 "a blocked link, pt-BR message" 422 '.detail == "Um vínculo bloqueado não pode ser contratado."'
-sql "update client_driver set status = 'PENDING' where token = '$BRUNO_GUSTAVO'" >/dev/null
-request POST /api/contracts "$ADMIN" "$(contract_body "$SEED_LINK" 2027-02-01 2027-12-17 "[$(item "$LUCAS" "$(slots RETURN NIGHT 22:00 - SATURDAY)")]")"
+sql "update client_driver set status = 'PENDING', blocked_at = null, blocked_by = null where token = '$BRUNO_GUSTAVO'" >/dev/null
+request POST /api/contracts "$ADMIN" "$(contract_body "$SEED_LINK" 2027-02-01 2027-12-17 "[$(item "$LUCAS" "$(slots RETURN NIGHT 22:00 SATURDAY)")]")"
 expect V40 "a second active contract on the same link, pt-BR message" 409 '.detail == "Este vínculo já tem um contrato ativo."'
 check V41 "the rejected creates stored nothing" "$CONTRACTS_BEFORE" "$(count contract) $(count contract_item) $(count schedule) $(count schedule_slot)"
 check V42 "and left the link pending" PENDING "$(link_status "$BRUNO_GUSTAVO")"
@@ -536,12 +418,16 @@ end_contract "$(jq -r .token <<<"$RESP_BODY")"
 request POST /api/contracts "$ADMIN" "$(theo '.dueDay = 28 | .installments = 1')"
 expect L3 "due day 28 and a single installment" 201
 end_contract "$(jq -r .token <<<"$RESP_BODY")"
-request POST /api/contracts "$ADMIN" "$(theo '.items[0].slots[0].windowEnd = "06:41" | .totalAmount = 0.01 | .items[0].monthlyAmount = 0.01')"
-expect L4 "one-minute window and one-cent amounts" 201
+request POST /api/contracts "$ADMIN" "$(theo '.items[0].slots[0].windowEnd = "06:41" | .totalAmount = 0.12 | .items[0].monthlyAmount = 0.01')"
+expect L4 "one cent per installment, and a windowEnd and a monthlyAmount in the body are ignored" 201 \
+  '.installmentAmount == 0.01 and .lastInstallmentAmount == 0.01 and (.items[0] | has("monthlyAmount") | not)
+   and (.items[0].slots | all(has("windowEnd") | not))'
 end_contract "$(jq -r .token <<<"$RESP_BODY")"
 request POST /api/contracts "$ADMIN" "$(theo '.birthDate = "2015-01-01" | .status = "ENDED" | .items[0].pickupStreet = "Rua Falsa"')"
 expect L5 "unknown and read-only fields in the body are ignored" 201 '.status == "ACTIVE" and .items[0].pickupStreet == "Rua dos Ipês"'
 end_contract "$(jq -r .token <<<"$RESP_BODY")"
+request POST /api/contracts "$ADMIN" "$(theo '.totalAmount = 0.11')"
+expect L6 "a total below one cent per installment, pt-BR message" 422 '.detail == "O valor total precisa cobrir pelo menos um centavo por parcela."'
 
 table "Weekday and leg collisions"
 request POST /api/contracts "$ADMIN" "$(contract_body "$BRUNO_GUSTAVO" 2027-02-01 2027-12-17 "[$(item "$PEDRO" "$MONDAY_OUTBOUND")]")"
@@ -553,7 +439,7 @@ request POST /api/contracts "$ADMIN" "$(contract_body "$BRUNO_GUSTAVO" 2027-02-0
 expect X4 "a suspended contract still reserves its slots" 409
 request PATCH "/api/contracts/$SIBLINGS" "$ADMIN" '{"status":"ACTIVE"}'
 expect X5 "reactivating the suspended contract never collides" 200 '.status == "ACTIVE"'
-request POST /api/contracts "$ADMIN" "$(contract_body "$BRUNO_GUSTAVO" 2027-02-01 2027-12-17 "[$(item "$PEDRO" "$(slots OUTBOUND NIGHT 18:00 - SATURDAY)")]")"
+request POST /api/contracts "$ADMIN" "$(contract_body "$BRUNO_GUSTAVO" 2027-02-01 2027-12-17 "[$(item "$PEDRO" "$(slots OUTBOUND NIGHT 18:00 SATURDAY)")]")"
 expect X6 "a weekday the dependent does not ride yet" 201
 end_contract "$(jq -r .token <<<"$RESP_BODY")"
 
@@ -626,7 +512,7 @@ request POST /api/contracts/doesnotexist/restore "$ADMIN"
 expect R13 "restoring an unknown contract" 404
 request DELETE "/api/contracts/$MARINA_OUTBOUND" "$ADMIN"
 expect R14 "the admin deletes it again" 204
-request POST /api/contracts "$ADMIN" "$(contract_body "$ANA_GUSTAVO" 2027-02-01 2027-12-17 "[$(item "$MARINA" "$(slots OUTBOUND MORNING 07:00 - MONDAY)")]")"
+request POST /api/contracts "$ADMIN" "$(contract_body "$ANA_GUSTAVO" 2027-02-01 2027-12-17 "[$(item "$MARINA" "$(slots OUTBOUND MORNING 07:00 MONDAY)")]")"
 expect R15 "a newer active contract on the same link" 201
 NEWER=$(jq -r .token <<<"$RESP_BODY")
 request POST "/api/contracts/$MARINA_OUTBOUND/restore" "$ADMIN"
@@ -642,10 +528,18 @@ expect R20 "restoring a contract whose slots were taken meanwhile" 409 '.detail 
 check R21 "the contract stays deleted" 1 "$(sql "select count(*) from contract where token = '$MARINA_OUTBOUND' and deleted_at is not null")"
 
 table "Pickup address is a copy"
-request PATCH "/api/dependent/$MARINA" "$ANA" "$(jq -nc --argjson a "$(address "Rua B" 20)" '{address: $a}')"
-expect A1 "the client moves the dependent to Rua B, 20" 200 '.address.street == "Rua B"'
+MOVE_TO_RUA_B=$(jq -nc --argjson a "$(address "Rua B" 20)" '{address: $a}')
+request PATCH "/api/dependent/$MARINA" "$ANA" "$MOVE_TO_RUA_B"
+expect A1 "a dependent with a contract in progress does not move (D17 of service-request-proposal)" 422 \
+  '.detail == "Este dependente tem um contrato em andamento: ele não pode ser removido nem mudar de escola, endereço ou grade escolar."'
+for contract in $(sql "select distinct c.token from contract c join contract_item i on i.contract_id = c.id join dependent d on d.id = i.dependent_id
+                       where d.token = '$MARINA' and c.deleted_at is null and c.status in ('ACTIVE', 'SUSPENDED')"); do
+  end_contract "$contract"
+done
+request PATCH "/api/dependent/$MARINA" "$ANA" "$MOVE_TO_RUA_B"
+expect A2 "once those contracts end, the client moves the dependent to Rua B, 20" 200 '.address.street == "Rua B"'
 request GET "/api/client-drivers/$ANA_HELENA/contracts" "$ANA"
-expect A2 "the contracts still pick up at Rua das Acácias, 250" 200 '[.[].items[].pickupStreet] | unique == ["Rua das Acácias"]'
+expect A3 "the contracts still pick up at Rua das Acácias, 250" 200 '[.[].items[].pickupStreet] | unique == ["Rua das Acácias"]'
 
 table "Concurrent creates on one link"
 PARALLEL_DIR="$(mktemp -d)"
@@ -661,17 +555,6 @@ rm -rf "$PARALLEL_DIR"
 check Z1 "six concurrent creates for one link: one 201, five 409" "201x1 409x5" "$STATUSES"
 check Z2 "and a single active contract was stored" 1 \
   "$(sql "select count(*) from contract c join client_driver l on l.id = c.client_driver_id where l.token = '$CARLA_GUSTAVO' and c.deleted_at is null")"
-in_parallel() {
-  local dir method=$1 first=$2 second=$3 body=${4-}
-  dir="$(mktemp -d)"
-  for path in "$first" "$second"; do
-    curl -s -o /dev/null -w '%{http_code}\n' -X "$method" "$BASE_URL$path" -H "Authorization: Bearer $ADMIN" \
-      -H "Content-Type: application/json" ${body:+--data-binary "$body"} >"$dir/$(basename "$(dirname "$path")")$RANDOM" &
-  done
-  wait
-  cat "$dir"/* | sort | paste -sd ' ' -
-  rm -rf "$dir"
-}
 CAIO_A=$(sql "select c.token from contract c join client_driver l on l.id = c.client_driver_id where l.token = '$CARLA_GUSTAVO' and c.deleted_at is null")
 request PATCH "/api/contracts/$CAIO_A" "$ADMIN" '{"status":"SUSPENDED"}'
 expect Z3a "the winner is suspended" 200
@@ -681,37 +564,37 @@ CAIO_B=$(jq -r .token <<<"$RESP_BODY")
 request PATCH "/api/contracts/$CAIO_B" "$ADMIN" '{"status":"SUSPENDED"}'
 expect Z3c "and suspended too" 200
 check Z3 "two concurrent reactivations on one link: one 200, one 409" "200 409" \
-  "$(in_parallel PATCH "/api/contracts/$CAIO_A" "/api/contracts/$CAIO_B" '{"status":"ACTIVE"}')"
+  "$(in_parallel PATCH "$ADMIN" '{"status":"ACTIVE"}' "/api/contracts/$CAIO_A" "/api/contracts/$CAIO_B")"
 check Z4 "a single contract of the link is ACTIVE" 1 \
   "$(sql "select count(*) from contract c join client_driver l on l.id = c.client_driver_id where l.token = '$CARLA_GUSTAVO' and c.status = 'ACTIVE' and c.deleted_at is null")"
-request POST /api/contracts "$ADMIN" "$(contract_body "$BRUNO_FABIO" 2027-02-01 2027-12-17 "[$(item "$THEO" "$(slots RETURN NIGHT 22:00 - SATURDAY)")]")"
+request POST /api/contracts "$ADMIN" "$(contract_body "$BRUNO_FABIO" 2027-02-01 2027-12-17 "[$(item "$THEO" "$(slots RETURN NIGHT 22:00 SATURDAY)")]")"
 expect Z5a "an active contract on another link" 201
 THEO_C=$(jq -r .token <<<"$RESP_BODY")
 request DELETE "/api/contracts/$THEO_C" "$ADMIN"
 expect Z5b "deleted" 204
-request POST /api/contracts "$ADMIN" "$(contract_body "$BRUNO_FABIO" 2027-02-01 2027-12-17 "[$(item "$THEO" "$(slots RETURN NIGHT 22:00 - SUNDAY)")]")"
+request POST /api/contracts "$ADMIN" "$(contract_body "$BRUNO_FABIO" 2027-02-01 2027-12-17 "[$(item "$THEO" "$(slots RETURN NIGHT 22:00 SUNDAY)")]")"
 expect Z5c "a second active contract on that link" 201
 THEO_D=$(jq -r .token <<<"$RESP_BODY")
 request DELETE "/api/contracts/$THEO_D" "$ADMIN"
 expect Z5d "deleted too" 204
 check Z5 "two concurrent restores of active contracts on one link: one 200, one 409" "200 409" \
-  "$(in_parallel POST "/api/contracts/$THEO_C/restore" "/api/contracts/$THEO_D/restore")"
+  "$(in_parallel POST "$ADMIN" "" "/api/contracts/$THEO_C/restore" "/api/contracts/$THEO_D/restore")"
 check Z6 "a single one came back" 1 \
   "$(sql "select count(*) from contract c join client_driver l on l.id = c.client_driver_id where l.token = '$BRUNO_FABIO' and c.deleted_at is null")"
 
 table "The link status has no direct write path"
 request GET "/api/client-drivers/$SEED_LINK" "$ADMIN"
 expect B1 "the seeded link is ACTIVE through its seeded ACTIVE contract" 200 '.status == "ACTIVE"'
-request POST /api/client-drivers "$ADMIN" "$(jq -nc --arg c "$CARLA_CLIENT" --arg d "$HELENA_DRIVER" '{clientToken: $c, driverToken: $d, status: "ACTIVE"}')"
+request POST /api/client-drivers "$ADMIN" "$(jq -nc --arg c "$CARLA_CLIENT" --arg d "$HELENA_DRIVER" '{clientToken: $c, driverToken: $d, origin: "CLIENT_SEARCH", status: "ACTIVE"}')"
 expect B2 "a status sent on creation is ignored" 201 '.status == "PENDING"'
 CARLA_HELENA=$(jq -r .token <<<"$RESP_BODY")
-request POST /api/client-drivers "$ADMIN" "$(jq -nc --arg c "$CARLA_CLIENT" --arg d "$FABIO_DRIVER" '{clientToken: $c, driverToken: $d, status: "BLOCKED"}')"
+request POST /api/client-drivers "$ADMIN" "$(jq -nc --arg c "$CARLA_CLIENT" --arg d "$FABIO_DRIVER" '{clientToken: $c, driverToken: $d, origin: "CLIENT_SEARCH", status: "BLOCKED"}')"
 expect B3 "BLOCKED sent on creation is ignored too" 201 '.status == "PENDING"'
-request POST /api/client-drivers "$ADMIN" "$(jq -nc --arg c "$CARLA_CLIENT" --arg d "$HELENA_DRIVER" '{clientToken: $c, driverToken: $d}')"
+request POST /api/client-drivers "$ADMIN" "$(jq -nc --arg c "$CARLA_CLIENT" --arg d "$HELENA_DRIVER" '{clientToken: $c, driverToken: $d, origin: "CLIENT_SEARCH"}')"
 expect B4 "the same pair twice" 409 '.detail == "Este cliente e este motorista já estão vinculados."'
-request POST /api/client-drivers "$ADMIN" "$(jq -nc --arg d "$HELENA_DRIVER" '{driverToken: $d}')"
+request POST /api/client-drivers "$ADMIN" "$(jq -nc --arg d "$HELENA_DRIVER" '{driverToken: $d, origin: "CLIENT_SEARCH"}')"
 expect B5 "missing clientToken" 400
-request POST /api/client-drivers "$CARLA" "$(jq -nc --arg c "$CARLA_CLIENT" --arg d "$HELENA_DRIVER" '{clientToken: $c, driverToken: $d}')"
+request POST /api/client-drivers "$CARLA" "$(jq -nc --arg c "$CARLA_CLIENT" --arg d "$HELENA_DRIVER" '{clientToken: $c, driverToken: $d, origin: "CLIENT_SEARCH"}')"
 expect B6 "a client cannot create a link" 403
 request PATCH "/api/client-drivers/$CARLA_HELENA" "$CARLA" '{"status":"ACTIVE"}'
 expect B7 "the client of the link cannot activate it" 405
@@ -724,7 +607,7 @@ check B11 "update_client_driver is in no bundle" 0 "$(sql "select count(*) from 
 check B12 "nor in a real admin token" 0 "$(claims "$ADMIN" | jq '[.permissions[] | select(. == "update_client_driver")] | length')"
 request POST /api/driver-ratings "$CARLA" "$(jq -nc --arg d "$HELENA_DRIVER" '{driverToken: $d, rating: 5}')"
 expect B13 "accepted effect: a client cannot rate a driver through a link without contract" 422 \
-  '.detail == "Só é possível avaliar um motorista com quem você tem vínculo ativo."'
+  '.detail == "Só é possível avaliar um motorista com quem você já teve um contrato em andamento."'
 
 table "V60: legacy links brought in line"
 sql "update client_driver set status = 'ACTIVE' where token = '$CARLA_HELENA'" >/dev/null
@@ -809,8 +692,6 @@ request POST "$UP" "$GUSTAVO" "$(rafael 'del(.slots)')"
 expect N13 "missing schedule" 400
 request POST "$UP" "$GUSTAVO" "$(rafael '.slots += [.slots[0]]')"
 expect N14 "the same weekday and leg twice" 400 '.detail == "O mesmo dia e trecho não pode aparecer duas vezes na agenda."'
-request POST "$UP" "$GUSTAVO" "$(rafael '.slots[0].windowEnd = "06:00"')"
-expect N15 "window end before its start" 400 '.detail == "O fim da janela deve ser posterior ao início."'
 request POST "$UP" "$GUSTAVO" "$(rafael '.slots[0].shift = "FULLTIME"')"
 expect N16 "a slot with the FULLTIME shift" 400
 request POST "$UP" "$GUSTAVO" "$(rafael '.name = 42')"
@@ -872,19 +753,17 @@ expect W12 "the rejected patches changed nothing" 200 '.name == "Rafael Prado" a
 request PATCH "$UP/$RAFAEL" "$GUSTAVO" "$(jq -nc --argjson a "$(address "Rua Nova" 5)" '{name: "Rafael P. Prado", schoolShift: "AFTERNOON", address: $a}')"
 expect W13 "name, school shift and address patched together" 200 \
   '.name == "Rafael P. Prado" and .schoolShift == "AFTERNOON" and .address.street == "Rua Nova" and (.slots | length) == 10'
-request PUT "$UP/$RAFAEL/schedule" "$GUSTAVO" "$(jq -nc --argjson s "$(slots OUTBOUND MORNING 06:40 - MONDAY TUESDAY WEDNESDAY THURSDAY FRIDAY)" '{slots: $s}')"
+request PUT "$UP/$RAFAEL/schedule" "$GUSTAVO" "$(jq -nc --argjson s "$(slots OUTBOUND MORNING 06:40 MONDAY TUESDAY WEDNESDAY THURSDAY FRIDAY)" '{slots: $s}')"
 expect W14 "the schedule is replaced by five outbound slots" 200 '(.slots | length) == 5 and all(.slots[]; .leg == "OUTBOUND")'
-request PUT "$UP/$RAFAEL/schedule" "$GUSTAVO" "$(jq -nc --argjson s "$(slots OUTBOUND MORNING 07:00 - MONDAY WEDNESDAY FRIDAY)" '{slots: $s}')"
-expect W15 "then by three" 200 '[.slots[].weekday] == ["MONDAY", "WEDNESDAY", "FRIDAY"] and all(.slots[]; .windowStart == "07:00:00")'
+request PUT "$UP/$RAFAEL/schedule" "$GUSTAVO" "$(jq -nc --argjson s "$(slots OUTBOUND MORNING 07:00 MONDAY WEDNESDAY FRIDAY)" '{slots: $s}')"
+expect W15 "then by three" 200 '[.slots[].weekday] == ["MONDAY", "WEDNESDAY", "FRIDAY"] and all(.slots[]; .pickupTime == "07:00:00")'
 check W16 "the previous fifteen slots remain soft-deleted, three are live" "15 3" \
   "$(sql "select count(*) filter (where s.deleted_at is not null) || ' ' || count(*) filter (where s.deleted_at is null) from schedule_slot s join unlinked_passenger p on p.schedule_id = s.schedule_id where p.token = '$RAFAEL'")"
 request PUT "$UP/$RAFAEL/schedule" "$GUSTAVO" '{"slots":[]}'
 expect W17 "an empty schedule" 400
 request PUT "$UP/$RAFAEL/schedule" "$GUSTAVO" '{}'
 expect W18 "a body without slots" 400
-request PUT "$UP/$RAFAEL/schedule" "$GUSTAVO" "$(jq -nc --argjson s "$(slots OUTBOUND MORNING 07:00 06:00 MONDAY)" '{slots: $s}')"
-expect W19 "a window ending before it starts" 400
-request PUT "$UP/$RAFAEL/schedule" "$GUSTAVO" "$(jq -nc --argjson s "$(slots OUTBOUND MORNING 07:00 - MONDAY MONDAY)" '{slots: $s}')"
+request PUT "$UP/$RAFAEL/schedule" "$GUSTAVO" "$(jq -nc --argjson s "$(slots OUTBOUND MORNING 07:00 MONDAY MONDAY)" '{slots: $s}')"
 expect W20 "the same weekday and leg twice" 400
 request GET "$UP/$RAFAEL" "$GUSTAVO"
 expect W21 "the rejected replacements kept the three slots" 200 '(.slots | length) == 3'

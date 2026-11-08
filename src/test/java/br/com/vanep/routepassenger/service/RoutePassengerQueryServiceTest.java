@@ -40,7 +40,7 @@ class RoutePassengerQueryServiceTest {
   }
 
   @Test
-  void returnsContractedAndUnlinkedStudentsTogetherOrderedByTheirWindow() {
+  void returnsContractedAndUnlinkedStudentsTogetherOrderedByTheirPickupTime() {
     when(items.findRoutePassengers(2L, MONDAY, DayOfWeek.MONDAY, OperationShift.MORNING))
         .thenReturn(List.of(passenger(PassengerSource.CONTRACT_ITEM, "Ana", LocalTime.of(7, 0))));
     when(unlinkedPassengers.findRoutePassengers(2L, DayOfWeek.MONDAY, OperationShift.MORNING))
@@ -72,7 +72,7 @@ class RoutePassengerQueryServiceTest {
         .isEmpty();
   }
 
-  RoutePassengerDTO passenger(PassengerSource source, String name, LocalTime windowStart) {
+  RoutePassengerDTO passenger(PassengerSource source, String name, LocalTime pickupTime) {
     return new RoutePassengerDTO(
         source,
         name.toLowerCase(),
@@ -80,14 +80,12 @@ class RoutePassengerQueryServiceTest {
         "school",
         "Escola Municipal",
         RouteLeg.OUTBOUND,
-        windowStart,
-        null,
+        pickupTime,
         "13015904",
         "Rua A",
         "10",
         null,
         "Centro",
-        null,
         "campinas",
         "Campinas",
         null);

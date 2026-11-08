@@ -361,8 +361,8 @@ class UnlinkedPassengerControllerTest {
         "neighborhood", "Centro");
   }
 
-  private Map<String, Object> slot(String weekday, String leg, String shift, String windowStart) {
-    return Map.of("weekday", weekday, "leg", leg, "shift", shift, "windowStart", windowStart);
+  private Map<String, Object> slot(String weekday, String leg, String shift, String pickupTime) {
+    return Map.of("weekday", weekday, "leg", leg, "shift", shift, "pickupTime", pickupTime);
   }
 
   private MockHttpServletRequestBuilder postJson(String path, Object body) throws Exception {
