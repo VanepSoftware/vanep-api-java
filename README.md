@@ -216,7 +216,7 @@ também o **Resource Server**.
 | **Tela de login** | Servida pela própria API (Thymeleaf) em **`/login`** — fundo preto, marca Vanep, e-mail + senha. É a tela mostrada durante o fluxo de autorização. |
 | **Login social (Google)** | Botão **"Entrar com Google"** (OAuth2 Client / OIDC). Aparece só quando há `GOOGLE_CLIENT_ID` configurado. |
 | **Resource Server** | Rotas **`/api/**`** são protegidas por **JWT** (Bearer). Sem token → **401**. Ex.: `GET /api/user/me` devolve o perfil da conta autenticada (consumido pelo front como "userinfo"), incluindo `pendingEmail` (só se houver token de verificação aberto) e `nameChangeAvailableAt` / `phoneChangeAvailableAt` / `emailChangeAvailableAt` (instantes ISO quando o cooldown ainda bloqueia a próxima mudança; omitidos/`null` caso contrário). |
-| **Senhas** | **Argon2id + pepper** (HMAC-SHA256 com `VANEP_PASSWORD_PEPPER` antes do hash). |
+| **Senhas** | **Argon2id + pepper** (HMAC-SHA256 com `VANEP_PASSWORD_PEPPER`) **vinculado ao `token` estável do usuário**. O token entra no pepper e não fica gravado dentro do hash, então copiar o hash para outra conta não autentica. Hashes antigos, sem vínculo, continuam válidos e são regravados nesse formato no primeiro login bem-sucedido. |
 
 ### Login com Google (cadastro em 2 passos)
 
@@ -245,7 +245,7 @@ Ao concluir, o usuário é levado a `/login?registered`. E-mail e documento (CPF
 
 | Variável | Default | Descrição |
 | --- | --- | --- |
-| **`VANEP_PASSWORD_PEPPER`** | *(obrigatório)* | Pepper do Argon2 (HMAC-SHA256 antes do hash). **Gere uma vez e nunca troque** após ter usuários. `openssl rand -hex 32` |
+| **`VANEP_PASSWORD_PEPPER`** | *(obrigatório)* | Pepper global do Argon2 (HMAC-SHA256 antes do hash, junto com o `token` do usuário). **Gere uma vez e nunca troque** após ter usuários. `openssl rand -hex 32` |
 | **`VANEP_REMEMBER_ME_KEY`** | *(obrigatório)* | Chave HMAC do cookie "lembrar-me". `openssl rand -hex 32` |
 | **`VANEP_OAUTH_JWK_PRIVATE_KEY`** | *(vazio = efêmera)* | Chave RSA privada (PEM) para assinar JWTs. Em dev pode deixar vazio (chave efêmera gerada no boot). **Obrigatório em produção.** |
 | **`VANEP_OAUTH_JWK_PUBLIC_KEY`** | *(vazio = efêmera)* | Chave RSA pública (PEM). Par da privada. |

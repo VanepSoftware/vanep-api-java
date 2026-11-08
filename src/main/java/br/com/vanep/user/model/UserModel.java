@@ -99,10 +99,14 @@ public class UserModel {
   @Column(name = "updated_at", nullable = false)
   private Instant updatedAt;
 
-  @PrePersist
-  void onCreate() {
-    if (token == null) {
+  public void assignToken() {
+    if (token == null || token.isBlank()) {
       token = UUID.randomUUID().toString().replace("-", "").substring(0, 25);
     }
+  }
+
+  @PrePersist
+  void onCreate() {
+    assignToken();
   }
 }

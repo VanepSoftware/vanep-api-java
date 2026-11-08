@@ -15,6 +15,8 @@ import br.com.vanep.auth.dto.AssistantSignupRequestDTO;
 import br.com.vanep.auth.dto.ClientSignupRequestDTO;
 import br.com.vanep.auth.dto.DriverSignupRequestDTO;
 import br.com.vanep.auth.exception.SignupDuplicateException;
+import br.com.vanep.auth.security.UserPasswordEncoder;
+import br.com.vanep.auth.security.UserPasswordService;
 import br.com.vanep.auth.verification.EmailVerificationService;
 import br.com.vanep.client.model.ClientModel;
 import br.com.vanep.client.repository.ClientRepository;
@@ -34,7 +36,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.security.crypto.password.PasswordEncoder;
 
 @ExtendWith(MockitoExtension.class)
 class RegistrationServiceTest {
@@ -43,7 +44,7 @@ class RegistrationServiceTest {
   @Mock private DriverRepository drivers;
   @Mock private AssistantRepository assistants;
   @Mock private RoleRepository roles;
-  @Mock private PasswordEncoder passwordEncoder;
+  @Mock private UserPasswordEncoder passwordEncoder;
   @Mock private EmailVerificationService emailVerification;
 
   private RoleModel roleTaggedAs(RoleName roleName, long id) {
@@ -56,12 +57,18 @@ class RegistrationServiceTest {
 
   private RegistrationService service() {
     return new RegistrationService(
-        users, clients, drivers, assistants, roles, passwordEncoder, emailVerification);
+        users,
+        clients,
+        drivers,
+        assistants,
+        roles,
+        new UserPasswordService(passwordEncoder),
+        emailVerification);
   }
 
   private RegistrationService serviceThatSaves() {
     when(users.save(any(UserModel.class))).thenAnswer(inv -> inv.getArgument(0));
-    when(passwordEncoder.encode(anyString())).thenReturn("hashed");
+    when(passwordEncoder.encode(anyString(), anyString())).thenReturn("hashed");
     return service();
   }
 
@@ -85,6 +92,8 @@ class RegistrationServiceTest {
 
     assertThat(user.getType()).isEqualTo(UserType.CLIENT);
     assertThat(user.getPassword()).isEqualTo("hashed");
+    assertThat(user.getToken()).hasSize(25);
+    verify(passwordEncoder).encode("secret1", user.getToken());
     assertThat(user.getTermsAcceptedAt()).isNotNull();
     assertThat(user.getRoleId()).isEqualTo(2L);
 

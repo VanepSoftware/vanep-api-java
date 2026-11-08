@@ -9,6 +9,7 @@ import br.com.vanep.auth.dto.DriverSignupFields;
 import br.com.vanep.auth.dto.DriverSignupRequestDTO;
 import br.com.vanep.auth.enums.AuthErrorCode;
 import br.com.vanep.auth.exception.SignupDuplicateException;
+import br.com.vanep.auth.security.UserPasswordService;
 import br.com.vanep.auth.verification.EmailVerificationService;
 import br.com.vanep.client.model.ClientModel;
 import br.com.vanep.client.repository.ClientRepository;
@@ -22,7 +23,6 @@ import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
 import java.time.Instant;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,7 +33,7 @@ public class RegistrationService {
   private final DriverRepository drivers;
   private final AssistantRepository assistants;
   private final RoleRepository roles;
-  private final PasswordEncoder passwordEncoder;
+  private final UserPasswordService userPasswords;
   private final EmailVerificationService emailVerification;
 
   public RegistrationService(
@@ -42,14 +42,14 @@ public class RegistrationService {
       DriverRepository drivers,
       AssistantRepository assistants,
       RoleRepository roles,
-      PasswordEncoder passwordEncoder,
+      UserPasswordService userPasswords,
       EmailVerificationService emailVerification) {
     this.users = users;
     this.clients = clients;
     this.drivers = drivers;
     this.assistants = assistants;
     this.roles = roles;
-    this.passwordEncoder = passwordEncoder;
+    this.userPasswords = userPasswords;
     this.emailVerification = emailVerification;
   }
 
@@ -114,7 +114,7 @@ public class RegistrationService {
     roles.findByRoleName(roleName).ifPresent(role -> user.setRoleId(role.getId()));
     user.setName(request.getName());
     user.setEmail(request.getEmail());
-    user.setPassword(passwordEncoder.encode(request.getPassword()));
+    userPasswords.assignEncodedPassword(user, request.getPassword());
     user.setDocument(document);
     user.setPhone(request.getPhone());
     user.setBirthDate(request.getBirthDate());

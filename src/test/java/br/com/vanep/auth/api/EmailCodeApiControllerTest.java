@@ -15,6 +15,7 @@ import br.com.vanep.auth.enums.AuthCodePurpose;
 import br.com.vanep.auth.mail.MailService;
 import br.com.vanep.auth.password.PasswordResetTokenRepository;
 import br.com.vanep.auth.password.model.PasswordResetTokenModel;
+import br.com.vanep.auth.security.UserPasswordEncoder;
 import br.com.vanep.auth.token.SecureCodes;
 import br.com.vanep.auth.token.SecureTokens;
 import br.com.vanep.auth.verification.EmailVerificationTokenRepository;
@@ -53,6 +54,7 @@ class EmailCodeApiControllerTest {
   @Autowired private EmailVerificationTokenRepository verificationTokens;
   @Autowired private PasswordResetTokenRepository resetTokens;
   @Autowired private PasswordEncoder passwordEncoder;
+  @Autowired private UserPasswordEncoder userPasswords;
   @Autowired private SecureCodes codes;
   @MockitoBean private MailService mail;
 
@@ -168,12 +170,15 @@ class EmailCodeApiControllerTest {
         .perform(resetRequest(EMAIL, CODE, "Brand-new-password1"))
         .andExpect(status().isNoContent());
 
+    UserModel reloaded = users.findByEmail(EMAIL).orElseThrow();
     assertThat(
-            passwordEncoder.matches(
-                "Brand-new-password1", users.findByEmail(EMAIL).orElseThrow().getPassword()))
+            userPasswords.matches(
+                "Brand-new-password1", reloaded.getPassword(), reloaded.getToken()))
         .isTrue();
     assertThat(
-            passwordEncoder.matches(PASSWORD, users.findByEmail(EMAIL).orElseThrow().getPassword()))
+            userPasswords.matches("Brand-new-password1", reloaded.getPassword(), "user-token-beta"))
+        .isFalse();
+    assertThat(userPasswords.matches(PASSWORD, reloaded.getPassword(), reloaded.getToken()))
         .isFalse();
   }
 
