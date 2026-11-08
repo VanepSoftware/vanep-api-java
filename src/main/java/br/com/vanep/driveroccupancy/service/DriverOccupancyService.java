@@ -8,6 +8,7 @@ import br.com.vanep.driveroccupancy.dto.ShiftOccupancyDTO;
 import br.com.vanep.shared.enums.OperationShift;
 import br.com.vanep.trip.service.TripService;
 import br.com.vanep.unlinkedpassenger.repository.UnlinkedPassengerRepository;
+import br.com.vanep.vehicle.service.OwnVehicleService;
 import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.EnumMap;
@@ -22,31 +23,40 @@ public class DriverOccupancyService {
   private final DriverService drivers;
   private final ContractItemRepository contractItems;
   private final UnlinkedPassengerRepository unlinkedPassengers;
+  private final OwnVehicleService vehicles;
 
   public DriverOccupancyService(
       DriverService drivers,
       ContractItemRepository contractItems,
-      UnlinkedPassengerRepository unlinkedPassengers) {
+      UnlinkedPassengerRepository unlinkedPassengers,
+      OwnVehicleService vehicles) {
     this.drivers = drivers;
     this.contractItems = contractItems;
     this.unlinkedPassengers = unlinkedPassengers;
+    this.vehicles = vehicles;
   }
 
   @Transactional(readOnly = true)
-  public DriverOccupancyResponseDTO findMyOccupancy(String callerUid) {
+  public DriverOccupancyResponseDTO findMyOccupancy(String callerUid, String vehicleToken) {
+    DriverModel driver = drivers.requireCallerDriver(callerUid);
     return findOccupancy(
-        drivers.requireCallerDriver(callerUid), LocalDate.now(TripService.SERVICE_ZONE));
+        driver,
+        vehicles.findOwnVehicleId(driver, vehicleToken),
+        LocalDate.now(TripService.SERVICE_ZONE));
   }
 
   @Transactional(readOnly = true)
-  public DriverOccupancyResponseDTO findOccupancy(DriverModel driver, LocalDate today) {
+  public DriverOccupancyResponseDTO findOccupancy(
+      DriverModel driver, Long vehicleId, LocalDate today) {
     Long driverId = driver.getId();
-    long studentsWithFamily = contractItems.countActiveDependents(driverId, today);
-    long students = studentsWithFamily + unlinkedPassengers.countByDriverId(driverId);
+    long contracted = contractItems.countActiveDependents(driverId, today);
+    long studentsWithFamily =
+        contracted + unlinkedPassengers.countMergedStudents(driverId, vehicleId);
+    long students = contracted + unlinkedPassengers.countStudents(driverId, vehicleId);
     return new DriverOccupancyResponseDTO(
         sumPassengersPerShift(
             contractItems.countActivePassengersByShift(driverId, today),
-            unlinkedPassengers.countPassengersByShift(driverId)),
+            unlinkedPassengers.countPassengersByShift(driverId, vehicleId)),
         students,
         studentsWithFamily);
   }

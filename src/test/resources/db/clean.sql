@@ -19,6 +19,8 @@ delete from service_request_item;
 delete from service_request;
 delete from contract_item;
 delete from contract;
+delete from family_match;
+delete from family_invite;
 delete from unlinked_passenger;
 delete from schedule_slot;
 delete from schedule;

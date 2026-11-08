@@ -192,21 +192,23 @@ class UnlinkedPassengerRepositoryTest {
     passengers.save(newPassenger(otherDriver, "Bia", "Rua C"));
     passengers.delete(passengers.save(newPassenger(driver, "Caio", "Rua D")));
 
-    assertThat(passengers.countPassengersByShift(driver.getId()))
+    assertThat(passengers.countPassengersByShift(driver.getId(), null))
         .extracting(ShiftOccupancyDTO::shift, ShiftOccupancyDTO::passengers)
         .containsExactlyInAnyOrder(
             tuple(OperationShift.MORNING, 2L), tuple(OperationShift.AFTERNOON, 2L));
-    assertThat(passengers.countByDriverId(driver.getId())).isEqualTo(2);
+    assertThat(passengers.countStudents(driver.getId(), null)).isEqualTo(2);
   }
 
   @Test
   void countsThePassengersPerShiftInOneStatementWhateverTheirNumber() {
     SqlStatementCounter counter = new SqlStatementCounter(entityManagerFactory);
     passengers.save(newPassenger(driver, "Lucas", "Rua A"));
-    long withOne = counter.countStatements(() -> passengers.countPassengersByShift(driver.getId()));
+    long withOne =
+        counter.countStatements(() -> passengers.countPassengersByShift(driver.getId(), null));
 
     passengers.save(newPassenger(driver, "Ana", "Rua B"));
-    long withTwo = counter.countStatements(() -> passengers.countPassengersByShift(driver.getId()));
+    long withTwo =
+        counter.countStatements(() -> passengers.countPassengersByShift(driver.getId(), null));
 
     assertThat(withOne).isEqualTo(1);
     assertThat(withTwo).isEqualTo(1);

@@ -8,6 +8,7 @@ public record RoutePassengerDTO(
     PassengerSource source,
     String token,
     String name,
+    String dependentToken,
     String schoolToken,
     String schoolName,
     RouteLeg leg,
