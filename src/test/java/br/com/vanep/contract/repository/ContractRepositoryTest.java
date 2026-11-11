@@ -19,7 +19,6 @@ import br.com.vanep.dependent.model.DependentModel;
 import br.com.vanep.dependent.repository.DependentRepository;
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
-import br.com.vanep.driveroccupancy.dto.ShiftOccupancyDTO;
 import br.com.vanep.routepassenger.dto.RoutePassengerDTO;
 import br.com.vanep.routepassenger.enums.PassengerSource;
 import br.com.vanep.schedule.model.ScheduleModel;
@@ -409,7 +408,7 @@ class ContractRepositoryTest {
             newItemOnShifts(ana, OperationShift.MORNING)));
 
     assertThat(items.countActivePassengersByShift(driverId(), MONDAY_IN_TERM))
-        .extracting(ShiftOccupancyDTO::shift, ShiftOccupancyDTO::passengers)
+        .extracting(count -> count.shift(), count -> count.passengers())
         .containsExactlyInAnyOrder(
             tuple(OperationShift.MORNING, 2L), tuple(OperationShift.AFTERNOON, 1L));
     assertThat(items.countActiveDependents(driverId(), MONDAY_IN_TERM)).isEqualTo(2);
@@ -425,7 +424,7 @@ class ContractRepositoryTest {
     assertThat(items.countActivePassengersByShift(driverId(), beforeTerm)).isEmpty();
     assertThat(items.countActiveDependents(driverId(), beforeTerm)).isZero();
     assertThat(items.countActivePassengersByShift(driverId(), MONDAY_IN_TERM))
-        .extracting(ShiftOccupancyDTO::passengers)
+        .extracting(count -> count.passengers())
         .containsExactly(1L);
   }
 
