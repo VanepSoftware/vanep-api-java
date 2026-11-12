@@ -3,6 +3,7 @@ package br.com.vanep.seed;
 import br.com.vanep.address.seed.PersonalAddressSeeder;
 import br.com.vanep.auth.security.PermissionEnum;
 import br.com.vanep.auth.security.PermissionRegistry;
+import br.com.vanep.auth.security.UserPasswordService;
 import br.com.vanep.client.model.ClientModel;
 import br.com.vanep.client.repository.ClientRepository;
 import br.com.vanep.clientdriver.seed.ClientDriverSeeder;
@@ -38,7 +39,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -67,7 +67,7 @@ public class DataSeeder implements ApplicationRunner {
   private final ContractSeeder contractSeeder;
   private final ServiceRequestSeeder serviceRequestSeeder;
   private final ProposalSeeder proposalSeeder;
-  private final PasswordEncoder passwordEncoder;
+  private final UserPasswordService userPasswords;
 
   @Value("${vanep.seed.enabled:false}")
   boolean enabled;
@@ -103,7 +103,7 @@ public class DataSeeder implements ApplicationRunner {
       ContractSeeder contractSeeder,
       ServiceRequestSeeder serviceRequestSeeder,
       ProposalSeeder proposalSeeder,
-      PasswordEncoder passwordEncoder) {
+      UserPasswordService userPasswords) {
     this.users = users;
     this.clients = clients;
     this.drivers = drivers;
@@ -122,7 +122,7 @@ public class DataSeeder implements ApplicationRunner {
     this.contractSeeder = contractSeeder;
     this.serviceRequestSeeder = serviceRequestSeeder;
     this.proposalSeeder = proposalSeeder;
-    this.passwordEncoder = passwordEncoder;
+    this.userPasswords = userPasswords;
   }
 
   @Override
@@ -301,7 +301,7 @@ public class DataSeeder implements ApplicationRunner {
     admin.setRoleId(adminRole.getId());
     admin.setName("Vanep Admin");
     admin.setEmail(adminEmail);
-    admin.setPassword(passwordEncoder.encode(adminPassword));
+    userPasswords.assignEncodedPassword(admin, adminPassword);
     admin.setDocument(adminDocument);
     admin.setVerified(true);
     users.save(admin);
@@ -329,7 +329,7 @@ public class DataSeeder implements ApplicationRunner {
       user.setEmail(seed.email());
       user.setDocument(seed.document());
       user.setPhone(seed.phone());
-      user.setPassword(passwordEncoder.encode("password"));
+      userPasswords.assignEncodedPassword(user, "password");
       user.setVerified(true);
       user.setTermsAcceptedAt(Instant.now());
       users.save(user);
@@ -366,7 +366,7 @@ public class DataSeeder implements ApplicationRunner {
       user.setName(seed.name());
       user.setEmail(seed.email());
       user.setDocument(seed.document());
-      user.setPassword(passwordEncoder.encode("password"));
+      userPasswords.assignEncodedPassword(user, "password");
       user.setVerified(true);
       user.setTermsAcceptedAt(Instant.now());
       users.save(user);

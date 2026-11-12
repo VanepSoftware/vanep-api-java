@@ -2,6 +2,9 @@ package br.com.vanep.auth.oauth.grant;
 
 import br.com.vanep.auth.security.LoginActivityService;
 import br.com.vanep.auth.security.LoginAttemptService;
+import br.com.vanep.auth.security.UserBoundPasswordAuthenticationProvider;
+import br.com.vanep.auth.security.UserPasswordEncoder;
+import br.com.vanep.auth.security.UserPasswordRehashService;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.security.authentication.AccountExpiredException;
@@ -10,7 +13,6 @@ import org.springframework.security.authentication.CredentialsExpiredException;
 import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.LockedException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -29,7 +31,7 @@ import org.springframework.security.oauth2.server.authorization.client.Registere
  */
 public final class MobilePasswordGrantAuthenticationProvider implements AuthenticationProvider {
 
-  private final DaoAuthenticationProvider credentials;
+  private final UserBoundPasswordAuthenticationProvider credentials;
   private final MobileGrantTokenIssuer tokenIssuer;
   private final LoginAttemptService loginAttempts;
   private final LoginActivityService loginActivity;
@@ -38,11 +40,14 @@ public final class MobilePasswordGrantAuthenticationProvider implements Authenti
   public MobilePasswordGrantAuthenticationProvider(
       UserDetailsService userDetailsService,
       PasswordEncoder passwordEncoder,
+      UserPasswordEncoder userPasswords,
+      UserPasswordRehashService rehash,
       MobileGrantTokenIssuer tokenIssuer,
       LoginAttemptService loginAttempts,
       LoginActivityService loginActivity,
       MessageSource messages) {
-    this.credentials = dedicatedCredentialsProvider(userDetailsService, passwordEncoder);
+    this.credentials =
+        dedicatedCredentialsProvider(userDetailsService, passwordEncoder, userPasswords, rehash);
     this.tokenIssuer = tokenIssuer;
     this.loginAttempts = loginAttempts;
     this.loginActivity = loginActivity;
@@ -53,10 +58,14 @@ public final class MobilePasswordGrantAuthenticationProvider implements Authenti
    * Its own instance, called outside the {@code ProviderManager}: the form login listener would
    * otherwise count the same failure twice.
    */
-  private static DaoAuthenticationProvider dedicatedCredentialsProvider(
-      UserDetailsService userDetailsService, PasswordEncoder passwordEncoder) {
-    DaoAuthenticationProvider provider = new DaoAuthenticationProvider(userDetailsService);
-    provider.setPasswordEncoder(passwordEncoder);
+  private static UserBoundPasswordAuthenticationProvider dedicatedCredentialsProvider(
+      UserDetailsService userDetailsService,
+      PasswordEncoder passwordEncoder,
+      UserPasswordEncoder userPasswords,
+      UserPasswordRehashService rehash) {
+    UserBoundPasswordAuthenticationProvider provider =
+        UserBoundPasswordAuthenticationProvider.create(
+            userDetailsService, passwordEncoder, userPasswords, rehash);
     provider.setPreAuthenticationChecks(
         user -> {
           if (!user.isAccountNonLocked()) {

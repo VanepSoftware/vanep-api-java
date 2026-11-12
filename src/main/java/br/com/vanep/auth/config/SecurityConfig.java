@@ -14,6 +14,9 @@ import br.com.vanep.auth.oauth.grant.MobilePasswordGrantAuthenticationProvider;
 import br.com.vanep.auth.oauth.grant.MobileTokenErrorResponseHandler;
 import br.com.vanep.auth.security.LoginActivityService;
 import br.com.vanep.auth.security.LoginAttemptService;
+import br.com.vanep.auth.security.UserBoundPasswordAuthenticationProvider;
+import br.com.vanep.auth.security.UserPasswordEncoder;
+import br.com.vanep.auth.security.UserPasswordRehashService;
 import br.com.vanep.auth.security.VanepUserDetailsService;
 import br.com.vanep.auth.signup.SignupTicketService;
 import java.util.ArrayList;
@@ -72,6 +75,16 @@ public class SecurityConfig {
   }
 
   @Bean
+  public UserBoundPasswordAuthenticationProvider userBoundPasswordAuthenticationProvider(
+      VanepUserDetailsService userDetailsService,
+      PasswordEncoder passwordEncoder,
+      UserPasswordEncoder userPasswords,
+      UserPasswordRehashService rehash) {
+    return UserBoundPasswordAuthenticationProvider.create(
+        userDetailsService, passwordEncoder, userPasswords, rehash);
+  }
+
+  @Bean
   @Order(1)
   public SecurityFilterChain authorizationServerSecurityFilterChain(
       HttpSecurity http,
@@ -82,6 +95,8 @@ public class SecurityConfig {
       OAuth2TokenGenerator<?> tokenGenerator,
       VanepUserDetailsService userDetailsService,
       PasswordEncoder passwordEncoder,
+      UserPasswordEncoder userPasswords,
+      UserPasswordRehashService rehash,
       LoginAttemptService loginAttempts,
       LoginActivityService loginActivity,
       GoogleIdTokenValidator googleIdTokenValidator,
@@ -122,6 +137,8 @@ public class SecurityConfig {
                                     new MobilePasswordGrantAuthenticationProvider(
                                         userDetailsService,
                                         passwordEncoder,
+                                        userPasswords,
+                                        rehash,
                                         tokenIssuer,
                                         loginAttempts,
                                         loginActivity,

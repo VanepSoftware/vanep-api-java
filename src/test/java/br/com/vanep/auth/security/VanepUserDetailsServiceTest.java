@@ -16,6 +16,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.LockedException;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 
 @ExtendWith(MockitoExtension.class)
@@ -31,6 +32,7 @@ class VanepUserDetailsServiceTest {
     UserModel user = new UserModel();
     user.setType(UserType.CLIENT);
     user.setEmail(EMAIL);
+    user.setToken("user-token-alpha");
     user.setPassword("stored-hash");
     user.setVerified(true);
     return user;
@@ -80,6 +82,20 @@ class VanepUserDetailsServiceTest {
 
     assertThatThrownBy(() -> service.loadUserByUsername(EMAIL))
         .isInstanceOf(UsernameNotFoundException.class);
+  }
+
+  @Test
+  void loadsTheStableUserTokenWithTheAccount() {
+    when(loginAttempts.isBlocked(EMAIL)).thenReturn(false);
+    when(users.findByEmail(EMAIL)).thenReturn(Optional.of(account()));
+
+    UserDetails loaded = service.loadUserByUsername(EMAIL);
+
+    assertThat(loaded).isInstanceOf(VanepUserDetails.class);
+    assertThat(((VanepUserDetails) loaded).getUserToken()).isEqualTo("user-token-alpha");
+    assertThat(loaded.getUsername()).isEqualTo(EMAIL);
+    assertThat(loaded.isEnabled()).isTrue();
+    assertThat(loaded.isAccountNonLocked()).isTrue();
   }
 
   @Test
