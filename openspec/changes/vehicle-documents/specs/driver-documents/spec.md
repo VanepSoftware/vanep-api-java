@@ -30,9 +30,9 @@ When this change is applied, every existing driver document of type `CRLV`, `VEH
 
 ### Requirement: The caller is the token's user
 
-The driver document endpoints MUST identify the caller by the user token in the access token, the same way as the rest of the API, and MUST NOT depend on the token subject being an e-mail.
+The driver document endpoints MUST identify the caller by the user token in the access token (the `uid` claim), the same way as the rest of the API, and MUST NOT look the caller up by the token subject. The subject is the e-mail the user had when the token was issued: after an e-mail change it no longer matches the account, and the freed address can later belong to another account.
 
-#### Scenario: A driver signed in with Google
+#### Scenario: The driver changed their e-mail
 
-- **WHEN** a driver who signed in through the Google grant lists their documents
-- **THEN** the response is HTTP 200 with their documents
+- **WHEN** a driver changes their e-mail and lists their documents with a token issued before the change
+- **THEN** the response is HTTP 200 with their own documents

@@ -131,7 +131,7 @@ Nenhum dado é movido. Nenhum app chama as rotas de documento nem a da foto de d
 
 ### D7 — O chamador pelo `uid`
 
-`DriverDocumentController` e os controllers novos usam `SecurityHelper.requireCallerUid(authentication)` e `UserService.requireByToken`, como o resto da API. O `findByEmail(jwt.getSubject())` sai do `DriverDocumentService`. O mesmo padrão existe no `DriverCnhController` e no `AssistantController`. Não mexo neles aqui, mas registro como dívida (R4).
+`DriverDocumentController` e os controllers novos usam `SecurityHelper.requireCallerUid(authentication)` e `UserService.requireByToken`, como o resto da API. O `findByEmail(jwt.getSubject())` sai do `DriverDocumentService`. O `sub` do token é o e-mail que o usuário tinha no login, nos dois grants (senha e Google). Depois de uma troca de e-mail ele não acha mais a conta, e o endereço liberado pode passar a ser de outra conta; o `uid` é o `users.token`, que nunca muda. O mesmo padrão existe em outros cinco lugares (R4). Não mexo neles aqui.
 
 ### D8 — Onboarding e aprovação
 
@@ -154,7 +154,7 @@ O PR 1 já leva o onboarding para os documentos da van na tabela nova e para o D
 | **R1** | A suíte roda em H2 sem Flyway: a `V71` (remoções, coluna da foto, `CHECK`s, permissões) não é exercitada em teste | QA da regra 55 contra o PostgreSQL com dados montados antes da migration: documentos de van e fotos no `driver_document`, documentos da pessoa, van com foto de documento |
 | **R2** | Motoristas aprovados antes desta change não têm curso, autorização da van nem número: continuam aprovados, mas nenhuma van deles passa nas credenciais, e a fase 3 vai recusar as propostas | Não há usuários reais. O seed sai completo (D9); os bancos locais mandam os documentos pela API ou são recriados. O endpoint de credenciais diz o que falta |
 | **R3** | Sem tela de revisão no admin, cada documento novo (inclusive de uma van nova) espera alguém chamar a API para aprovar | É o que acontece hoje com a aprovação do motorista. A tela de revisão é uma task do frontend; o `GET /api/driver-documents?status=PENDING` e o equivalente da van listam o que espera revisão |
-| **R4** | `DriverCnhController` e `AssistantController` continuam resolvendo o chamador por `jwt.getSubject()` | Fora do escopo; anotar como dívida no Genwork. Esta change corrige só os documentos |
+| **R4** | `DriverCnhController`, `AssistantController`, `VehicleController` (`POST` e `GET /api/vehicles`), `ClientRatingController`, `DriverRatingController` e `DependentService` continuam resolvendo o chamador por `jwt.getSubject()`: depois de uma troca de e-mail, o token ainda válido dá 404 nessas rotas, ou acha outra conta se o e-mail antigo for reaproveitado. O refresh também parece montar o token novo pelo e-mail antigo | Fora do escopo; dívida registrada no Genwork (VAN-87), com a investigação do refresh. Esta change corrige só os documentos |
 | **R5** | Os números das migrations colidem: a VAN-57 usa a `V69` e a `V70`, e a `contract-generation` reservou a `V72` e a `V73` | Esta change usa a `V71`. Reconfirmar antes do merge; quem entra por último renumera |
 | **R6** | A regra "categoria contém D ou E" aceita texto estranho (`"DE"` digitado à mão) | O cadastro da CNH já é revisado na aprovação; validar o formato da categoria é uma melhoria separada |
 | **R7** | A certidão criminal sem validade obrigatória pode ficar antiga | O admin confere a data na revisão; a renovação periódica entra com a fase 8 (documento vencido), se o jurídico pedir |
