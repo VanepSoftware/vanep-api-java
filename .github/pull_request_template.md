@@ -10,8 +10,21 @@ Genwork links the PR to the task and moves it on the board when the title or the
 <!--
 Explain what this PR does and why.
 Highlight the main changes and their purpose.
-If UI changes were made, attach screenshots.
 -->
+
+## Screenshots and video
+
+<!--
+Required (constitution rule 56): screenshots AND a screen recording of the real run
+(emulator/simulator/device/browser, or the QA run for backend-only changes).
+Host the files on the `pr-assets` branch under `van-<N>/` and link them here.
+-->
+
+| Screen / scenario | Screenshot |
+|---|---|
+|  |  |
+
+Video: 
 
 ## Test Instructions
 
@@ -30,6 +43,7 @@ Mention which features/flows should be tested.
 - [ ] I ran the app and migrations locally.
 - [ ] I reviewed the changes.
 - [ ] Tests pass locally.
+- [ ] Screenshots and video of the real run are in the description.
 
 <!--
 Flag anything that needs special attention:
