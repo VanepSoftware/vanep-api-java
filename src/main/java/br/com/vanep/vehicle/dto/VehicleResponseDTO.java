@@ -13,6 +13,5 @@ public record VehicleResponseDTO(
     Integer capacity,
     String photoFrontUrl,
     String photoSideUrl,
-    String photoDocumentUrl,
     boolean active,
     Instant createdAt) {}

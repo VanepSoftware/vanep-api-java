@@ -12,12 +12,12 @@ import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.driverdocument.dto.DriverDocumentRequestDTO;
 import br.com.vanep.driverdocument.dto.DriverDocumentStatusUpdateRequestDTO;
-import br.com.vanep.driverdocument.enums.DocumentStatusEnum;
-import br.com.vanep.driverdocument.enums.DocumentTypeEnum;
-import br.com.vanep.driverdocument.enums.ReviewMethodEnum;
+import br.com.vanep.driverdocument.enums.DriverDocumentType;
 import br.com.vanep.driverdocument.mapper.DriverDocumentMapper;
 import br.com.vanep.driverdocument.model.DriverDocumentModel;
 import br.com.vanep.driverdocument.repository.DriverDocumentRepository;
+import br.com.vanep.shared.document.enums.DocumentStatus;
+import br.com.vanep.shared.document.enums.ReviewMethod;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
@@ -67,7 +67,7 @@ class DriverDocumentServiceTest {
 
     request =
         new DriverDocumentRequestDTO(
-            "driver-token-123", DocumentTypeEnum.CRLV, LocalDate.of(2027, 1, 1));
+            "driver-token-123", DriverDocumentType.CRIMINAL_RECORD, LocalDate.of(2027, 1, 1));
   }
 
   @Test
@@ -93,7 +93,7 @@ class DriverDocumentServiceTest {
 
     DriverDocumentModel saved = new DriverDocumentModel();
     saved.setDriver(driver);
-    saved.setDocumentType(DocumentTypeEnum.CRLV);
+    saved.setDocumentType(DriverDocumentType.CRIMINAL_RECORD);
     when(driverDocumentRepository.save(any(DriverDocumentModel.class))).thenReturn(saved);
 
     service.create(request, "driver@vanep.com");
@@ -113,13 +113,13 @@ class DriverDocumentServiceTest {
 
     DriverDocumentStatusUpdateRequestDTO statusRequest =
         new DriverDocumentStatusUpdateRequestDTO(
-            DocumentStatusEnum.APPROVED, ReviewMethodEnum.MANUAL, null, null);
+            DocumentStatus.APPROVED, ReviewMethod.MANUAL, null, null);
 
     service.updateStatus("doc-123", statusRequest, "driver@vanep.com");
 
     verify(driverDocumentRepository).save(existing);
-    assertThat(existing.getStatus()).isEqualTo(DocumentStatusEnum.APPROVED);
-    assertThat(existing.getReviewMethod()).isEqualTo(ReviewMethodEnum.MANUAL);
+    assertThat(existing.getReview().getStatus()).isEqualTo(DocumentStatus.APPROVED);
+    assertThat(existing.getReview().getReviewMethod()).isEqualTo(ReviewMethod.MANUAL);
   }
 
   @Test

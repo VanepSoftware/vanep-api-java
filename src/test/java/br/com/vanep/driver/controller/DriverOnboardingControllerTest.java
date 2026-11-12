@@ -18,8 +18,7 @@ import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.drivercnh.model.DriverCnhModel;
 import br.com.vanep.drivercnh.repository.DriverCnhRepository;
-import br.com.vanep.driverdocument.enums.DocumentStatusEnum;
-import br.com.vanep.driverdocument.enums.DocumentTypeEnum;
+import br.com.vanep.driverdocument.enums.DriverDocumentType;
 import br.com.vanep.driverdocument.model.DriverDocumentModel;
 import br.com.vanep.driverdocument.repository.DriverDocumentRepository;
 import br.com.vanep.media.model.MediaFileModel;
@@ -31,6 +30,9 @@ import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
 import br.com.vanep.vehicle.model.VehicleModel;
 import br.com.vanep.vehicle.repository.VehicleRepository;
+import br.com.vanep.vehicledocument.enums.VehicleDocumentType;
+import br.com.vanep.vehicledocument.model.VehicleDocumentModel;
+import br.com.vanep.vehicledocument.repository.VehicleDocumentRepository;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -59,6 +61,7 @@ class DriverOnboardingControllerTest {
   @Autowired private VehicleRepository vehicles;
   @Autowired private DriverCnhRepository driverCnhs;
   @Autowired private DriverDocumentRepository driverDocuments;
+  @Autowired private VehicleDocumentRepository vehicleDocuments;
   @Autowired private MediaFileRepository mediaFiles;
   @Autowired private AddressRepository addresses;
   @Autowired private CityRepository cities;
@@ -177,7 +180,7 @@ class DriverOnboardingControllerTest {
     vehicle.setColor("Branca");
     vehicle.setCapacity(18);
     vehicle.setActive(true);
-    vehicles.save(vehicle);
+    vehicle = vehicles.save(vehicle);
 
     DriverCnhModel cnh = new DriverCnhModel();
     cnh.setDriver(driver);
@@ -188,27 +191,31 @@ class DriverOnboardingControllerTest {
     cnh.setActive(true);
     driverCnhs.save(cnh);
 
-    for (DocumentTypeEnum type :
-        List.of(
-            DocumentTypeEnum.CRLV,
-            DocumentTypeEnum.VEHICLE_INSPECTION,
-            DocumentTypeEnum.MUNICIPAL_AUTHORIZATION)) {
-      MediaFileModel file = new MediaFileModel();
-      file.setObjectKey(
-          "driver-documents/" + type.name().toLowerCase() + "-" + System.nanoTime() + ".pdf");
-      file.setMimeType("application/pdf");
-      file.setSizeBytes(2048L);
-      file.setOriginalName("doc.pdf");
-      mediaFiles.save(file);
+    DriverDocumentModel authorization = new DriverDocumentModel();
+    authorization.setDriver(driver);
+    authorization.setDocumentType(DriverDocumentType.MUNICIPAL_AUTHORIZATION);
+    authorization.setDocumentNumber("TE-0001/2026");
+    authorization.setFile(saveFile("municipal"));
+    driverDocuments.save(authorization);
 
-      DriverDocumentModel doc = new DriverDocumentModel();
-      doc.setDriver(driver);
+    for (VehicleDocumentType type :
+        List.of(VehicleDocumentType.CRLV, VehicleDocumentType.VEHICLE_INSPECTION)) {
+      VehicleDocumentModel doc = new VehicleDocumentModel();
+      doc.setVehicle(vehicle);
       doc.setDocumentType(type);
-      doc.setStatus(DocumentStatusEnum.PENDING);
-      doc.setActive(true);
-      doc.setFile(file);
-      driverDocuments.save(doc);
+      doc.setExpiresAt(LocalDate.now().plusMonths(6));
+      doc.setFile(saveFile(type.name().toLowerCase()));
+      vehicleDocuments.save(doc);
     }
+  }
+
+  private MediaFileModel saveFile(String name) {
+    MediaFileModel file = new MediaFileModel();
+    file.setObjectKey("documents/" + name + "-" + System.nanoTime() + ".pdf");
+    file.setMimeType("application/pdf");
+    file.setSizeBytes(2048L);
+    file.setOriginalName("doc.pdf");
+    return mediaFiles.save(file);
   }
 
   @Test
@@ -235,10 +242,9 @@ class DriverOnboardingControllerTest {
         .andExpect(jsonPath("$.cnhStep.completed").value(false))
         .andExpect(jsonPath("$.documentsStep.completed").value(false))
         .andExpect(
-            jsonPath("$.documentsStep.missingTypes")
-                .value(
-                    org.hamcrest.Matchers.containsInAnyOrder(
-                        "CRLV", "VEHICLE_INSPECTION", "MUNICIPAL_AUTHORIZATION")));
+            jsonPath("$.documentsStep.missingDriverTypes")
+                .value(org.hamcrest.Matchers.contains("MUNICIPAL_AUTHORIZATION")))
+        .andExpect(jsonPath("$.documentsStep.vehicles").isEmpty());
   }
 
   @Test
@@ -254,7 +260,10 @@ class DriverOnboardingControllerTest {
         .andExpect(jsonPath("$.vehicleStep.completed").value(true))
         .andExpect(jsonPath("$.cnhStep.completed").value(true))
         .andExpect(jsonPath("$.documentsStep.completed").value(true))
-        .andExpect(jsonPath("$.documentsStep.missingTypes").isEmpty());
+        .andExpect(jsonPath("$.documentsStep.missingDriverTypes").isEmpty())
+        .andExpect(jsonPath("$.documentsStep.vehicles[0].plate").value("ABC1D23"))
+        .andExpect(jsonPath("$.documentsStep.vehicles[0].completed").value(true))
+        .andExpect(jsonPath("$.documentsStep.vehicles[0].missingTypes").isEmpty());
   }
 
   @Test

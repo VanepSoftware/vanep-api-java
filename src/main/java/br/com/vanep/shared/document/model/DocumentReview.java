@@ -1,0 +1,46 @@
+package br.com.vanep.shared.document.model;
+
+import br.com.vanep.shared.document.enums.DocumentStatus;
+import br.com.vanep.shared.document.enums.ReviewMethod;
+import br.com.vanep.user.model.UserModel;
+import jakarta.persistence.Column;
+import jakarta.persistence.Embeddable;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import java.time.Instant;
+import lombok.Getter;
+import lombok.Setter;
+
+@Embeddable
+@Getter
+@Setter
+public class DocumentReview {
+
+  @Enumerated(EnumType.STRING)
+  @Column(nullable = false, length = 20)
+  private DocumentStatus status = DocumentStatus.PENDING;
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = "review_method", length = 30)
+  private ReviewMethod reviewMethod;
+
+  @Column(name = "external_check_id", length = 64)
+  private String externalCheckId;
+
+  @Column(name = "rejection_reason", length = 255)
+  private String rejectionReason;
+
+  @ManyToOne(fetch = FetchType.EAGER)
+  @JoinColumn(name = "reviewed_by")
+  private UserModel reviewedBy;
+
+  @Column(name = "reviewed_at")
+  private Instant reviewedAt;
+
+  public static DocumentReview pending() {
+    return new DocumentReview();
+  }
+}

@@ -3,14 +3,16 @@ package br.com.vanep.driverdocument.mapper;
 import br.com.vanep.driverdocument.dto.DriverDocumentResponseDTO;
 import br.com.vanep.driverdocument.model.DriverDocumentModel;
 import br.com.vanep.media.web.MediaUrl;
+import br.com.vanep.shared.document.model.DocumentReview;
 import org.springframework.stereotype.Component;
 
 @Component
 public class DriverDocumentMapper {
 
   public DriverDocumentResponseDTO toResponse(DriverDocumentModel document) {
+    DocumentReview review = document.getReview();
     String reviewedByUserToken =
-        document.getReviewedBy() != null ? document.getReviewedBy().getToken() : null;
+        review.getReviewedBy() != null ? review.getReviewedBy().getToken() : null;
 
     return new DriverDocumentResponseDTO(
         document.getToken(),
@@ -18,12 +20,12 @@ public class DriverDocumentMapper {
         document.getDocumentType(),
         MediaUrl.of("/api/driver-documents", document.getToken(), "file", document.getFile()),
         document.getExpiresAt(),
-        document.getStatus(),
-        document.getReviewMethod(),
-        document.getExternalCheckId(),
-        document.getRejectionReason(),
+        review.getStatus(),
+        review.getReviewMethod(),
+        review.getExternalCheckId(),
+        review.getRejectionReason(),
         reviewedByUserToken,
-        document.getReviewedAt(),
+        review.getReviewedAt(),
         document.getNotifiedAt(),
         document.isActive(),
         document.getCreatedAt(),

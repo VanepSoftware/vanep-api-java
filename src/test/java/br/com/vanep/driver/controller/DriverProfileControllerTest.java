@@ -168,7 +168,6 @@ class DriverProfileControllerTest {
     VehicleModel sprinter = saveVehicle(driver, "ABC1D23", "Sprinter", true);
     saveVehicle(driver, "XYZ9Z99", "Transit", false);
     upload("/api/vehicles/" + sprinter.getToken() + "/photo-front", ownerJwt(driver));
-    upload("/api/vehicles/" + sprinter.getToken() + "/photo-document", ownerJwt(driver));
 
     mockMvc
         .perform(get("/api/drivers/" + driver.getToken() + "/profile").with(clientJwt()))
@@ -194,13 +193,12 @@ class DriverProfileControllerTest {
     String base = "/api/vehicles/" + sprinter.getToken();
     upload(base + "/photo-front", ownerJwt(driver));
     upload(base + "/photo-side", ownerJwt(driver));
-    upload(base + "/photo-document", ownerJwt(driver));
 
     mockMvc.perform(get(base + "/photo-front").with(clientJwt())).andExpect(status().isOk());
     mockMvc.perform(get(base + "/photo-side").with(clientJwt())).andExpect(status().isOk());
     mockMvc
         .perform(get(base + "/photo-document").with(clientJwt()))
-        .andExpect(status().isForbidden());
+        .andExpect(status().isNotFound());
   }
 
   @Test

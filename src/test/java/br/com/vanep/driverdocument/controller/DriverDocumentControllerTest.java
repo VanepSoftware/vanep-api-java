@@ -11,10 +11,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
-import br.com.vanep.driverdocument.enums.DocumentStatusEnum;
-import br.com.vanep.driverdocument.enums.DocumentTypeEnum;
+import br.com.vanep.driverdocument.enums.DriverDocumentType;
 import br.com.vanep.driverdocument.model.DriverDocumentModel;
 import br.com.vanep.driverdocument.repository.DriverDocumentRepository;
+import br.com.vanep.shared.document.enums.DocumentStatus;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
@@ -101,9 +101,9 @@ class DriverDocumentControllerTest {
 
     DriverDocumentModel doc = new DriverDocumentModel();
     doc.setDriver(driver);
-    doc.setDocumentType(DocumentTypeEnum.CRLV);
+    doc.setDocumentType(DriverDocumentType.CRIMINAL_RECORD);
     doc.setExpiresAt(LocalDate.of(2027, 1, 1));
-    doc.setStatus(DocumentStatusEnum.PENDING);
+    doc.getReview().setStatus(DocumentStatus.PENDING);
     doc = documents.save(doc);
     docToken = doc.getToken();
   }
@@ -174,7 +174,7 @@ class DriverDocumentControllerTest {
     String body =
         """
         {
-          "documentType": "CRLV"
+          "documentType": "CRIMINAL_RECORD"
         }
         """;
     mockMvc
@@ -191,7 +191,7 @@ class DriverDocumentControllerTest {
     String body =
         """
         {
-          "documentType": "RESIDENCE_PROOF"
+          "documentType": "SCHOOL_DRIVER_COURSE"
         }
         """;
 
@@ -203,7 +203,7 @@ class DriverDocumentControllerTest {
                 .content(body))
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.token").exists())
-        .andExpect(jsonPath("$.documentType").value("RESIDENCE_PROOF"))
+        .andExpect(jsonPath("$.documentType").value("SCHOOL_DRIVER_COURSE"))
         .andExpect(jsonPath("$.fileUrl").doesNotExist())
         .andExpect(jsonPath("$.status").value("PENDING"));
   }
@@ -247,13 +247,13 @@ class DriverDocumentControllerTest {
   @Test
   void updateResetsStatusToPending() throws Exception {
     DriverDocumentModel doc = documents.findByToken(docToken).orElseThrow();
-    doc.setStatus(DocumentStatusEnum.APPROVED);
+    doc.getReview().setStatus(DocumentStatus.APPROVED);
     documents.save(doc);
 
     String body =
         """
         {
-          "documentType": "CRLV",
+          "documentType": "CRIMINAL_RECORD",
           "expiresAt": "2028-01-01"
         }
         """;

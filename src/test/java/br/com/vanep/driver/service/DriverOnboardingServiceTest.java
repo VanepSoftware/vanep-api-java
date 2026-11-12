@@ -2,6 +2,7 @@ package br.com.vanep.driver.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.lenient;
@@ -11,25 +12,30 @@ import static org.mockito.Mockito.when;
 import br.com.vanep.city.model.CityModel;
 import br.com.vanep.driver.DriverApprovalStatus;
 import br.com.vanep.driver.DriverRepository;
+import br.com.vanep.driver.dto.DriverOnboardingDocumentsStepDTO;
 import br.com.vanep.driver.dto.DriverOnboardingStatusResponseDTO;
 import br.com.vanep.driver.dto.DriverRejectionRequestDTO;
 import br.com.vanep.driver.dto.DriverResponseDTO;
+import br.com.vanep.driver.dto.VehicleDocumentsStepDTO;
 import br.com.vanep.driver.mapper.DriverMapper;
 import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.drivercnh.model.DriverCnhModel;
 import br.com.vanep.drivercnh.repository.DriverCnhRepository;
-import br.com.vanep.driverdocument.enums.DocumentStatusEnum;
-import br.com.vanep.driverdocument.enums.DocumentTypeEnum;
+import br.com.vanep.driverdocument.enums.DriverDocumentType;
 import br.com.vanep.driverdocument.model.DriverDocumentModel;
 import br.com.vanep.driverdocument.repository.DriverDocumentRepository;
 import br.com.vanep.driverservicearea.model.DriverServiceAreaModel;
 import br.com.vanep.driverservicearea.repository.DriverServiceAreaRepository;
 import br.com.vanep.media.model.MediaFileModel;
+import br.com.vanep.shared.document.enums.DocumentStatus;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.service.UserService;
 import br.com.vanep.vehicle.model.VehicleModel;
 import br.com.vanep.vehicle.repository.VehicleRepository;
+import br.com.vanep.vehicledocument.enums.VehicleDocumentType;
+import br.com.vanep.vehicledocument.model.VehicleDocumentModel;
+import br.com.vanep.vehicledocument.repository.VehicleDocumentRepository;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -55,6 +61,7 @@ class DriverOnboardingServiceTest {
   @Mock private VehicleRepository vehicleRepository;
   @Mock private DriverCnhRepository driverCnhRepository;
   @Mock private DriverDocumentRepository driverDocumentRepository;
+  @Mock private VehicleDocumentRepository vehicleDocumentRepository;
   @Mock private DriverServiceAreaRepository driverServiceAreaRepository;
   @Mock private UserService userService;
   @Mock private DriverNotificationService driverNotificationService;
@@ -74,6 +81,7 @@ class DriverOnboardingServiceTest {
             vehicleRepository,
             driverCnhRepository,
             driverDocumentRepository,
+            vehicleDocumentRepository,
             driverServiceAreaRepository,
             userService,
             driverNotificationService,
@@ -97,18 +105,74 @@ class DriverOnboardingServiceTest {
     driver.setBasePrice(BigDecimal.valueOf(150.00));
   }
 
-  private DriverDocumentModel mockDocument(DocumentTypeEnum type, boolean withFile) {
+  private DriverDocumentModel driverDocument(DriverDocumentType type, boolean withFile) {
     DriverDocumentModel doc = new DriverDocumentModel();
     doc.setToken("doc-token-" + type.name().toLowerCase());
     doc.setActive(true);
     doc.setDocumentType(type);
-    doc.setStatus(DocumentStatusEnum.PENDING);
     if (withFile) {
-      MediaFileModel file = new MediaFileModel();
-      file.setToken("media-token-" + type.name().toLowerCase());
-      doc.setFile(file);
+      doc.setFile(file(type.name()));
     }
     return doc;
+  }
+
+  private VehicleModel vehicle(long id, String plate) {
+    VehicleModel vehicle = new VehicleModel();
+    vehicle.setId(id);
+    vehicle.setToken("vehicle-token-" + id);
+    vehicle.setPlate(plate);
+    vehicle.setActive(true);
+    return vehicle;
+  }
+
+  private VehicleDocumentModel vehicleDocument(
+      VehicleModel vehicle, VehicleDocumentType type, boolean withFile) {
+    VehicleDocumentModel doc = new VehicleDocumentModel();
+    doc.setToken("vehicle-doc-" + vehicle.getId() + "-" + type.name().toLowerCase());
+    doc.setVehicle(vehicle);
+    doc.setDocumentType(type);
+    if (withFile) {
+      doc.setFile(file(type.name()));
+    }
+    return doc;
+  }
+
+  private MediaFileModel file(String name) {
+    MediaFileModel file = new MediaFileModel();
+    file.setToken("media-token-" + name.toLowerCase());
+    return file;
+  }
+
+  private void stubReadyToSubmit(VehicleModel vehicle) {
+    user.setAddressId(55L);
+    when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of(vehicle));
+    DriverCnhModel cnh = new DriverCnhModel();
+    cnh.setActive(true);
+    cnh.setValidUntil(LocalDate.now().plusYears(1));
+    when(driverCnhRepository.findByDriverId(20L)).thenReturn(List.of(cnh));
+    stubCompleteDocuments(vehicle);
+  }
+
+  private void stubCompleteDocuments(VehicleModel vehicle) {
+    when(driverDocumentRepository.findByDriverId(20L))
+        .thenReturn(List.of(driverDocument(DriverDocumentType.MUNICIPAL_AUTHORIZATION, true)));
+    when(vehicleDocumentRepository.findByVehicleIdIn(List.of(vehicle.getId())))
+        .thenReturn(
+            List.of(
+                vehicleDocument(vehicle, VehicleDocumentType.CRLV, true),
+                vehicleDocument(vehicle, VehicleDocumentType.VEHICLE_INSPECTION, true)));
+  }
+
+  private void stubDriverWithArea() {
+    when(userService.requireByTokenAndType("user-token-10", UserType.DRIVER)).thenReturn(user);
+    when(driverRepository.findByUserId(10L)).thenReturn(Optional.of(driver));
+    DriverServiceAreaModel area = new DriverServiceAreaModel();
+    area.setCity(new CityModel());
+    when(driverServiceAreaRepository.findByDriverId(20L)).thenReturn(List.of(area));
+    DriverCnhModel cnh = new DriverCnhModel();
+    cnh.setActive(true);
+    cnh.setValidUntil(LocalDate.now().plusYears(2));
+    when(driverCnhRepository.findByDriverId(20L)).thenReturn(List.of(cnh));
   }
 
   @Test
@@ -132,47 +196,231 @@ class DriverOnboardingServiceTest {
     assertThat(status.cnhStep().completed()).isFalse();
     assertThat(status.cnhStep().pendingItems()).contains("cnh");
     assertThat(status.documentsStep().completed()).isFalse();
-    assertThat(status.documentsStep().missingTypes())
-        .containsExactlyInAnyOrder(
-            DocumentTypeEnum.CRLV,
-            DocumentTypeEnum.VEHICLE_INSPECTION,
-            DocumentTypeEnum.MUNICIPAL_AUTHORIZATION);
+    assertThat(status.documentsStep().missingDriverTypes())
+        .containsExactly(DriverDocumentType.MUNICIPAL_AUTHORIZATION);
+    assertThat(status.documentsStep().vehicles()).isEmpty();
   }
 
   @Test
   void getOnboardingStatusReturnsCompleteWhenAllRequirementsMet() {
-    when(userService.requireByTokenAndType("user-token-10", UserType.DRIVER)).thenReturn(user);
-    when(driverRepository.findByUserId(10L)).thenReturn(Optional.of(driver));
-
-    DriverServiceAreaModel area = new DriverServiceAreaModel();
-    area.setCity(new CityModel());
-    when(driverServiceAreaRepository.findByDriverId(20L)).thenReturn(List.of(area));
-
-    VehicleModel vehicle = new VehicleModel();
-    vehicle.setActive(true);
-    when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of(vehicle));
-
-    DriverCnhModel cnh = new DriverCnhModel();
-    cnh.setActive(true);
-    cnh.setValidUntil(LocalDate.now().plusYears(2));
-    when(driverCnhRepository.findByDriverId(20L)).thenReturn(List.of(cnh));
-
-    DriverDocumentModel crlv = mockDocument(DocumentTypeEnum.CRLV, true);
-    DriverDocumentModel inspection = mockDocument(DocumentTypeEnum.VEHICLE_INSPECTION, true);
-    DriverDocumentModel municipal = mockDocument(DocumentTypeEnum.MUNICIPAL_AUTHORIZATION, true);
-
-    when(driverDocumentRepository.findByDriverId(20L))
-        .thenReturn(List.of(crlv, inspection, municipal));
+    stubDriverWithArea();
+    VehicleModel van = vehicle(1L, "ABC1D23");
+    when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of(van));
+    stubCompleteDocuments(van);
 
     DriverOnboardingStatusResponseDTO status = service.getOnboardingStatus("user-token-10");
 
-    assertThat(status.approvalStatus()).isEqualTo(DriverApprovalStatus.PENDING);
     assertThat(status.canSubmit()).isTrue();
-    assertThat(status.profileStep().completed()).isTrue();
-    assertThat(status.vehicleStep().completed()).isTrue();
-    assertThat(status.cnhStep().completed()).isTrue();
     assertThat(status.documentsStep().completed()).isTrue();
-    assertThat(status.documentsStep().missingTypes()).isEmpty();
+    assertThat(status.documentsStep().missingDriverTypes()).isEmpty();
+    assertThat(status.documentsStep().vehicles())
+        .singleElement()
+        .satisfies(
+            vanStep -> {
+              assertThat(vanStep.vehicleToken()).isEqualTo("vehicle-token-1");
+              assertThat(vanStep.plate()).isEqualTo("ABC1D23");
+              assertThat(vanStep.completed()).isTrue();
+              assertThat(vanStep.missingTypes()).isEmpty();
+              assertThat(vanStep.uploadedDocuments()).hasSize(2);
+            });
+  }
+
+  @Test
+  void oneCompleteVanIsEnoughWhenTheOtherHasNoDocuments() {
+    stubDriverWithArea();
+    VehicleModel complete = vehicle(1L, "ABC1D23");
+    VehicleModel bare = vehicle(2L, "XYZ9K87");
+    when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of(complete, bare));
+    when(driverDocumentRepository.findByDriverId(20L))
+        .thenReturn(List.of(driverDocument(DriverDocumentType.MUNICIPAL_AUTHORIZATION, true)));
+    when(vehicleDocumentRepository.findByVehicleIdIn(List.of(1L, 2L)))
+        .thenReturn(
+            List.of(
+                vehicleDocument(complete, VehicleDocumentType.CRLV, true),
+                vehicleDocument(complete, VehicleDocumentType.VEHICLE_INSPECTION, true)));
+
+    DriverOnboardingStatusResponseDTO status = service.getOnboardingStatus("user-token-10");
+
+    assertThat(status.documentsStep().completed()).isTrue();
+    assertThat(status.documentsStep().vehicles())
+        .extracting(vanStep -> vanStep.plate(), vanStep -> vanStep.completed())
+        .containsExactly(tuple("ABC1D23", true), tuple("XYZ9K87", false));
+    assertThat(status.documentsStep().vehicles().get(1).missingTypes())
+        .containsExactly(VehicleDocumentType.CRLV, VehicleDocumentType.VEHICLE_INSPECTION);
+  }
+
+  @Test
+  void theDocumentsOfAnotherVanDoNotCompleteAVan() {
+    stubDriverWithArea();
+    VehicleModel first = vehicle(1L, "ABC1D23");
+    VehicleModel second = vehicle(2L, "XYZ9K87");
+    when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of(first, second));
+    when(driverDocumentRepository.findByDriverId(20L))
+        .thenReturn(List.of(driverDocument(DriverDocumentType.MUNICIPAL_AUTHORIZATION, true)));
+    when(vehicleDocumentRepository.findByVehicleIdIn(List.of(1L, 2L)))
+        .thenReturn(
+            List.of(
+                vehicleDocument(first, VehicleDocumentType.CRLV, true),
+                vehicleDocument(second, VehicleDocumentType.VEHICLE_INSPECTION, true)));
+
+    DriverOnboardingStatusResponseDTO status = service.getOnboardingStatus("user-token-10");
+
+    assertThat(status.documentsStep().completed()).isFalse();
+    assertThat(status.documentsStep().vehicles())
+        .extracting(vanStep -> vanStep.missingTypes())
+        .containsExactly(
+            List.of(VehicleDocumentType.VEHICLE_INSPECTION), List.of(VehicleDocumentType.CRLV));
+  }
+
+  @Test
+  void anInactiveVanIsNotEvaluated() {
+    stubDriverWithArea();
+    VehicleModel inactive = vehicle(1L, "ABC1D23");
+    inactive.setActive(false);
+    when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of(inactive));
+    when(driverDocumentRepository.findByDriverId(20L))
+        .thenReturn(List.of(driverDocument(DriverDocumentType.MUNICIPAL_AUTHORIZATION, true)));
+
+    DriverOnboardingStatusResponseDTO status = service.getOnboardingStatus("user-token-10");
+
+    assertThat(status.documentsStep().completed()).isFalse();
+    assertThat(status.documentsStep().vehicles()).isEmpty();
+  }
+
+  @Test
+  void aRejectedVanDocumentDoesNotCount() {
+    stubDriverWithArea();
+    VehicleModel van = vehicle(1L, "ABC1D23");
+    when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of(van));
+    VehicleDocumentModel rejected = vehicleDocument(van, VehicleDocumentType.CRLV, true);
+    rejected.getReview().setStatus(DocumentStatus.REJECTED);
+    when(driverDocumentRepository.findByDriverId(20L))
+        .thenReturn(List.of(driverDocument(DriverDocumentType.MUNICIPAL_AUTHORIZATION, true)));
+    when(vehicleDocumentRepository.findByVehicleIdIn(List.of(1L)))
+        .thenReturn(
+            List.of(rejected, vehicleDocument(van, VehicleDocumentType.VEHICLE_INSPECTION, true)));
+
+    DriverOnboardingStatusResponseDTO status = service.getOnboardingStatus("user-token-10");
+
+    assertThat(status.documentsStep().vehicles().get(0).missingTypes())
+        .containsExactly(VehicleDocumentType.CRLV);
+  }
+
+  @Test
+  void anExpiredDocumentDoesNotCount() {
+    stubDriverWithArea();
+    VehicleModel van = vehicle(1L, "ABC1D23");
+    when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of(van));
+    DriverDocumentModel expiredAuthorization =
+        driverDocument(DriverDocumentType.MUNICIPAL_AUTHORIZATION, true);
+    expiredAuthorization.setExpiresAt(LocalDate.now().minusDays(1));
+    VehicleDocumentModel expiredInspection =
+        vehicleDocument(van, VehicleDocumentType.VEHICLE_INSPECTION, true);
+    expiredInspection.setExpiresAt(LocalDate.now().minusDays(1));
+    VehicleDocumentModel crlv = vehicleDocument(van, VehicleDocumentType.CRLV, true);
+    crlv.setExpiresAt(LocalDate.now());
+    when(driverDocumentRepository.findByDriverId(20L)).thenReturn(List.of(expiredAuthorization));
+    when(vehicleDocumentRepository.findByVehicleIdIn(List.of(1L)))
+        .thenReturn(List.of(crlv, expiredInspection));
+
+    DriverOnboardingStatusResponseDTO status = service.getOnboardingStatus("user-token-10");
+
+    assertThat(status.documentsStep().missingDriverTypes())
+        .containsExactly(DriverDocumentType.MUNICIPAL_AUTHORIZATION);
+    assertThat(status.documentsStep().vehicles().get(0).missingTypes())
+        .containsExactly(VehicleDocumentType.VEHICLE_INSPECTION);
+  }
+
+  @Test
+  void getOnboardingStatusReturnsIncompleteWhenDocumentHasNoFileUploaded() {
+    stubDriverWithArea();
+    VehicleModel van = vehicle(1L, "ABC1D23");
+    when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of(van));
+    when(driverDocumentRepository.findByDriverId(20L))
+        .thenReturn(List.of(driverDocument(DriverDocumentType.MUNICIPAL_AUTHORIZATION, true)));
+    when(vehicleDocumentRepository.findByVehicleIdIn(List.of(1L)))
+        .thenReturn(
+            List.of(
+                vehicleDocument(van, VehicleDocumentType.CRLV, false),
+                vehicleDocument(van, VehicleDocumentType.VEHICLE_INSPECTION, true)));
+
+    DriverOnboardingStatusResponseDTO status = service.getOnboardingStatus("user-token-10");
+
+    assertThat(status.canSubmit()).isFalse();
+    assertThat(status.documentsStep().completed()).isFalse();
+    assertThat(status.documentsStep().vehicles().get(0).missingTypes())
+        .containsExactly(VehicleDocumentType.CRLV);
+  }
+
+  @Test
+  void theMissingDocumentsNameTheDriverTypesAndEachIncompleteVanByPlate() {
+    DriverOnboardingDocumentsStepDTO step =
+        new DriverOnboardingDocumentsStepDTO(
+            false,
+            List.of(DriverDocumentType.MUNICIPAL_AUTHORIZATION),
+            List.of(),
+            List.of(
+                new VehicleDocumentsStepDTO(
+                    "vehicle-token-1",
+                    "ABC1D23",
+                    false,
+                    List.of(VehicleDocumentType.CRLV, VehicleDocumentType.VEHICLE_INSPECTION),
+                    List.of()),
+                new VehicleDocumentsStepDTO(
+                    "vehicle-token-2",
+                    "XYZ9K87",
+                    false,
+                    List.of(VehicleDocumentType.CRLV),
+                    List.of())));
+
+    assertThat(DriverOnboardingService.describeMissingDocuments(step))
+        .isEqualTo("MUNICIPAL_AUTHORIZATION; ABC1D23: CRLV, VEHICLE_INSPECTION; XYZ9K87: CRLV");
+  }
+
+  @Test
+  void withACompleteVanOnlyTheDriverTypesAreMissing() {
+    DriverOnboardingDocumentsStepDTO step =
+        new DriverOnboardingDocumentsStepDTO(
+            false,
+            List.of(DriverDocumentType.MUNICIPAL_AUTHORIZATION),
+            List.of(),
+            List.of(
+                new VehicleDocumentsStepDTO(
+                    "vehicle-token-1", "ABC1D23", true, List.of(), List.of()),
+                new VehicleDocumentsStepDTO(
+                    "vehicle-token-2",
+                    "XYZ9K87",
+                    false,
+                    List.of(VehicleDocumentType.CRLV),
+                    List.of())));
+
+    assertThat(DriverOnboardingService.describeMissingDocuments(step))
+        .isEqualTo("MUNICIPAL_AUTHORIZATION");
+  }
+
+  @Test
+  void submittingWithOneCompleteVanAndAnotherWithoutDocumentsIsAccepted() {
+    when(userService.requireByTokenAndType("user-token-10", UserType.DRIVER)).thenReturn(user);
+    when(driverRepository.findByUserId(10L)).thenReturn(Optional.of(driver));
+    when(driverRepository.save(any(DriverModel.class))).thenAnswer(inv -> inv.getArgument(0));
+    VehicleModel complete = vehicle(1L, "ABC1D23");
+    VehicleModel bare = vehicle(2L, "XYZ9K87");
+    user.setAddressId(55L);
+    when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of(complete, bare));
+    DriverCnhModel cnh = new DriverCnhModel();
+    cnh.setActive(true);
+    cnh.setValidUntil(LocalDate.now().plusYears(1));
+    when(driverCnhRepository.findByDriverId(20L)).thenReturn(List.of(cnh));
+    when(driverDocumentRepository.findByDriverId(20L))
+        .thenReturn(List.of(driverDocument(DriverDocumentType.MUNICIPAL_AUTHORIZATION, true)));
+    when(vehicleDocumentRepository.findByVehicleIdIn(List.of(1L, 2L)))
+        .thenReturn(
+            List.of(
+                vehicleDocument(complete, VehicleDocumentType.CRLV, true),
+                vehicleDocument(complete, VehicleDocumentType.VEHICLE_INSPECTION, true)));
+
+    assertThat(service.submitOnboarding("user-token-10").approvalStatus())
+        .isEqualTo(DriverApprovalStatus.UNDER_REVIEW);
   }
 
   @Test
@@ -217,20 +465,14 @@ class DriverOnboardingServiceTest {
   void submitOnboardingThrowsUnprocessableEntityWhenVehicleMissing() {
     when(userService.requireByTokenAndType("user-token-10", UserType.DRIVER)).thenReturn(user);
     when(driverRepository.findByUserId(10L)).thenReturn(Optional.of(driver));
-
-    user.setAddressId(55L); // Has city via address
+    user.setAddressId(55L);
     when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of());
-
     DriverCnhModel cnh = new DriverCnhModel();
     cnh.setActive(true);
     cnh.setValidUntil(LocalDate.now().plusYears(1));
     when(driverCnhRepository.findByDriverId(20L)).thenReturn(List.of(cnh));
-
-    DriverDocumentModel crlv = mockDocument(DocumentTypeEnum.CRLV, true);
-    DriverDocumentModel inspection = mockDocument(DocumentTypeEnum.VEHICLE_INSPECTION, true);
-    DriverDocumentModel municipal = mockDocument(DocumentTypeEnum.MUNICIPAL_AUTHORIZATION, true);
     when(driverDocumentRepository.findByDriverId(20L))
-        .thenReturn(List.of(crlv, inspection, municipal));
+        .thenReturn(List.of(driverDocument(DriverDocumentType.MUNICIPAL_AUTHORIZATION, true)));
 
     assertThatThrownBy(() -> service.submitOnboarding("user-token-10"))
         .isInstanceOf(ResponseStatusException.class)
@@ -245,25 +487,38 @@ class DriverOnboardingServiceTest {
   }
 
   @Test
+  void submitOnboardingWithoutAVanDoesNotReportAnEmptyDocumentList() {
+    when(userService.requireByTokenAndType("user-token-10", UserType.DRIVER)).thenReturn(user);
+    when(driverRepository.findByUserId(10L)).thenReturn(Optional.of(driver));
+    user.setAddressId(55L);
+    when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of());
+    DriverCnhModel cnh = new DriverCnhModel();
+    cnh.setActive(true);
+    cnh.setValidUntil(LocalDate.now().plusYears(1));
+    when(driverCnhRepository.findByDriverId(20L)).thenReturn(List.of(cnh));
+    when(driverDocumentRepository.findByDriverId(20L))
+        .thenReturn(List.of(driverDocument(DriverDocumentType.MUNICIPAL_AUTHORIZATION, true)));
+
+    assertThatThrownBy(() -> service.submitOnboarding("user-token-10"))
+        .isInstanceOf(ResponseStatusException.class)
+        .satisfies(
+            e -> {
+              ResponseStatusException ex = (ResponseStatusException) e;
+              assertThat(ex.getReason()).contains("driver.onboarding.vehicle_required");
+              assertThat(ex.getReason()).doesNotContain("driver.onboarding.documents_missing");
+            });
+  }
+
+  @Test
   void submitOnboardingThrowsUnprocessableEntityWhenCnhExpired() {
     when(userService.requireByTokenAndType("user-token-10", UserType.DRIVER)).thenReturn(user);
     when(driverRepository.findByUserId(10L)).thenReturn(Optional.of(driver));
-
-    user.setAddressId(55L);
-    VehicleModel vehicle = new VehicleModel();
-    vehicle.setActive(true);
-    when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of(vehicle));
-
-    DriverCnhModel cnh = new DriverCnhModel();
-    cnh.setActive(true);
-    cnh.setValidUntil(LocalDate.now().minusDays(1)); // Expired!
-    when(driverCnhRepository.findByDriverId(20L)).thenReturn(List.of(cnh));
-
-    DriverDocumentModel crlv = mockDocument(DocumentTypeEnum.CRLV, true);
-    DriverDocumentModel inspection = mockDocument(DocumentTypeEnum.VEHICLE_INSPECTION, true);
-    DriverDocumentModel municipal = mockDocument(DocumentTypeEnum.MUNICIPAL_AUTHORIZATION, true);
-    when(driverDocumentRepository.findByDriverId(20L))
-        .thenReturn(List.of(crlv, inspection, municipal));
+    VehicleModel van = vehicle(1L, "ABC1D23");
+    stubReadyToSubmit(van);
+    DriverCnhModel expired = new DriverCnhModel();
+    expired.setActive(true);
+    expired.setValidUntil(LocalDate.now().minusDays(1));
+    when(driverCnhRepository.findByDriverId(20L)).thenReturn(List.of(expired));
 
     assertThatThrownBy(() -> service.submitOnboarding("user-token-10"))
         .isInstanceOf(ResponseStatusException.class)
@@ -279,21 +534,9 @@ class DriverOnboardingServiceTest {
   void submitOnboardingThrowsUnprocessableEntityWhenDocumentMissing() {
     when(userService.requireByTokenAndType("user-token-10", UserType.DRIVER)).thenReturn(user);
     when(driverRepository.findByUserId(10L)).thenReturn(Optional.of(driver));
-
-    user.setAddressId(55L);
-    VehicleModel vehicle = new VehicleModel();
-    vehicle.setActive(true);
-    when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of(vehicle));
-
-    DriverCnhModel cnh = new DriverCnhModel();
-    cnh.setActive(true);
-    cnh.setValidUntil(LocalDate.now().plusYears(1));
-    when(driverCnhRepository.findByDriverId(20L)).thenReturn(List.of(cnh));
-
-    // CRLV and inspection uploaded with files, but MUNICIPAL_AUTHORIZATION is missing!
-    DriverDocumentModel crlv = mockDocument(DocumentTypeEnum.CRLV, true);
-    DriverDocumentModel inspection = mockDocument(DocumentTypeEnum.VEHICLE_INSPECTION, true);
-    when(driverDocumentRepository.findByDriverId(20L)).thenReturn(List.of(crlv, inspection));
+    VehicleModel van = vehicle(1L, "ABC1D23");
+    stubReadyToSubmit(van);
+    when(driverDocumentRepository.findByDriverId(20L)).thenReturn(List.of());
 
     assertThatThrownBy(() -> service.submitOnboarding("user-token-10"))
         .isInstanceOf(ResponseStatusException.class)
@@ -301,7 +544,9 @@ class DriverOnboardingServiceTest {
             e -> {
               ResponseStatusException ex = (ResponseStatusException) e;
               assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
+              assertThat(ex.getReason()).contains("driver.onboarding.documents_missing");
             });
+    assertThat(driver.getApprovalStatus()).isEqualTo(DriverApprovalStatus.PENDING);
   }
 
   @Test
@@ -312,22 +557,7 @@ class DriverOnboardingServiceTest {
     when(userService.requireByTokenAndType("user-token-10", UserType.DRIVER)).thenReturn(user);
     when(driverRepository.findByUserId(10L)).thenReturn(Optional.of(driver));
     when(driverRepository.save(any(DriverModel.class))).thenAnswer(inv -> inv.getArgument(0));
-
-    user.setAddressId(55L);
-    VehicleModel vehicle = new VehicleModel();
-    vehicle.setActive(true);
-    when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of(vehicle));
-
-    DriverCnhModel cnh = new DriverCnhModel();
-    cnh.setActive(true);
-    cnh.setValidUntil(LocalDate.now().plusYears(1));
-    when(driverCnhRepository.findByDriverId(20L)).thenReturn(List.of(cnh));
-
-    DriverDocumentModel crlv = mockDocument(DocumentTypeEnum.CRLV, true);
-    DriverDocumentModel inspection = mockDocument(DocumentTypeEnum.VEHICLE_INSPECTION, true);
-    DriverDocumentModel municipal = mockDocument(DocumentTypeEnum.MUNICIPAL_AUTHORIZATION, true);
-    when(driverDocumentRepository.findByDriverId(20L))
-        .thenReturn(List.of(crlv, inspection, municipal));
+    stubReadyToSubmit(vehicle(1L, "ABC1D23"));
 
     DriverOnboardingStatusResponseDTO response = service.submitOnboarding("user-token-10");
 
@@ -343,59 +573,16 @@ class DriverOnboardingServiceTest {
   }
 
   @Test
-  void getOnboardingStatusReturnsIncompleteWhenDocumentHasNoFileUploaded() {
-    when(userService.requireByTokenAndType("user-token-10", UserType.DRIVER)).thenReturn(user);
-    when(driverRepository.findByUserId(10L)).thenReturn(Optional.of(driver));
-
-    DriverServiceAreaModel area = new DriverServiceAreaModel();
-    area.setCity(new CityModel());
-    when(driverServiceAreaRepository.findByDriverId(20L)).thenReturn(List.of(area));
-
-    VehicleModel vehicle = new VehicleModel();
-    vehicle.setActive(true);
-    when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of(vehicle));
-
-    DriverCnhModel cnh = new DriverCnhModel();
-    cnh.setActive(true);
-    cnh.setValidUntil(LocalDate.now().plusYears(2));
-    when(driverCnhRepository.findByDriverId(20L)).thenReturn(List.of(cnh));
-
-    // CRLV exists but with no uploaded file (file == null)
-    DriverDocumentModel crlv = mockDocument(DocumentTypeEnum.CRLV, false);
-    DriverDocumentModel inspection = mockDocument(DocumentTypeEnum.VEHICLE_INSPECTION, true);
-    DriverDocumentModel municipal = mockDocument(DocumentTypeEnum.MUNICIPAL_AUTHORIZATION, true);
-
-    when(driverDocumentRepository.findByDriverId(20L))
-        .thenReturn(List.of(crlv, inspection, municipal));
-
-    DriverOnboardingStatusResponseDTO status = service.getOnboardingStatus("user-token-10");
-
-    assertThat(status.canSubmit()).isFalse();
-    assertThat(status.documentsStep().completed()).isFalse();
-    assertThat(status.documentsStep().missingTypes()).containsExactly(DocumentTypeEnum.CRLV);
-  }
-
-  @Test
   void submitOnboardingThrowsUnprocessableEntityWhenDocumentHasNoFileUploaded() {
     when(userService.requireByTokenAndType("user-token-10", UserType.DRIVER)).thenReturn(user);
     when(driverRepository.findByUserId(10L)).thenReturn(Optional.of(driver));
-
-    user.setAddressId(55L);
-    VehicleModel vehicle = new VehicleModel();
-    vehicle.setActive(true);
-    when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of(vehicle));
-
-    DriverCnhModel cnh = new DriverCnhModel();
-    cnh.setActive(true);
-    cnh.setValidUntil(LocalDate.now().plusYears(1));
-    when(driverCnhRepository.findByDriverId(20L)).thenReturn(List.of(cnh));
-
-    // CRLV exists but file is null
-    DriverDocumentModel crlv = mockDocument(DocumentTypeEnum.CRLV, false);
-    DriverDocumentModel inspection = mockDocument(DocumentTypeEnum.VEHICLE_INSPECTION, true);
-    DriverDocumentModel municipal = mockDocument(DocumentTypeEnum.MUNICIPAL_AUTHORIZATION, true);
-    when(driverDocumentRepository.findByDriverId(20L))
-        .thenReturn(List.of(crlv, inspection, municipal));
+    VehicleModel van = vehicle(1L, "ABC1D23");
+    stubReadyToSubmit(van);
+    when(vehicleDocumentRepository.findByVehicleIdIn(List.of(1L)))
+        .thenReturn(
+            List.of(
+                vehicleDocument(van, VehicleDocumentType.CRLV, false),
+                vehicleDocument(van, VehicleDocumentType.VEHICLE_INSPECTION, true)));
 
     assertThatThrownBy(() -> service.submitOnboarding("user-token-10"))
         .isInstanceOf(ResponseStatusException.class)

@@ -5,11 +5,12 @@ import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.driverdocument.dto.DriverDocumentRequestDTO;
 import br.com.vanep.driverdocument.dto.DriverDocumentResponseDTO;
 import br.com.vanep.driverdocument.dto.DriverDocumentStatusUpdateRequestDTO;
-import br.com.vanep.driverdocument.enums.DocumentStatusEnum;
-import br.com.vanep.driverdocument.enums.DocumentTypeEnum;
+import br.com.vanep.driverdocument.enums.DriverDocumentType;
 import br.com.vanep.driverdocument.mapper.DriverDocumentMapper;
 import br.com.vanep.driverdocument.model.DriverDocumentModel;
 import br.com.vanep.driverdocument.repository.DriverDocumentRepository;
+import br.com.vanep.shared.document.enums.DocumentStatus;
+import br.com.vanep.shared.document.model.DocumentReview;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
@@ -84,7 +85,7 @@ public class DriverDocumentService {
     document.setDriver(driver);
     document.setDocumentType(request.documentType());
     document.setExpiresAt(request.expiresAt());
-    document.setStatus(DocumentStatusEnum.PENDING);
+    document.getReview().setStatus(DocumentStatus.PENDING);
 
     return mapper.toResponse(driverDocumentRepository.save(document));
   }
@@ -92,8 +93,8 @@ public class DriverDocumentService {
   @Transactional(readOnly = true)
   public Page<DriverDocumentResponseDTO> findAll(
       String driverToken,
-      DocumentTypeEnum documentType,
-      DocumentStatusEnum status,
+      DriverDocumentType documentType,
+      DocumentStatus status,
       String callerEmail,
       Pageable pageable) {
     UserModel caller =
@@ -136,7 +137,8 @@ public class DriverDocumentService {
                 targetDriverId, documentType, pageable);
       } else if (status != null) {
         documents =
-            driverDocumentRepository.findByDriverIdAndStatus(targetDriverId, status, pageable);
+            driverDocumentRepository.findByDriverIdAndReviewStatus(
+                targetDriverId, status, pageable);
       } else {
         documents = driverDocumentRepository.findByDriverId(targetDriverId, pageable);
       }
@@ -157,7 +159,7 @@ public class DriverDocumentService {
     DriverDocumentModel document = requireByToken(token);
     document.setDocumentType(request.documentType());
     document.setExpiresAt(request.expiresAt());
-    document.setStatus(DocumentStatusEnum.PENDING);
+    document.getReview().setStatus(DocumentStatus.PENDING);
 
     return mapper.toResponse(driverDocumentRepository.save(document));
   }
@@ -175,12 +177,13 @@ public class DriverDocumentService {
                     new ResponseStatusException(
                         HttpStatus.NOT_FOUND, message("user.account.not_found")));
 
-    document.setStatus(request.status());
-    document.setReviewMethod(request.reviewMethod());
-    document.setExternalCheckId(request.externalCheckId());
-    document.setRejectionReason(request.rejectionReason());
-    document.setReviewedBy(reviewer);
-    document.setReviewedAt(Instant.now());
+    DocumentReview review = document.getReview();
+    review.setStatus(request.status());
+    review.setReviewMethod(request.reviewMethod());
+    review.setExternalCheckId(request.externalCheckId());
+    review.setRejectionReason(request.rejectionReason());
+    review.setReviewedBy(reviewer);
+    review.setReviewedAt(Instant.now());
 
     return mapper.toResponse(driverDocumentRepository.save(document));
   }

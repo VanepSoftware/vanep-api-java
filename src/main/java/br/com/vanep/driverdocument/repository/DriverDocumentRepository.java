@@ -1,8 +1,8 @@
 package br.com.vanep.driverdocument.repository;
 
-import br.com.vanep.driverdocument.enums.DocumentStatusEnum;
-import br.com.vanep.driverdocument.enums.DocumentTypeEnum;
+import br.com.vanep.driverdocument.enums.DriverDocumentType;
 import br.com.vanep.driverdocument.model.DriverDocumentModel;
+import br.com.vanep.shared.document.enums.DocumentStatus;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
@@ -22,21 +22,21 @@ public interface DriverDocumentRepository
 
   // Each document has its own file and reviewer (and, on the admin list, its own driver), so
   // every list fetches them with the rows instead of one select per document (rule 17).
-  @EntityGraph(attributePaths = {"driver.user", "file", "reviewedBy"})
+  @EntityGraph(attributePaths = {"driver.user", "file", "review.reviewedBy"})
   List<DriverDocumentModel> findByDriverId(Long driverId);
 
-  @EntityGraph(attributePaths = {"driver.user", "file", "reviewedBy"})
+  @EntityGraph(attributePaths = {"driver.user", "file", "review.reviewedBy"})
   Page<DriverDocumentModel> findByDriverId(Long driverId, Pageable pageable);
 
-  @EntityGraph(attributePaths = {"driver.user", "file", "reviewedBy"})
+  @EntityGraph(attributePaths = {"driver.user", "file", "review.reviewedBy"})
   Page<DriverDocumentModel> findByDriverIdAndDocumentType(
-      Long driverId, DocumentTypeEnum documentType, Pageable pageable);
+      Long driverId, DriverDocumentType documentType, Pageable pageable);
 
-  @EntityGraph(attributePaths = {"driver.user", "file", "reviewedBy"})
-  Page<DriverDocumentModel> findByDriverIdAndStatus(
-      Long driverId, DocumentStatusEnum status, Pageable pageable);
+  @EntityGraph(attributePaths = {"driver.user", "file", "review.reviewedBy"})
+  Page<DriverDocumentModel> findByDriverIdAndReviewStatus(
+      Long driverId, DocumentStatus status, Pageable pageable);
 
-  @EntityGraph(attributePaths = {"driver.user", "file", "reviewedBy"})
+  @EntityGraph(attributePaths = {"driver.user", "file", "review.reviewedBy"})
   @Override
   Page<DriverDocumentModel> findAll(Pageable pageable);
 

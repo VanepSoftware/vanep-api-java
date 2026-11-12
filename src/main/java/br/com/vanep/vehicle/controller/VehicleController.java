@@ -129,18 +129,4 @@ public class VehicleController {
   public ResponseEntity<InputStreamResource> downloadPhotoSide(@PathVariable String token) {
     return mediaResponder.respond(photoService.require(token, MediaSlot.VEHICLE_PHOTO_SIDE));
   }
-
-  @PostMapping(value = "/{token}/photo-document", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-  @ResponseStatus(HttpStatus.CREATED)
-  @PreAuthorize("hasAuthority('update_vehicle') or @sec.isVehicleOwner(#token, authentication)")
-  public void uploadPhotoDocument(
-      @PathVariable String token, @RequestPart("file") MultipartFile file) {
-    photoService.replace(token, MediaSlot.VEHICLE_PHOTO_DOCUMENT, file);
-  }
-
-  @GetMapping("/{token}/photo-document")
-  @PreAuthorize("hasAuthority('show_vehicle') or @sec.isVehicleOwner(#token, authentication)")
-  public ResponseEntity<InputStreamResource> downloadPhotoDocument(@PathVariable String token) {
-    return mediaResponder.respond(photoService.require(token, MediaSlot.VEHICLE_PHOTO_DOCUMENT));
-  }
 }

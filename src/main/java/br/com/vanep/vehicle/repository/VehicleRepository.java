@@ -17,7 +17,7 @@ public interface VehicleRepository extends JpaRepository<VehicleModel, Long> {
   Optional<VehicleModel> findByToken(String token);
 
   // Each vehicle has its own three photos, so they are fetched with the list (rule 17).
-  @EntityGraph(attributePaths = {"driver.user", "photoFront", "photoSide", "photoDocument"})
+  @EntityGraph(attributePaths = {"driver.user", "photoFront", "photoSide"})
   List<VehicleModel> findByDriverId(Long driverId);
 
   @Lock(LockModeType.PESSIMISTIC_WRITE)
@@ -31,7 +31,6 @@ public interface VehicleRepository extends JpaRepository<VehicleModel, Long> {
       select vehicle from VehicleModel vehicle
       left join fetch vehicle.photoFront
       left join fetch vehicle.photoSide
-      left join fetch vehicle.photoDocument
       where vehicle.driver.id = :driverId
         and vehicle.active = true
       order by vehicle.createdAt, vehicle.id

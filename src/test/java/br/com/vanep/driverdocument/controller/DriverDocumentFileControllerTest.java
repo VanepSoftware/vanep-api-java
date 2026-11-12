@@ -12,7 +12,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
-import br.com.vanep.driverdocument.enums.DocumentTypeEnum;
+import br.com.vanep.driverdocument.enums.DriverDocumentType;
 import br.com.vanep.driverdocument.model.DriverDocumentModel;
 import br.com.vanep.driverdocument.repository.DriverDocumentRepository;
 import br.com.vanep.media.enums.MediaVisibility;
@@ -67,7 +67,7 @@ class DriverDocumentFileControllerTest {
 
     DriverDocumentModel document = new DriverDocumentModel();
     document.setDriver(driver);
-    document.setDocumentType(DocumentTypeEnum.CRLV);
+    document.setDocumentType(DriverDocumentType.CRIMINAL_RECORD);
     documentToken = documents.save(document).getToken();
   }
 
@@ -93,7 +93,7 @@ class DriverDocumentFileControllerTest {
     String body =
         """
         {
-          "documentType": "CRLV"
+          "documentType": "CRIMINAL_RECORD"
         }
         """;
 

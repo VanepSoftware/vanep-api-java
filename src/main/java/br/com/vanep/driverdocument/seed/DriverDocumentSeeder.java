@@ -2,10 +2,10 @@ package br.com.vanep.driverdocument.seed;
 
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
-import br.com.vanep.driverdocument.enums.DocumentStatusEnum;
-import br.com.vanep.driverdocument.enums.DocumentTypeEnum;
+import br.com.vanep.driverdocument.enums.DriverDocumentType;
 import br.com.vanep.driverdocument.model.DriverDocumentModel;
 import br.com.vanep.driverdocument.repository.DriverDocumentRepository;
+import br.com.vanep.shared.document.enums.DocumentStatus;
 import br.com.vanep.user.repository.UserRepository;
 import java.time.LocalDate;
 import java.util.Optional;
@@ -46,16 +46,17 @@ public class DriverDocumentSeeder {
 
     DriverDocumentModel doc1 = new DriverDocumentModel();
     doc1.setDriver(driver);
-    doc1.setDocumentType(DocumentTypeEnum.CRLV);
+    doc1.setDocumentType(DriverDocumentType.MUNICIPAL_AUTHORIZATION);
+    doc1.setDocumentNumber("TE-0001/2026");
     doc1.setExpiresAt(LocalDate.of(2026, 12, 31));
-    doc1.setStatus(DocumentStatusEnum.APPROVED);
+    doc1.getReview().setStatus(DocumentStatus.APPROVED);
     documents.save(doc1);
 
     DriverDocumentModel doc2 = new DriverDocumentModel();
     doc2.setDriver(driver);
-    doc2.setDocumentType(DocumentTypeEnum.CRIMINAL_RECORD);
+    doc2.setDocumentType(DriverDocumentType.CRIMINAL_RECORD);
     doc2.setExpiresAt(LocalDate.of(2026, 10, 15));
-    doc2.setStatus(DocumentStatusEnum.PENDING);
+    doc2.getReview().setStatus(DocumentStatus.PENDING);
     documents.save(doc2);
 
     log.info("Seed: driver documents created for {}.", SEED_DRIVER_EMAIL);

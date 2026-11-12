@@ -3,11 +3,11 @@ package br.com.vanep.driverdocument.controller;
 import br.com.vanep.driverdocument.dto.DriverDocumentRequestDTO;
 import br.com.vanep.driverdocument.dto.DriverDocumentResponseDTO;
 import br.com.vanep.driverdocument.dto.DriverDocumentStatusUpdateRequestDTO;
-import br.com.vanep.driverdocument.enums.DocumentStatusEnum;
-import br.com.vanep.driverdocument.enums.DocumentTypeEnum;
+import br.com.vanep.driverdocument.enums.DriverDocumentType;
 import br.com.vanep.driverdocument.service.DriverDocumentFileService;
 import br.com.vanep.driverdocument.service.DriverDocumentService;
 import br.com.vanep.media.web.MediaResponder;
+import br.com.vanep.shared.document.enums.DocumentStatus;
 import jakarta.validation.Valid;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.data.domain.Page;
@@ -61,8 +61,8 @@ public class DriverDocumentController {
   @PreAuthorize("hasAuthority('list_driver_documents')")
   public Page<DriverDocumentResponseDTO> list(
       @RequestParam(required = false) String driverToken,
-      @RequestParam(required = false) DocumentTypeEnum documentType,
-      @RequestParam(required = false) DocumentStatusEnum status,
+      @RequestParam(required = false) DriverDocumentType documentType,
+      @RequestParam(required = false) DocumentStatus status,
       @AuthenticationPrincipal Jwt jwt,
       @PageableDefault Pageable pageable) {
     return service.findAll(driverToken, documentType, status, jwt.getSubject(), pageable);

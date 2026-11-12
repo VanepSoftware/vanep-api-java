@@ -1,12 +1,11 @@
 package br.com.vanep.driverdocument.model;
 
 import br.com.vanep.driver.model.DriverModel;
-import br.com.vanep.driverdocument.enums.DocumentStatusEnum;
-import br.com.vanep.driverdocument.enums.DocumentTypeEnum;
-import br.com.vanep.driverdocument.enums.ReviewMethodEnum;
+import br.com.vanep.driverdocument.enums.DriverDocumentType;
 import br.com.vanep.media.model.MediaFileModel;
-import br.com.vanep.user.model.UserModel;
+import br.com.vanep.shared.document.model.DocumentReview;
 import jakarta.persistence.Column;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -48,7 +47,10 @@ public class DriverDocumentModel {
 
   @Enumerated(EnumType.STRING)
   @Column(name = "document_type", nullable = false, length = 50)
-  private DocumentTypeEnum documentType;
+  private DriverDocumentType documentType;
+
+  @Column(name = "document_number", length = 64)
+  private String documentNumber;
 
   @ManyToOne(fetch = FetchType.EAGER)
   @JoinColumn(name = "file_media_id")
@@ -57,26 +59,7 @@ public class DriverDocumentModel {
   @Column(name = "expires_at")
   private LocalDate expiresAt;
 
-  @Enumerated(EnumType.STRING)
-  @Column(nullable = false, length = 20)
-  private DocumentStatusEnum status = DocumentStatusEnum.PENDING;
-
-  @Enumerated(EnumType.STRING)
-  @Column(name = "review_method", length = 30)
-  private ReviewMethodEnum reviewMethod;
-
-  @Column(name = "external_check_id", length = 64)
-  private String externalCheckId;
-
-  @Column(name = "rejection_reason", length = 255)
-  private String rejectionReason;
-
-  @ManyToOne(fetch = FetchType.EAGER)
-  @JoinColumn(name = "reviewed_by")
-  private UserModel reviewedBy;
-
-  @Column(name = "reviewed_at")
-  private Instant reviewedAt;
+  @Embedded private DocumentReview review = DocumentReview.pending();
 
   @Column(name = "notified_at")
   private Instant notifiedAt;

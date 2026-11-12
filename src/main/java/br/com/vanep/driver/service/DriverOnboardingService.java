@@ -8,26 +8,34 @@ import br.com.vanep.driver.dto.DriverOnboardingStatusResponseDTO;
 import br.com.vanep.driver.dto.DriverOnboardingStepDTO;
 import br.com.vanep.driver.dto.DriverRejectionRequestDTO;
 import br.com.vanep.driver.dto.DriverResponseDTO;
+import br.com.vanep.driver.dto.VehicleDocumentSummaryDTO;
+import br.com.vanep.driver.dto.VehicleDocumentsStepDTO;
 import br.com.vanep.driver.mapper.DriverMapper;
 import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.drivercnh.model.DriverCnhModel;
 import br.com.vanep.drivercnh.repository.DriverCnhRepository;
-import br.com.vanep.driverdocument.enums.DocumentStatusEnum;
-import br.com.vanep.driverdocument.enums.DocumentTypeEnum;
+import br.com.vanep.driverdocument.enums.DriverDocumentType;
 import br.com.vanep.driverdocument.model.DriverDocumentModel;
 import br.com.vanep.driverdocument.repository.DriverDocumentRepository;
 import br.com.vanep.driverservicearea.repository.DriverServiceAreaRepository;
+import br.com.vanep.media.model.MediaFileModel;
 import br.com.vanep.media.web.MediaUrl;
+import br.com.vanep.shared.document.enums.DocumentStatus;
+import br.com.vanep.shared.document.model.DocumentReview;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.service.UserService;
 import br.com.vanep.vehicle.model.VehicleModel;
 import br.com.vanep.vehicle.repository.VehicleRepository;
+import br.com.vanep.vehicledocument.enums.VehicleDocumentType;
+import br.com.vanep.vehicledocument.model.VehicleDocumentModel;
+import br.com.vanep.vehicledocument.repository.VehicleDocumentRepository;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
@@ -41,16 +49,17 @@ import org.springframework.web.server.ResponseStatusException;
 @Service
 public class DriverOnboardingService {
 
-  private static final List<DocumentTypeEnum> MANDATORY_DOCUMENT_TYPES =
-      List.of(
-          DocumentTypeEnum.CRLV,
-          DocumentTypeEnum.VEHICLE_INSPECTION,
-          DocumentTypeEnum.MUNICIPAL_AUTHORIZATION);
+  private static final List<DriverDocumentType> MANDATORY_DRIVER_DOCUMENT_TYPES =
+      List.of(DriverDocumentType.MUNICIPAL_AUTHORIZATION);
+
+  private static final List<VehicleDocumentType> MANDATORY_VEHICLE_DOCUMENT_TYPES =
+      List.of(VehicleDocumentType.CRLV, VehicleDocumentType.VEHICLE_INSPECTION);
 
   private final DriverRepository driverRepository;
   private final VehicleRepository vehicleRepository;
   private final DriverCnhRepository driverCnhRepository;
   private final DriverDocumentRepository driverDocumentRepository;
+  private final VehicleDocumentRepository vehicleDocumentRepository;
   private final DriverServiceAreaRepository driverServiceAreaRepository;
   private final UserService userService;
   private final DriverNotificationService driverNotificationService;
@@ -62,6 +71,7 @@ public class DriverOnboardingService {
       VehicleRepository vehicleRepository,
       DriverCnhRepository driverCnhRepository,
       DriverDocumentRepository driverDocumentRepository,
+      VehicleDocumentRepository vehicleDocumentRepository,
       DriverServiceAreaRepository driverServiceAreaRepository,
       UserService userService,
       DriverNotificationService driverNotificationService,
@@ -71,6 +81,7 @@ public class DriverOnboardingService {
     this.vehicleRepository = vehicleRepository;
     this.driverCnhRepository = driverCnhRepository;
     this.driverDocumentRepository = driverDocumentRepository;
+    this.vehicleDocumentRepository = vehicleDocumentRepository;
     this.driverServiceAreaRepository = driverServiceAreaRepository;
     this.userService = userService;
     this.driverNotificationService = driverNotificationService;
@@ -95,9 +106,10 @@ public class DriverOnboardingService {
     DriverModel driver = requireDriverByUserId(user.getId());
 
     DriverOnboardingStepDTO profileStep = evaluateProfileStep(driver, user);
-    DriverOnboardingStepDTO vehicleStep = evaluateVehicleStep(driver);
+    List<VehicleModel> vehicles = vehicleRepository.findByDriverId(driver.getId());
+    DriverOnboardingStepDTO vehicleStep = evaluateVehicleStep(vehicles);
     DriverOnboardingStepDTO cnhStep = evaluateCnhStep(driver);
-    DriverOnboardingDocumentsStepDTO documentsStep = evaluateDocumentsStep(driver);
+    DriverOnboardingDocumentsStepDTO documentsStep = evaluateDocumentsStep(driver, vehicles);
 
     boolean allStepsCompleted =
         profileStep.completed()
@@ -134,9 +146,10 @@ public class DriverOnboardingService {
     }
 
     DriverOnboardingStepDTO profileStep = evaluateProfileStep(driver, user);
-    DriverOnboardingStepDTO vehicleStep = evaluateVehicleStep(driver);
+    List<VehicleModel> vehicles = vehicleRepository.findByDriverId(driver.getId());
+    DriverOnboardingStepDTO vehicleStep = evaluateVehicleStep(vehicles);
     DriverOnboardingStepDTO cnhStep = evaluateCnhStep(driver);
-    DriverOnboardingDocumentsStepDTO documentsStep = evaluateDocumentsStep(driver);
+    DriverOnboardingDocumentsStepDTO documentsStep = evaluateDocumentsStep(driver, vehicles);
 
     List<String> errors = new ArrayList<>();
     if (!profileStep.completed()) {
@@ -152,15 +165,12 @@ public class DriverOnboardingService {
         errors.add(message("driver.onboarding.cnh_required"));
       }
     }
-    if (!documentsStep.completed()) {
-      String missing =
-          documentsStep.missingTypes().stream()
-              .map(type -> type.name())
-              .collect(Collectors.joining(", "));
+    String missingDocuments = describeMissingDocuments(documentsStep);
+    if (!documentsStep.completed() && !missingDocuments.isEmpty()) {
       errors.add(
           messages.getMessage(
               "driver.onboarding.documents_missing",
-              new Object[] {missing},
+              new Object[] {missingDocuments},
               LocaleContextHolder.getLocale()));
     }
 
@@ -204,8 +214,7 @@ public class DriverOnboardingService {
     return new DriverOnboardingStepDTO(pending.isEmpty(), pending);
   }
 
-  DriverOnboardingStepDTO evaluateVehicleStep(DriverModel driver) {
-    List<VehicleModel> vehicles = vehicleRepository.findByDriverId(driver.getId());
+  DriverOnboardingStepDTO evaluateVehicleStep(List<VehicleModel> vehicles) {
     boolean hasActiveVehicle = vehicles.stream().anyMatch(vehicle -> vehicle.isActive());
     List<String> pending = new ArrayList<>();
     if (!hasActiveVehicle) {
@@ -234,36 +243,119 @@ public class DriverOnboardingService {
     return new DriverOnboardingStepDTO(pending.isEmpty(), pending);
   }
 
-  DriverOnboardingDocumentsStepDTO evaluateDocumentsStep(DriverModel driver) {
-    List<DriverDocumentModel> documents = driverDocumentRepository.findByDriverId(driver.getId());
-    List<DriverDocumentSummaryDTO> summaries =
-        documents.stream().map(this::toDocumentSummary).toList();
+  DriverOnboardingDocumentsStepDTO evaluateDocumentsStep(
+      DriverModel driver, List<VehicleModel> vehicles) {
+    LocalDate today = LocalDate.now();
+    List<DriverDocumentModel> driverDocuments =
+        driverDocumentRepository.findByDriverId(driver.getId());
+    List<DriverDocumentType> missingDriverTypes =
+        MANDATORY_DRIVER_DOCUMENT_TYPES.stream()
+            .filter(
+                type -> driverDocuments.stream().noneMatch(doc -> isSubmitted(doc, type, today)))
+            .toList();
 
-    List<DocumentTypeEnum> missingTypes = new ArrayList<>();
-    for (DocumentTypeEnum requiredType : MANDATORY_DOCUMENT_TYPES) {
-      boolean present =
-          documents.stream()
-              .anyMatch(
-                  doc ->
-                      doc.isActive()
-                          && doc.getDocumentType() == requiredType
-                          && doc.getStatus() != DocumentStatusEnum.REJECTED
-                          && doc.getFile() != null);
-      if (!present) {
-        missingTypes.add(requiredType);
-      }
-    }
+    List<VehicleDocumentsStepDTO> vehicleSteps = evaluateVehicleDocuments(vehicles, today);
+    boolean completed =
+        missingDriverTypes.isEmpty()
+            && vehicleSteps.stream().anyMatch(vehicleStep -> vehicleStep.completed());
 
-    return new DriverOnboardingDocumentsStepDTO(missingTypes.isEmpty(), missingTypes, summaries);
+    return new DriverOnboardingDocumentsStepDTO(
+        completed,
+        missingDriverTypes,
+        driverDocuments.stream().map(doc -> toDocumentSummary(doc)).toList(),
+        vehicleSteps);
   }
 
-  private DriverDocumentSummaryDTO toDocumentSummary(DriverDocumentModel doc) {
+  List<VehicleDocumentsStepDTO> evaluateVehicleDocuments(
+      List<VehicleModel> vehicles, LocalDate today) {
+    List<VehicleModel> activeVehicles =
+        vehicles.stream().filter(vehicle -> vehicle.isActive()).toList();
+    if (activeVehicles.isEmpty()) {
+      return List.of();
+    }
+    Map<Long, List<VehicleDocumentModel>> documentsByVehicle =
+        vehicleDocumentRepository
+            .findByVehicleIdIn(activeVehicles.stream().map(vehicle -> vehicle.getId()).toList())
+            .stream()
+            .collect(Collectors.groupingBy(doc -> doc.getVehicle().getId()));
+    return activeVehicles.stream()
+        .map(
+            vehicle ->
+                evaluateDocumentsOf(
+                    vehicle, documentsByVehicle.getOrDefault(vehicle.getId(), List.of()), today))
+        .toList();
+  }
+
+  VehicleDocumentsStepDTO evaluateDocumentsOf(
+      VehicleModel vehicle, List<VehicleDocumentModel> documents, LocalDate today) {
+    List<VehicleDocumentType> missingTypes =
+        MANDATORY_VEHICLE_DOCUMENT_TYPES.stream()
+            .filter(type -> documents.stream().noneMatch(doc -> isSubmitted(doc, type, today)))
+            .toList();
+    return new VehicleDocumentsStepDTO(
+        vehicle.getToken(),
+        vehicle.getPlate(),
+        missingTypes.isEmpty(),
+        missingTypes,
+        documents.stream().map(doc -> toDocumentSummary(doc)).toList());
+  }
+
+  static boolean isSubmitted(
+      DriverDocumentModel document, DriverDocumentType type, LocalDate today) {
+    return document.isActive()
+        && document.getDocumentType() == type
+        && isValidSubmission(
+            document.getReview(), document.getFile(), document.getExpiresAt(), today);
+  }
+
+  static boolean isSubmitted(
+      VehicleDocumentModel document, VehicleDocumentType type, LocalDate today) {
+    return document.getDocumentType() == type
+        && isValidSubmission(
+            document.getReview(), document.getFile(), document.getExpiresAt(), today);
+  }
+
+  private static boolean isValidSubmission(
+      DocumentReview review, MediaFileModel file, LocalDate expiresAt, LocalDate today) {
+    return review.getStatus() != DocumentStatus.REJECTED
+        && file != null
+        && (expiresAt == null || !expiresAt.isBefore(today));
+  }
+
+  static String describeMissingDocuments(DriverOnboardingDocumentsStepDTO documentsStep) {
+    List<String> parts = new ArrayList<>();
+    if (!documentsStep.missingDriverTypes().isEmpty()) {
+      parts.add(joinNames(documentsStep.missingDriverTypes()));
+    }
+    boolean hasCompleteVehicle =
+        documentsStep.vehicles().stream().anyMatch(vehicleStep -> vehicleStep.completed());
+    documentsStep.vehicles().stream()
+        .filter(vehicleStep -> !hasCompleteVehicle && !vehicleStep.completed())
+        .forEach(
+            vehicleStep ->
+                parts.add(vehicleStep.plate() + ": " + joinNames(vehicleStep.missingTypes())));
+    return String.join("; ", parts);
+  }
+
+  static String joinNames(List<? extends Enum<?>> types) {
+    return types.stream().map(type -> type.name()).collect(Collectors.joining(", "));
+  }
+
+  DriverDocumentSummaryDTO toDocumentSummary(DriverDocumentModel doc) {
     return new DriverDocumentSummaryDTO(
         doc.getToken(),
         doc.getDocumentType(),
-        doc.getStatus(),
-        doc.getRejectionReason(),
+        doc.getReview().getStatus(),
+        doc.getReview().getRejectionReason(),
         MediaUrl.of("/api/driver-documents", doc.getToken(), "file", doc.getFile()));
+  }
+
+  VehicleDocumentSummaryDTO toDocumentSummary(VehicleDocumentModel doc) {
+    return new VehicleDocumentSummaryDTO(
+        doc.getToken(),
+        doc.getDocumentType(),
+        doc.getReview().getStatus(),
+        doc.getReview().getRejectionReason());
   }
 
   @Transactional
