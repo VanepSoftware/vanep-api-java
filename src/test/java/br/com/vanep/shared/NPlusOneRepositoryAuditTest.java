@@ -151,9 +151,9 @@ class NPlusOneRepositoryAuditTest {
     recordHotspot(
         counter,
         hotspots,
-        "DriverDocumentRepository.findAll(Pageable) — admin, one driver per row",
+        "DriverDocumentRepository.findFiltered — admin, one driver per row",
         () -> createDocumentForNewDriver(0),
-        () -> touchDocumentPage(documents.findAll(PageRequest.of(0, 2))),
+        () -> touchDocumentPage(documents.findFiltered(null, null, null, PageRequest.of(0, 2))),
         () -> {
           createDocumentForNewDriver(1);
           createDocumentForNewDriver(2);
@@ -164,15 +164,18 @@ class NPlusOneRepositoryAuditTest {
     recordHotspot(
         counter,
         hotspots,
-        "DriverDocumentRepository.findByDriverIdAndDocumentType (page smaller than the total)",
+        "DriverDocumentRepository.findFiltered by type (page smaller than the total)",
         () -> {
           createDocumentOfType(10, DriverDocumentType.CRIMINAL_RECORD);
           createDocumentOfType(11, DriverDocumentType.CRIMINAL_RECORD);
         },
         () ->
             touchDocumentPage(
-                documents.findByDriverIdAndDocumentType(
-                    driver.getId(), DriverDocumentType.CRIMINAL_RECORD, PageRequest.of(0, 2))),
+                documents.findFiltered(
+                    driver.getId(),
+                    DriverDocumentType.CRIMINAL_RECORD,
+                    null,
+                    PageRequest.of(0, 2))),
         () -> {
           createDocumentOfType(12, DriverDocumentType.CRIMINAL_RECORD);
           createDocumentOfType(13, DriverDocumentType.CRIMINAL_RECORD);
@@ -183,12 +186,12 @@ class NPlusOneRepositoryAuditTest {
     recordHotspot(
         counter,
         hotspots,
-        "DriverDocumentRepository.findByDriverIdAndReviewStatus (page smaller than the total)",
+        "DriverDocumentRepository.findFiltered by status (page smaller than the total)",
         () -> {},
         () ->
             touchDocumentPage(
-                documents.findByDriverIdAndReviewStatus(
-                    driver.getId(), DocumentStatus.PENDING, PageRequest.of(0, 2))),
+                documents.findFiltered(
+                    driver.getId(), null, DocumentStatus.PENDING, PageRequest.of(0, 2))),
         () -> {
           createDocument(15);
           createDocument(16);

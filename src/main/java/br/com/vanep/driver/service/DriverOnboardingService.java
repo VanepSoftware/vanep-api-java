@@ -28,6 +28,7 @@ import br.com.vanep.user.service.UserService;
 import br.com.vanep.vehicle.model.VehicleModel;
 import br.com.vanep.vehicle.repository.VehicleRepository;
 import br.com.vanep.vehicledocument.enums.VehicleDocumentType;
+import br.com.vanep.vehicledocument.mapper.VehicleDocumentMapper;
 import br.com.vanep.vehicledocument.model.VehicleDocumentModel;
 import br.com.vanep.vehicledocument.repository.VehicleDocumentRepository;
 import java.math.BigDecimal;
@@ -355,7 +356,8 @@ public class DriverOnboardingService {
         doc.getToken(),
         doc.getDocumentType(),
         doc.getReview().getStatus(),
-        doc.getReview().getRejectionReason());
+        doc.getReview().getRejectionReason(),
+        MediaUrl.of(VehicleDocumentMapper.BASE_PATH, doc.getToken(), "file", doc.getFile()));
   }
 
   @Transactional

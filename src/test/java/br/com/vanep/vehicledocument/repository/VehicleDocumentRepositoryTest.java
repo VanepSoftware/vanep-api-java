@@ -174,7 +174,16 @@ class VehicleDocumentRepositoryTest {
     assertThat(documents.findByToken(saved.getToken())).isEmpty();
     assertThat(documents.findByVehicleToken(van.getToken(), null, null, Pageable.unpaged()))
         .isEmpty();
-    assertThat(documents.findDriverUserTokenByDocumentToken(saved.getToken())).isEmpty();
+  }
+
+  @Test
+  void theOwnerOfARemovedVanIsStillResolvedSoTheApiAnswersNotFound() {
+    VehicleDocumentModel saved =
+        documents.save(newDocument(van, VehicleDocumentType.CRLV, LocalDate.of(2027, 1, 31)));
+    vehicles.delete(van);
+
+    assertThat(documents.findDriverUserTokenByDocumentToken(saved.getToken()))
+        .contains(driverUser.getToken());
   }
 
   @Test

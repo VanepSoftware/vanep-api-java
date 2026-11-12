@@ -75,10 +75,36 @@ class DriverDocumentRepositoryTest {
     documents.save(pending);
 
     assertThat(
-            documents.findByDriverIdAndReviewStatus(
-                driver.getId(), DocumentStatus.APPROVED, Pageable.unpaged()))
+            documents.findFiltered(
+                driver.getId(), null, DocumentStatus.APPROVED, Pageable.unpaged()))
         .extracting(document -> document.getToken())
         .containsExactly(approvedToken);
+  }
+
+  @Test
+  void theTypeAndTheStatusFilterTogether() {
+    DriverDocumentModel approvedCourse = new DriverDocumentModel();
+    approvedCourse.setDriver(driver);
+    approvedCourse.setDocumentType(DriverDocumentType.SCHOOL_DRIVER_COURSE);
+    approvedCourse.getReview().setStatus(DocumentStatus.APPROVED);
+    documents.save(approvedCourse);
+    DriverDocumentModel pendingCourse = new DriverDocumentModel();
+    pendingCourse.setDriver(driver);
+    pendingCourse.setDocumentType(DriverDocumentType.SCHOOL_DRIVER_COURSE);
+    String pendingCourseToken = documents.save(pendingCourse).getToken();
+    DriverDocumentModel pendingRecord = new DriverDocumentModel();
+    pendingRecord.setDriver(driver);
+    pendingRecord.setDocumentType(DriverDocumentType.CRIMINAL_RECORD);
+    documents.save(pendingRecord);
+
+    assertThat(
+            documents.findFiltered(
+                driver.getId(),
+                DriverDocumentType.SCHOOL_DRIVER_COURSE,
+                DocumentStatus.PENDING,
+                Pageable.unpaged()))
+        .extracting(document -> document.getToken())
+        .containsExactly(pendingCourseToken);
   }
 
   private UserModel saveUser(String email, String document, UserType type) {

@@ -7,4 +7,5 @@ public record VehicleDocumentSummaryDTO(
     String token,
     VehicleDocumentType documentType,
     DocumentStatus status,
-    String rejectionReason) {}
+    String rejectionReason,
+    String fileUrl) {}

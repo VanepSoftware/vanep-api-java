@@ -1,12 +1,13 @@
 package br.com.vanep.driverdocument.controller;
 
+import br.com.vanep.auth.security.SecurityHelper;
 import br.com.vanep.driverdocument.dto.DriverDocumentRequestDTO;
 import br.com.vanep.driverdocument.dto.DriverDocumentResponseDTO;
-import br.com.vanep.driverdocument.dto.DriverDocumentStatusUpdateRequestDTO;
 import br.com.vanep.driverdocument.enums.DriverDocumentType;
 import br.com.vanep.driverdocument.service.DriverDocumentFileService;
 import br.com.vanep.driverdocument.service.DriverDocumentService;
 import br.com.vanep.media.web.MediaResponder;
+import br.com.vanep.shared.document.dto.DocumentStatusUpdateRequestDTO;
 import br.com.vanep.shared.document.enums.DocumentStatus;
 import jakarta.validation.Valid;
 import org.springframework.core.io.InputStreamResource;
@@ -17,10 +18,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -49,12 +50,12 @@ public class DriverDocumentController {
     this.mediaResponder = mediaResponder;
   }
 
-  @PostMapping
+  @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
   @ResponseStatus(HttpStatus.CREATED)
   @PreAuthorize("hasAuthority('create_driver_document')")
   public DriverDocumentResponseDTO create(
-      @Valid @RequestBody DriverDocumentRequestDTO request, @AuthenticationPrincipal Jwt jwt) {
-    return service.create(request, jwt.getSubject());
+      @Valid @ModelAttribute DriverDocumentRequestDTO request, Authentication authentication) {
+    return service.create(request, SecurityHelper.requireCallerUid(authentication));
   }
 
   @GetMapping
@@ -63,9 +64,14 @@ public class DriverDocumentController {
       @RequestParam(required = false) String driverToken,
       @RequestParam(required = false) DriverDocumentType documentType,
       @RequestParam(required = false) DocumentStatus status,
-      @AuthenticationPrincipal Jwt jwt,
+      Authentication authentication,
       @PageableDefault Pageable pageable) {
-    return service.findAll(driverToken, documentType, status, jwt.getSubject(), pageable);
+    return service.findAll(
+        driverToken,
+        documentType,
+        status,
+        SecurityHelper.requireCallerUid(authentication),
+        pageable);
   }
 
   @GetMapping("/{token}")
@@ -75,21 +81,13 @@ public class DriverDocumentController {
     return service.findByToken(token);
   }
 
-  @PutMapping("/{token}")
-  @PreAuthorize(
-      "hasAuthority('update_driver_document') or @sec.isDriverDocumentOwner(#token, authentication)")
-  public DriverDocumentResponseDTO update(
-      @PathVariable String token, @Valid @RequestBody DriverDocumentRequestDTO request) {
-    return service.update(token, request);
-  }
-
   @PutMapping("/{token}/status")
   @PreAuthorize("hasAuthority('update_driver_document')")
   public DriverDocumentResponseDTO updateStatus(
       @PathVariable String token,
-      @Valid @RequestBody DriverDocumentStatusUpdateRequestDTO request,
-      @AuthenticationPrincipal Jwt jwt) {
-    return service.updateStatus(token, request, jwt.getSubject());
+      @Valid @RequestBody DocumentStatusUpdateRequestDTO request,
+      Authentication authentication) {
+    return service.updateStatus(token, request, SecurityHelper.requireCallerUid(authentication));
   }
 
   @DeleteMapping("/{token}")

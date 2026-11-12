@@ -6,7 +6,6 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -17,6 +16,8 @@ import br.com.vanep.driverdocument.model.DriverDocumentModel;
 import br.com.vanep.driverdocument.repository.DriverDocumentRepository;
 import br.com.vanep.media.enums.MediaVisibility;
 import br.com.vanep.media.repository.MediaFileRepository;
+import br.com.vanep.shared.document.enums.DocumentStatus;
+import br.com.vanep.shared.document.enums.ReviewMethod;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
@@ -28,7 +29,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor;
@@ -89,23 +89,17 @@ class DriverDocumentFileControllerTest {
   }
 
   @Test
-  void aDocumentIsCreatedWithoutAFile() throws Exception {
-    String body =
-        """
-        {
-          "documentType": "CRIMINAL_RECORD"
-        }
-        """;
-
+  void aDocumentIsSentWithItsFile() throws Exception {
     mockMvc
         .perform(
-            post("/api/driver-documents")
-                .with(ownerJwt())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(body))
+            multipart("/api/driver-documents")
+                .file(new MockMultipartFile("file", "record.pdf", "application/pdf", pdf()))
+                .param("documentType", "CRIMINAL_RECORD")
+                .with(ownerJwt()))
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.token").exists())
-        .andExpect(jsonPath("$.fileUrl").doesNotExist())
+        .andExpect(jsonPath("$.fileUrl").exists())
+        .andExpect(jsonPath("$.file.mimeType").value("application/pdf"))
         .andExpect(jsonPath("$.status").value("PENDING"));
   }
 
@@ -145,7 +139,28 @@ class DriverDocumentFileControllerTest {
     mockMvc
         .perform(get("/api/driver-documents/" + documentToken).with(ownerJwt()))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.fileUrl").value(startsWith(path() + "?v=")));
+        .andExpect(jsonPath("$.fileUrl").value(startsWith(path() + "?v=")))
+        .andExpect(jsonPath("$.file.mimeType").value("application/pdf"))
+        .andExpect(jsonPath("$.file.sizeBytes").value(pdf().length))
+        .andExpect(jsonPath("$.file.originalName").value("crlv.pdf"));
+  }
+
+  @Test
+  void swappingTheFileOfAnApprovedDocumentReturnsItToPending() throws Exception {
+    upload(pdf(), "crlv.pdf", "application/pdf", ownerJwt());
+    DriverDocumentModel approved = documents.findByToken(documentToken).orElseThrow();
+    approved.getReview().setStatus(DocumentStatus.APPROVED);
+    approved.getReview().setReviewMethod(ReviewMethod.MANUAL);
+    approved.getReview().setReviewedAt(Instant.now());
+    documents.save(approved);
+
+    upload(pdf(), "crlv-novo.pdf", "application/pdf", ownerJwt());
+
+    DriverDocumentModel stored = documents.findByToken(documentToken).orElseThrow();
+    assertThat(stored.getReview().getStatus()).isEqualTo(DocumentStatus.PENDING);
+    assertThat(stored.getReview().getReviewMethod()).isNull();
+    assertThat(stored.getReview().getReviewedAt()).isNull();
+    assertThat(stored.getReview().getReviewedBy()).isNull();
   }
 
   @Test

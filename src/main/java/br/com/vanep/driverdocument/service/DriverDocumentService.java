@@ -4,17 +4,18 @@ import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.driverdocument.dto.DriverDocumentRequestDTO;
 import br.com.vanep.driverdocument.dto.DriverDocumentResponseDTO;
-import br.com.vanep.driverdocument.dto.DriverDocumentStatusUpdateRequestDTO;
 import br.com.vanep.driverdocument.enums.DriverDocumentType;
 import br.com.vanep.driverdocument.mapper.DriverDocumentMapper;
 import br.com.vanep.driverdocument.model.DriverDocumentModel;
 import br.com.vanep.driverdocument.repository.DriverDocumentRepository;
+import br.com.vanep.media.enums.MediaSlot;
+import br.com.vanep.media.service.MediaFileService;
+import br.com.vanep.shared.document.dto.DocumentStatusUpdateRequestDTO;
 import br.com.vanep.shared.document.enums.DocumentStatus;
-import br.com.vanep.shared.document.model.DocumentReview;
+import br.com.vanep.shared.document.service.DocumentReviewService;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
-import br.com.vanep.user.repository.UserRepository;
-import java.time.Instant;
+import br.com.vanep.user.service.UserService;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.data.domain.Page;
@@ -29,20 +30,26 @@ public class DriverDocumentService {
 
   private final DriverDocumentRepository driverDocumentRepository;
   private final DriverRepository driverRepository;
-  private final UserRepository userRepository;
+  private final UserService userService;
+  private final DocumentReviewService reviewService;
   private final DriverDocumentMapper mapper;
+  private final MediaFileService media;
   private final MessageSource messages;
 
   public DriverDocumentService(
       DriverDocumentRepository driverDocumentRepository,
       DriverRepository driverRepository,
-      UserRepository userRepository,
+      UserService userService,
+      DocumentReviewService reviewService,
       DriverDocumentMapper mapper,
+      MediaFileService media,
       MessageSource messages) {
     this.driverDocumentRepository = driverDocumentRepository;
     this.driverRepository = driverRepository;
-    this.userRepository = userRepository;
+    this.userService = userService;
+    this.reviewService = reviewService;
     this.mapper = mapper;
+    this.media = media;
     this.messages = messages;
   }
 
@@ -51,14 +58,8 @@ public class DriverDocumentService {
   }
 
   @Transactional
-  public DriverDocumentResponseDTO create(DriverDocumentRequestDTO request, String callerEmail) {
-    UserModel caller =
-        userRepository
-            .findByEmail(callerEmail)
-            .orElseThrow(
-                () ->
-                    new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, message("user.account.not_found")));
+  public DriverDocumentResponseDTO create(DriverDocumentRequestDTO request, String callerUid) {
+    UserModel caller = userService.requireByToken(callerUid);
 
     DriverModel driver;
     if (caller.getType() == UserType.ADMIN
@@ -84,10 +85,10 @@ public class DriverDocumentService {
     DriverDocumentModel document = new DriverDocumentModel();
     document.setDriver(driver);
     document.setDocumentType(request.documentType());
-    document.setExpiresAt(request.expiresAt());
-    document.getReview().setStatus(DocumentStatus.PENDING);
+    DriverDocumentModel saved = driverDocumentRepository.save(document);
+    saved.setFile(media.store(MediaSlot.DRIVER_DOCUMENT_FILE, saved.getToken(), request.file()));
 
-    return mapper.toResponse(driverDocumentRepository.save(document));
+    return mapper.toResponse(driverDocumentRepository.save(saved));
   }
 
   @Transactional(readOnly = true)
@@ -95,15 +96,9 @@ public class DriverDocumentService {
       String driverToken,
       DriverDocumentType documentType,
       DocumentStatus status,
-      String callerEmail,
+      String callerUid,
       Pageable pageable) {
-    UserModel caller =
-        userRepository
-            .findByEmail(callerEmail)
-            .orElseThrow(
-                () ->
-                    new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, message("user.account.not_found")));
+    UserModel caller = userService.requireByToken(callerUid);
 
     Long targetDriverId = null;
 
@@ -129,24 +124,9 @@ public class DriverDocumentService {
       targetDriverId = driver.getId();
     }
 
-    Page<DriverDocumentModel> documents;
-    if (targetDriverId != null) {
-      if (documentType != null) {
-        documents =
-            driverDocumentRepository.findByDriverIdAndDocumentType(
-                targetDriverId, documentType, pageable);
-      } else if (status != null) {
-        documents =
-            driverDocumentRepository.findByDriverIdAndReviewStatus(
-                targetDriverId, status, pageable);
-      } else {
-        documents = driverDocumentRepository.findByDriverId(targetDriverId, pageable);
-      }
-    } else {
-      documents = driverDocumentRepository.findAll(pageable);
-    }
-
-    return documents.map(mapper::toResponse);
+    return driverDocumentRepository
+        .findFiltered(targetDriverId, documentType, status, pageable)
+        .map(mapper::toResponse);
   }
 
   @Transactional(readOnly = true)
@@ -155,35 +135,12 @@ public class DriverDocumentService {
   }
 
   @Transactional
-  public DriverDocumentResponseDTO update(String token, DriverDocumentRequestDTO request) {
-    DriverDocumentModel document = requireByToken(token);
-    document.setDocumentType(request.documentType());
-    document.setExpiresAt(request.expiresAt());
-    document.getReview().setStatus(DocumentStatus.PENDING);
-
-    return mapper.toResponse(driverDocumentRepository.save(document));
-  }
-
-  @Transactional
   public DriverDocumentResponseDTO updateStatus(
-      String token, DriverDocumentStatusUpdateRequestDTO request, String callerEmail) {
+      String token, DocumentStatusUpdateRequestDTO request, String reviewerUid) {
     DriverDocumentModel document = requireByToken(token);
-
-    UserModel reviewer =
-        userRepository
-            .findByEmail(callerEmail)
-            .orElseThrow(
-                () ->
-                    new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, message("user.account.not_found")));
-
-    DocumentReview review = document.getReview();
-    review.setStatus(request.status());
-    review.setReviewMethod(request.reviewMethod());
-    review.setExternalCheckId(request.externalCheckId());
-    review.setRejectionReason(request.rejectionReason());
-    review.setReviewedBy(reviewer);
-    review.setReviewedAt(Instant.now());
+    document.setReview(
+        reviewService.review(request, document.getFile(), document.getDocumentType(), reviewerUid));
+    applyApprovalData(document, request);
 
     return mapper.toResponse(driverDocumentRepository.save(document));
   }
@@ -208,7 +165,18 @@ public class DriverDocumentService {
     throw new ResponseStatusException(HttpStatus.NOT_FOUND, message("driver_document.not_found"));
   }
 
-  private DriverDocumentModel requireByToken(String token) {
+  static void applyApprovalData(
+      DriverDocumentModel document, DocumentStatusUpdateRequestDTO request) {
+    document.setDocumentNumber(request.approves() ? request.documentNumber() : null);
+    document.setExpiresAt(request.approves() ? request.expiresAt() : null);
+  }
+
+  static void clearApprovalData(DriverDocumentModel document) {
+    document.setDocumentNumber(null);
+    document.setExpiresAt(null);
+  }
+
+  DriverDocumentModel requireByToken(String token) {
     return driverDocumentRepository
         .findByToken(token)
         .orElseThrow(

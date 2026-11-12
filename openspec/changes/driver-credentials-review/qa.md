@@ -1,8 +1,10 @@
 # QA — driver-credentials-review (constitution rule 55)
 
-Latest run: API built from `VAN-86/1-schema` (PR 1), 2026-11-21, after the file-only submissions, on a fresh database with the seed. Result: `qa.sh` **36/36 passed**, twice in a row on the same database. The V72 checks bind only approved documents (C4 to C6d), and the approved municipal authorization without number goes back to review (M4, M4b).
+Latest run: API built from `VAN-86/2-review-and-http` (PR 2), 2026-11-21, after the file-only submissions, on a fresh database with the seed. Result: `qa.sh` **114/114 passed**, twice in a row on the same database. The driver sends each document with only its type and its file, and the admin fills the number and the expiry on approval (D2): the life of a document (L), what the send and the approval must carry (B, P) and the driver's documents (DD).
 
-Before the file-only submissions: API built from `VAN-86/1-schema` (PR 1), 2026-11-11. Result: `qa.sh` **32/32 passed**.
+Before the file-only submissions: API built from `VAN-86/2-review-and-http` (PR 2), 2026-11-20, after the mobile requests, on a fresh database with the seed. Result: `qa.sh` **105/105 passed**, twice in a row on the same database. L2b checks the `file` that the document response now carries (D22).
+
+Before the mobile requests: API built from `VAN-86/2-review-and-http` (PR 2), 2026-11-11. Result: `qa.sh` **104/104 passed**, twice in a row on the same database (the script can be repeated).
 
 ## How to run
 
@@ -34,6 +36,8 @@ QA_DB_CONTAINER=vanep-vd-qa-db BASE_URL=http://localhost:8081 scripts/qa/driver-
 It then checks the constraints, the van document's expiry included, and the permission grants.
 
 **Part 2** runs against the live API, which migrated the main database with Flyway. It uses real tokens from the mobile password grant, for the seed's admin, driver (Fábio) and client (Ana).
+
+**Part 3** (PR 2) uses the same tokens plus another seed driver. DD10 proves the caller is resolved by `uid`: it renames the driver's e-mail while their token, whose `sub` is still the old e-mail, keeps working, and restores the e-mail afterwards.
 
 ## PR 1 — schema, shared review and the van without its document photo
 
@@ -90,7 +94,7 @@ It then checks the constraints, the van document's expiry included, and the perm
 |---|---|---|---|
 | D1 | a CRLV as a driver document is refused | 400 | PASS |
 | D2 | a profile photo as a driver document is refused | 400 | PASS |
-| D3 | the specialized course is accepted | 201 | PASS |
+| D3 | the specialized course is accepted with its file and no data | 201 | PASS |
 | D4 | only the accepted one was written | 3 | PASS |
 
 == Onboarding reading the van's documents
@@ -101,4 +105,116 @@ It then checks the constraints, the van document's expiry included, and the perm
 | O3 | a client is refused | 403 | PASS |
 | O4 | no token | 401 | PASS |
 
-TOTAL: 36 passed
+## PR 2 — Review and routes of the documents
+
+== The life of a van document
+| id | scenario | expected | result |
+|---|---|---|---|
+| L1 | the owner sends the CRLV of the van with its file, without typing its data | 201 | PASS |
+| L2 | the owner replaces the CRLV's file while it is pending | 201 | PASS |
+| L2b | the document describes its file | 200 | PASS |
+| L3 | the owner reads the file back as PDF | 200 application/pdf | PASS |
+| L4 | the owner tries to approve their own document | 403 | PASS |
+| L5 | the status did not change | PENDING | PASS |
+| L6 | the admin approves it with the number and the expiry read from the file | 200 | PASS |
+| L7 | the owner swaps the file | 201 | PASS |
+| L8 | the swapped document is pending with no reviewer and without the approved data | 200 | PASS |
+| L9 | the admin approves it again | 200 | PASS |
+| L10 | the owner cannot edit the data: there is no PUT of a document | 405 | PASS |
+| L11 | the admin rejects with a reason, stored trimmed | 200 | PASS |
+| L12 | the van keeps both inspections, the newer first | 200 | PASS |
+| L13 | the admin filters the van's documents by status | 200 | PASS |
+| L14 | the onboarding shows the van document with its file URL | 200 | PASS |
+
+== Who may touch a van's documents
+| id | scenario | expected | result |
+|---|---|---|---|
+| A1 | another driver lists the van's documents | 403 | PASS |
+| A2 | another driver adds a document to the van | 403 | PASS |
+| A3 | another driver reads the document | 403 | PASS |
+| A4 | another driver reads the file and gets no content | 403 0 | PASS |
+| A5 | another driver replaces the file | 403 | PASS |
+| A6 | another driver tries to edit the document: there is no PUT | 405 | PASS |
+| A7 | another driver removes the document | 403 | PASS |
+| A8 | a client lists the van's documents | 403 | PASS |
+| A9 | a client reads the document | 403 | PASS |
+| A10 | no token | 401 | PASS |
+| A11 | an invalid token | 401 | PASS |
+| A12 | an unknown van | 404 | PASS |
+| A13 | an unknown document | 404 | PASS |
+| A14 | nothing refused was written | 3 | PASS |
+| A15 | the admin lists the van's documents | 200 | PASS |
+| A16 | the admin sends a document for the van | 201 | PASS |
+
+== What a van document must have
+| id | scenario | expected | result |
+|---|---|---|---|
+| B1 | a person's document type | 400 | PASS |
+| B2 | a document without file | 400 | PASS |
+| B4 | a document without type | 400 | PASS |
+| B6 | a type in lower case | 400 | PASS |
+| B7 | a type that is not one of the van's | 400 | PASS |
+| B9 | nothing refused was written | 4 | PASS |
+| B10 | the number and the expiry sent with the file are not read | PENDING null null | PASS |
+
+== What the approval must carry
+| id | scenario | expected | result |
+|---|---|---|---|
+| P1 | approving an authorization without number | 400 | PASS |
+| P2 | approving without the expiry | 400 | PASS |
+| P3 | a number of 65 characters | 400 | PASS |
+| P4 | an expiry in the wrong format | 400 | PASS |
+| P5 | the refused approvals changed nothing | PENDING:: | PASS |
+| P6 | a number of exactly 64 characters, stored without the outer spaces | 200 | PASS |
+| P7 | a rejection does not store the data of its body | 200 | PASS |
+
+== The review of a van document
+| id | scenario | expected | result |
+|---|---|---|---|
+| R1 | approving a document left without file before this change | 422 | PASS |
+| R2 | rejecting without reason | 400 | PASS |
+| R3 | a review without status | 400 | PASS |
+| R4 | an unknown status | 400 | PASS |
+| R5 | the refused reviews changed nothing | PENDING: | PASS |
+
+== Removing and restoring
+| id | scenario | expected | result |
+|---|---|---|---|
+| X1 | the owner removes a document | 204 | PASS |
+| X2 | the removed document is gone | 404 | PASS |
+| X3 | the owner cannot restore it | 403 | PASS |
+| X4 | the admin restores it | 200 | PASS |
+| X5 | restoring a live document | 409 | PASS |
+| X6 | restoring an unknown document | 404 | PASS |
+| X7 | the owner adds a second van | 201 | PASS |
+| X8 | the owner removes the second van | 204 | PASS |
+| X9 | the removed van's documents cannot be listed | 404 | PASS |
+| X10 | the removed van's document is unreachable to the owner | 404 | PASS |
+| X11 | and to the admin | 404 | PASS |
+| X12 | the owner restores the van | 200 | PASS |
+| X13 | the restored van brings its documents back | 200 | PASS |
+| X14 | the second van is removed again, so the run can be repeated | 204 | PASS |
+
+== Driver documents with number, clean review and the caller by uid
+| id | scenario | expected | result |
+|---|---|---|---|
+| DD2 | a van document type | 400 | PASS |
+| DD2b | a driver document without file | 400 | PASS |
+| DD3 | nothing refused was written | 3 | PASS |
+| DD1 | approving a municipal authorization without number | 400 | PASS |
+| DD4 | the specialized course is sent with its file and no number | 201 | PASS |
+| DD5 | the owner replaces the course's file while it is pending | 201 | PASS |
+| DD6 | the admin approves it with the number read from the file, resolved by uid | 200 | PASS |
+| DD7 | swapping the file returns it to pending without the number | 200 | PASS |
+| DD8 | rejecting without reason | 400 | PASS |
+| DD9 | the owner cannot review | 403 | PASS |
+| DD10 | the token's subject no longer matches an e-mail and the driver still lists their documents | 200 | PASS |
+| DD11 | another driver reads the document | 403 | PASS |
+
+== Regression
+| id | scenario | expected | result |
+|---|---|---|---|
+| G1 | the side photo still uploads | 201 | PASS |
+| G2 | the admin lists pending driver documents | 200 | PASS |
+
+TOTAL: 114 passed

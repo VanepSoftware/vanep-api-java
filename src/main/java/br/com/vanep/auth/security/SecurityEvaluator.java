@@ -12,6 +12,7 @@ import br.com.vanep.driverdocument.repository.DriverDocumentRepository;
 import br.com.vanep.driverrating.repository.DriverRatingRepository;
 import br.com.vanep.trip.repository.TripRepository;
 import br.com.vanep.vehicle.repository.VehicleRepository;
+import br.com.vanep.vehicledocument.repository.VehicleDocumentRepository;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 
@@ -30,6 +31,7 @@ public class SecurityEvaluator {
   private final AssistantRepository assistantRepository;
   private final ConversationRepository conversationRepository;
   private final ContractRepository contractRepository;
+  private final VehicleDocumentRepository vehicleDocumentRepository;
 
   public SecurityEvaluator(
       DriverRepository driverRepository,
@@ -43,7 +45,8 @@ public class SecurityEvaluator {
       TripRepository tripRepository,
       AssistantRepository assistantRepository,
       ConversationRepository conversationRepository,
-      ContractRepository contractRepository) {
+      ContractRepository contractRepository,
+      VehicleDocumentRepository vehicleDocumentRepository) {
     this.driverRepository = driverRepository;
     this.clientRepository = clientRepository;
     this.clientDriverRepository = clientDriverRepository;
@@ -56,6 +59,7 @@ public class SecurityEvaluator {
     this.assistantRepository = assistantRepository;
     this.conversationRepository = conversationRepository;
     this.contractRepository = contractRepository;
+    this.vehicleDocumentRepository = vehicleDocumentRepository;
   }
 
   public boolean isDriverOwner(String token, Authentication authentication) {
@@ -133,6 +137,16 @@ public class SecurityEvaluator {
         .flatMap(
             uid ->
                 driverDocumentRepository
+                    .findDriverUserTokenByDocumentToken(token)
+                    .map(driverUserToken -> driverUserToken.equals(uid)))
+        .orElse(false);
+  }
+
+  public boolean isVehicleDocumentOwner(String token, Authentication authentication) {
+    return SecurityHelper.getCallerUid(authentication)
+        .flatMap(
+            uid ->
+                vehicleDocumentRepository
                     .findDriverUserTokenByDocumentToken(token)
                     .map(driverUserToken -> driverUserToken.equals(uid)))
         .orElse(false);

@@ -28,7 +28,7 @@ public interface VehicleDocumentRepository extends JpaRepository<VehicleDocument
       value =
           """
           select document from VehicleDocumentModel document
-          join document.vehicle vehicle
+          join fetch document.vehicle vehicle
           where vehicle.token = :vehicleToken
             and (:documentType is null or document.documentType = :documentType)
             and (:status is null or document.review.status = :status)
@@ -82,7 +82,7 @@ public interface VehicleDocumentRepository extends JpaRepository<VehicleDocument
           JOIN vehicle ON vehicle.id = document.vehicle_id
           JOIN driver ON driver.id = vehicle.driver_id
           JOIN users u ON u.id = driver.user_id
-          WHERE document.token = :token AND vehicle.deleted_at IS NULL
+          WHERE document.token = :token
           """,
       nativeQuery = true)
   Optional<String> findDriverUserTokenByDocumentToken(@Param("token") String token);

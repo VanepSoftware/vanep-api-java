@@ -28,17 +28,20 @@ public interface DriverDocumentRepository
   @EntityGraph(attributePaths = {"driver.user", "file", "review.reviewedBy"})
   Page<DriverDocumentModel> findByDriverId(Long driverId, Pageable pageable);
 
+  // The list: every filter is optional, and the ones sent apply together.
   @EntityGraph(attributePaths = {"driver.user", "file", "review.reviewedBy"})
-  Page<DriverDocumentModel> findByDriverIdAndDocumentType(
-      Long driverId, DriverDocumentType documentType, Pageable pageable);
-
-  @EntityGraph(attributePaths = {"driver.user", "file", "review.reviewedBy"})
-  Page<DriverDocumentModel> findByDriverIdAndReviewStatus(
-      Long driverId, DocumentStatus status, Pageable pageable);
-
-  @EntityGraph(attributePaths = {"driver.user", "file", "review.reviewedBy"})
-  @Override
-  Page<DriverDocumentModel> findAll(Pageable pageable);
+  @Query(
+      """
+      select document from DriverDocumentModel document
+      where (:driverId is null or document.driver.id = :driverId)
+        and (:documentType is null or document.documentType = :documentType)
+        and (:status is null or document.review.status = :status)
+      """)
+  Page<DriverDocumentModel> findFiltered(
+      @Param("driverId") Long driverId,
+      @Param("documentType") DriverDocumentType documentType,
+      @Param("status") DocumentStatus status,
+      Pageable pageable);
 
   @Modifying
   @Query(
