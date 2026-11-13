@@ -1,5 +1,6 @@
 package br.com.vanep.drivercnh.controller;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -20,10 +21,14 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Locale;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.MessageSource;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor;
@@ -42,6 +47,7 @@ class DriverCnhControllerTest {
   @Autowired private UserRepository users;
   @Autowired private DriverRepository drivers;
   @Autowired private DriverCnhRepository cnhs;
+  @Autowired private MessageSource messages;
 
   private MockMvc mockMvc;
   private String driverEmail;
@@ -175,7 +181,7 @@ class DriverCnhControllerTest {
         """
         {
           "registrationNumber": "22222222222",
-          "category": "B",
+          "category": "D",
           "issueDate": "2021-06-10",
           "validUntil": "2031-06-10"
         }
@@ -195,7 +201,7 @@ class DriverCnhControllerTest {
         """
         {
           "registrationNumber": "22222222222",
-          "category": "B",
+          "category": "D",
           "issueDate": "2021-06-10",
           "validUntil": "2031-06-10",
           "issuingState": "SP"
@@ -211,7 +217,7 @@ class DriverCnhControllerTest {
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.token").exists())
         .andExpect(jsonPath("$.registrationNumber").value("22222222222"))
-        .andExpect(jsonPath("$.category").value("B"))
+        .andExpect(jsonPath("$.category").value("D"))
         .andExpect(jsonPath("$.driverToken").value(otherDriverToken))
         .andExpect(jsonPath("$.photoUrl").doesNotExist());
   }
@@ -236,13 +242,55 @@ class DriverCnhControllerTest {
         .andExpect(status().isBadRequest());
   }
 
+  @ParameterizedTest
+  @ValueSource(strings = {"A", "B", "C", "AB", "AC", "B EAR", "DE", "ACC", "F"})
+  void createReturns400ForACategoryThatDoesNotAllowSchoolTransport(String category)
+      throws Exception {
+    long before = cnhs.count();
+    mockMvc
+        .perform(
+            post("/api/driver-cnhs")
+                .with(otherDriverJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {"registrationNumber": "22222222222", "category": "%s",
+                     "issueDate": "2021-06-10", "validUntil": "2031-06-10"}
+                    """
+                        .formatted(category)))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.field").value("category"))
+        .andExpect(
+            jsonPath("$.detail")
+                .value(
+                    messages.getMessage(
+                        "driver_cnh.category.invalid", null, Locale.forLanguageTag("pt-BR"))));
+    assertThat(cnhs.count()).isEqualTo(before);
+  }
+
+  @Test
+  void theCategoryIsSavedTrimmedAndInUpperCase() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/driver-cnhs")
+                .with(otherDriverJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {"registrationNumber": "22222222222", "category": " ad ",
+                     "issueDate": "2021-06-10", "validUntil": "2031-06-10"}
+                    """))
+        .andExpect(status().isCreated())
+        .andExpect(jsonPath("$.category").value("AD"));
+  }
+
   @Test
   void createReturns409ForDuplicateRegistration() throws Exception {
     String body =
         """
         {
           "registrationNumber": "11111111111",
-          "category": "B",
+          "category": "D",
           "issueDate": "2021-06-10",
           "validUntil": "2031-06-10"
         }
@@ -263,7 +311,7 @@ class DriverCnhControllerTest {
         """
         {
           "registrationNumber": "33333333333",
-          "category": "B",
+          "category": "D",
           "issueDate": "2021-06-10",
           "validUntil": "2031-06-10"
         }

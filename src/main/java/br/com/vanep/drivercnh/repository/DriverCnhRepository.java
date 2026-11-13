@@ -14,6 +14,16 @@ public interface DriverCnhRepository extends JpaRepository<DriverCnhModel, Long>
 
   List<DriverCnhModel> findByDriverId(Long driverId);
 
+  @Query(
+      """
+      select cnh from DriverCnhModel cnh
+      join fetch cnh.driver driver
+      join fetch driver.user
+      left join fetch cnh.photo
+      where driver.id = :driverId
+      """)
+  List<DriverCnhModel> findWithDetailsByDriverId(@Param("driverId") Long driverId);
+
   boolean existsByRegistrationNumber(String registrationNumber);
 
   boolean existsByDriverId(Long driverId);

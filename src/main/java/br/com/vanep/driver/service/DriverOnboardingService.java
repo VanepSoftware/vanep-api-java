@@ -20,6 +20,8 @@ import br.com.vanep.driverdocument.repository.DriverDocumentRepository;
 import br.com.vanep.driverservicearea.repository.DriverServiceAreaRepository;
 import br.com.vanep.media.model.MediaFileModel;
 import br.com.vanep.media.web.MediaUrl;
+import br.com.vanep.schooltransportcredential.service.SchoolTransportCredentialPolicy;
+import br.com.vanep.schooltransportcredential.service.SchoolTransportCredentialService;
 import br.com.vanep.shared.document.enums.DocumentStatus;
 import br.com.vanep.shared.document.model.DocumentReview;
 import br.com.vanep.user.enums.UserType;
@@ -51,10 +53,13 @@ import org.springframework.web.server.ResponseStatusException;
 public class DriverOnboardingService {
 
   private static final List<DriverDocumentType> MANDATORY_DRIVER_DOCUMENT_TYPES =
-      List.of(DriverDocumentType.MUNICIPAL_AUTHORIZATION);
+      List.of(DriverDocumentType.SCHOOL_DRIVER_COURSE, DriverDocumentType.CRIMINAL_RECORD);
 
   private static final List<VehicleDocumentType> MANDATORY_VEHICLE_DOCUMENT_TYPES =
-      List.of(VehicleDocumentType.CRLV, VehicleDocumentType.VEHICLE_INSPECTION);
+      List.of(
+          VehicleDocumentType.CRLV,
+          VehicleDocumentType.VEHICLE_INSPECTION,
+          VehicleDocumentType.SCHOOL_VEHICLE_AUTHORIZATION);
 
   private final DriverRepository driverRepository;
   private final VehicleRepository vehicleRepository;
@@ -62,6 +67,7 @@ public class DriverOnboardingService {
   private final DriverDocumentRepository driverDocumentRepository;
   private final VehicleDocumentRepository vehicleDocumentRepository;
   private final DriverServiceAreaRepository driverServiceAreaRepository;
+  private final SchoolTransportCredentialService credentialService;
   private final UserService userService;
   private final DriverNotificationService driverNotificationService;
   private final DriverMapper mapper;
@@ -74,6 +80,7 @@ public class DriverOnboardingService {
       DriverDocumentRepository driverDocumentRepository,
       VehicleDocumentRepository vehicleDocumentRepository,
       DriverServiceAreaRepository driverServiceAreaRepository,
+      SchoolTransportCredentialService credentialService,
       UserService userService,
       DriverNotificationService driverNotificationService,
       DriverMapper mapper,
@@ -84,6 +91,7 @@ public class DriverOnboardingService {
     this.driverDocumentRepository = driverDocumentRepository;
     this.vehicleDocumentRepository = vehicleDocumentRepository;
     this.driverServiceAreaRepository = driverServiceAreaRepository;
+    this.credentialService = credentialService;
     this.userService = userService;
     this.driverNotificationService = driverNotificationService;
     this.mapper = mapper;
@@ -162,6 +170,8 @@ public class DriverOnboardingService {
     if (!cnhStep.completed()) {
       if (cnhStep.pendingItems().contains("cnh_expired")) {
         errors.add(message("driver.onboarding.cnh_expired"));
+      } else if (cnhStep.pendingItems().contains("cnh_category")) {
+        errors.add(message("driver.onboarding.cnh_category"));
       } else {
         errors.add(message("driver.onboarding.cnh_required"));
       }
@@ -231,14 +241,18 @@ public class DriverOnboardingService {
     if (activeCnhs.isEmpty()) {
       pending.add("cnh");
     } else {
-      boolean hasNonExpired =
+      LocalDate today = SchoolTransportCredentialService.today();
+      List<DriverCnhModel> validCnhs =
           activeCnhs.stream()
-              .anyMatch(
-                  cnh ->
-                      cnh.getValidUntil() != null
-                          && !cnh.getValidUntil().isBefore(LocalDate.now()));
-      if (!hasNonExpired) {
+              .filter(cnh -> cnh.getValidUntil() != null && !cnh.getValidUntil().isBefore(today))
+              .toList();
+      if (validCnhs.isEmpty()) {
         pending.add("cnh_expired");
+      } else if (validCnhs.stream()
+          .noneMatch(
+              cnh ->
+                  SchoolTransportCredentialPolicy.hasSchoolTransportCategory(cnh.getCategory()))) {
+        pending.add("cnh_category");
       }
     }
     return new DriverOnboardingStepDTO(pending.isEmpty(), pending);
@@ -246,7 +260,7 @@ public class DriverOnboardingService {
 
   DriverOnboardingDocumentsStepDTO evaluateDocumentsStep(
       DriverModel driver, List<VehicleModel> vehicles) {
-    LocalDate today = LocalDate.now();
+    LocalDate today = SchoolTransportCredentialService.today();
     List<DriverDocumentModel> driverDocuments =
         driverDocumentRepository.findByDriverId(driver.getId());
     List<DriverDocumentType> missingDriverTypes =
@@ -368,6 +382,11 @@ public class DriverOnboardingService {
     if (driver.getApprovalStatus() != DriverApprovalStatus.UNDER_REVIEW) {
       throw new ResponseStatusException(
           HttpStatus.BAD_REQUEST, message("driver.onboarding.not_under_review"));
+    }
+    if (!credentialService.hasAnyQualifiedVehicle(
+        driver.getId(), SchoolTransportCredentialService.today())) {
+      throw new ResponseStatusException(
+          HttpStatus.UNPROCESSABLE_CONTENT, message("driver.onboarding.documents_not_approved"));
     }
 
     driver.setApprovalStatus(DriverApprovalStatus.APPROVED);

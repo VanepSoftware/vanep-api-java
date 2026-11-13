@@ -1,5 +1,6 @@
 package br.com.vanep.driver.controller;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -23,6 +24,7 @@ import br.com.vanep.driverdocument.model.DriverDocumentModel;
 import br.com.vanep.driverdocument.repository.DriverDocumentRepository;
 import br.com.vanep.media.model.MediaFileModel;
 import br.com.vanep.media.repository.MediaFileRepository;
+import br.com.vanep.shared.document.enums.DocumentStatus;
 import br.com.vanep.state.model.StateModel;
 import br.com.vanep.state.repository.StateRepository;
 import br.com.vanep.user.enums.UserType;
@@ -37,10 +39,12 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Locale;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.MessageSource;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor;
@@ -67,6 +71,7 @@ class DriverOnboardingControllerTest {
   @Autowired private CityRepository cities;
   @Autowired private StateRepository states;
   @Autowired private CountryRepository countries;
+  @Autowired private MessageSource messages;
 
   private MockMvc mockMvc;
 
@@ -191,22 +196,42 @@ class DriverOnboardingControllerTest {
     cnh.setActive(true);
     driverCnhs.save(cnh);
 
-    DriverDocumentModel authorization = new DriverDocumentModel();
-    authorization.setDriver(driver);
-    authorization.setDocumentType(DriverDocumentType.MUNICIPAL_AUTHORIZATION);
-    authorization.setDocumentNumber("TE-0001/2026");
-    authorization.setFile(saveFile("municipal"));
-    driverDocuments.save(authorization);
+    for (DriverDocumentType type :
+        List.of(DriverDocumentType.SCHOOL_DRIVER_COURSE, DriverDocumentType.CRIMINAL_RECORD)) {
+      DriverDocumentModel document = new DriverDocumentModel();
+      document.setDriver(driver);
+      document.setDocumentType(type);
+      document.setFile(saveFile(type.name().toLowerCase()));
+      driverDocuments.save(document);
+    }
 
-    for (VehicleDocumentType type :
-        List.of(VehicleDocumentType.CRLV, VehicleDocumentType.VEHICLE_INSPECTION)) {
+    for (VehicleDocumentType type : VehicleDocumentType.values()) {
       VehicleDocumentModel doc = new VehicleDocumentModel();
       doc.setVehicle(vehicle);
       doc.setDocumentType(type);
+      doc.setDocumentNumber(
+          type == VehicleDocumentType.SCHOOL_VEHICLE_AUTHORIZATION ? "AUT-1" : null);
       doc.setExpiresAt(LocalDate.now().plusMonths(6));
       doc.setFile(saveFile(type.name().toLowerCase()));
       vehicleDocuments.save(doc);
     }
+  }
+
+  private void approveEveryDocument() {
+    driverDocuments
+        .findAll()
+        .forEach(
+            document -> {
+              document.getReview().setStatus(DocumentStatus.APPROVED);
+              driverDocuments.save(document);
+            });
+    vehicleDocuments
+        .findAll()
+        .forEach(
+            document -> {
+              document.getReview().setStatus(DocumentStatus.APPROVED);
+              vehicleDocuments.save(document);
+            });
   }
 
   private MediaFileModel saveFile(String name) {
@@ -243,7 +268,7 @@ class DriverOnboardingControllerTest {
         .andExpect(jsonPath("$.documentsStep.completed").value(false))
         .andExpect(
             jsonPath("$.documentsStep.missingDriverTypes")
-                .value(org.hamcrest.Matchers.contains("MUNICIPAL_AUTHORIZATION")))
+                .value(org.hamcrest.Matchers.contains("SCHOOL_DRIVER_COURSE", "CRIMINAL_RECORD")))
         .andExpect(jsonPath("$.documentsStep.vehicles").isEmpty());
   }
 
@@ -326,6 +351,8 @@ class DriverOnboardingControllerTest {
 
   @Test
   void approveDriverSuccessForAdmin() throws Exception {
+    completeAllRequirements();
+    approveEveryDocument();
     driver.setApprovalStatus(DriverApprovalStatus.UNDER_REVIEW);
     driver.setActive(false);
     driver = drivers.save(driver);
@@ -340,6 +367,8 @@ class DriverOnboardingControllerTest {
 
   @Test
   void approveDriverSuccessForAdminWithRoleAdminOnly() throws Exception {
+    completeAllRequirements();
+    approveEveryDocument();
     driver.setApprovalStatus(DriverApprovalStatus.UNDER_REVIEW);
     driver.setActive(false);
     driver = drivers.save(driver);
@@ -351,6 +380,37 @@ class DriverOnboardingControllerTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.approvalStatus").value("APPROVED"))
         .andExpect(jsonPath("$.active").value(true));
+  }
+
+  @Test
+  void approvingWithThePendingInspectionOfTheOnlyVanIsRefused() throws Exception {
+    completeAllRequirements();
+    approveEveryDocument();
+    VehicleDocumentModel inspection =
+        vehicleDocuments.findAll().stream()
+            .filter(
+                document -> document.getDocumentType() == VehicleDocumentType.VEHICLE_INSPECTION)
+            .findFirst()
+            .orElseThrow();
+    inspection.getReview().setStatus(DocumentStatus.PENDING);
+    vehicleDocuments.save(inspection);
+    driver.setApprovalStatus(DriverApprovalStatus.UNDER_REVIEW);
+    driver = drivers.save(driver);
+
+    mockMvc
+        .perform(
+            post("/api/drivers/" + driver.getToken() + "/approve").with(adminJwt(adminUserUid)))
+        .andExpect(status().isUnprocessableContent())
+        .andExpect(
+            jsonPath("$.detail")
+                .value(
+                    messages.getMessage(
+                        "driver.onboarding.documents_not_approved",
+                        null,
+                        Locale.forLanguageTag("pt-BR"))));
+
+    assertThat(drivers.findByToken(driver.getToken()).orElseThrow().getApprovalStatus())
+        .isEqualTo(DriverApprovalStatus.UNDER_REVIEW);
   }
 
   @Test

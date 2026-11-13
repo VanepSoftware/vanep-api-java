@@ -25,6 +25,17 @@ public interface DriverDocumentRepository
   @EntityGraph(attributePaths = {"driver.user", "file", "review.reviewedBy"})
   List<DriverDocumentModel> findByDriverId(Long driverId);
 
+  @Query(
+      """
+      select document from DriverDocumentModel document
+      join fetch document.driver driver
+      join fetch driver.user
+      left join fetch document.file
+      left join fetch document.review.reviewedBy
+      where driver.id = :driverId
+      """)
+  List<DriverDocumentModel> findWithDetailsByDriverId(@Param("driverId") Long driverId);
+
   @EntityGraph(attributePaths = {"driver.user", "file", "review.reviewedBy"})
   Page<DriverDocumentModel> findByDriverId(Long driverId, Pageable pageable);
 

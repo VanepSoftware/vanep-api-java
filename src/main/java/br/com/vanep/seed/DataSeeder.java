@@ -29,6 +29,7 @@ import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
 import br.com.vanep.vehicle.seed.VehicleSeeder;
+import br.com.vanep.vehicledocument.seed.VehicleDocumentSeeder;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
@@ -64,6 +65,7 @@ public class DataSeeder implements ApplicationRunner {
   private final TripSeeder tripSeeder;
   private final ClientDriverSeeder clientDriverSeeder;
   private final VehicleSeeder vehicleSeeder;
+  private final VehicleDocumentSeeder vehicleDocumentSeeder;
   private final ContractSeeder contractSeeder;
   private final ServiceRequestSeeder serviceRequestSeeder;
   private final ProposalSeeder proposalSeeder;
@@ -100,6 +102,7 @@ public class DataSeeder implements ApplicationRunner {
       TripSeeder tripSeeder,
       ClientDriverSeeder clientDriverSeeder,
       VehicleSeeder vehicleSeeder,
+      VehicleDocumentSeeder vehicleDocumentSeeder,
       ContractSeeder contractSeeder,
       ServiceRequestSeeder serviceRequestSeeder,
       ProposalSeeder proposalSeeder,
@@ -119,6 +122,7 @@ public class DataSeeder implements ApplicationRunner {
     this.tripSeeder = tripSeeder;
     this.clientDriverSeeder = clientDriverSeeder;
     this.vehicleSeeder = vehicleSeeder;
+    this.vehicleDocumentSeeder = vehicleDocumentSeeder;
     this.contractSeeder = contractSeeder;
     this.serviceRequestSeeder = serviceRequestSeeder;
     this.proposalSeeder = proposalSeeder;
@@ -144,6 +148,7 @@ public class DataSeeder implements ApplicationRunner {
     driverCnhSeeder.seed();
     driverDocumentSeeder.seed();
     vehicleSeeder.seed();
+    vehicleDocumentSeeder.seed();
     clientDriverSeeder.seed();
     contractSeeder.seed();
     serviceRequestSeeder.seed();

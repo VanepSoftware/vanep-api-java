@@ -482,10 +482,10 @@ decide "/api/driver-documents/$COURSE/status" "$DRIVER" '{"status": "APPROVED"}'
 expect DD9 "the owner cannot review" 403
 DRIVER_USER=$(sql "select token from users where email = '$SEED_DRIVER_EMAIL'")
 sql "update users set email = 'renamed.qa@seed.vanep.com.br' where token = '$DRIVER_USER'" >/dev/null
-request GET /api/driver-documents "$DRIVER"
+request GET "/api/driver-documents?size=500" "$DRIVER"
+sql "update users set email = '$SEED_DRIVER_EMAIL' where token = '$DRIVER_USER'" >/dev/null
 expect DD10 "the token's subject no longer matches an e-mail and the driver still lists their documents" 200 \
   '[.content[].token] | index("'"$COURSE"'") != null'
-sql "update users set email = '$SEED_DRIVER_EMAIL' where token = '$DRIVER_USER'" >/dev/null
 request GET "/api/driver-documents/$COURSE" "$OTHER"
 expect DD11 "another driver reads the document" 403
 
@@ -494,6 +494,176 @@ upload "/api/vehicles/$VAN/photo-side" "$DRIVER"
 expect G1 "the side photo still uploads" 201
 request GET "/api/driver-documents?status=PENDING" "$ADMIN"
 expect G2 "the admin lists pending driver documents" 200 '.totalElements >= 1'
+
+# ---------------------------------------------------------------------------------------------
+# Part 4 — PR 3: credentials, the legal onboarding and the approval
+# ---------------------------------------------------------------------------------------------
+
+valid_cpf() {
+  local digits=() sum index check
+  for index in 0 1 2 3 4 5 6 7 8; do digits+=($((RANDOM % 10))); done
+  for check in 9 10; do
+    sum=0
+    for ((index = 0; index < check; index++)); do sum=$((sum + digits[index] * (check + 1 - index))); done
+    sum=$(((sum * 10) % 11 % 10))
+    digits+=("$sum")
+  done
+  printf '%s' "${digits[@]}"
+}
+
+credentials() { request GET "/api/vehicles/$1/school-transport-credentials" "$2"; }
+satisfied_of() { jq -r --arg r "$1" '.requirements[] | select(.requirement == $r) | .satisfied' <<<"$RESP_BODY"; }
+
+RUN=$(date +%s)
+NEW_EMAIL="qa.motorista.$RUN@vanep.test"
+LETTERS=ABCDEFGHIJKLMNOPQRSTUVWXYZ
+random_plate() { printf 'Q%s%s%d%s%02d' "$1" "${LETTERS:RANDOM%26:1}" $((RANDOM % 10)) "${LETTERS:RANDOM%26:1}" $((RANDOM % 100)); }
+NEW_PLATE=$(random_plate D)
+SECOND_PLATE=$(random_plate E)
+CNH_NUMBER="9$(printf '%010d' $((RUN % 10000000000)))"
+SOON=$(date -v+1y +%F 2>/dev/null || date -d '+1 year' +%F)
+
+table "A new driver from scratch"
+NEW_PASSWORD='Senha@Forte2026'
+request POST /api/auth/signup/driver "" "{\"name\": \"Motorista QA\", \"email\": \"$NEW_EMAIL\", \"password\": \"$NEW_PASSWORD\", \"document\": \"$(valid_cpf)\", \"acceptTerms\": true, \"basePrice\": 180.00}"
+expect N1 "a new driver signs up" 201
+# The e-mail code goes by mail (disabled here) and the city comes from Google Places (unreachable):
+# both are set directly, they are not what this change delivers.
+sql "insert into address (token, city_id, street) select 'qa$RUN', city_id, 'Rua do QA' from address order by id limit 1" >/dev/null
+sql "update users set verified = true, address_id = (select id from address where token = 'qa$RUN') where email = '$NEW_EMAIL'" >/dev/null
+NEW=$(SEED_PASSWORD=$NEW_PASSWORD login "$NEW_EMAIL")
+NEW_DRIVER=$(sql "select d.token from driver d join users u on u.id = d.user_id where u.email = '$NEW_EMAIL'")
+request POST /api/vehicles/me "$NEW" "{\"plate\": \"$NEW_PLATE\", \"brand\": \"Fiat\", \"model\": \"Ducato\", \"manufactureYear\": 2023, \"color\": \"Branca\", \"capacity\": 15}"
+expect N2 "the driver adds a van" 201
+NVAN=$(jq -r .token <<<"$RESP_BODY")
+credentials "$NVAN" "$NEW"
+expect N3 "a new van: nothing satisfied but the optional municipal authorization is not required" 200 \
+  '.satisfied == false and ([.requirements[] | select(.optional | not) | .satisfied] | all(. == false)) and ([.requirements[] | select(.optional)] | length == 1)'
+request POST /api/driver-cnhs "$NEW" "{\"registrationNumber\": \"$CNH_NUMBER\", \"category\": \"B\", \"issueDate\": \"2018-04-10\", \"validUntil\": \"$SOON\"}"
+expect N4 "a category B license is refused on the category field" 400 '.field == "category" and (.detail | contains("D, E, AD"))'
+check N4b "the refused license was not saved" "0" \
+  "$(sql "select count(*) from driver_cnh c join driver d on d.id = c.driver_id where d.token = '$NEW_DRIVER'")"
+request POST /api/driver-cnhs "$NEW" "{\"registrationNumber\": \"$CNH_NUMBER\", \"category\": \"D\", \"issueDate\": \"2018-04-10\", \"validUntil\": \"$SOON\"}"
+expect N4c "the driver registers a category D license" 201
+CNH=$(jq -r .token <<<"$RESP_BODY")
+# A license saved before the rule with category B is set directly: the API no longer accepts it.
+sql "update driver_cnh set category = 'B' where token = '$CNH'" >/dev/null
+request GET "/api/driver-cnhs/$CNH" "$NEW"
+expect N4d "a license saved before the rule with category B is still read" 200 '.category == "B"'
+request GET /api/drivers/me/onboarding "$NEW"
+expect N5 "the onboarding reports cnh_category" 200 '.cnhStep.completed == false and .cnhStep.pendingItems == ["cnh_category"]'
+credentials "$NVAN" "$NEW"
+check N6 "category B does not satisfy DRIVER_LICENSE" "false" "$(satisfied_of DRIVER_LICENSE)"
+request PUT "/api/driver-cnhs/$CNH" "$NEW" "{\"registrationNumber\": \"$CNH_NUMBER\", \"category\": \"B\", \"issueDate\": \"2018-04-10\", \"validUntil\": \"$SOON\"}"
+expect N6b "changing the license to category B is refused" 400 '.field == "category"'
+request PUT "/api/driver-cnhs/$CNH" "$NEW" "{\"registrationNumber\": \"$CNH_NUMBER\", \"category\": \"AD\", \"issueDate\": \"2018-04-10\", \"validUntil\": \"$SOON\"}"
+expect N7 "the driver corrects the license to category AD" 200
+request GET /api/drivers/me/onboarding "$NEW"
+expect N8 "the license step is complete" 200 '.cnhStep.completed == true'
+credentials "$NVAN" "$NEW"
+check N9 "category AD satisfies DRIVER_LICENSE" "true" "$(satisfied_of DRIVER_LICENSE)"
+
+table "Documents one at a time"
+send_doc "/api/vehicles/$NVAN/documents" "$NEW" '{"documentType": "CRLV", "documentNumber": "RENAVAM-QA", "expiresAt": "2027-09-30"}'
+NCRLV=$(jq -r .token <<<"$RESP_BODY")
+upload_pdf "/api/vehicle-documents/$NCRLV/file" "$NEW"
+expect E1 "today the driver only sends the CRLV" 201
+request GET /api/drivers/me/onboarding "$NEW"
+expect E2 "the documents step is incomplete, lists what is left and keeps the CRLV" 200 \
+  '.documentsStep.completed == false and .documentsStep.missingDriverTypes == ["SCHOOL_DRIVER_COURSE", "CRIMINAL_RECORD"]
+   and (.documentsStep.vehicles[0].missingTypes == ["VEHICLE_INSPECTION", "SCHOOL_VEHICLE_AUTHORIZATION"])
+   and ([.documentsStep.vehicles[0].uploadedDocuments[].documentType] == ["CRLV"])'
+request POST /api/drivers/me/submit-onboarding "$NEW"
+expect E3 "submitting now is refused, naming the types and the plate" 422 \
+  '.detail | contains("SCHOOL_DRIVER_COURSE, CRIMINAL_RECORD") and contains("'"$NEW_PLATE"': VEHICLE_INSPECTION, SCHOOL_VEHICLE_AUTHORIZATION")'
+check E4 "the refused submission changed nothing" "PENDING 1" \
+  "$(sql "select d.approval_status || ' ' || (select count(*) from vehicle_document vd join vehicle v on v.id = vd.vehicle_id where v.token = '$NVAN') from driver d where d.token = '$NEW_DRIVER'")"
+for doc in 'SCHOOL_DRIVER_COURSE CURSO-QA' 'CRIMINAL_RECORD CERT-QA'; do
+  set -- $doc
+  send_doc /api/driver-documents "$NEW" "{\"documentType\": \"$1\", \"documentNumber\": \"$2\"}"
+  token=$(jq -r .token <<<"$RESP_BODY")
+  upload_pdf "/api/driver-documents/$token/file" "$NEW"
+done
+expect E5 "a week later the driver sends the course and the criminal record" 201
+send_doc "/api/vehicles/$NVAN/documents" "$NEW" '{"documentType": "VEHICLE_INSPECTION", "expiresAt": "2027-05-31"}'
+NINSP=$(jq -r .token <<<"$RESP_BODY")
+upload_pdf "/api/vehicle-documents/$NINSP/file" "$NEW"
+request POST /api/drivers/me/submit-onboarding "$NEW"
+expect E6 "still missing the school authorization of any van" 422 '.detail | contains("'"$NEW_PLATE"': SCHOOL_VEHICLE_AUTHORIZATION")'
+send_doc "/api/vehicles/$NVAN/documents" "$NEW" '{"documentType": "SCHOOL_VEHICLE_AUTHORIZATION", "documentNumber": "AUT-QA-77", "expiresAt": "2027-02-28"}'
+NAUT=$(jq -r .token <<<"$RESP_BODY")
+upload_pdf "/api/vehicle-documents/$NAUT/file" "$NEW"
+request POST /api/vehicles/me "$NEW" "{\"plate\": \"$SECOND_PLATE\", \"brand\": \"Renault\", \"model\": \"Master\", \"manufactureYear\": 2021, \"color\": \"Prata\", \"capacity\": 16}"
+expect E7 "the driver adds a second van with no documents" 201
+NVAN2=$(jq -r .token <<<"$RESP_BODY")
+request GET /api/drivers/me/onboarding "$NEW"
+expect E8 "one complete van is enough; the second shows its three types missing" 200 \
+  '.documentsStep.completed == true and .canSubmit == true
+   and ([.documentsStep.vehicles[] | select(.vehicleToken == "'"$NVAN2"'") | .missingTypes] == [["CRLV", "VEHICLE_INSPECTION", "SCHOOL_VEHICLE_AUTHORIZATION"]])'
+request POST /api/drivers/me/submit-onboarding "$NEW"
+expect E9 "the driver submits" 200 '.approvalStatus == "UNDER_REVIEW"'
+send_doc "/api/vehicles/$NVAN/documents" "$NEW" '{"documentType": "VEHICLE_INSPECTION", "expiresAt": "2027-11-30"}'
+expect E10 "a driver under review can still add a document" 201
+EXTRA=$(jq -r .token <<<"$RESP_BODY")
+request DELETE "/api/vehicle-documents/$EXTRA" "$NEW"
+
+table "Approving the driver"
+request POST "/api/drivers/$NEW_DRIVER/approve" "$ADMIN"
+expect A1x "approving with the documents still pending" 422 \
+  '.detail == "O motorista só pode ser aprovado quando pelo menos uma van ativa tiver todos os documentos de transporte escolar aprovados e válidos."'
+check A2x "the driver is still under review" "UNDER_REVIEW" "$(sql "select approval_status from driver where token = '$NEW_DRIVER'")"
+request POST "/api/drivers/$NEW_DRIVER/reject" "$ADMIN" '{"reason": "Vistoria ilegível"}'
+expect A3x "the admin rejects the driver: the inspection is unreadable" 200 '.approvalStatus == "REJECTED"'
+upload_pdf "/api/vehicle-documents/$NINSP/file" "$NEW"
+request POST /api/drivers/me/submit-onboarding "$NEW"
+expect A4x "the driver uploads a new file and submits again" 200 '.approvalStatus == "UNDER_REVIEW"'
+for token in $(sql "select dd.token from driver_document dd join driver d on d.id = dd.driver_id where d.token = '$NEW_DRIVER' and dd.deleted_at is null"); do
+  decide "/api/driver-documents/$token/status" "$ADMIN" '{"status": "APPROVED", "reviewMethod": "MANUAL"}'
+done
+for token in "$NCRLV" "$NAUT"; do
+  decide "/api/vehicle-documents/$token/status" "$ADMIN" '{"status": "APPROVED", "reviewMethod": "MANUAL"}'
+done
+credentials "$NVAN" "$NEW"
+expect A5x "with the inspection still pending only VEHICLE_INSPECTION fails" 200 \
+  '.satisfied == false and ([.requirements[] | select((.satisfied | not) and (.optional | not)) | .requirement] == ["VEHICLE_INSPECTION"])'
+request POST "/api/drivers/$NEW_DRIVER/approve" "$ADMIN"
+expect A6x "approving with the inspection of the only complete van pending" 422
+decide "/api/vehicle-documents/$NINSP/status" "$ADMIN" '{"status": "APPROVED", "reviewMethod": "MANUAL"}'
+credentials "$NVAN" "$NEW"
+expect A7x "everything approved: the van passes, with each number and expiry" 200 \
+  '.satisfied == true and ([.requirements[] | select(.requirement == "SCHOOL_VEHICLE_AUTHORIZATION")][0] | .number == "AUT-QA-77" and .validUntil == "2027-02-28")
+   and ([.requirements[] | select(.requirement == "DRIVER_LICENSE")][0].number == "'"$CNH_NUMBER"'")'
+credentials "$NVAN2" "$NEW"
+expect A8x "the second van shows the three vehicle requirements missing" 200 \
+  '[.requirements[] | select((.satisfied | not) and (.optional | not)) | .requirement] == ["VEHICLE_REGISTRATION", "VEHICLE_INSPECTION", "SCHOOL_VEHICLE_AUTHORIZATION"]'
+request POST "/api/drivers/$NEW_DRIVER/approve" "$ADMIN"
+expect A9x "the admin approves the driver" 200 '.approvalStatus == "APPROVED"'
+
+table "Credentials over time and access"
+# The API counts days in America/Sao_Paulo; current_date is the day of the database (UTC), which
+# is already tomorrow after 21:00 in Sao Paulo.
+SERVICE_TODAY="(now() at time zone 'America/Sao_Paulo')::date"
+sql "update vehicle_document set expires_at = $SERVICE_TODAY - 1 where token = '$NINSP'" >/dev/null
+credentials "$NVAN" "$NEW"
+check T1 "an inspection expired yesterday makes VEHICLE_INSPECTION fail" "false" "$(satisfied_of VEHICLE_INSPECTION)"
+sql "update vehicle_document set expires_at = $SERVICE_TODAY where token = '$NINSP'" >/dev/null
+credentials "$NVAN" "$NEW"
+check T2 "an inspection valid until today passes" "true" "$(satisfied_of VEHICLE_INSPECTION)"
+credentials "$VAN" "$DRIVER"
+expect T3 "the seed driver's van passes" 200 '.satisfied == true'
+credentials "$VAN" "$ADMIN"
+expect T4 "the admin reads it with show_vehicle" 200
+credentials "$VAN" "$NEW"
+expect T5 "another driver is refused" 403
+credentials "$VAN" "$CLIENT"
+expect T6 "a client is refused" 403
+credentials "$VAN" ""
+expect T7 "no token" 401
+credentials unknown-van "$ADMIN"
+expect T8 "an unknown van" 404
+request DELETE "/api/vehicles/$NVAN2" "$NEW"
+credentials "$NVAN2" "$NEW"
+expect T9 "a removed van" 404
 
 echo
 echo "TOTAL: $PASSED passed"

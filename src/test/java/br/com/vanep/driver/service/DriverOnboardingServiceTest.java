@@ -5,7 +5,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -27,6 +30,7 @@ import br.com.vanep.driverdocument.repository.DriverDocumentRepository;
 import br.com.vanep.driverservicearea.model.DriverServiceAreaModel;
 import br.com.vanep.driverservicearea.repository.DriverServiceAreaRepository;
 import br.com.vanep.media.model.MediaFileModel;
+import br.com.vanep.schooltransportcredential.service.SchoolTransportCredentialService;
 import br.com.vanep.shared.document.enums.DocumentStatus;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
@@ -44,6 +48,8 @@ import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.MessageSource;
@@ -63,6 +69,7 @@ class DriverOnboardingServiceTest {
   @Mock private DriverDocumentRepository driverDocumentRepository;
   @Mock private VehicleDocumentRepository vehicleDocumentRepository;
   @Mock private DriverServiceAreaRepository driverServiceAreaRepository;
+  @Mock private SchoolTransportCredentialService credentialService;
   @Mock private UserService userService;
   @Mock private DriverNotificationService driverNotificationService;
   @Mock private DriverMapper mapper;
@@ -83,6 +90,7 @@ class DriverOnboardingServiceTest {
             driverDocumentRepository,
             vehicleDocumentRepository,
             driverServiceAreaRepository,
+            credentialService,
             userService,
             driverNotificationService,
             mapper,
@@ -137,6 +145,27 @@ class DriverOnboardingServiceTest {
     return doc;
   }
 
+  private List<DriverDocumentModel> completeDriverDocuments() {
+    return List.of(
+        driverDocument(DriverDocumentType.SCHOOL_DRIVER_COURSE, true),
+        driverDocument(DriverDocumentType.CRIMINAL_RECORD, true));
+  }
+
+  private List<VehicleDocumentModel> completeVanDocuments(VehicleModel vehicle) {
+    return List.of(
+        vehicleDocument(vehicle, VehicleDocumentType.CRLV, true),
+        vehicleDocument(vehicle, VehicleDocumentType.VEHICLE_INSPECTION, true),
+        vehicleDocument(vehicle, VehicleDocumentType.SCHOOL_VEHICLE_AUTHORIZATION, true));
+  }
+
+  private static DriverCnhModel cnh(String category, LocalDate validUntil) {
+    DriverCnhModel cnh = new DriverCnhModel();
+    cnh.setActive(true);
+    cnh.setCategory(category);
+    cnh.setValidUntil(validUntil);
+    return cnh;
+  }
+
   private MediaFileModel file(String name) {
     MediaFileModel file = new MediaFileModel();
     file.setToken("media-token-" + name.toLowerCase());
@@ -146,21 +175,15 @@ class DriverOnboardingServiceTest {
   private void stubReadyToSubmit(VehicleModel vehicle) {
     user.setAddressId(55L);
     when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of(vehicle));
-    DriverCnhModel cnh = new DriverCnhModel();
-    cnh.setActive(true);
-    cnh.setValidUntil(LocalDate.now().plusYears(1));
+    DriverCnhModel cnh = cnh("D", LocalDate.now().plusYears(1));
     when(driverCnhRepository.findByDriverId(20L)).thenReturn(List.of(cnh));
     stubCompleteDocuments(vehicle);
   }
 
   private void stubCompleteDocuments(VehicleModel vehicle) {
-    when(driverDocumentRepository.findByDriverId(20L))
-        .thenReturn(List.of(driverDocument(DriverDocumentType.MUNICIPAL_AUTHORIZATION, true)));
+    when(driverDocumentRepository.findByDriverId(20L)).thenReturn(completeDriverDocuments());
     when(vehicleDocumentRepository.findByVehicleIdIn(List.of(vehicle.getId())))
-        .thenReturn(
-            List.of(
-                vehicleDocument(vehicle, VehicleDocumentType.CRLV, true),
-                vehicleDocument(vehicle, VehicleDocumentType.VEHICLE_INSPECTION, true)));
+        .thenReturn(completeVanDocuments(vehicle));
   }
 
   private void stubDriverWithArea() {
@@ -169,9 +192,7 @@ class DriverOnboardingServiceTest {
     DriverServiceAreaModel area = new DriverServiceAreaModel();
     area.setCity(new CityModel());
     when(driverServiceAreaRepository.findByDriverId(20L)).thenReturn(List.of(area));
-    DriverCnhModel cnh = new DriverCnhModel();
-    cnh.setActive(true);
-    cnh.setValidUntil(LocalDate.now().plusYears(2));
+    DriverCnhModel cnh = cnh("D", LocalDate.now().plusYears(2));
     when(driverCnhRepository.findByDriverId(20L)).thenReturn(List.of(cnh));
   }
 
@@ -197,7 +218,8 @@ class DriverOnboardingServiceTest {
     assertThat(status.cnhStep().pendingItems()).contains("cnh");
     assertThat(status.documentsStep().completed()).isFalse();
     assertThat(status.documentsStep().missingDriverTypes())
-        .containsExactly(DriverDocumentType.MUNICIPAL_AUTHORIZATION);
+        .containsExactly(
+            DriverDocumentType.SCHOOL_DRIVER_COURSE, DriverDocumentType.CRIMINAL_RECORD);
     assertThat(status.documentsStep().vehicles()).isEmpty();
   }
 
@@ -221,7 +243,7 @@ class DriverOnboardingServiceTest {
               assertThat(vanStep.plate()).isEqualTo("ABC1D23");
               assertThat(vanStep.completed()).isTrue();
               assertThat(vanStep.missingTypes()).isEmpty();
-              assertThat(vanStep.uploadedDocuments()).hasSize(2);
+              assertThat(vanStep.uploadedDocuments()).hasSize(3);
             });
   }
 
@@ -231,13 +253,9 @@ class DriverOnboardingServiceTest {
     VehicleModel complete = vehicle(1L, "ABC1D23");
     VehicleModel bare = vehicle(2L, "XYZ9K87");
     when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of(complete, bare));
-    when(driverDocumentRepository.findByDriverId(20L))
-        .thenReturn(List.of(driverDocument(DriverDocumentType.MUNICIPAL_AUTHORIZATION, true)));
+    when(driverDocumentRepository.findByDriverId(20L)).thenReturn(completeDriverDocuments());
     when(vehicleDocumentRepository.findByVehicleIdIn(List.of(1L, 2L)))
-        .thenReturn(
-            List.of(
-                vehicleDocument(complete, VehicleDocumentType.CRLV, true),
-                vehicleDocument(complete, VehicleDocumentType.VEHICLE_INSPECTION, true)));
+        .thenReturn(completeVanDocuments(complete));
 
     DriverOnboardingStatusResponseDTO status = service.getOnboardingStatus("user-token-10");
 
@@ -246,7 +264,10 @@ class DriverOnboardingServiceTest {
         .extracting(vanStep -> vanStep.plate(), vanStep -> vanStep.completed())
         .containsExactly(tuple("ABC1D23", true), tuple("XYZ9K87", false));
     assertThat(status.documentsStep().vehicles().get(1).missingTypes())
-        .containsExactly(VehicleDocumentType.CRLV, VehicleDocumentType.VEHICLE_INSPECTION);
+        .containsExactly(
+            VehicleDocumentType.CRLV,
+            VehicleDocumentType.VEHICLE_INSPECTION,
+            VehicleDocumentType.SCHOOL_VEHICLE_AUTHORIZATION);
   }
 
   @Test
@@ -255,8 +276,7 @@ class DriverOnboardingServiceTest {
     VehicleModel first = vehicle(1L, "ABC1D23");
     VehicleModel second = vehicle(2L, "XYZ9K87");
     when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of(first, second));
-    when(driverDocumentRepository.findByDriverId(20L))
-        .thenReturn(List.of(driverDocument(DriverDocumentType.MUNICIPAL_AUTHORIZATION, true)));
+    when(driverDocumentRepository.findByDriverId(20L)).thenReturn(completeDriverDocuments());
     when(vehicleDocumentRepository.findByVehicleIdIn(List.of(1L, 2L)))
         .thenReturn(
             List.of(
@@ -269,7 +289,10 @@ class DriverOnboardingServiceTest {
     assertThat(status.documentsStep().vehicles())
         .extracting(vanStep -> vanStep.missingTypes())
         .containsExactly(
-            List.of(VehicleDocumentType.VEHICLE_INSPECTION), List.of(VehicleDocumentType.CRLV));
+            List.of(
+                VehicleDocumentType.VEHICLE_INSPECTION,
+                VehicleDocumentType.SCHOOL_VEHICLE_AUTHORIZATION),
+            List.of(VehicleDocumentType.CRLV, VehicleDocumentType.SCHOOL_VEHICLE_AUTHORIZATION));
   }
 
   @Test
@@ -278,8 +301,7 @@ class DriverOnboardingServiceTest {
     VehicleModel inactive = vehicle(1L, "ABC1D23");
     inactive.setActive(false);
     when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of(inactive));
-    when(driverDocumentRepository.findByDriverId(20L))
-        .thenReturn(List.of(driverDocument(DriverDocumentType.MUNICIPAL_AUTHORIZATION, true)));
+    when(driverDocumentRepository.findByDriverId(20L)).thenReturn(completeDriverDocuments());
 
     DriverOnboardingStatusResponseDTO status = service.getOnboardingStatus("user-token-10");
 
@@ -294,11 +316,13 @@ class DriverOnboardingServiceTest {
     when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of(van));
     VehicleDocumentModel rejected = vehicleDocument(van, VehicleDocumentType.CRLV, true);
     rejected.getReview().setStatus(DocumentStatus.REJECTED);
-    when(driverDocumentRepository.findByDriverId(20L))
-        .thenReturn(List.of(driverDocument(DriverDocumentType.MUNICIPAL_AUTHORIZATION, true)));
+    when(driverDocumentRepository.findByDriverId(20L)).thenReturn(completeDriverDocuments());
     when(vehicleDocumentRepository.findByVehicleIdIn(List.of(1L)))
         .thenReturn(
-            List.of(rejected, vehicleDocument(van, VehicleDocumentType.VEHICLE_INSPECTION, true)));
+            List.of(
+                rejected,
+                vehicleDocument(van, VehicleDocumentType.VEHICLE_INSPECTION, true),
+                vehicleDocument(van, VehicleDocumentType.SCHOOL_VEHICLE_AUTHORIZATION, true)));
 
     DriverOnboardingStatusResponseDTO status = service.getOnboardingStatus("user-token-10");
 
@@ -311,22 +335,28 @@ class DriverOnboardingServiceTest {
     stubDriverWithArea();
     VehicleModel van = vehicle(1L, "ABC1D23");
     when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of(van));
-    DriverDocumentModel expiredAuthorization =
-        driverDocument(DriverDocumentType.MUNICIPAL_AUTHORIZATION, true);
-    expiredAuthorization.setExpiresAt(LocalDate.now().minusDays(1));
+    DriverDocumentModel expiredCourse =
+        driverDocument(DriverDocumentType.SCHOOL_DRIVER_COURSE, true);
+    expiredCourse.setExpiresAt(LocalDate.now().minusDays(1));
     VehicleDocumentModel expiredInspection =
         vehicleDocument(van, VehicleDocumentType.VEHICLE_INSPECTION, true);
     expiredInspection.setExpiresAt(LocalDate.now().minusDays(1));
     VehicleDocumentModel crlv = vehicleDocument(van, VehicleDocumentType.CRLV, true);
     crlv.setExpiresAt(LocalDate.now());
-    when(driverDocumentRepository.findByDriverId(20L)).thenReturn(List.of(expiredAuthorization));
+    when(driverDocumentRepository.findByDriverId(20L))
+        .thenReturn(
+            List.of(expiredCourse, driverDocument(DriverDocumentType.CRIMINAL_RECORD, true)));
     when(vehicleDocumentRepository.findByVehicleIdIn(List.of(1L)))
-        .thenReturn(List.of(crlv, expiredInspection));
+        .thenReturn(
+            List.of(
+                crlv,
+                expiredInspection,
+                vehicleDocument(van, VehicleDocumentType.SCHOOL_VEHICLE_AUTHORIZATION, true)));
 
     DriverOnboardingStatusResponseDTO status = service.getOnboardingStatus("user-token-10");
 
     assertThat(status.documentsStep().missingDriverTypes())
-        .containsExactly(DriverDocumentType.MUNICIPAL_AUTHORIZATION);
+        .containsExactly(DriverDocumentType.SCHOOL_DRIVER_COURSE);
     assertThat(status.documentsStep().vehicles().get(0).missingTypes())
         .containsExactly(VehicleDocumentType.VEHICLE_INSPECTION);
   }
@@ -336,13 +366,13 @@ class DriverOnboardingServiceTest {
     stubDriverWithArea();
     VehicleModel van = vehicle(1L, "ABC1D23");
     when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of(van));
-    when(driverDocumentRepository.findByDriverId(20L))
-        .thenReturn(List.of(driverDocument(DriverDocumentType.MUNICIPAL_AUTHORIZATION, true)));
+    when(driverDocumentRepository.findByDriverId(20L)).thenReturn(completeDriverDocuments());
     when(vehicleDocumentRepository.findByVehicleIdIn(List.of(1L)))
         .thenReturn(
             List.of(
                 vehicleDocument(van, VehicleDocumentType.CRLV, false),
-                vehicleDocument(van, VehicleDocumentType.VEHICLE_INSPECTION, true)));
+                vehicleDocument(van, VehicleDocumentType.VEHICLE_INSPECTION, true),
+                vehicleDocument(van, VehicleDocumentType.SCHOOL_VEHICLE_AUTHORIZATION, true)));
 
     DriverOnboardingStatusResponseDTO status = service.getOnboardingStatus("user-token-10");
 
@@ -353,11 +383,178 @@ class DriverOnboardingServiceTest {
   }
 
   @Test
+  void theMunicipalAuthorizationIsNotRequired() {
+    stubDriverWithArea();
+    VehicleModel van = vehicle(1L, "ABC1D23");
+    when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of(van));
+    stubCompleteDocuments(van);
+
+    DriverOnboardingStatusResponseDTO status = service.getOnboardingStatus("user-token-10");
+
+    assertThat(status.documentsStep().completed()).isTrue();
+    assertThat(status.documentsStep().uploadedDocuments())
+        .extracting(document -> document.documentType())
+        .doesNotContain(DriverDocumentType.MUNICIPAL_AUTHORIZATION);
+  }
+
+  @Test
+  void missingTheCourseLeavesTheStepIncompleteWithTheCourse() {
+    stubDriverWithArea();
+    VehicleModel van = vehicle(1L, "ABC1D23");
+    when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of(van));
+    when(driverDocumentRepository.findByDriverId(20L))
+        .thenReturn(List.of(driverDocument(DriverDocumentType.CRIMINAL_RECORD, true)));
+    when(vehicleDocumentRepository.findByVehicleIdIn(List.of(1L)))
+        .thenReturn(completeVanDocuments(van));
+
+    DriverOnboardingStatusResponseDTO status = service.getOnboardingStatus("user-token-10");
+
+    assertThat(status.documentsStep().completed()).isFalse();
+    assertThat(status.documentsStep().missingDriverTypes())
+        .containsExactly(DriverDocumentType.SCHOOL_DRIVER_COURSE);
+    assertThat(status.canSubmit()).isFalse();
+  }
+
+  @Test
+  void savingOnlyTheCrlvKeepsItAndListsWhatIsLeft() {
+    stubDriverWithArea();
+    VehicleModel van = vehicle(1L, "ABC1D23");
+    when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of(van));
+    when(driverDocumentRepository.findByDriverId(20L)).thenReturn(List.of());
+    when(vehicleDocumentRepository.findByVehicleIdIn(List.of(1L)))
+        .thenReturn(List.of(vehicleDocument(van, VehicleDocumentType.CRLV, true)));
+
+    DriverOnboardingStatusResponseDTO status = service.getOnboardingStatus("user-token-10");
+
+    assertThat(status.documentsStep().completed()).isFalse();
+    assertThat(status.documentsStep().missingDriverTypes())
+        .containsExactly(
+            DriverDocumentType.SCHOOL_DRIVER_COURSE, DriverDocumentType.CRIMINAL_RECORD);
+    assertThat(status.documentsStep().vehicles().get(0).missingTypes())
+        .containsExactly(
+            VehicleDocumentType.VEHICLE_INSPECTION,
+            VehicleDocumentType.SCHOOL_VEHICLE_AUTHORIZATION);
+    assertThat(status.documentsStep().vehicles().get(0).uploadedDocuments())
+        .extracting(document -> document.documentType())
+        .containsExactly(VehicleDocumentType.CRLV);
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"B", "AB", "C"})
+  void aCnhWithoutCategoryDOrEIsReportedAsCnhCategory(String category) {
+    stubDriverWithArea();
+    when(driverCnhRepository.findByDriverId(20L))
+        .thenReturn(List.of(cnh(category, LocalDate.now().plusYears(2))));
+    when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of());
+    when(driverDocumentRepository.findByDriverId(20L)).thenReturn(List.of());
+
+    DriverOnboardingStatusResponseDTO status = service.getOnboardingStatus("user-token-10");
+
+    assertThat(status.cnhStep().completed()).isFalse();
+    assertThat(status.cnhStep().pendingItems()).containsExactly("cnh_category");
+  }
+
+  @Test
+  void aCnhWithCategoryAdCompletesTheStep() {
+    stubDriverWithArea();
+    when(driverCnhRepository.findByDriverId(20L))
+        .thenReturn(List.of(cnh("AD", LocalDate.now().plusYears(2))));
+    when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of());
+    when(driverDocumentRepository.findByDriverId(20L)).thenReturn(List.of());
+
+    assertThat(service.getOnboardingStatus("user-token-10").cnhStep().completed()).isTrue();
+  }
+
+  @Test
+  void submittingWithACategoryBCnhIsRefusedWithCnhCategory() {
+    when(userService.requireByTokenAndType("user-token-10", UserType.DRIVER)).thenReturn(user);
+    when(driverRepository.findByUserId(10L)).thenReturn(Optional.of(driver));
+    stubReadyToSubmit(vehicle(1L, "ABC1D23"));
+    when(driverCnhRepository.findByDriverId(20L))
+        .thenReturn(List.of(cnh("B", LocalDate.now().plusYears(2))));
+
+    assertThatThrownBy(() -> service.submitOnboarding("user-token-10"))
+        .isInstanceOf(ResponseStatusException.class)
+        .satisfies(
+            e ->
+                assertThat(((ResponseStatusException) e).getReason())
+                    .contains("driver.onboarding.cnh_category"));
+    assertThat(driver.getApprovalStatus()).isEqualTo(DriverApprovalStatus.PENDING);
+  }
+
+  @Test
+  void submittingWithoutTheSchoolAuthorizationNamesTheTypeAndThePlate() {
+    when(userService.requireByTokenAndType("user-token-10", UserType.DRIVER)).thenReturn(user);
+    when(driverRepository.findByUserId(10L)).thenReturn(Optional.of(driver));
+    VehicleModel van = vehicle(1L, "ABC1D23");
+    stubReadyToSubmit(van);
+    when(vehicleDocumentRepository.findByVehicleIdIn(List.of(1L)))
+        .thenReturn(
+            List.of(
+                vehicleDocument(van, VehicleDocumentType.CRLV, true),
+                vehicleDocument(van, VehicleDocumentType.VEHICLE_INSPECTION, true)));
+
+    assertThatThrownBy(() -> service.submitOnboarding("user-token-10"))
+        .isInstanceOf(ResponseStatusException.class)
+        .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+        .isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
+
+    verify(messages)
+        .getMessage(
+            eq("driver.onboarding.documents_missing"),
+            argThat(args -> "ABC1D23: SCHOOL_VEHICLE_AUTHORIZATION".equals(args[0])),
+            any());
+    assertThat(driver.getApprovalStatus()).isEqualTo(DriverApprovalStatus.PENDING);
+    verify(driverRepository, never()).save(any(DriverModel.class));
+    verify(vehicleDocumentRepository, never()).save(any());
+    verify(driverDocumentRepository, never()).save(any());
+  }
+
+  @Test
+  void submittingWithOneCompleteVanAndAnotherWithoutDocumentsIsAccepted() {
+    when(userService.requireByTokenAndType("user-token-10", UserType.DRIVER)).thenReturn(user);
+    when(driverRepository.findByUserId(10L)).thenReturn(Optional.of(driver));
+    when(driverRepository.save(any(DriverModel.class))).thenAnswer(inv -> inv.getArgument(0));
+    VehicleModel complete = vehicle(1L, "ABC1D23");
+    VehicleModel bare = vehicle(2L, "XYZ9K87");
+    user.setAddressId(55L);
+    when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of(complete, bare));
+    when(driverCnhRepository.findByDriverId(20L))
+        .thenReturn(List.of(cnh("D", LocalDate.now().plusYears(1))));
+    when(driverDocumentRepository.findByDriverId(20L)).thenReturn(completeDriverDocuments());
+    when(vehicleDocumentRepository.findByVehicleIdIn(List.of(1L, 2L)))
+        .thenReturn(completeVanDocuments(complete));
+
+    assertThat(service.submitOnboarding("user-token-10").approvalStatus())
+        .isEqualTo(DriverApprovalStatus.UNDER_REVIEW);
+  }
+
+  @Test
+  void withACompleteVanOnlyTheDriverTypesAreMissing() {
+    DriverOnboardingDocumentsStepDTO step =
+        new DriverOnboardingDocumentsStepDTO(
+            false,
+            List.of(DriverDocumentType.CRIMINAL_RECORD),
+            List.of(),
+            List.of(
+                new VehicleDocumentsStepDTO(
+                    "vehicle-token-1", "ABC1D23", true, List.of(), List.of()),
+                new VehicleDocumentsStepDTO(
+                    "vehicle-token-2",
+                    "XYZ9K87",
+                    false,
+                    List.of(VehicleDocumentType.CRLV),
+                    List.of())));
+
+    assertThat(DriverOnboardingService.describeMissingDocuments(step)).isEqualTo("CRIMINAL_RECORD");
+  }
+
+  @Test
   void theMissingDocumentsNameTheDriverTypesAndEachIncompleteVanByPlate() {
     DriverOnboardingDocumentsStepDTO step =
         new DriverOnboardingDocumentsStepDTO(
             false,
-            List.of(DriverDocumentType.MUNICIPAL_AUTHORIZATION),
+            List.of(DriverDocumentType.SCHOOL_DRIVER_COURSE),
             List.of(),
             List.of(
                 new VehicleDocumentsStepDTO(
@@ -370,57 +567,13 @@ class DriverOnboardingServiceTest {
                     "vehicle-token-2",
                     "XYZ9K87",
                     false,
-                    List.of(VehicleDocumentType.CRLV),
+                    List.of(VehicleDocumentType.SCHOOL_VEHICLE_AUTHORIZATION),
                     List.of())));
 
     assertThat(DriverOnboardingService.describeMissingDocuments(step))
-        .isEqualTo("MUNICIPAL_AUTHORIZATION; ABC1D23: CRLV, VEHICLE_INSPECTION; XYZ9K87: CRLV");
-  }
-
-  @Test
-  void withACompleteVanOnlyTheDriverTypesAreMissing() {
-    DriverOnboardingDocumentsStepDTO step =
-        new DriverOnboardingDocumentsStepDTO(
-            false,
-            List.of(DriverDocumentType.MUNICIPAL_AUTHORIZATION),
-            List.of(),
-            List.of(
-                new VehicleDocumentsStepDTO(
-                    "vehicle-token-1", "ABC1D23", true, List.of(), List.of()),
-                new VehicleDocumentsStepDTO(
-                    "vehicle-token-2",
-                    "XYZ9K87",
-                    false,
-                    List.of(VehicleDocumentType.CRLV),
-                    List.of())));
-
-    assertThat(DriverOnboardingService.describeMissingDocuments(step))
-        .isEqualTo("MUNICIPAL_AUTHORIZATION");
-  }
-
-  @Test
-  void submittingWithOneCompleteVanAndAnotherWithoutDocumentsIsAccepted() {
-    when(userService.requireByTokenAndType("user-token-10", UserType.DRIVER)).thenReturn(user);
-    when(driverRepository.findByUserId(10L)).thenReturn(Optional.of(driver));
-    when(driverRepository.save(any(DriverModel.class))).thenAnswer(inv -> inv.getArgument(0));
-    VehicleModel complete = vehicle(1L, "ABC1D23");
-    VehicleModel bare = vehicle(2L, "XYZ9K87");
-    user.setAddressId(55L);
-    when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of(complete, bare));
-    DriverCnhModel cnh = new DriverCnhModel();
-    cnh.setActive(true);
-    cnh.setValidUntil(LocalDate.now().plusYears(1));
-    when(driverCnhRepository.findByDriverId(20L)).thenReturn(List.of(cnh));
-    when(driverDocumentRepository.findByDriverId(20L))
-        .thenReturn(List.of(driverDocument(DriverDocumentType.MUNICIPAL_AUTHORIZATION, true)));
-    when(vehicleDocumentRepository.findByVehicleIdIn(List.of(1L, 2L)))
-        .thenReturn(
-            List.of(
-                vehicleDocument(complete, VehicleDocumentType.CRLV, true),
-                vehicleDocument(complete, VehicleDocumentType.VEHICLE_INSPECTION, true)));
-
-    assertThat(service.submitOnboarding("user-token-10").approvalStatus())
-        .isEqualTo(DriverApprovalStatus.UNDER_REVIEW);
+        .isEqualTo(
+            "SCHOOL_DRIVER_COURSE; ABC1D23: CRLV, VEHICLE_INSPECTION;"
+                + " XYZ9K87: SCHOOL_VEHICLE_AUTHORIZATION");
   }
 
   @Test
@@ -467,12 +620,9 @@ class DriverOnboardingServiceTest {
     when(driverRepository.findByUserId(10L)).thenReturn(Optional.of(driver));
     user.setAddressId(55L);
     when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of());
-    DriverCnhModel cnh = new DriverCnhModel();
-    cnh.setActive(true);
-    cnh.setValidUntil(LocalDate.now().plusYears(1));
+    DriverCnhModel cnh = cnh("D", LocalDate.now().plusYears(1));
     when(driverCnhRepository.findByDriverId(20L)).thenReturn(List.of(cnh));
-    when(driverDocumentRepository.findByDriverId(20L))
-        .thenReturn(List.of(driverDocument(DriverDocumentType.MUNICIPAL_AUTHORIZATION, true)));
+    when(driverDocumentRepository.findByDriverId(20L)).thenReturn(completeDriverDocuments());
 
     assertThatThrownBy(() -> service.submitOnboarding("user-token-10"))
         .isInstanceOf(ResponseStatusException.class)
@@ -492,12 +642,9 @@ class DriverOnboardingServiceTest {
     when(driverRepository.findByUserId(10L)).thenReturn(Optional.of(driver));
     user.setAddressId(55L);
     when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of());
-    DriverCnhModel cnh = new DriverCnhModel();
-    cnh.setActive(true);
-    cnh.setValidUntil(LocalDate.now().plusYears(1));
+    DriverCnhModel cnh = cnh("D", LocalDate.now().plusYears(1));
     when(driverCnhRepository.findByDriverId(20L)).thenReturn(List.of(cnh));
-    when(driverDocumentRepository.findByDriverId(20L))
-        .thenReturn(List.of(driverDocument(DriverDocumentType.MUNICIPAL_AUTHORIZATION, true)));
+    when(driverDocumentRepository.findByDriverId(20L)).thenReturn(completeDriverDocuments());
 
     assertThatThrownBy(() -> service.submitOnboarding("user-token-10"))
         .isInstanceOf(ResponseStatusException.class)
@@ -582,7 +729,8 @@ class DriverOnboardingServiceTest {
         .thenReturn(
             List.of(
                 vehicleDocument(van, VehicleDocumentType.CRLV, false),
-                vehicleDocument(van, VehicleDocumentType.VEHICLE_INSPECTION, true)));
+                vehicleDocument(van, VehicleDocumentType.VEHICLE_INSPECTION, true),
+                vehicleDocument(van, VehicleDocumentType.SCHOOL_VEHICLE_AUTHORIZATION, true)));
 
     assertThatThrownBy(() -> service.submitOnboarding("user-token-10"))
         .isInstanceOf(ResponseStatusException.class)
@@ -630,6 +778,7 @@ class DriverOnboardingServiceTest {
             null,
             null);
     when(mapper.toResponse(driver)).thenReturn(expectedResponse);
+    when(credentialService.hasAnyQualifiedVehicle(eq(20L), any())).thenReturn(true);
 
     DriverResponseDTO response = service.approve("driver-token-20", "admin-uid");
 
@@ -650,10 +799,32 @@ class DriverOnboardingServiceTest {
     when(userService.requireByToken("admin-uid")).thenReturn(new UserModel());
     when(driverRepository.findByToken("driver-token-20")).thenReturn(Optional.of(driver));
     when(driverRepository.save(any(DriverModel.class))).thenAnswer(inv -> inv.getArgument(0));
+    when(credentialService.hasAnyQualifiedVehicle(eq(20L), any())).thenReturn(true);
 
     service.approve("driver-token-20", "admin-uid");
 
     assertThat(driver.isAvailable()).isTrue();
+  }
+
+  @Test
+  void approvingWithoutAnyVanQualifiedOnTheCredentialsIsRefused() {
+    driver.setApprovalStatus(DriverApprovalStatus.UNDER_REVIEW);
+    when(userService.requireByToken("admin-uid")).thenReturn(new UserModel());
+    when(driverRepository.findByToken("driver-token-20")).thenReturn(Optional.of(driver));
+    when(credentialService.hasAnyQualifiedVehicle(eq(20L), any())).thenReturn(false);
+
+    assertThatThrownBy(() -> service.approve("driver-token-20", "admin-uid"))
+        .isInstanceOf(ResponseStatusException.class)
+        .satisfies(
+            e -> {
+              ResponseStatusException ex = (ResponseStatusException) e;
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
+              assertThat(ex.getReason()).isEqualTo("driver.onboarding.documents_not_approved");
+            });
+
+    assertThat(driver.getApprovalStatus()).isEqualTo(DriverApprovalStatus.UNDER_REVIEW);
+    verify(driverRepository, never()).save(any(DriverModel.class));
+    verify(driverNotificationService, never()).notifyApproval(any());
   }
 
   @Test

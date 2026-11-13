@@ -14,6 +14,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import br.com.vanep.driver.DriverApprovalStatus;
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.shared.document.enums.DocumentStatus;
@@ -110,6 +111,16 @@ class VehicleDocumentControllerTest {
         .andExpect(jsonPath("$.fileUrl").value(startsWith("/api/vehicle-documents/")))
         .andExpect(jsonPath("$.file.mimeType").value("application/pdf"))
         .andExpect(jsonPath("$.file.originalName").value("crlv.pdf"));
+  }
+
+  @Test
+  void aDriverUnderReviewStillSendsAndReplacesDocuments() throws Exception {
+    DriverModel owner = vehicles.findByToken(vehicleToken).orElseThrow().getDriver();
+    owner.setApprovalStatus(DriverApprovalStatus.UNDER_REVIEW);
+    drivers.save(owner);
+
+    mockMvc.perform(send("VEHICLE_INSPECTION", ownerJwt())).andExpect(status().isCreated());
+    uploadPdf(ownerJwt());
   }
 
   @Test

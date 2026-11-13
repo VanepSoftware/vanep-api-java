@@ -57,6 +57,35 @@ public interface VehicleDocumentRepository extends JpaRepository<VehicleDocument
       """)
   List<VehicleDocumentModel> findByVehicleIdIn(@Param("vehicleIds") Collection<Long> vehicleIds);
 
+  @Query(
+      """
+      select document from VehicleDocumentModel document
+      join fetch document.vehicle vehicle
+      join fetch vehicle.driver vehicleDriver
+      join fetch vehicleDriver.user
+      left join fetch vehicle.photoFront
+      left join fetch vehicle.photoSide
+      left join fetch document.file
+      left join fetch document.review.reviewedBy
+      where vehicleDriver.id = :driverId and vehicle.active = true
+      """)
+  List<VehicleDocumentModel> findOfActiveVehiclesByDriverId(@Param("driverId") Long driverId);
+
+  @Query(
+      """
+      select document from VehicleDocumentModel document
+      join fetch document.vehicle vehicle
+      join fetch vehicle.driver vehicleDriver
+      join fetch vehicleDriver.user
+      left join fetch vehicle.photoFront
+      left join fetch vehicle.photoSide
+      left join fetch document.file
+      left join fetch document.review.reviewedBy
+      where vehicle.id = :vehicleId and vehicleDriver.id = :driverId and vehicle.active = true
+      """)
+  List<VehicleDocumentModel> findOfActiveVehicle(
+      @Param("driverId") Long driverId, @Param("vehicleId") Long vehicleId);
+
   @Modifying
   @Query(
       value = "UPDATE vehicle_document SET deleted_at = NULL WHERE token = :token",
