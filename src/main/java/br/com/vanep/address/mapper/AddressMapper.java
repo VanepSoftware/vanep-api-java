@@ -17,6 +17,8 @@ public class AddressMapper {
         address.getCity().getToken(),
         address.getCity().getName(),
         address.getCity().getState().getUf(),
+        address.getCity().getLatitude(),
+        address.getCity().getLongitude(),
         address.isActive(),
         address.getCreatedAt());
   }

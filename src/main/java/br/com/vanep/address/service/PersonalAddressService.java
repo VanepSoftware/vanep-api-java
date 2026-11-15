@@ -98,6 +98,8 @@ public class PersonalAddressService {
         address.getCity().getName(),
         address.getCity().getToken(),
         address.getCity().getState().getUf(),
+        address.getCity().getLatitude(),
+        address.getCity().getLongitude(),
         address.getCity().getState().getCountry().getIsoCode());
   }
 

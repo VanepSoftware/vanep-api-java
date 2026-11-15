@@ -88,6 +88,8 @@ class SchoolServiceTest {
         "city-campinas",
         "Campinas",
         "SP",
+        null,
+        null,
         true,
         null);
   }

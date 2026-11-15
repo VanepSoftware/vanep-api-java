@@ -13,6 +13,8 @@ public class CityMapper {
         city.getName(),
         city.getState().getToken(),
         city.getState().getUf(),
+        city.getLatitude(),
+        city.getLongitude(),
         city.isActive(),
         city.getCreatedAt());
   }

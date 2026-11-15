@@ -25,6 +25,7 @@ import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -100,6 +101,10 @@ class PersonalAddressControllerTest {
     city.setState(states.findByUf(uf).orElseThrow());
     city.setName(name);
     city.setIbgeCode(ibgeCode);
+    if ("5300108".equals(ibgeCode)) {
+      city.setLatitude(new BigDecimal("-15.784300"));
+      city.setLongitude(new BigDecimal("-47.908100"));
+    }
     return cities.save(city);
   }
 
@@ -146,6 +151,8 @@ class PersonalAddressControllerTest {
         .andExpect(jsonPath("$.cityToken").value(brasiliaToken))
         .andExpect(jsonPath("$.cityName").value("Brasília"))
         .andExpect(jsonPath("$.stateUf").value("DF"))
+        .andExpect(jsonPath("$.cityLatitude").value(-15.784300))
+        .andExpect(jsonPath("$.cityLongitude").value(-47.908100))
         .andExpect(jsonPath("$.countryIsoCode").value("BR"))
         .andExpect(jsonPath("$.street").value(STREET))
         .andExpect(jsonPath("$.zipCode").value(ZIP))

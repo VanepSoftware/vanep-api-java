@@ -13,6 +13,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 import lombok.Getter;
@@ -50,6 +51,12 @@ public class CityModel {
 
   @Column(name = "requires_district")
   private Boolean requiresDistrict;
+
+  @Column(precision = 9, scale = 6)
+  private BigDecimal latitude;
+
+  @Column(precision = 9, scale = 6)
+  private BigDecimal longitude;
 
   @Column(name = "is_active", nullable = false)
   private boolean active = true;
