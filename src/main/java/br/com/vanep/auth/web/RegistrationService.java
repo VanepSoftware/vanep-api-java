@@ -9,6 +9,7 @@ import br.com.vanep.auth.dto.DriverSignupFields;
 import br.com.vanep.auth.dto.DriverSignupRequestDTO;
 import br.com.vanep.auth.enums.AuthErrorCode;
 import br.com.vanep.auth.exception.SignupDuplicateException;
+import br.com.vanep.auth.exception.SignupDuplicateException.DuplicateField;
 import br.com.vanep.auth.security.UserPasswordService;
 import br.com.vanep.auth.verification.EmailVerificationService;
 import br.com.vanep.client.model.ClientModel;
@@ -23,6 +24,8 @@ import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -108,7 +111,7 @@ public class RegistrationService {
 
   UserModel createUser(UserType type, RoleName roleName, AccountSignupRequestDTO request) {
     String document = CpfValidator.normalize(request.getDocument());
-    rejectDuplicates(request.getEmail(), document);
+    rejectDuplicates(request.getEmail(), document, request.getPhone());
     UserModel user = new UserModel();
     user.setType(type);
     roles.findByRoleName(roleName).ifPresent(role -> user.setRoleId(role.getId()));
@@ -124,14 +127,32 @@ public class RegistrationService {
     return users.save(user);
   }
 
-  public void rejectDuplicates(String email, String normalizedDocument) {
-    if (email != null && users.existsByEmail(email)) {
-      throw new SignupDuplicateException(
-          "email", "auth.signup.email.duplicate", AuthErrorCode.EMAIL_DUPLICATE);
+  /** Checks every field before failing, so the answer lists all duplicates instead of the first. */
+  public void rejectDuplicates(String email, String document, String phone) {
+    List<DuplicateField> duplicates = new ArrayList<>();
+    if (email != null && !email.isBlank() && users.existsByEmail(email.trim())) {
+      duplicates.add(
+          new DuplicateField(
+              "email", "auth.signup.email.duplicate", AuthErrorCode.EMAIL_DUPLICATE));
     }
+    String normalizedDocument = CpfValidator.normalize(document);
     if (!normalizedDocument.isEmpty() && users.existsByDocument(normalizedDocument)) {
-      throw new SignupDuplicateException(
-          "document", "auth.signup.document.duplicate", AuthErrorCode.DOCUMENT_DUPLICATE);
+      duplicates.add(
+          new DuplicateField(
+              "document", "auth.signup.document.duplicate", AuthErrorCode.DOCUMENT_DUPLICATE));
     }
+    String phoneDigits = digitsOf(phone);
+    if (!phoneDigits.isEmpty() && users.existsByPhone(phoneDigits)) {
+      duplicates.add(
+          new DuplicateField(
+              "phone", "auth.signup.phone.duplicate", AuthErrorCode.PHONE_DUPLICATE));
+    }
+    if (!duplicates.isEmpty()) {
+      throw new SignupDuplicateException(duplicates);
+    }
+  }
+
+  private static String digitsOf(String raw) {
+    return raw == null ? "" : raw.replaceAll("\\D", "");
   }
 }

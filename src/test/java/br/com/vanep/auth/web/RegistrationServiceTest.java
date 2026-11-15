@@ -2,6 +2,7 @@ package br.com.vanep.auth.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
@@ -15,6 +16,7 @@ import br.com.vanep.auth.dto.AssistantSignupRequestDTO;
 import br.com.vanep.auth.dto.ClientSignupRequestDTO;
 import br.com.vanep.auth.dto.DriverSignupRequestDTO;
 import br.com.vanep.auth.exception.SignupDuplicateException;
+import br.com.vanep.auth.exception.SignupDuplicateException.DuplicateField;
 import br.com.vanep.auth.security.UserPasswordEncoder;
 import br.com.vanep.auth.security.UserPasswordService;
 import br.com.vanep.auth.verification.EmailVerificationService;
@@ -31,6 +33,7 @@ import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
 import java.math.BigDecimal;
 import java.util.Optional;
+import org.assertj.core.api.InstanceOfAssertFactories;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -174,8 +177,10 @@ class RegistrationServiceTest {
 
     assertThatThrownBy(() -> service.registerClient(clientRequest()))
         .isInstanceOf(SignupDuplicateException.class)
-        .extracting("field", "messageKey")
-        .containsExactly("email", "auth.signup.email.duplicate");
+        .extracting("duplicates")
+        .asInstanceOf(InstanceOfAssertFactories.list(DuplicateField.class))
+        .extracting(DuplicateField::field, DuplicateField::messageKey)
+        .containsExactly(tuple("email", "auth.signup.email.duplicate"));
 
     verify(users, never()).save(any(UserModel.class));
     verify(clients, never()).save(any(ClientModel.class));
@@ -190,10 +195,42 @@ class RegistrationServiceTest {
 
     assertThatThrownBy(() -> service.registerClient(request))
         .isInstanceOf(SignupDuplicateException.class)
-        .extracting("field", "messageKey")
-        .containsExactly("document", "auth.signup.document.duplicate");
+        .extracting("duplicates")
+        .asInstanceOf(InstanceOfAssertFactories.list(DuplicateField.class))
+        .extracting(DuplicateField::field, DuplicateField::messageKey)
+        .containsExactly(tuple("document", "auth.signup.document.duplicate"));
 
     verify(users, never()).save(any(UserModel.class));
+  }
+
+  @Test
+  void registerRejectsEveryDuplicatedFieldAtOnce() {
+    RegistrationService service = service();
+    ClientSignupRequestDTO request = clientRequest();
+    request.setPhone("(11) 98765-4321");
+    when(users.existsByEmail("ana@vanep.com")).thenReturn(true);
+    when(users.existsByDocument("39053344705")).thenReturn(true);
+    when(users.existsByPhone("11987654321")).thenReturn(true);
+
+    assertThatThrownBy(() -> service.registerClient(request))
+        .isInstanceOf(SignupDuplicateException.class)
+        .extracting("duplicates")
+        .asInstanceOf(InstanceOfAssertFactories.list(DuplicateField.class))
+        .extracting(DuplicateField::field)
+        .containsExactly("email", "document", "phone");
+
+    verify(users, never()).save(any(UserModel.class));
+  }
+
+  @Test
+  void rejectDuplicatesIgnoresMissingFields() {
+    RegistrationService service = service();
+
+    service.rejectDuplicates(null, "", "  ");
+
+    verify(users, never()).existsByEmail(anyString());
+    verify(users, never()).existsByDocument(anyString());
+    verify(users, never()).existsByPhone(anyString());
   }
 
   @Test

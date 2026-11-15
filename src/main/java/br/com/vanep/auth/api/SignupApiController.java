@@ -4,6 +4,7 @@ import br.com.vanep.auth.dto.AssistantSignupRequestDTO;
 import br.com.vanep.auth.dto.ClientSignupRequestDTO;
 import br.com.vanep.auth.dto.DriverSignupRequestDTO;
 import br.com.vanep.auth.dto.GoogleSignupCompleteRequestDTO;
+import br.com.vanep.auth.dto.SignupDuplicateCheckRequestDTO;
 import br.com.vanep.auth.dto.SignupResponseDTO;
 import br.com.vanep.auth.signup.GoogleSignupService;
 import br.com.vanep.auth.web.RegistrationService;
@@ -46,6 +47,16 @@ public class SignupApiController {
   public SignupResponseDTO registerAssistant(
       @Valid @RequestBody AssistantSignupRequestDTO request) {
     return toResponse(registrationService.registerAssistant(request));
+  }
+
+  /**
+   * Answers {@code 204} when none of the given fields is taken, or {@code 409} listing every taken
+   * one, so the app can warn before the last step. Sign-up itself checks again.
+   */
+  @PostMapping("/check")
+  @ResponseStatus(HttpStatus.NO_CONTENT)
+  public void checkDuplicates(@RequestBody SignupDuplicateCheckRequestDTO request) {
+    registrationService.rejectDuplicates(request.email(), request.document(), request.phone());
   }
 
   @PostMapping("/complete")

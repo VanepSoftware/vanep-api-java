@@ -35,7 +35,8 @@ public class GoogleSignupService {
             .orElseThrow(InvalidSignupTicketException::new);
 
     request.setDocument(CpfValidator.normalize(request.getDocument()));
-    registrationService.rejectDuplicates(ticket.getEmail(), request.getDocument());
+    registrationService.rejectDuplicates(
+        ticket.getEmail(), request.getDocument(), request.getPhone());
 
     return accounts.completeRegistration(
         ticket.getProvider(),
