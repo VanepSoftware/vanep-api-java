@@ -18,33 +18,21 @@ public interface DriverDocumentRepository
     extends JpaRepository<DriverDocumentModel, Long>,
         JpaSpecificationExecutor<DriverDocumentModel> {
 
+  @EntityGraph(attributePaths = {"driver.user", "file", "review.reviewedBy"})
   Optional<DriverDocumentModel> findByToken(String token);
 
   // Each document has its own file and reviewer (and, on the admin list, its own driver), so
   // every list fetches them with the rows instead of one select per document (rule 17).
   @EntityGraph(attributePaths = {"driver.user", "file", "review.reviewedBy"})
-  List<DriverDocumentModel> findByDriverId(Long driverId);
-
-  @Query(
-      """
-      select document from DriverDocumentModel document
-      join fetch document.driver driver
-      join fetch driver.user
-      left join fetch document.file
-      left join fetch document.review.reviewedBy
-      where driver.id = :driverId
-      """)
-  List<DriverDocumentModel> findWithDetailsByDriverId(@Param("driverId") Long driverId);
-
-  @EntityGraph(attributePaths = {"driver.user", "file", "review.reviewedBy"})
-  Page<DriverDocumentModel> findByDriverId(Long driverId, Pageable pageable);
+  List<DriverDocumentModel> findByDriverIdAndSupersededAtIsNull(Long driverId);
 
   // The list: every filter is optional, and the ones sent apply together.
   @EntityGraph(attributePaths = {"driver.user", "file", "review.reviewedBy"})
   @Query(
       """
       select document from DriverDocumentModel document
-      where (:driverId is null or document.driver.id = :driverId)
+      where document.supersededAt is null
+        and (:driverId is null or document.driver.id = :driverId)
         and (:documentType is null or document.documentType = :documentType)
         and (:status is null or document.review.status = :status)
       """)

@@ -8,6 +8,8 @@ import br.com.vanep.media.enums.MediaVisibility;
 import br.com.vanep.media.enums.StorageProvider;
 import br.com.vanep.media.model.MediaFileModel;
 import br.com.vanep.media.repository.MediaFileRepository;
+import br.com.vanep.shared.SqlStatementCounter;
+import br.com.vanep.shared.document.enums.DocumentRejectionReason;
 import br.com.vanep.shared.document.enums.DocumentStatus;
 import br.com.vanep.shared.document.enums.ReviewMethod;
 import br.com.vanep.user.enums.UserType;
@@ -17,6 +19,7 @@ import br.com.vanep.vehicle.model.VehicleModel;
 import br.com.vanep.vehicle.repository.VehicleRepository;
 import br.com.vanep.vehicledocument.enums.VehicleDocumentType;
 import br.com.vanep.vehicledocument.model.VehicleDocumentModel;
+import jakarta.persistence.EntityManagerFactory;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -25,6 +28,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.jdbc.Sql;
@@ -41,6 +45,7 @@ class VehicleDocumentRepositoryTest {
   @Autowired private UserRepository users;
   @Autowired private MediaFileRepository mediaFiles;
   @Autowired private TransactionTemplate transactions;
+  @Autowired private EntityManagerFactory entityManagerFactory;
 
   private UserModel driverUser;
   private DriverModel driver;
@@ -126,7 +131,9 @@ class VehicleDocumentRepositoryTest {
     documents.save(
         newDocument(saveVehicle("VAN2B34"), VehicleDocumentType.CRLV, LocalDate.of(2027, 1, 31)));
 
-    assertThat(documents.findByVehicleToken(van.getToken(), null, null, Pageable.unpaged()))
+    assertThat(
+            documents.findUnsupersededByVehicleToken(
+                van.getToken(), null, null, Pageable.unpaged()))
         .extracting(document -> document.getToken())
         .containsExactly(newer.getToken(), older.getToken(), crlv.getToken());
   }
@@ -142,11 +149,11 @@ class VehicleDocumentRepositoryTest {
         newDocument(van, VehicleDocumentType.VEHICLE_INSPECTION, LocalDate.of(2026, 12, 31)));
 
     assertThat(
-            documents.findByVehicleToken(
+            documents.findUnsupersededByVehicleToken(
                 van.getToken(), VehicleDocumentType.VEHICLE_INSPECTION, null, Pageable.unpaged()))
         .hasSize(2);
     assertThat(
-            documents.findByVehicleToken(
+            documents.findUnsupersededByVehicleToken(
                 van.getToken(), null, DocumentStatus.APPROVED, Pageable.unpaged()))
         .extracting(document -> document.getToken())
         .containsExactly(approvedToken);
@@ -160,7 +167,7 @@ class VehicleDocumentRepositoryTest {
     documents.save(
         newDocument(saveVehicle("VAN3C45"), VehicleDocumentType.CRLV, LocalDate.of(2027, 1, 31)));
 
-    assertThat(documents.findByVehicleIdIn(List.of(van.getId(), other.getId())))
+    assertThat(documents.findUnsupersededByVehicleIdIn(List.of(van.getId(), other.getId())))
         .extracting(document -> document.getVehicle().getId())
         .containsExactlyInAnyOrder(van.getId(), other.getId());
   }
@@ -172,7 +179,9 @@ class VehicleDocumentRepositoryTest {
     vehicles.delete(van);
 
     assertThat(documents.findByToken(saved.getToken())).isEmpty();
-    assertThat(documents.findByVehicleToken(van.getToken(), null, null, Pageable.unpaged()))
+    assertThat(
+            documents.findUnsupersededByVehicleToken(
+                van.getToken(), null, null, Pageable.unpaged()))
         .isEmpty();
   }
 
@@ -193,6 +202,124 @@ class VehicleDocumentRepositoryTest {
 
     assertThat(documents.findDriverUserTokenByDocumentToken(saved.getToken()))
         .contains(driverUser.getToken());
+  }
+
+  @Test
+  void storesAndReadsBackTheVersionTheReasonCodeTheSupersededDateAndTheNotice() {
+    VehicleDocumentModel document =
+        newDocument(van, VehicleDocumentType.CRLV, LocalDate.of(2027, 1, 31));
+    document.getReview().setStatus(DocumentStatus.REJECTED);
+    document.getReview().setRejectionReasonCode(DocumentRejectionReason.EXPIRED);
+    document.setSupersededAt(Instant.parse("2026-11-12T10:00:00Z"));
+    document.setNotifiedAt(Instant.parse("2026-11-11T10:00:00Z"));
+    VehicleDocumentModel saved = documents.save(document);
+    saved.setDocumentNumber("changed");
+    documents.save(saved);
+
+    VehicleDocumentModel stored = documents.findByToken(saved.getToken()).orElseThrow();
+
+    assertThat(stored.getVersion()).isEqualTo(1L);
+    assertThat(stored.getReview().getRejectionReasonCode())
+        .isEqualTo(DocumentRejectionReason.EXPIRED);
+    assertThat(stored.getSupersededAt()).isEqualTo(Instant.parse("2026-11-12T10:00:00Z"));
+    assertThat(stored.getNotifiedAt()).isEqualTo(Instant.parse("2026-11-11T10:00:00Z"));
+  }
+
+  @Test
+  void storesAndReadsBackTheLastDataCorrectionAndTheNotEligibleReason() {
+    VehicleDocumentModel document =
+        newDocument(van, VehicleDocumentType.CRLV, LocalDate.of(2027, 1, 31));
+    document.getReview().setStatus(DocumentStatus.APPROVED);
+    document.getReview().setDataCorrectedById(42L);
+    document.getReview().setDataCorrectedAt(Instant.parse("2026-11-21T10:00:00Z"));
+    VehicleDocumentModel corrected = documents.save(document);
+    VehicleDocumentModel rejected =
+        newDocument(van, VehicleDocumentType.VEHICLE_INSPECTION, LocalDate.of(2027, 1, 31));
+    rejected.getReview().setStatus(DocumentStatus.REJECTED);
+    rejected.getReview().setRejectionReasonCode(DocumentRejectionReason.NOT_ELIGIBLE);
+    documents.save(rejected);
+
+    VehicleDocumentModel stored = documents.findByToken(corrected.getToken()).orElseThrow();
+    assertThat(stored.getReview().getDataCorrectedById()).isEqualTo(42L);
+    assertThat(stored.getReview().getDataCorrectedAt())
+        .isEqualTo(Instant.parse("2026-11-21T10:00:00Z"));
+    assertThat(
+            documents
+                .findByToken(rejected.getToken())
+                .orElseThrow()
+                .getReview()
+                .getRejectionReasonCode())
+        .isEqualTo(DocumentRejectionReason.NOT_ELIGIBLE);
+  }
+
+  @Test
+  void theListsAndTheCredentialQueriesIgnoreSupersededSubmissions() {
+    VehicleDocumentModel superseded =
+        newDocument(van, VehicleDocumentType.VEHICLE_INSPECTION, LocalDate.of(2027, 6, 30));
+    superseded.getReview().setStatus(DocumentStatus.APPROVED);
+    superseded.setSupersededAt(Instant.now());
+    documents.save(superseded);
+    String liveToken =
+        documents
+            .save(
+                newDocument(
+                    van, VehicleDocumentType.VEHICLE_INSPECTION, LocalDate.of(2027, 12, 31)))
+            .getToken();
+
+    assertThat(
+            documents.findUnsupersededByVehicleToken(
+                van.getToken(), null, null, Pageable.unpaged()))
+        .extracting(document -> document.getToken())
+        .containsExactly(liveToken);
+    assertThat(
+            documents
+                .findUnsupersededByVehicleToken(van.getToken(), null, null, Pageable.unpaged())
+                .getTotalElements())
+        .isEqualTo(1);
+    assertThat(documents.findUnsupersededByVehicleIdIn(List.of(van.getId())))
+        .extracting(document -> document.getToken())
+        .containsExactly(liveToken);
+    assertThat(documents.findUnsupersededOfActiveVehiclesByDriverId(driver.getId()))
+        .extracting(document -> document.getToken())
+        .containsExactly(liveToken);
+    assertThat(documents.findUnsupersededOfActiveVehicle(driver.getId(), van.getId()))
+        .extracting(document -> document.getToken())
+        .containsExactly(liveToken);
+  }
+
+  @Test
+  void theVansListLoadsEachReviewerWithoutOneQueryPerDocument() {
+    SqlStatementCounter counter = new SqlStatementCounter(entityManagerFactory);
+    saveReviewedDocuments(0, 2);
+    long withTwo = counter.countStatements(this::readTheReviewersOfTheFirstPage);
+    saveReviewedDocuments(2, 6);
+    long withSix = counter.countStatements(this::readTheReviewersOfTheFirstPage);
+
+    assertThat(withSix).isEqualTo(withTwo);
+  }
+
+  private void readTheReviewersOfTheFirstPage() {
+    documents
+        .findUnsupersededByVehicleToken(van.getToken(), null, null, PageRequest.of(0, 20))
+        .forEach(
+            document -> {
+              document.getReview().getReviewedBy().getEmail();
+              document.getFile().getToken();
+            });
+  }
+
+  private void saveReviewedDocuments(int from, int to) {
+    for (int index = from; index < to; index++) {
+      VehicleDocumentModel document =
+          newDocument(van, VehicleDocumentType.CRLV, LocalDate.of(2027, 1, 1).plusDays(index));
+      document.setFile(saveFile());
+      document.getReview().setStatus(DocumentStatus.APPROVED);
+      document
+          .getReview()
+          .setReviewedBy(
+              saveUser("reviewer" + index + "@vanep.com", "0000000000" + index, UserType.ADMIN));
+      documents.save(document);
+    }
   }
 
   private VehicleDocumentModel newDocument(

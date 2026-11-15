@@ -1,6 +1,7 @@
 package br.com.vanep.driver.model;
 
 import br.com.vanep.driver.DriverApprovalStatus;
+import br.com.vanep.driver.enums.DriverRejectionReason;
 import br.com.vanep.media.model.MediaFileModel;
 import br.com.vanep.user.model.UserModel;
 import jakarta.persistence.Column;
@@ -83,6 +84,10 @@ public class DriverModel {
 
   @Column(name = "submitted_at")
   private Instant submittedAt;
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = "rejection_reason_code", length = 30)
+  private DriverRejectionReason rejectionReasonCode;
 
   @Column(name = "rejection_reason")
   private String rejectionReason;

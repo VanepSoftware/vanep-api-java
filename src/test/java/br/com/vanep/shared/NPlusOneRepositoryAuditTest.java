@@ -112,9 +112,9 @@ class NPlusOneRepositoryAuditTest {
     recordHotspot(
         counter,
         hotspots,
-        "DriverDocumentRepository.findByDriverId (touch driver.user + file + reviewer)",
+        "DriverDocumentRepository.findByDriverIdAndSupersededAtIsNull (touch driver.user + file + reviewer)",
         () -> createDocument(0),
-        () -> touchDocuments(documents.findByDriverId(driver.getId())),
+        () -> touchDocuments(documents.findByDriverIdAndSupersededAtIsNull(driver.getId())),
         () -> {
           createDocument(1);
           createDocument(2);
@@ -125,9 +125,9 @@ class NPlusOneRepositoryAuditTest {
     recordHotspot(
         counter,
         hotspots,
-        "DriverCnhRepository.findByDriverId (touch driver.user)",
+        "DriverCnhRepository.findByDriverIdAndSupersededAtIsNull (touch driver.user)",
         () -> createCnh(0),
-        () -> touchCnhs(cnhs.findByDriverId(driver.getId())),
+        () -> touchCnhs(cnhs.findByDriverIdAndSupersededAtIsNull(driver.getId())),
         () -> {
           createCnh(1);
           createCnh(2);
@@ -138,9 +138,11 @@ class NPlusOneRepositoryAuditTest {
     recordHotspot(
         counter,
         hotspots,
-        "DriverDocumentRepository.findByDriverId(Pageable) (touch driver.user + file + reviewer)",
+        "DriverDocumentRepository.findFiltered by driver (touch driver.user + file + reviewer)",
         () -> {},
-        () -> touchDocumentPage(documents.findByDriverId(driver.getId(), PageRequest.of(0, 2))),
+        () ->
+            touchDocumentPage(
+                documents.findFiltered(driver.getId(), null, null, PageRequest.of(0, 2))),
         () -> {
           createDocument(4);
           createDocument(5);

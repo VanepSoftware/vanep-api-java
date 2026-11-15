@@ -1,5 +1,6 @@
 package br.com.vanep.shared.document.model;
 
+import br.com.vanep.shared.document.enums.DocumentRejectionReason;
 import br.com.vanep.shared.document.enums.DocumentStatus;
 import br.com.vanep.shared.document.enums.ReviewMethod;
 import br.com.vanep.user.model.UserModel;
@@ -30,6 +31,10 @@ public class DocumentReview {
   @Column(name = "external_check_id", length = 64)
   private String externalCheckId;
 
+  @Enumerated(EnumType.STRING)
+  @Column(name = "rejection_reason_code", length = 30)
+  private DocumentRejectionReason rejectionReasonCode;
+
   @Column(name = "rejection_reason", length = 255)
   private String rejectionReason;
 
@@ -39,6 +44,12 @@ public class DocumentReview {
 
   @Column(name = "reviewed_at")
   private Instant reviewedAt;
+
+  @Column(name = "data_corrected_by")
+  private Long dataCorrectedById;
+
+  @Column(name = "data_corrected_at")
+  private Instant dataCorrectedAt;
 
   public static DocumentReview pending() {
     return new DocumentReview();

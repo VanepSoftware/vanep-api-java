@@ -1,14 +1,14 @@
 # QA — driver-credentials-review (constitution rule 55)
 
-Latest run: API built from `VAN-86/3-credentials-and-onboarding` (PR 3), 2026-11-21, after the file-only submissions, on a fresh database with the seed. Result: `qa.sh` **155/155 passed**, twice in a row on the same database. The documents of the new driver are sent with their files, and the approvals carry the data read from them (D2).
+Latest run: API built from `VAN-86/4-review-schema` (PR 4), 2026-11-21, after the file-only submissions, on a fresh database with the seed. Result: `qa.sh` **175/175 passed**, twice in a row on the same database. V75 also adds NOT_ELIGIBLE (K2b) and the data correction columns (R8).
 
-Before the file-only submissions: API built from `VAN-86/3-credentials-and-onboarding` (PR 3), 2026-11-21, after the CNH category rule, on a fresh database with the seed. Result: `qa.sh` **146/146 passed**, twice in a row on the same database, with the PR 2 scenarios as a regression. N4 to N6b check that the API only takes the CNH categories D, E, AD and AE, and that a license saved before with category B is still read and reported as `cnh_category`.
+Before the file-only submissions: API built from `VAN-86/4-review-schema` (PR 4), 2026-11-21, after the CNH category rule, on a fresh database with the seed. Result: `qa.sh` **164/164 passed**, twice in a row on the same database: V75 and the regression of PRs 1 to 3. N4 to N6b check that the API only takes the CNH categories D, E, AD and AE, and that a license saved before with category B is still read and reported as `cnh_category`.
 
-Before the CNH category rule: API built from `VAN-86/3-credentials-and-onboarding` (PR 3), 2026-11-20, after the mobile requests, on a fresh database with the seed. Result: `qa.sh` **142/142 passed**, twice in a row on the same database, with the PR 2 scenarios as a regression.
+Before the CNH category rule: API built from `VAN-86/4-review-schema` (PR 4), 2026-11-20, after the mobile requests, on a fresh database with the seed. Result: `qa.sh` **160/160 passed**, twice in a row on the same database: V75 and the regression of PRs 1 to 3.
 
-Before the mobile requests: API built from `VAN-86/3-credentials-and-onboarding` (PR 3), 2026-11-12, on a fresh database with the new seed. Result: `qa.sh` **141/141 passed**, twice in a row on the same database (the script can be repeated), and `scripts/qa/service-request-proposal/qa.sh` as a regression on its own fresh database with `places-stub.py`: **563/563 passed**.
+Before the mobile requests: API built from `VAN-86/4-review-schema` (PR 4), 2026-11-15, rebased on the current `main`, on a fresh database with the seed. Result: `qa.sh` **159/159 passed**, twice in a row on the same database: the 141 scenarios of PRs 1 to 3 as a regression, and the 18 of V75.
 
-Previous run: API built from `VAN-86/2-review-and-http` (PR 2), 2026-11-11: `qa.sh` **104/104 passed**, twice in a row.
+Previous runs: API built from `VAN-86/3-credentials-and-onboarding` (PR 3), 2026-11-12: `qa.sh` **141/141 passed**, twice in a row, and `scripts/qa/service-request-proposal/qa.sh` as a regression on its own fresh database with `places-stub.py`: **563/563 passed**. API built from `VAN-86/2-review-and-http` (PR 2), 2026-11-11: `qa.sh` **104/104 passed**, twice in a row.
 
 ## How to run
 
@@ -38,6 +38,10 @@ QA_DB_CONTAINER=vanep-vd-qa-db BASE_URL=http://localhost:8081 scripts/qa/driver-
 - that the photo column is gone.
 
 It then checks the constraints, the van document's expiry included, and the permission grants.
+
+**Part 1b (V75 on the data V72 left)** (PR 4) adds a rejected document, a rejected driver and a CNH, applies V75 and checks the reason code `OTHER` on the rejected rows, the CNH `PENDING` at version 0, `btree_gist`, the dropped CNH indexes, the `CHECK`s of the reason codes and of the CNH status, the exclusion constraint of the CNH number (two drivers refused, the same driver and a removed CNH accepted) and `review_documents` in the `ADMIN` bundle only.
+
+The first run of part 3 on PR 4 found that the `CHECK` "a rejected row has a reason code" in V75 made every rejection answer 500, because the PR 4 service does not send a code yet. That `CHECK`, and the unique index of one `PENDING` per owner and type (a second `PENDING` would also answer 500), moved to the migration of PR 5, together with the service that enforces them.
 
 **Part 2** runs against the live API, which migrated the main database with Flyway. It uses real tokens from the mobile password grant, for the seed's admin, driver (Fábio) and client (Ana).
 
@@ -86,6 +90,8 @@ The first run of part 4 found a defect from PR 1: with one complete van and anot
 | id | scenario | expected | result |
 |---|---|---|---|
 | F1 | V72 is applied by Flyway | 1 | PASS |
+| F3 | V75 is applied by Flyway | 1 | PASS |
+| F4 | review_documents is in the live ADMIN bundle only | ADMIN | PASS |
 | F2 | the seed's documents have only the person's types | 0 | PASS |
 
 == The van without its document photo
@@ -284,4 +290,38 @@ The first run of part 4 found a defect from PR 1: with one complete van and anot
 | T8 | an unknown van | 404 | PASS |
 | T9 | a removed van | 404 | PASS |
 
-TOTAL: 155 passed
+TOTAL: 175 passed
+
+## PR 4 — schema of the new review
+
+== V75 on legacy data
+| id | scenario | expected | result |
+|---|---|---|---|
+| R1 | a rejected document gets the reason code OTHER and keeps its message | OTHER:Ilegível | PASS |
+| R2 | a rejected driver gets the reason code OTHER | OTHER | PASS |
+| R3 | an existing CNH becomes PENDING, at version 0 | PENDING:0 | PASS |
+| R4 | the documents start at version 0 and not superseded | 0 | PASS |
+| R5 | the other documents get no reason code | 1 | PASS |
+| R6 | btree_gist is installed | 1 | PASS |
+| R7 | the old one-CNH-per-driver and unique-number indexes are gone | 0 | PASS |
+| R8 | the three submissions keep who last corrected their data, and when | 6 | PASS |
+
+== V75 constraints
+| id | scenario | expected | result |
+|---|---|---|---|
+| K1 | an unknown reason code on a document | rejected by driver_document_rejection_reason_code_check | PASS |
+| K2 | a van document with a valid reason code | accepted | PASS |
+| K2b | NOT_ELIGIBLE is a reason code: a true document that does not allow school transport | accepted | PASS |
+| K3 | an unknown CNH status | rejected by driver_cnh_status_check | PASS |
+| K4 | an unknown driver rejection code | rejected by driver_rejection_reason_code_check | PASS |
+| K5 | the same CNH number on two drivers | rejected by driver_cnh_registration_one_driver_excl | PASS |
+| K6 | the same CNH number again on the same driver (a renewal) | accepted | PASS |
+| K7 | another driver may reuse a number of a removed CNH | accepted | PASS |
+
+== V75 permissions
+| id | scenario | expected | result |
+|---|---|---|---|
+| P3 | the ADMIN bundle gets review_documents | 1 | PASS |
+| P4 | no other bundle gets it | 0 | PASS |
+
+The live database: F3 and F4 in the PR 1 table above. The regression of PRs 1 to 3 is every table of this file.

@@ -2,7 +2,9 @@ package br.com.vanep.drivercnh.model;
 
 import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.media.model.MediaFileModel;
+import br.com.vanep.shared.document.model.DocumentReview;
 import jakarta.persistence.Column;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
@@ -12,6 +14,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
@@ -64,6 +67,18 @@ public class DriverCnhModel {
   @ManyToOne(fetch = FetchType.EAGER)
   @JoinColumn(name = "photo_media_id")
   private MediaFileModel photo;
+
+  @Embedded private DocumentReview review = DocumentReview.pending();
+
+  @Column(name = "notified_at")
+  private Instant notifiedAt;
+
+  @Version
+  @Column(nullable = false)
+  private Long version;
+
+  @Column(name = "superseded_at")
+  private Instant supersededAt;
 
   @Column(name = "is_active", nullable = false)
   private boolean active = true;

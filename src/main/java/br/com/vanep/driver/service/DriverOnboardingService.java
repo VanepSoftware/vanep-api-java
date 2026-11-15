@@ -235,7 +235,8 @@ public class DriverOnboardingService {
   }
 
   DriverOnboardingStepDTO evaluateCnhStep(DriverModel driver) {
-    List<DriverCnhModel> cnhs = driverCnhRepository.findByDriverId(driver.getId());
+    List<DriverCnhModel> cnhs =
+        driverCnhRepository.findByDriverIdAndSupersededAtIsNull(driver.getId());
     List<DriverCnhModel> activeCnhs = cnhs.stream().filter(cnh -> cnh.isActive()).toList();
     List<String> pending = new ArrayList<>();
     if (activeCnhs.isEmpty()) {
@@ -262,7 +263,7 @@ public class DriverOnboardingService {
       DriverModel driver, List<VehicleModel> vehicles) {
     LocalDate today = SchoolTransportCredentialService.today();
     List<DriverDocumentModel> driverDocuments =
-        driverDocumentRepository.findByDriverId(driver.getId());
+        driverDocumentRepository.findByDriverIdAndSupersededAtIsNull(driver.getId());
     List<DriverDocumentType> missingDriverTypes =
         MANDATORY_DRIVER_DOCUMENT_TYPES.stream()
             .filter(
@@ -290,7 +291,8 @@ public class DriverOnboardingService {
     }
     Map<Long, List<VehicleDocumentModel>> documentsByVehicle =
         vehicleDocumentRepository
-            .findByVehicleIdIn(activeVehicles.stream().map(vehicle -> vehicle.getId()).toList())
+            .findUnsupersededByVehicleIdIn(
+                activeVehicles.stream().map(vehicle -> vehicle.getId()).toList())
             .stream()
             .collect(Collectors.groupingBy(doc -> doc.getVehicle().getId()));
     return activeVehicles.stream()

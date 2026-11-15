@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Manual QA for the driver-credentials-review change (constitution rule 55). Two parts:
-#  - V72 against legacy data: a separate database in the throwaway container gets V1..V71 through
-#    psql, then the rows V72 must remove or keep, then V72, and each outcome is checked.
+#  - V72 and V75 against legacy data: a separate database in the throwaway container gets V1..V71
+#    through psql, then the rows V72 must remove or keep, then V72, then the rows V75 must fill,
+#    then V75, and each outcome is checked.
 #  - the live API from the branch, on the throwaway database it migrated with Flyway and seeded.
 # Never point it at a shared database: it creates and drops a database and writes rows directly.
 set -euo pipefail
@@ -224,6 +225,67 @@ check P1 "the ADMIN bundle gets the five vehicle document permissions and keeps 
 check P2 "no other bundle gets them" "0" \
   "$(mig_sql "select count(*) from role_permissions where name <> 'ADMIN' and permissions::text like '%vehicle_document%'")"
 
+# ---------------------------------------------------------------------------------------------
+# Part 1b — PR 4: V75 on the data V72 left
+# ---------------------------------------------------------------------------------------------
+
+mig_sql "
+insert into users (token, type, name, email, document, verified, terms_accepted_at) values
+  ('u-other', 'DRIVER', 'Other', 'other@qa', '39053344705', true, now());
+insert into driver (token, user_id, base_price, approval_status, rejection_reason)
+  select 'd-other', id, 90, 'REJECTED', 'Cadastro incompleto' from users where token = 'u-other';
+insert into driver_document (token, driver_id, document_type, status, rejection_reason)
+  select 'dd-rejected', id, 'CRIMINAL_RECORD', 'REJECTED', 'Ilegível' from driver where token = 'd-driver';
+insert into driver_cnh (token, driver_id, registration_number, category, issue_date, valid_until)
+  select 'cnh-driver', id, '01234567890', 'D', date '2024-01-10', date '2034-01-10'
+  from driver where token = 'd-driver';
+" >/dev/null
+
+mig_apply "$(ls "$MIGRATIONS"/V75__*.sql)"
+
+table "V75 on legacy data"
+check R1 "a rejected document gets the reason code OTHER and keeps its message" "OTHER:Ilegível" \
+  "$(mig_sql "select rejection_reason_code || ':' || rejection_reason from driver_document where token = 'dd-rejected'")"
+check R2 "a rejected driver gets the reason code OTHER" "OTHER" \
+  "$(mig_sql "select rejection_reason_code from driver where token = 'd-other'")"
+check R3 "an existing CNH becomes PENDING, at version 0" "PENDING:0" \
+  "$(mig_sql "select status || ':' || version from driver_cnh where token = 'cnh-driver'")"
+check R4 "the documents start at version 0 and not superseded" "0" \
+  "$(mig_sql "select count(*) from driver_document where version <> 0 or superseded_at is not null")"
+check R5 "the other documents get no reason code" "1" \
+  "$(mig_sql "select count(*) from driver_document where rejection_reason_code is not null")"
+check R6 "btree_gist is installed" "1" \
+  "$(mig_sql "select count(*) from pg_extension where extname = 'btree_gist'")"
+check R7 "the old one-CNH-per-driver and unique-number indexes are gone" "0" \
+  "$(mig_sql "select count(*) from pg_indexes where indexname in ('driver_cnh_driver_active_key', 'driver_cnh_registration_active_key')")"
+check R8 "the three submissions keep who last corrected their data, and when" "6" \
+  "$(mig_sql "select count(*) from information_schema.columns where table_name in ('driver_document', 'vehicle_document', 'driver_cnh')
+              and column_name in ('data_corrected_by', 'data_corrected_at')")"
+
+table "V75 constraints"
+mig_check_rejected K1 "an unknown reason code on a document" driver_document_rejection_reason_code_check \
+  "update driver_document set rejection_reason_code = 'BLURRY' where token = 'dd-criminal'"
+mig_check_accepted K2 "a van document with a valid reason code" \
+  "insert into vehicle_document (token, vehicle_id, document_type, expires_at, status, rejection_reason_code) select 'x', id, 'CRLV', date '2027-01-31', 'REJECTED', 'EXPIRED' from vehicle limit 1"
+mig_check_accepted K2b "NOT_ELIGIBLE is a reason code: a true document that does not allow school transport" \
+  "update driver_cnh set status = 'REJECTED', rejection_reason_code = 'NOT_ELIGIBLE' where token = 'cnh-driver'"
+mig_check_rejected K3 "an unknown CNH status" driver_cnh_status_check \
+  "update driver_cnh set status = 'EXPIRED' where token = 'cnh-driver'"
+mig_check_rejected K4 "an unknown driver rejection code" driver_rejection_reason_code_check \
+  "update driver set rejection_reason_code = 'ILLEGIBLE' where token = 'd-other'"
+mig_check_rejected K5 "the same CNH number on two drivers" driver_cnh_registration_one_driver_excl \
+  "insert into driver_cnh (token, driver_id, registration_number, category, issue_date, valid_until) select 'x', id, '01234567890', 'D', date '2024-01-10', date '2034-01-10' from driver where token = 'd-other'"
+mig_check_accepted K6 "the same CNH number again on the same driver (a renewal)" \
+  "insert into driver_cnh (token, driver_id, registration_number, category, issue_date, valid_until) select 'x', id, '01234567890', 'D', date '2026-01-10', date '2036-01-10' from driver where token = 'd-driver'"
+mig_check_accepted K7 "another driver may reuse a number of a removed CNH" \
+  "update driver_cnh set deleted_at = now() where token = 'cnh-driver'; insert into driver_cnh (token, driver_id, registration_number, category, issue_date, valid_until) select 'x', id, '01234567890', 'D', date '2024-01-10', date '2034-01-10' from driver where token = 'd-other'"
+
+table "V75 permissions"
+check P3 "the ADMIN bundle gets review_documents" "1" \
+  "$(mig_sql "select count(*) from role_permissions where name = 'ADMIN' and permissions @> '[\"review_documents\"]'::jsonb")"
+check P4 "no other bundle gets it" "0" \
+  "$(mig_sql "select count(*) from role_permissions where name <> 'ADMIN' and permissions @> '[\"review_documents\"]'::jsonb")"
+
 sql "drop database $MIGRATION_DB" >/dev/null
 
 # ---------------------------------------------------------------------------------------------
@@ -239,6 +301,10 @@ VAN=$(sql "select v.token from vehicle v join driver d on d.id = v.driver_id joi
 table "Flyway on the live database"
 check F1 "V72 is applied by Flyway" "1" \
   "$(sql "select count(*) from flyway_schema_history where version = '72' and success")"
+check F3 "V75 is applied by Flyway" "1" \
+  "$(sql "select count(*) from flyway_schema_history where version = '75' and success")"
+check F4 "review_documents is in the live ADMIN bundle only" "ADMIN" \
+  "$(sql "select string_agg(name, ',') from role_permissions where permissions @> '[\"review_documents\"]'::jsonb")"
 check F2 "the seed's documents have only the person's types" "0" \
   "$(sql "select count(*) from driver_document where deleted_at is null
           and document_type not in ('MUNICIPAL_AUTHORIZATION', 'SCHOOL_DRIVER_COURSE', 'CRIMINAL_RECORD')")"

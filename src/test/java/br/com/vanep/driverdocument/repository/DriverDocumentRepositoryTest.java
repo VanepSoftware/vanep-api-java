@@ -6,17 +6,23 @@ import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.driverdocument.enums.DriverDocumentType;
 import br.com.vanep.driverdocument.model.DriverDocumentModel;
+import br.com.vanep.shared.SqlStatementCounter;
+import br.com.vanep.shared.document.enums.DocumentRejectionReason;
 import br.com.vanep.shared.document.enums.DocumentStatus;
 import br.com.vanep.shared.document.enums.ReviewMethod;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
+import jakarta.persistence.EntityManagerFactory;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
+import java.util.function.Supplier;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.jdbc.Sql;
@@ -29,6 +35,7 @@ class DriverDocumentRepositoryTest {
   @Autowired private DriverDocumentRepository documents;
   @Autowired private DriverRepository drivers;
   @Autowired private UserRepository users;
+  @Autowired private EntityManagerFactory entityManagerFactory;
 
   private DriverModel driver;
 
@@ -105,6 +112,95 @@ class DriverDocumentRepositoryTest {
                 Pageable.unpaged()))
         .extracting(document -> document.getToken())
         .containsExactly(pendingCourseToken);
+  }
+
+  @Test
+  void storesAndReadsBackTheVersionTheReasonCodeAndTheSupersededDate() {
+    DriverDocumentModel document = newDocument(DriverDocumentType.CRIMINAL_RECORD);
+    document.getReview().setStatus(DocumentStatus.REJECTED);
+    document.getReview().setRejectionReasonCode(DocumentRejectionReason.ILLEGIBLE);
+    document.setSupersededAt(Instant.parse("2026-11-12T10:00:00Z"));
+    DriverDocumentModel saved = documents.save(document);
+    assertThat(saved.getVersion()).isZero();
+
+    saved.setDocumentNumber("changed");
+    documents.save(saved);
+    DriverDocumentModel stored = documents.findByToken(saved.getToken()).orElseThrow();
+
+    assertThat(stored.getVersion()).isEqualTo(1L);
+    assertThat(stored.getReview().getRejectionReasonCode())
+        .isEqualTo(DocumentRejectionReason.ILLEGIBLE);
+    assertThat(stored.getSupersededAt()).isEqualTo(Instant.parse("2026-11-12T10:00:00Z"));
+  }
+
+  @Test
+  void theListsIgnoreSupersededSubmissions() {
+    DriverDocumentModel superseded = newDocument(DriverDocumentType.CRIMINAL_RECORD);
+    superseded.getReview().setStatus(DocumentStatus.APPROVED);
+    superseded.setSupersededAt(Instant.now());
+    documents.save(superseded);
+    DriverDocumentModel live = newDocument(DriverDocumentType.CRIMINAL_RECORD);
+    live.getReview().setStatus(DocumentStatus.APPROVED);
+    String liveToken = documents.save(live).getToken();
+
+    List<Supplier<List<DriverDocumentModel>>> queries =
+        List.of(
+            () -> documents.findByDriverIdAndSupersededAtIsNull(driver.getId()),
+            () ->
+                documents.findFiltered(driver.getId(), null, null, Pageable.unpaged()).getContent(),
+            () ->
+                documents
+                    .findFiltered(
+                        driver.getId(),
+                        DriverDocumentType.CRIMINAL_RECORD,
+                        DocumentStatus.APPROVED,
+                        Pageable.unpaged())
+                    .getContent(),
+            () -> documents.findFiltered(null, null, null, Pageable.unpaged()).getContent());
+    queries.forEach(
+        query ->
+            assertThat(query.get())
+                .extracting(document -> document.getToken())
+                .containsExactly(liveToken));
+  }
+
+  @Test
+  void theListsLoadEachReviewerWithoutOneQueryPerDocument() {
+    SqlStatementCounter counter = new SqlStatementCounter(entityManagerFactory);
+    saveReviewedDocuments(0, 2);
+    long withTwo = counter.countStatements(this::readTheReviewersOfTheFirstPage);
+    saveReviewedDocuments(2, 6);
+    long withSix = counter.countStatements(this::readTheReviewersOfTheFirstPage);
+
+    assertThat(withSix).isEqualTo(withTwo);
+  }
+
+  private void readTheReviewersOfTheFirstPage() {
+    documents
+        .findFiltered(driver.getId(), null, null, PageRequest.of(0, 20))
+        .forEach(document -> document.getReview().getReviewedBy().getEmail());
+    documents
+        .findByDriverIdAndSupersededAtIsNull(driver.getId())
+        .forEach(document -> document.getReview().getReviewedBy().getEmail());
+  }
+
+  private void saveReviewedDocuments(int from, int to) {
+    for (int index = from; index < to; index++) {
+      DriverDocumentModel document = newDocument(DriverDocumentType.SCHOOL_DRIVER_COURSE);
+      document.getReview().setStatus(DocumentStatus.APPROVED);
+      document
+          .getReview()
+          .setReviewedBy(
+              saveUser("reviewer" + index + "@vanep.com", "0000000000" + index, UserType.ADMIN));
+      documents.save(document);
+    }
+  }
+
+  private DriverDocumentModel newDocument(DriverDocumentType type) {
+    DriverDocumentModel document = new DriverDocumentModel();
+    document.setDriver(driver);
+    document.setDocumentType(type);
+    return document;
   }
 
   private UserModel saveUser(String email, String document, UserType type) {

@@ -83,6 +83,7 @@ public enum PermissionEnum {
   UPDATE_VEHICLE_DOCUMENT("update_vehicle_document"),
   DELETE_VEHICLE_DOCUMENT("delete_vehicle_document"),
   RESTORE_VEHICLE_DOCUMENT("restore_vehicle_document"),
+  REVIEW_DOCUMENTS("review_documents"),
   START_TRIP("start_trip"),
   FINISH_TRIP("finish_trip"),
   LIST_TRIPS("list_trips"),

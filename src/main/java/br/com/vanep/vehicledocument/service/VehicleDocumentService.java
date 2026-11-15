@@ -67,7 +67,7 @@ public class VehicleDocumentService {
       Pageable pageable) {
     requireVehicle(vehicleToken);
     return documents
-        .findByVehicleToken(vehicleToken, documentType, status, pageable)
+        .findUnsupersededByVehicleToken(vehicleToken, documentType, status, pageable)
         .map(document -> mapper.toResponse(document));
   }
 

@@ -17,6 +17,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
@@ -60,6 +61,16 @@ public class VehicleDocumentModel {
   private LocalDate expiresAt;
 
   @Embedded private DocumentReview review = DocumentReview.pending();
+
+  @Column(name = "notified_at")
+  private Instant notifiedAt;
+
+  @Version
+  @Column(nullable = false)
+  private Long version;
+
+  @Column(name = "superseded_at")
+  private Instant supersededAt;
 
   @CreationTimestamp
   @Column(name = "created_at", nullable = false, updatable = false)

@@ -176,13 +176,14 @@ class DriverOnboardingServiceTest {
     user.setAddressId(55L);
     when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of(vehicle));
     DriverCnhModel cnh = cnh("D", LocalDate.now().plusYears(1));
-    when(driverCnhRepository.findByDriverId(20L)).thenReturn(List.of(cnh));
+    when(driverCnhRepository.findByDriverIdAndSupersededAtIsNull(20L)).thenReturn(List.of(cnh));
     stubCompleteDocuments(vehicle);
   }
 
   private void stubCompleteDocuments(VehicleModel vehicle) {
-    when(driverDocumentRepository.findByDriverId(20L)).thenReturn(completeDriverDocuments());
-    when(vehicleDocumentRepository.findByVehicleIdIn(List.of(vehicle.getId())))
+    when(driverDocumentRepository.findByDriverIdAndSupersededAtIsNull(20L))
+        .thenReturn(completeDriverDocuments());
+    when(vehicleDocumentRepository.findUnsupersededByVehicleIdIn(List.of(vehicle.getId())))
         .thenReturn(completeVanDocuments(vehicle));
   }
 
@@ -193,7 +194,7 @@ class DriverOnboardingServiceTest {
     area.setCity(new CityModel());
     when(driverServiceAreaRepository.findByDriverId(20L)).thenReturn(List.of(area));
     DriverCnhModel cnh = cnh("D", LocalDate.now().plusYears(2));
-    when(driverCnhRepository.findByDriverId(20L)).thenReturn(List.of(cnh));
+    when(driverCnhRepository.findByDriverIdAndSupersededAtIsNull(20L)).thenReturn(List.of(cnh));
   }
 
   @Test
@@ -203,8 +204,8 @@ class DriverOnboardingServiceTest {
     when(driverRepository.findByUserId(10L)).thenReturn(Optional.of(driver));
     when(driverServiceAreaRepository.findByDriverId(20L)).thenReturn(List.of());
     when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of());
-    when(driverCnhRepository.findByDriverId(20L)).thenReturn(List.of());
-    when(driverDocumentRepository.findByDriverId(20L)).thenReturn(List.of());
+    when(driverCnhRepository.findByDriverIdAndSupersededAtIsNull(20L)).thenReturn(List.of());
+    when(driverDocumentRepository.findByDriverIdAndSupersededAtIsNull(20L)).thenReturn(List.of());
 
     DriverOnboardingStatusResponseDTO status = service.getOnboardingStatus("user-token-10");
 
@@ -253,8 +254,9 @@ class DriverOnboardingServiceTest {
     VehicleModel complete = vehicle(1L, "ABC1D23");
     VehicleModel bare = vehicle(2L, "XYZ9K87");
     when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of(complete, bare));
-    when(driverDocumentRepository.findByDriverId(20L)).thenReturn(completeDriverDocuments());
-    when(vehicleDocumentRepository.findByVehicleIdIn(List.of(1L, 2L)))
+    when(driverDocumentRepository.findByDriverIdAndSupersededAtIsNull(20L))
+        .thenReturn(completeDriverDocuments());
+    when(vehicleDocumentRepository.findUnsupersededByVehicleIdIn(List.of(1L, 2L)))
         .thenReturn(completeVanDocuments(complete));
 
     DriverOnboardingStatusResponseDTO status = service.getOnboardingStatus("user-token-10");
@@ -276,8 +278,9 @@ class DriverOnboardingServiceTest {
     VehicleModel first = vehicle(1L, "ABC1D23");
     VehicleModel second = vehicle(2L, "XYZ9K87");
     when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of(first, second));
-    when(driverDocumentRepository.findByDriverId(20L)).thenReturn(completeDriverDocuments());
-    when(vehicleDocumentRepository.findByVehicleIdIn(List.of(1L, 2L)))
+    when(driverDocumentRepository.findByDriverIdAndSupersededAtIsNull(20L))
+        .thenReturn(completeDriverDocuments());
+    when(vehicleDocumentRepository.findUnsupersededByVehicleIdIn(List.of(1L, 2L)))
         .thenReturn(
             List.of(
                 vehicleDocument(first, VehicleDocumentType.CRLV, true),
@@ -301,7 +304,8 @@ class DriverOnboardingServiceTest {
     VehicleModel inactive = vehicle(1L, "ABC1D23");
     inactive.setActive(false);
     when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of(inactive));
-    when(driverDocumentRepository.findByDriverId(20L)).thenReturn(completeDriverDocuments());
+    when(driverDocumentRepository.findByDriverIdAndSupersededAtIsNull(20L))
+        .thenReturn(completeDriverDocuments());
 
     DriverOnboardingStatusResponseDTO status = service.getOnboardingStatus("user-token-10");
 
@@ -316,8 +320,9 @@ class DriverOnboardingServiceTest {
     when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of(van));
     VehicleDocumentModel rejected = vehicleDocument(van, VehicleDocumentType.CRLV, true);
     rejected.getReview().setStatus(DocumentStatus.REJECTED);
-    when(driverDocumentRepository.findByDriverId(20L)).thenReturn(completeDriverDocuments());
-    when(vehicleDocumentRepository.findByVehicleIdIn(List.of(1L)))
+    when(driverDocumentRepository.findByDriverIdAndSupersededAtIsNull(20L))
+        .thenReturn(completeDriverDocuments());
+    when(vehicleDocumentRepository.findUnsupersededByVehicleIdIn(List.of(1L)))
         .thenReturn(
             List.of(
                 rejected,
@@ -343,10 +348,10 @@ class DriverOnboardingServiceTest {
     expiredInspection.setExpiresAt(LocalDate.now().minusDays(1));
     VehicleDocumentModel crlv = vehicleDocument(van, VehicleDocumentType.CRLV, true);
     crlv.setExpiresAt(LocalDate.now());
-    when(driverDocumentRepository.findByDriverId(20L))
+    when(driverDocumentRepository.findByDriverIdAndSupersededAtIsNull(20L))
         .thenReturn(
             List.of(expiredCourse, driverDocument(DriverDocumentType.CRIMINAL_RECORD, true)));
-    when(vehicleDocumentRepository.findByVehicleIdIn(List.of(1L)))
+    when(vehicleDocumentRepository.findUnsupersededByVehicleIdIn(List.of(1L)))
         .thenReturn(
             List.of(
                 crlv,
@@ -366,8 +371,9 @@ class DriverOnboardingServiceTest {
     stubDriverWithArea();
     VehicleModel van = vehicle(1L, "ABC1D23");
     when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of(van));
-    when(driverDocumentRepository.findByDriverId(20L)).thenReturn(completeDriverDocuments());
-    when(vehicleDocumentRepository.findByVehicleIdIn(List.of(1L)))
+    when(driverDocumentRepository.findByDriverIdAndSupersededAtIsNull(20L))
+        .thenReturn(completeDriverDocuments());
+    when(vehicleDocumentRepository.findUnsupersededByVehicleIdIn(List.of(1L)))
         .thenReturn(
             List.of(
                 vehicleDocument(van, VehicleDocumentType.CRLV, false),
@@ -402,9 +408,9 @@ class DriverOnboardingServiceTest {
     stubDriverWithArea();
     VehicleModel van = vehicle(1L, "ABC1D23");
     when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of(van));
-    when(driverDocumentRepository.findByDriverId(20L))
+    when(driverDocumentRepository.findByDriverIdAndSupersededAtIsNull(20L))
         .thenReturn(List.of(driverDocument(DriverDocumentType.CRIMINAL_RECORD, true)));
-    when(vehicleDocumentRepository.findByVehicleIdIn(List.of(1L)))
+    when(vehicleDocumentRepository.findUnsupersededByVehicleIdIn(List.of(1L)))
         .thenReturn(completeVanDocuments(van));
 
     DriverOnboardingStatusResponseDTO status = service.getOnboardingStatus("user-token-10");
@@ -420,8 +426,8 @@ class DriverOnboardingServiceTest {
     stubDriverWithArea();
     VehicleModel van = vehicle(1L, "ABC1D23");
     when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of(van));
-    when(driverDocumentRepository.findByDriverId(20L)).thenReturn(List.of());
-    when(vehicleDocumentRepository.findByVehicleIdIn(List.of(1L)))
+    when(driverDocumentRepository.findByDriverIdAndSupersededAtIsNull(20L)).thenReturn(List.of());
+    when(vehicleDocumentRepository.findUnsupersededByVehicleIdIn(List.of(1L)))
         .thenReturn(List.of(vehicleDocument(van, VehicleDocumentType.CRLV, true)));
 
     DriverOnboardingStatusResponseDTO status = service.getOnboardingStatus("user-token-10");
@@ -443,10 +449,10 @@ class DriverOnboardingServiceTest {
   @ValueSource(strings = {"B", "AB", "C"})
   void aCnhWithoutCategoryDOrEIsReportedAsCnhCategory(String category) {
     stubDriverWithArea();
-    when(driverCnhRepository.findByDriverId(20L))
+    when(driverCnhRepository.findByDriverIdAndSupersededAtIsNull(20L))
         .thenReturn(List.of(cnh(category, LocalDate.now().plusYears(2))));
     when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of());
-    when(driverDocumentRepository.findByDriverId(20L)).thenReturn(List.of());
+    when(driverDocumentRepository.findByDriverIdAndSupersededAtIsNull(20L)).thenReturn(List.of());
 
     DriverOnboardingStatusResponseDTO status = service.getOnboardingStatus("user-token-10");
 
@@ -457,10 +463,10 @@ class DriverOnboardingServiceTest {
   @Test
   void aCnhWithCategoryAdCompletesTheStep() {
     stubDriverWithArea();
-    when(driverCnhRepository.findByDriverId(20L))
+    when(driverCnhRepository.findByDriverIdAndSupersededAtIsNull(20L))
         .thenReturn(List.of(cnh("AD", LocalDate.now().plusYears(2))));
     when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of());
-    when(driverDocumentRepository.findByDriverId(20L)).thenReturn(List.of());
+    when(driverDocumentRepository.findByDriverIdAndSupersededAtIsNull(20L)).thenReturn(List.of());
 
     assertThat(service.getOnboardingStatus("user-token-10").cnhStep().completed()).isTrue();
   }
@@ -470,7 +476,7 @@ class DriverOnboardingServiceTest {
     when(userService.requireByTokenAndType("user-token-10", UserType.DRIVER)).thenReturn(user);
     when(driverRepository.findByUserId(10L)).thenReturn(Optional.of(driver));
     stubReadyToSubmit(vehicle(1L, "ABC1D23"));
-    when(driverCnhRepository.findByDriverId(20L))
+    when(driverCnhRepository.findByDriverIdAndSupersededAtIsNull(20L))
         .thenReturn(List.of(cnh("B", LocalDate.now().plusYears(2))));
 
     assertThatThrownBy(() -> service.submitOnboarding("user-token-10"))
@@ -488,7 +494,7 @@ class DriverOnboardingServiceTest {
     when(driverRepository.findByUserId(10L)).thenReturn(Optional.of(driver));
     VehicleModel van = vehicle(1L, "ABC1D23");
     stubReadyToSubmit(van);
-    when(vehicleDocumentRepository.findByVehicleIdIn(List.of(1L)))
+    when(vehicleDocumentRepository.findUnsupersededByVehicleIdIn(List.of(1L)))
         .thenReturn(
             List.of(
                 vehicleDocument(van, VehicleDocumentType.CRLV, true),
@@ -519,10 +525,11 @@ class DriverOnboardingServiceTest {
     VehicleModel bare = vehicle(2L, "XYZ9K87");
     user.setAddressId(55L);
     when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of(complete, bare));
-    when(driverCnhRepository.findByDriverId(20L))
+    when(driverCnhRepository.findByDriverIdAndSupersededAtIsNull(20L))
         .thenReturn(List.of(cnh("D", LocalDate.now().plusYears(1))));
-    when(driverDocumentRepository.findByDriverId(20L)).thenReturn(completeDriverDocuments());
-    when(vehicleDocumentRepository.findByVehicleIdIn(List.of(1L, 2L)))
+    when(driverDocumentRepository.findByDriverIdAndSupersededAtIsNull(20L))
+        .thenReturn(completeDriverDocuments());
+    when(vehicleDocumentRepository.findUnsupersededByVehicleIdIn(List.of(1L, 2L)))
         .thenReturn(completeVanDocuments(complete));
 
     assertThat(service.submitOnboarding("user-token-10").approvalStatus())
@@ -586,8 +593,8 @@ class DriverOnboardingServiceTest {
     when(driverRepository.findByUserId(10L)).thenReturn(Optional.of(driver));
     when(driverServiceAreaRepository.findByDriverId(20L)).thenReturn(List.of());
     when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of());
-    when(driverCnhRepository.findByDriverId(20L)).thenReturn(List.of());
-    when(driverDocumentRepository.findByDriverId(20L)).thenReturn(List.of());
+    when(driverCnhRepository.findByDriverIdAndSupersededAtIsNull(20L)).thenReturn(List.of());
+    when(driverDocumentRepository.findByDriverIdAndSupersededAtIsNull(20L)).thenReturn(List.of());
 
     DriverOnboardingStatusResponseDTO status = service.getOnboardingStatus("user-token-10");
 
@@ -621,8 +628,9 @@ class DriverOnboardingServiceTest {
     user.setAddressId(55L);
     when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of());
     DriverCnhModel cnh = cnh("D", LocalDate.now().plusYears(1));
-    when(driverCnhRepository.findByDriverId(20L)).thenReturn(List.of(cnh));
-    when(driverDocumentRepository.findByDriverId(20L)).thenReturn(completeDriverDocuments());
+    when(driverCnhRepository.findByDriverIdAndSupersededAtIsNull(20L)).thenReturn(List.of(cnh));
+    when(driverDocumentRepository.findByDriverIdAndSupersededAtIsNull(20L))
+        .thenReturn(completeDriverDocuments());
 
     assertThatThrownBy(() -> service.submitOnboarding("user-token-10"))
         .isInstanceOf(ResponseStatusException.class)
@@ -643,8 +651,9 @@ class DriverOnboardingServiceTest {
     user.setAddressId(55L);
     when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of());
     DriverCnhModel cnh = cnh("D", LocalDate.now().plusYears(1));
-    when(driverCnhRepository.findByDriverId(20L)).thenReturn(List.of(cnh));
-    when(driverDocumentRepository.findByDriverId(20L)).thenReturn(completeDriverDocuments());
+    when(driverCnhRepository.findByDriverIdAndSupersededAtIsNull(20L)).thenReturn(List.of(cnh));
+    when(driverDocumentRepository.findByDriverIdAndSupersededAtIsNull(20L))
+        .thenReturn(completeDriverDocuments());
 
     assertThatThrownBy(() -> service.submitOnboarding("user-token-10"))
         .isInstanceOf(ResponseStatusException.class)
@@ -665,7 +674,7 @@ class DriverOnboardingServiceTest {
     DriverCnhModel expired = new DriverCnhModel();
     expired.setActive(true);
     expired.setValidUntil(LocalDate.now().minusDays(1));
-    when(driverCnhRepository.findByDriverId(20L)).thenReturn(List.of(expired));
+    when(driverCnhRepository.findByDriverIdAndSupersededAtIsNull(20L)).thenReturn(List.of(expired));
 
     assertThatThrownBy(() -> service.submitOnboarding("user-token-10"))
         .isInstanceOf(ResponseStatusException.class)
@@ -683,7 +692,7 @@ class DriverOnboardingServiceTest {
     when(driverRepository.findByUserId(10L)).thenReturn(Optional.of(driver));
     VehicleModel van = vehicle(1L, "ABC1D23");
     stubReadyToSubmit(van);
-    when(driverDocumentRepository.findByDriverId(20L)).thenReturn(List.of());
+    when(driverDocumentRepository.findByDriverIdAndSupersededAtIsNull(20L)).thenReturn(List.of());
 
     assertThatThrownBy(() -> service.submitOnboarding("user-token-10"))
         .isInstanceOf(ResponseStatusException.class)
@@ -725,7 +734,7 @@ class DriverOnboardingServiceTest {
     when(driverRepository.findByUserId(10L)).thenReturn(Optional.of(driver));
     VehicleModel van = vehicle(1L, "ABC1D23");
     stubReadyToSubmit(van);
-    when(vehicleDocumentRepository.findByVehicleIdIn(List.of(1L)))
+    when(vehicleDocumentRepository.findUnsupersededByVehicleIdIn(List.of(1L)))
         .thenReturn(
             List.of(
                 vehicleDocument(van, VehicleDocumentType.CRLV, false),

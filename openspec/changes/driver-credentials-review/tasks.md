@@ -21,7 +21,7 @@
 - [x] Reconferir que `vanep-mobile` e `vanep-frontend` não chamam `/api/driver-documents`, `/api/vehicles/{token}/photo-document` nem `GET /api/drivers/me/onboarding`, e que o app só lê `photoDocumentUrl`
 - [x] Criar a task desta change no Genwork (**VAN-86**) e citá-la na VAN-31 como dependência
 - [x] Branch `VAN-86/spec-driver-credentials-review` a partir da `main`, só com `openspec/changes/driver-credentials-review/`. É a base da pilha
-- [ ] **Confirmar o número de Flyway dos PRs 4 a 10:** `V75` (PR 4), depois da `V73` e da `V74` da `contract-generation`. Reconfirmar antes do merge de cada um (R5)
+- [x] **Confirmar o número de Flyway dos PRs 4 a 10:** `V75` (PR 4), depois da `V73` e da `V74` da `contract-generation`. Reconfirmar antes do merge de cada um (R5)
 - [x] Mandar à sessão do `vanep-frontend` o contrato final das rotas, dos DTOs, dos enums e dos códigos de erro dos PRs 5 a 10 (D10 a D19), depois do ok da spec
 - [ ] Mandar às sessões do `vanep-mobile` e do `vanep-frontend` o contrato do envio só com o arquivo e da aprovação com os dados (D2, D14), com o `document.review.field_required` e o `NOT_ELIGIBLE`, depois do ok da spec
 
@@ -97,18 +97,18 @@
 > Depends on: PR 3 | Parallel with: VAN-31
 > Order: test → migration → enums → model → repository
 
-- [ ] 4.1 Criar branch `VAN-86/4-review-schema` de dentro da branch do PR 3
-- [ ] 4.2 Testes de repositório:
+- [x] 4.1 Criar branch `VAN-86/4-review-schema` de dentro da branch do PR 3
+- [x] 4.2 Testes de repositório:
   - os três models gravam e relêem `version`, `rejectionReasonCode` e `supersededAt`, e a `DriverCnhModel` a revisão embutida;
   - as listagens e as consultas da policy ignoram os substituídos;
   - as listagens de documento do motorista e da van fazem o número de consultas de antes com o revisor carregado (`SqlStatementCounter`)
-- [ ] 4.3 Migration `V75__document_submission_review.sql` com os passos da `V75` no Migration Plan, na ordem
-- [ ] 4.4 `shared.document.enums.DocumentRejectionReason` (com `NOT_ELIGIBLE`, D12) e `driver.enums.DriverRejectionReason`; `DocumentReview` com `rejectionReasonCode` (o `reviewedBy` segue `EAGER`, D13); `@Version` e `supersededAt` nos três models; `DriverCnhModel` com o `DocumentReview`, `notifiedAt`; `DriverModel.rejectionReasonCode`
-- [ ] 4.5 Repositórios: `left join fetch` do revisor (D13) em toda consulta que monta resposta, `countQuery` nas paginadas, filtro `supersededAt is null` nas listagens e nas consultas do `SchoolTransportCredentialService`. Testes 4.2 verdes
-- [ ] 4.6 `PermissionEnum.REVIEW_DOCUMENTS`
-- [ ] 4.6a `data_corrected_by` e `data_corrected_at` nas três tabelas (na `V75`) e nos três models, com o corretor mapeado como id, sem associação (D25)
-- [ ] 4.7 `make lint` + `./mvnw verify -B`
-- [ ] 4.8 QA da regra 55:
+- [x] 4.3 Migration `V75__document_submission_review.sql` com os passos da `V75` no Migration Plan, na ordem
+- [x] 4.4 `shared.document.enums.DocumentRejectionReason` (com `NOT_ELIGIBLE`, D12) e `driver.enums.DriverRejectionReason`; `DocumentReview` com `rejectionReasonCode` (o `reviewedBy` segue `EAGER`, D13); `@Version` e `supersededAt` nos três models; `DriverCnhModel` com o `DocumentReview`, `notifiedAt`; `DriverModel.rejectionReasonCode`
+- [x] 4.5 Repositórios: `left join fetch` do revisor (D13) em toda consulta que monta resposta, `countQuery` nas paginadas, filtro `supersededAt is null` nas listagens e nas consultas do `SchoolTransportCredentialService`. Testes 4.2 verdes
+- [x] 4.6 `PermissionEnum.REVIEW_DOCUMENTS`
+- [x] 4.6a `data_corrected_by` e `data_corrected_at` nas três tabelas (na `V75`) e nos três models, com o corretor mapeado como id, sem associação (D25)
+- [x] 4.7 `make lint` + `./mvnw verify -B`
+- [x] 4.8 QA da regra 55:
   - montar antes da `V75`: um documento recusado, um motorista recusado e uma CNH;
   - aplicar a `V75` e conferir que os recusados têm `OTHER` e que a CNH ficou `PENDING`, na versão 0;
   - as recusas do banco: código inválido, status inválido da CNH e o mesmo número de CNH em dois motoristas;

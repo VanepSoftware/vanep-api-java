@@ -20,6 +20,8 @@ public interface VehicleDocumentRepository extends JpaRepository<VehicleDocument
       select document from VehicleDocumentModel document
       join fetch document.vehicle vehicle
       join fetch vehicle.driver
+      left join fetch document.file
+      left join fetch document.review.reviewedBy
       where document.token = :token
       """)
   Optional<VehicleDocumentModel> findByToken(@Param("token") String token);
@@ -29,7 +31,10 @@ public interface VehicleDocumentRepository extends JpaRepository<VehicleDocument
           """
           select document from VehicleDocumentModel document
           join fetch document.vehicle vehicle
+          left join fetch document.file
+          left join fetch document.review.reviewedBy
           where vehicle.token = :vehicleToken
+            and document.supersededAt is null
             and (:documentType is null or document.documentType = :documentType)
             and (:status is null or document.review.status = :status)
           order by document.expiresAt desc nulls first, document.createdAt desc, document.id desc
@@ -39,10 +44,11 @@ public interface VehicleDocumentRepository extends JpaRepository<VehicleDocument
           select count(document) from VehicleDocumentModel document
           join document.vehicle vehicle
           where vehicle.token = :vehicleToken
+            and document.supersededAt is null
             and (:documentType is null or document.documentType = :documentType)
             and (:status is null or document.review.status = :status)
           """)
-  Page<VehicleDocumentModel> findByVehicleToken(
+  Page<VehicleDocumentModel> findUnsupersededByVehicleToken(
       @Param("vehicleToken") String vehicleToken,
       @Param("documentType") VehicleDocumentType documentType,
       @Param("status") DocumentStatus status,
@@ -52,10 +58,13 @@ public interface VehicleDocumentRepository extends JpaRepository<VehicleDocument
       """
       select document from VehicleDocumentModel document
       join fetch document.vehicle vehicle
-      where vehicle.id in :vehicleIds
+      left join fetch document.file
+      left join fetch document.review.reviewedBy
+      where vehicle.id in :vehicleIds and document.supersededAt is null
       order by document.expiresAt desc nulls first, document.createdAt desc, document.id desc
       """)
-  List<VehicleDocumentModel> findByVehicleIdIn(@Param("vehicleIds") Collection<Long> vehicleIds);
+  List<VehicleDocumentModel> findUnsupersededByVehicleIdIn(
+      @Param("vehicleIds") Collection<Long> vehicleIds);
 
   @Query(
       """
@@ -68,8 +77,10 @@ public interface VehicleDocumentRepository extends JpaRepository<VehicleDocument
       left join fetch document.file
       left join fetch document.review.reviewedBy
       where vehicleDriver.id = :driverId and vehicle.active = true
+        and document.supersededAt is null
       """)
-  List<VehicleDocumentModel> findOfActiveVehiclesByDriverId(@Param("driverId") Long driverId);
+  List<VehicleDocumentModel> findUnsupersededOfActiveVehiclesByDriverId(
+      @Param("driverId") Long driverId);
 
   @Query(
       """
@@ -82,8 +93,9 @@ public interface VehicleDocumentRepository extends JpaRepository<VehicleDocument
       left join fetch document.file
       left join fetch document.review.reviewedBy
       where vehicle.id = :vehicleId and vehicleDriver.id = :driverId and vehicle.active = true
+        and document.supersededAt is null
       """)
-  List<VehicleDocumentModel> findOfActiveVehicle(
+  List<VehicleDocumentModel> findUnsupersededOfActiveVehicle(
       @Param("driverId") Long driverId, @Param("vehicleId") Long vehicleId);
 
   @Modifying

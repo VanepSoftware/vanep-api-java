@@ -55,18 +55,19 @@ public class SchoolTransportCredentialService {
   public SchoolTransportCredentialsDTO findCredentials(
       Long driverId, Long vehicleId, LocalDate date) {
     return policy.evaluate(
-        cnhs.findWithDetailsByDriverId(driverId),
-        driverDocuments.findWithDetailsByDriverId(driverId),
-        vehicleDocuments.findOfActiveVehicle(driverId, vehicleId),
+        cnhs.findByDriverIdAndSupersededAtIsNull(driverId),
+        driverDocuments.findByDriverIdAndSupersededAtIsNull(driverId),
+        vehicleDocuments.findUnsupersededOfActiveVehicle(driverId, vehicleId),
         date);
   }
 
   @Transactional(readOnly = true)
   public boolean hasAnyQualifiedVehicle(Long driverId, LocalDate date) {
-    List<DriverCnhModel> driverCnhs = cnhs.findWithDetailsByDriverId(driverId);
-    List<DriverDocumentModel> documents = driverDocuments.findWithDetailsByDriverId(driverId);
+    List<DriverCnhModel> driverCnhs = cnhs.findByDriverIdAndSupersededAtIsNull(driverId);
+    List<DriverDocumentModel> documents =
+        driverDocuments.findByDriverIdAndSupersededAtIsNull(driverId);
     Map<Long, List<VehicleDocumentModel>> documentsByVehicle =
-        vehicleDocuments.findOfActiveVehiclesByDriverId(driverId).stream()
+        vehicleDocuments.findUnsupersededOfActiveVehiclesByDriverId(driverId).stream()
             .collect(Collectors.groupingBy(document -> document.getVehicle().getId()));
     return documentsByVehicle.values().stream()
         .anyMatch(

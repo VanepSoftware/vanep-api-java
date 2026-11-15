@@ -17,6 +17,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
@@ -63,6 +64,13 @@ public class DriverDocumentModel {
 
   @Column(name = "notified_at")
   private Instant notifiedAt;
+
+  @Version
+  @Column(nullable = false)
+  private Long version;
+
+  @Column(name = "superseded_at")
+  private Instant supersededAt;
 
   @Column(name = "is_active", nullable = false)
   private boolean active = true;

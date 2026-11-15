@@ -7,7 +7,9 @@ import br.com.vanep.driverdocument.model.DriverDocumentModel;
 import br.com.vanep.driverdocument.repository.DriverDocumentRepository;
 import br.com.vanep.schooltransportcredential.service.SchoolTransportCredentialService;
 import br.com.vanep.shared.document.enums.DocumentStatus;
+import br.com.vanep.shared.document.enums.ReviewMethod;
 import br.com.vanep.user.repository.UserRepository;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -60,7 +62,8 @@ public class DriverDocumentSeeder {
   }
 
   void seedDocuments(DriverModel driver, int sequence, LocalDate today) {
-    List<DriverDocumentModel> existing = documents.findByDriverId(driver.getId());
+    List<DriverDocumentModel> existing =
+        documents.findByDriverIdAndSupersededAtIsNull(driver.getId());
     for (DocumentSeed seed : SEEDS) {
       boolean hasValidApproved =
           existing.stream()
@@ -81,6 +84,8 @@ public class DriverDocumentSeeder {
           "%s-%04d/%d".formatted(seed.numberPrefix(), sequence, today.getYear()));
       document.setExpiresAt(today.plusMonths(seed.validMonths()));
       document.getReview().setStatus(DocumentStatus.APPROVED);
+      document.getReview().setReviewMethod(ReviewMethod.MANUAL);
+      document.getReview().setReviewedAt(Instant.now());
       documents.save(document);
       log.info("Seed: driver document {} created for driver {}.", seed.type(), driver.getToken());
     }

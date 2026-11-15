@@ -3,6 +3,7 @@ package br.com.vanep.drivercnh.repository;
 import br.com.vanep.drivercnh.model.DriverCnhModel;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -10,19 +11,14 @@ import org.springframework.data.repository.query.Param;
 
 public interface DriverCnhRepository extends JpaRepository<DriverCnhModel, Long> {
 
+  @EntityGraph(attributePaths = {"driver.user", "photo", "review.reviewedBy"})
   Optional<DriverCnhModel> findByToken(String token);
 
-  List<DriverCnhModel> findByDriverId(Long driverId);
+  @EntityGraph(attributePaths = {"driver.user", "photo", "review.reviewedBy"})
+  List<DriverCnhModel> findByDriverIdAndSupersededAtIsNull(Long driverId);
 
-  @Query(
-      """
-      select cnh from DriverCnhModel cnh
-      join fetch cnh.driver driver
-      join fetch driver.user
-      left join fetch cnh.photo
-      where driver.id = :driverId
-      """)
-  List<DriverCnhModel> findWithDetailsByDriverId(@Param("driverId") Long driverId);
+  @EntityGraph(attributePaths = {"driver.user", "photo", "review.reviewedBy"})
+  List<DriverCnhModel> findBySupersededAtIsNull();
 
   boolean existsByRegistrationNumber(String registrationNumber);
 

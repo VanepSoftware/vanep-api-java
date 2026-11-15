@@ -103,7 +103,7 @@ public class DriverCnhService {
 
     List<DriverCnhModel> cnhs;
     if (caller.getType() == UserType.ADMIN) {
-      cnhs = cnhRepository.findAll();
+      cnhs = cnhRepository.findBySupersededAtIsNull();
     } else {
       DriverModel driver =
           driverRepository
@@ -112,7 +112,7 @@ public class DriverCnhService {
                   () ->
                       new ResponseStatusException(
                           HttpStatus.NOT_FOUND, message("user.driver_profile.not_found")));
-      cnhs = cnhRepository.findByDriverId(driver.getId());
+      cnhs = cnhRepository.findByDriverIdAndSupersededAtIsNull(driver.getId());
     }
     return cnhs.stream().map(mapper::toResponse).toList();
   }

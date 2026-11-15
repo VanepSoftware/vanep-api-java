@@ -4,12 +4,14 @@ import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driverdocument.seed.DriverDocumentSeeder;
 import br.com.vanep.schooltransportcredential.service.SchoolTransportCredentialService;
 import br.com.vanep.shared.document.enums.DocumentStatus;
+import br.com.vanep.shared.document.enums.ReviewMethod;
 import br.com.vanep.user.repository.UserRepository;
 import br.com.vanep.vehicle.model.VehicleModel;
 import br.com.vanep.vehicle.repository.VehicleRepository;
 import br.com.vanep.vehicledocument.enums.VehicleDocumentType;
 import br.com.vanep.vehicledocument.model.VehicleDocumentModel;
 import br.com.vanep.vehicledocument.repository.VehicleDocumentRepository;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import org.slf4j.Logger;
@@ -59,7 +61,7 @@ public class VehicleDocumentSeeder {
       return;
     }
     List<VehicleDocumentModel> existing =
-        documents.findByVehicleIdIn(seedVans.stream().map(van -> van.getId()).toList());
+        documents.findUnsupersededByVehicleIdIn(seedVans.stream().map(van -> van.getId()).toList());
     seedVans.forEach(van -> seedDocuments(van, existing, today));
   }
 
@@ -83,6 +85,8 @@ public class VehicleDocumentSeeder {
           "%s-%s/%d".formatted(seed.numberPrefix(), van.getPlate(), today.getYear()));
       document.setExpiresAt(today.plusMonths(seed.validMonths()));
       document.getReview().setStatus(DocumentStatus.APPROVED);
+      document.getReview().setReviewMethod(ReviewMethod.MANUAL);
+      document.getReview().setReviewedAt(Instant.now());
       documents.save(document);
       log.info("Seed: vehicle document {} created for {}.", seed.type(), van.getPlate());
     }
