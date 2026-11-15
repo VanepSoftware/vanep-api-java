@@ -22,6 +22,7 @@ import br.com.vanep.drivercompliance.enums.ComplianceState;
 import br.com.vanep.drivercompliance.service.DriverCompliancePolicy;
 import br.com.vanep.drivercompliance.service.DriverComplianceService;
 import br.com.vanep.driverdocument.enums.DriverDocumentType;
+import br.com.vanep.driverdocument.mapper.DriverDocumentMapper;
 import br.com.vanep.driverdocument.model.DriverDocumentModel;
 import br.com.vanep.driverservicearea.repository.DriverServiceAreaRepository;
 import br.com.vanep.media.web.MediaUrl;
@@ -336,7 +337,7 @@ public class DriverOnboardingService {
         doc.getDocumentType(),
         doc.getReview().getStatus(),
         doc.getReview().getRejectionReason(),
-        MediaUrl.of("/api/driver-documents", doc.getToken(), "file", doc.getFile()));
+        MediaUrl.of(DriverDocumentMapper.BASE_PATH, doc.getToken(), "file", doc.getFile()));
   }
 
   VehicleDocumentSummaryDTO toDocumentSummary(VehicleDocumentModel doc) {

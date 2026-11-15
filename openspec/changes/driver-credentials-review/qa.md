@@ -1,18 +1,18 @@
 # QA — driver-credentials-review (constitution rule 55)
 
-PR 8 and PR 9 were QA'd apart, each on top of PR 7: the runs below are the PR 9 ones, and the PR 8 results come from its own run. They were not run again together after PR 9 was moved on top of PR 8.
+PR 8 was QA'd apart, on top of PR 7: the runs below were made before PR 9 was moved on top of PR 8, so they do not include it, and the PR 8 results come from its own run.
 
-Latest run: API built from `VAN-86/9-admin-queue` (PR 9, on top of PR 7), 2026-11-21, after the file-only submissions, on a fresh database with the seed and the JVM in `Pacific/Kiritimati`. Result: `qa.sh` **331/331 passed**, twice in a row on the same database. The regression of PRs 1 to 7 with the file-only submissions.
+Latest run: API built from `VAN-86/10-admin-driver-page` (PR 10, on top of PR 9), 2026-11-21, after the file-only submissions, on a fresh database with the seed and the JVM in `Pacific/Kiritimati`. Result: `qa.sh` **345/345 passed**, twice in a row on the same database. The CNH on the page has its whole number and who corrected it (P3y, P3z).
 
-Before the file-only submissions: API built from `VAN-86/9-admin-queue` (PR 9, on top of PR 7), 2026-11-21, after the CNH category rule, on a fresh database with the seed and the JVM in `Pacific/Kiritimati`. Result: `qa.sh` **304/304 passed**, twice in a row on the same database, with the regression of PRs 1 to 7 under the date limits (D21). N4 to N6b check that the API only takes the CNH categories D, E, AD and AE, and that a license saved before with category B is still read and reported as `cnh_category`.
+Before the file-only submissions: API built from `VAN-86/10-admin-driver-page` (PR 10, on top of PR 9), 2026-11-21, after the CNH category rule, on a fresh database with the seed and the JVM in `Pacific/Kiritimati`. Result: `qa.sh` **317/317 passed**, twice in a row on the same database; the page's file metadata is the shared `DocumentFileResponseDTO` (D22). N4 to N6b check that the API only takes the CNH categories D, E, AD and AE, and that a license saved before with category B is still read and reported as `cnh_category`.
 
-Before the CNH category rule: API built from `VAN-86/9-admin-queue` (PR 9, on top of PR 7), 2026-11-20, after the mobile requests, on a fresh database with the seed and the JVM in `Pacific/Kiritimati`. Result: `qa.sh` **300/300 passed**, twice in a row on the same database, with the regression of PRs 1 to 7 under the date limits (D21).
+Before the CNH category rule: API built from `VAN-86/10-admin-driver-page` (PR 10, on top of PR 9), 2026-11-20, after the mobile requests, on a fresh database with the seed and the JVM in `Pacific/Kiritimati`. Result: `qa.sh` **313/313 passed**, twice in a row on the same database; the page's file metadata is the shared `DocumentFileResponseDTO` (D22).
 
-Before the mobile requests: API built from `VAN-86/9-admin-queue` (PR 9, on top of PR 7), 2026-11-20, after the code review fixes, on a fresh database with the seed and the JVM in `Pacific/Kiritimati`. Result: `qa.sh` **284/284 passed**, twice in a row on the same database. N8 now expects `cnh_file` while the new driver's CNH has no file, and N8b checks the step complete after the upload.
+Before the mobile requests: API built from `VAN-86/10-admin-driver-page` (PR 10, on top of PR 9), 2026-11-20, after the code review fixes, on a fresh database with the seed and the JVM in `Pacific/Kiritimati`. Result: `qa.sh` **297/297 passed**, twice in a row on the same database. N8 now expects `cnh_file` while the new driver's CNH has no file, and N8b checks the step complete after the upload.
 
-Before the code review fixes: API built from `VAN-86/9-admin-queue` (PR 9, on top of PR 7), 2026-11-15, on a fresh database with the seed and the JVM in `Pacific/Kiritimati`. Result: `qa.sh` **283/283 passed**, twice in a row on the same database: the four tabs and the counts, the search by name, e-mail and plate with or without hyphen, the queue current at every read, who reads it, R10 with 1,000 more drivers, and the regression of PRs 1 to 7 (PR 8 is a parallel branch).
+Before the code review fixes: API built from `VAN-86/10-admin-driver-page` (PR 10, on top of PR 9), 2026-11-15, on a fresh database with the seed and the JVM in `Pacific/Kiritimati`. Result: `qa.sh` **296/296 passed**, twice in a row on the same database: the page of the approved new driver (personal data, active vans only, masked CNH, history), the last decision, the review queue and the history after a rejection and a resend, who reads the page, and the regression of PRs 1 to 7 and 9.
 
-Previous runs: API built from `VAN-86/7-compliance-policy` (PR 7), 2026-11-15, on a fresh database with the seed, with the JVM in `Pacific/Kiritimati` (already the next day, while São Paulo is still on the 15th). `qa.sh` **259/259 passed**, twice in a row on the same database: the blockers of each refused approval of the new driver, an approval and a rejection at once, São Paulo's date against the JVM's, and the regression of PRs 1 to 6, including the CNH file as a PDF. Before that: API built from `VAN-86/6-cnh-review` (PR 6), 2026-11-15, on a fresh database with the seed. `qa.sh` **253/253 passed**, twice in a row on the same database: the CNH review, the renewal with the same number, the number of one driver (two drivers sending the same new number at once, 8 times in a row: a later run found that PostgreSQL can abort one of the two with a deadlock instead of the violation, and the service now answers that one with the same 409; this run logged 3 such deadlocks and no 500), the CNH file as a PDF (the digital CNH) on the `/file` route, read back as `application/pdf`, with the old `/photo` route gone and the column renamed by V77, the onboarding with a rejected CNH and the seed, and the regression of PRs 1 to 5. The new driver of part 4 now has their CNH approved by the admin before DRIVER_LICENSE counts. As a regression, `scripts/qa/service-request-proposal/qa.sh` on its own fresh database with `places-stub.py` and the JVM in `Etc/GMT+12`: **563/563 passed**. Before that: API built from `VAN-86/5-review-and-submissions` (PR 5), 2026-11-15, on a fresh database with the seed. `qa.sh` **224/224 passed**, twice in a row on the same database: V76 on legacy data, the decisions, the final submissions, the renewals and the file caching, and the regression of PRs 1 to 4, whose PR 2 and PR 3 flows now follow the PR 5 rules (the decision carries the version, a rejection carries a code, a renewal is a new submission). Before that: API built from `VAN-86/4-review-schema` (PR 4), 2026-11-15, rebased on the current `main`, on a fresh database with the seed. `qa.sh` **159/159 passed**, twice in a row on the same database: the 141 scenarios of PRs 1 to 3 as a regression, and the 18 of V75. Before that: API built from `VAN-86/3-credentials-and-onboarding` (PR 3), 2026-11-12: `qa.sh` **141/141 passed**, twice in a row, and `scripts/qa/service-request-proposal/qa.sh` as a regression on its own fresh database with `places-stub.py`: **563/563 passed**. API built from `VAN-86/2-review-and-http` (PR 2), 2026-11-11: `qa.sh` **104/104 passed**, twice in a row.
+Previous runs: API built from `VAN-86/9-admin-queue` (PR 9, on top of PR 7), 2026-11-15, on a fresh database with the seed and the JVM in `Pacific/Kiritimati`. `qa.sh` **283/283 passed**, twice in a row on the same database: the four tabs and the counts, the search by name, e-mail and plate with or without hyphen, the queue current at every read, who reads it, R10 with 1,000 more drivers, and the regression of PRs 1 to 7 (PR 8 is a parallel branch). Before that: API built from `VAN-86/7-compliance-policy` (PR 7), 2026-11-15, on a fresh database with the seed, with the JVM in `Pacific/Kiritimati` (already the next day, while São Paulo is still on the 15th). `qa.sh` **259/259 passed**, twice in a row on the same database: the blockers of each refused approval of the new driver, an approval and a rejection at once, São Paulo's date against the JVM's, and the regression of PRs 1 to 6, including the CNH file as a PDF. Before that: API built from `VAN-86/6-cnh-review` (PR 6), 2026-11-15, on a fresh database with the seed. `qa.sh` **253/253 passed**, twice in a row on the same database: the CNH review, the renewal with the same number, the number of one driver (two drivers sending the same new number at once, 8 times in a row: a later run found that PostgreSQL can abort one of the two with a deadlock instead of the violation, and the service now answers that one with the same 409; this run logged 3 such deadlocks and no 500), the CNH file as a PDF (the digital CNH) on the `/file` route, read back as `application/pdf`, with the old `/photo` route gone and the column renamed by V77, the onboarding with a rejected CNH and the seed, and the regression of PRs 1 to 5. The new driver of part 4 now has their CNH approved by the admin before DRIVER_LICENSE counts. As a regression, `scripts/qa/service-request-proposal/qa.sh` on its own fresh database with `places-stub.py` and the JVM in `Etc/GMT+12`: **563/563 passed**. Before that: API built from `VAN-86/5-review-and-submissions` (PR 5), 2026-11-15, on a fresh database with the seed. `qa.sh` **224/224 passed**, twice in a row on the same database: V76 on legacy data, the decisions, the final submissions, the renewals and the file caching, and the regression of PRs 1 to 4, whose PR 2 and PR 3 flows now follow the PR 5 rules (the decision carries the version, a rejection carries a code, a renewal is a new submission). Before that: API built from `VAN-86/4-review-schema` (PR 4), 2026-11-15, rebased on the current `main`, on a fresh database with the seed. `qa.sh` **159/159 passed**, twice in a row on the same database: the 141 scenarios of PRs 1 to 3 as a regression, and the 18 of V75. Before that: API built from `VAN-86/3-credentials-and-onboarding` (PR 3), 2026-11-12: `qa.sh` **141/141 passed**, twice in a row, and `scripts/qa/service-request-proposal/qa.sh` as a regression on its own fresh database with `places-stub.py`: **563/563 passed**. API built from `VAN-86/2-review-and-http` (PR 2), 2026-11-11: `qa.sh` **104/104 passed**, twice in a row.
 
 ## How to run
 
@@ -67,6 +67,8 @@ The first run of part 3 on PR 4 found that the `CHECK` "a rejected row has a rea
 | 2 | 1,007 | 0.28 s | 0.58 s | 0.67 s | 0.66 s | 0.56 s | 0.01 s |
 
 Below the signal of about 1 s that would bring back the stored table of D16, but in the same order of magnitude: the time grows with the base, as R10 accepts.
+
+**Part 10** (PR 10) reads the new driver's page: the CPF and the reviewer of the onboarding (only this route has the CPF; the queue rows of part 9 have none), the active van only, the CNH masked to its last 4 digits with its file URL and the renewal's expiry, and the history newest first; then the driver sends a criminal record, the admin rejects it as `ILLEGIBLE`, the driver resends, and the page shows the approval still counting, the resend pending and in the review queue, the rejection as the last decision without a file, and the history with both sendings and the rejection with its reviewer.
 
 **Part 2** runs against the live API, which migrated the main database with Flyway. It uses real tokens from the mobile password grant, for the seed's admin, driver (Fábio) and client (Ana).
 
@@ -214,7 +216,7 @@ The first run of part 4 found a defect from PR 1: with one complete van and anot
 | id | scenario | expected | result |
 |---|---|---|---|
 | Q1 | the reviewer corrects a mistyped number and expiry | 200 | PASS |
-| Q2 | the correction records who corrected and keeps the file | 570fd2fda38c40ba9335584d0:yes | PASS |
+| Q2 | the correction records who corrected and keeps the file | 70bdc73a6a244406a5e20a884:yes | PASS |
 | Q3 | a correction on the version before is stale | 409 | PASS |
 | Q4 | a correction without the required number | 400 | PASS |
 | Q5 | an expiry before today may be corrected: the document is then expired | 200 | PASS |
@@ -339,7 +341,7 @@ The first run of part 4 found a defect from PR 1: with one complete van and anot
 | T8 | an unknown van | 404 | PASS |
 | T9 | a removed van | 404 | PASS |
 
-TOTAL: 331 passed
+TOTAL: 345 passed
 
 ## PR 4 — schema of the new review
 
@@ -613,7 +615,7 @@ The live database: F3 and F4 in the PR 1 table above. The regression of PRs 1 to
 | S2x | by the plate in lower case without hyphen | 200 | PASS |
 | S3x | by the e-mail, any case | 200 | PASS |
 | S4x | a search that matches nobody | 200 | PASS |
-| S5x | the same page twice is the same | {"content":[{"token":"79f51985b8cc4faab6fa59e67","name":"Motorista Recusado","email":"qa.recusado.1795316016@vanep.test","city":null,"vehicleCount":0,"approvalStatus":"PENDING","submittedAt":null,"createdAt":"2026-11-22T02:53:47.484878Z","nextAction":"ADMIN","canApprove":false,"pendingReviewCount":1,"oldestPendingAt":"2026-11-22T02:53:48.024565Z","rejectedCount":0,"missingCount":2,"expiredCount":0,"nextExpiryOn":null},{"token":"582f108cd923410aad1806616","name":"Motorista QA","email":"qa.corrida.b.1795316016@vanep.test","city":null,"vehicleCount":0,"approvalStatus":"PENDING","submittedAt":null,"createdAt":"2026-11-22T02:53:43.544144Z","nextAction":"DRIVER","canApprove":false,"pendingReviewCount":0,"oldestPendingAt":null,"rejectedCount":0,"missingCount":3,"expiredCount":0,"nextExpiryOn":null}],"empty":false,"first":true,"last":false,"number":0,"numberOfElements":2,"pageable":{"offset":0,"pageNumber":0,"pageSize":2,"paged":true,"sort":{"empty":true,"sorted":false,"unsorted":true},"unpaged":false},"size":2,"sort":{"empty":true,"sorted":false,"unsorted":true},"totalElements":7,"totalPages":4} | PASS |
+| S5x | the same page twice is the same | {"content":[{"token":"9ea1302041694c9e835d0909d","name":"Motorista Recusado","email":"qa.recusado.1795316152@vanep.test","city":null,"vehicleCount":0,"approvalStatus":"PENDING","submittedAt":null,"createdAt":"2026-11-22T02:56:02.747131Z","nextAction":"ADMIN","canApprove":false,"pendingReviewCount":1,"oldestPendingAt":"2026-11-22T02:56:03.044067Z","rejectedCount":0,"missingCount":2,"expiredCount":0,"nextExpiryOn":null},{"token":"b2aa63aa1fc44251a7f1b5089","name":"Motorista QA","email":"qa.corrida.b.1795316152@vanep.test","city":null,"vehicleCount":0,"approvalStatus":"PENDING","submittedAt":null,"createdAt":"2026-11-22T02:55:58.269192Z","nextAction":"DRIVER","canApprove":false,"pendingReviewCount":0,"oldestPendingAt":null,"rejectedCount":0,"missingCount":3,"expiredCount":0,"nextExpiryOn":null}],"empty":false,"first":true,"last":false,"number":0,"numberOfElements":2,"pageable":{"offset":0,"pageNumber":0,"pageSize":2,"paged":true,"sort":{"empty":true,"sorted":false,"unsorted":true},"unpaged":false},"size":2,"sort":{"empty":true,"sorted":false,"unsorted":true},"totalElements":7,"totalPages":4} | PASS |
 | S6x | an unknown tab | 400 | PASS |
 
 == The queue is current at every read
@@ -636,3 +638,27 @@ The live database: F3 and F4 in the PR 1 table above. The regression of PRs 1 to
 | L2x | the counts see the 1,000 new drivers | true | PASS |
 | L3x | the search finds a plate among them | 1 | PASS |
 | L4x | every tab, the counts and the search answer | 200 200 200 200 200 200  | PASS |
+
+## PR 10 — the driver's page for the admin
+
+== The driver's page
+| id | scenario | expected | result |
+|---|---|---|---|
+| P1y | the approved new driver: personal data only on this route, the decision and the history | 200 | PASS |
+| P2y | only the active vans, the second van was removed | ["b1a3c62b5cfb4a9a88a35ad89"] | PASS |
+| P3y | the CNH has its whole number for the correction, its file URL, its expiry and who corrected it | true | PASS |
+| P3z | the history names who corrected the CNH's data | true | PASS |
+| P4y | after a rejection and a resend: the approval counts, the resend waits, the rejection is the last decision | 200 | PASS |
+| P5y | the review queue holds the resend | ["ed861d9a13e841269f1cc0ad5"] | PASS |
+| P6y | the decision counts it | 1 ADMIN | PASS |
+| P7y | the history has the first sending, its rejection with the code and the second sending | true | PASS |
+| P8y | the van's requirements carry the file metadata | true | PASS |
+
+== Who reads the page
+| id | scenario | expected | result |
+|---|---|---|---|
+| P9y | the driver themself | 403 | PASS |
+| P10y | a client | 403 | PASS |
+| P11y | no token | 401 | PASS |
+| P12y | an unknown driver | 404 | PASS |
+| P13y | an admin token without review_documents still has approve_driver | 200 | PASS |

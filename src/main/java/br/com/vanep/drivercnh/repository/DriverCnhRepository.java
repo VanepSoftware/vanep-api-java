@@ -21,6 +21,9 @@ public interface DriverCnhRepository extends JpaRepository<DriverCnhModel, Long>
   @EntityGraph(attributePaths = {"driver.user", "file", "review.reviewedBy"})
   List<DriverCnhModel> findBySupersededAtIsNull();
 
+  @EntityGraph(attributePaths = {"review.reviewedBy"})
+  List<DriverCnhModel> findByDriverIdAndSupersededAtIsNotNull(Long driverId);
+
   @EntityGraph(attributePaths = {"driver.user", "file", "review.reviewedBy"})
   List<DriverCnhModel> findByDriverIdInAndSupersededAtIsNull(Collection<Long> driverIds);
 

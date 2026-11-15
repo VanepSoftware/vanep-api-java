@@ -83,6 +83,9 @@ public interface VehicleDocumentRepository extends JpaRepository<VehicleDocument
   List<VehicleDocumentModel> findUnsupersededOfActiveVehicle(
       @Param("driverId") Long driverId, @Param("vehicleId") Long vehicleId);
 
+  @EntityGraph(attributePaths = {"vehicle", "review.reviewedBy"})
+  List<VehicleDocumentModel> findByVehicleIdInAndSupersededAtIsNotNull(Collection<Long> vehicleIds);
+
   @EntityGraph(attributePaths = {"file"})
   List<VehicleDocumentModel> findByVehicleIdAndDocumentTypeAndSupersededAtIsNull(
       Long vehicleId, VehicleDocumentType documentType);

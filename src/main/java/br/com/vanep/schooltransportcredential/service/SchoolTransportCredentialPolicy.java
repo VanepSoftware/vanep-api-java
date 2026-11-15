@@ -39,6 +39,25 @@ public class SchoolTransportCredentialPolicy {
           CredentialRequirement.SCHOOL_VEHICLE_AUTHORIZATION,
               VehicleDocumentType.SCHOOL_VEHICLE_AUTHORIZATION);
 
+  public static CredentialRequirement requirementOf(DocumentSubmission submission) {
+    return switch (submission) {
+      case DriverCnhModel _ -> CredentialRequirement.DRIVER_LICENSE;
+      case DriverDocumentModel document ->
+          requirementOf(DRIVER_DOCUMENT_TYPES, document.getDocumentType());
+      case VehicleDocumentModel document ->
+          requirementOf(VEHICLE_DOCUMENT_TYPES, document.getDocumentType());
+      default -> throw new IllegalArgumentException("Unknown submission " + submission.kind());
+    };
+  }
+
+  static <T> CredentialRequirement requirementOf(Map<CredentialRequirement, T> types, T type) {
+    return types.entrySet().stream()
+        .filter(entry -> entry.getValue() == type)
+        .map(entry -> entry.getKey())
+        .findFirst()
+        .orElseThrow();
+  }
+
   // A null expiry means the document does not expire, so it outranks any dated one.
   private static final Comparator<DocumentSubmission> FARTHEST_EXPIRY_THEN_NEWEST =
       Comparator.comparing(

@@ -295,8 +295,8 @@
 > Depends on: PR 9 | Parallel with: PR 8
 > Order: test → repository → service → controller → response DTO
 
-- [ ] 10.1 Criar branch `VAN-86/10-admin-driver-page` de dentro da branch do PR 9
-- [ ] 10.2 Testes (spec `admin-driver-review`):
+- [x] 10.1 Criar branch `VAN-86/10-admin-driver-page` de dentro da branch do PR 9
+- [x] 10.2 Testes (spec `admin-driver-review`):
   - o agregado de um motorista com duas vans, uma renovação pendente e um reenvio depois de recusa;
   - `lastDecision` sem arquivo;
   - `reviewQueue` na ordem do checklist;
@@ -309,11 +309,11 @@
   - número constante de consultas para qualquer número de vans e documentos;
   - motorista desconhecido ou removido → 404;
   - permissões como no 9.3
-- [ ] 10.3 Testes do `history`: envios, aprovações e recusas, inclusive dos substituídos, e o envio e a decisão do cadastro, do mais novo ao mais antigo e no máximo 50; `actor` com o revisor nas decisões e nulo nos envios
-- [ ] 10.4 Consultas da página nos repositórios (últimas decisões por tabela); `DriverComplianceDetailService` sobre o `DriverComplianceService.evaluate`, com o `history`; `GET /api/drivers/{token}/compliance` no `DriverComplianceController`; `DriverComplianceDetailResponseDTO` com records aninhados e `SubmissionResponseDTO`. Testes 10.2 e 10.3 verdes
-- [ ] 10.4a O `file` do `SubmissionResponseDTO` pelo `DocumentFileResponseDTO` (D22), sem record próprio
-- [ ] 10.5 `make lint` + `./mvnw verify -B`
-- [ ] 10.6 QA da regra 55: a página em cada etapa do motorista novo, conferindo o `reviewQueue`, o `lastDecision` e o `history` depois de um reenvio, e o CPF e a data de nascimento presentes só nessa rota; regressão do QA dos PRs 1 a 7 e do 9
+- [x] 10.3 Testes do `history`: envios, aprovações e recusas, inclusive dos substituídos, e o envio e a decisão do cadastro, do mais novo ao mais antigo e no máximo 50; `actor` com o revisor nas decisões e nulo nos envios
+- [x] 10.4 Consultas da página nos repositórios (últimas decisões por tabela); `DriverComplianceDetailService` sobre o `DriverComplianceService.evaluate`, com o `history`; `GET /api/drivers/{token}/compliance` no `DriverComplianceController`; `DriverComplianceDetailResponseDTO` com records aninhados e `SubmissionResponseDTO`. Testes 10.2 e 10.3 verdes
+- [x] 10.4a O `file` do `SubmissionResponseDTO` pelo `DocumentFileResponseDTO` (D22), sem record próprio
+- [x] 10.5 `make lint` + `./mvnw verify -B`
+- [x] 10.6 QA da regra 55: a página em cada etapa do motorista novo, conferindo o `reviewQueue`, o `lastDecision` e o `history` depois de um reenvio, e o CPF e a data de nascimento presentes só nessa rota; regressão do QA dos PRs 1 a 7 e do 9
 
 ## 11. PR 11 — Situação do próprio motorista
 

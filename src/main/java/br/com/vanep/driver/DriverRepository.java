@@ -49,6 +49,15 @@ public interface DriverRepository extends JpaRepository<DriverModel, Long> {
     String getCityName();
   }
 
+  @Query(
+      """
+      select driver from DriverModel driver
+      join fetch driver.user
+      left join fetch driver.reviewedBy
+      where driver.token = :token
+      """)
+  Optional<DriverModel> findWithReviewerByToken(@Param("token") String token);
+
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   @Query("select driver from DriverModel driver where driver.token = :token")
   Optional<DriverModel> findByTokenForUpdate(@Param("token") String token);

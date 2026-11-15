@@ -10,6 +10,8 @@ import org.springframework.stereotype.Component;
 @Component
 public class DriverCnhMapper {
 
+  public static final String BASE_PATH = "/api/driver-cnhs";
+
   public DriverCnhResponseDTO toResponse(DriverCnhModel cnh) {
     DocumentReview review = cnh.getReview();
     return new DriverCnhResponseDTO(
@@ -22,7 +24,7 @@ public class DriverCnhMapper {
         cnh.getFirstLicenseDate(),
         cnh.getSecurityNumber(),
         cnh.getIssuingState(),
-        MediaUrl.of("/api/driver-cnhs", cnh.getToken(), "file", cnh.getFile()),
+        MediaUrl.of(BASE_PATH, cnh.getToken(), "file", cnh.getFile()),
         DocumentFileMapper.toResponse(cnh.getFile()),
         review.getStatus(),
         review.getReviewMethod(),

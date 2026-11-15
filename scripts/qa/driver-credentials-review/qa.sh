@@ -1448,5 +1448,67 @@ delete from driver where token like '$BULK-d%';
 delete from users where token like '$BULK-u%';
 " >/dev/null
 
+# ---------------------------------------------------------------------------------------------
+# Part 10 — PR 10: the driver's page for the admin
+# ---------------------------------------------------------------------------------------------
+
+page() { request GET "/api/drivers/$1/compliance" "${2-$ADMIN}"; }
+requirement() { jq --arg r "$1" '.driverRequirements[] | select(.requirement == $r)' <<<"$PAGE"; }
+
+table "The driver's page"
+page "$NEW_DRIVER"
+expect P1y "the approved new driver: personal data only on this route, the decision and the history" 200 \
+  '.driver.document != null and .driver.email == "'"$NEW_EMAIL"'" and .driver.approvalStatus == "APPROVED"
+   and .driver.reviewedBy.token == "'"$ADMIN_UID"'" and .asOf != null
+   and ([.history[] | select(.kind == "DRIVER_APPROVED")][0].actor.token == "'"$ADMIN_UID"'")
+   and ([.history[].kind] | index("ONBOARDING_SUBMITTED") != null)
+   and ([.history[] | .at] == ([.history[] | .at] | sort | reverse))'
+PAGE="$RESP_BODY"
+check P2y "only the active vans, the second van was removed" "[\"$NVAN\"]" "$(jq -c '[.vehicles[].token]' <<<"$PAGE")"
+check P3y "the CNH has its whole number for the correction, its file URL, its expiry and who corrected it" "true" \
+  "$(requirement DRIVER_LICENSE | jq '.current.registrationNumber == "'"$CNH_NUMBER"'" and .current.category == "D"
+     and .current.dataCorrectedAt != null and .current.dataCorrectedBy.token == "'"$ADMIN_UID"'"
+     and (.current.fileUrl | startswith("/api/driver-cnhs/'"$RENEWED_CNH"'/file?v="))
+     and .current.expiresAt == "'"$LATER"'" and .lastDecision.status == "APPROVED"')"
+
+check P3z "the history names who corrected the CNH's data" "true" \
+  "$(jq '[.history[] | select(.kind == "SUBMISSION_DATA_CORRECTED" and .requirement == "DRIVER_LICENSE")][0].actor.token == "'"$ADMIN_UID"'"' <<<"$PAGE")"
+
+send_doc /api/driver-documents "$NEW" '{"documentType": "CRIMINAL_RECORD", "documentNumber": "CERT-QA-2"}'
+FIRST_RESEND=$(jq -r .token <<<"$RESP_BODY")
+upload_pdf "/api/driver-documents/$FIRST_RESEND/file" "$NEW"
+review driver-documents "$FIRST_RESEND" '{"status": "REJECTED", "rejectionReasonCode": "ILLEGIBLE"}'
+send_doc /api/driver-documents "$NEW" '{"documentType": "CRIMINAL_RECORD", "documentNumber": "CERT-QA-3"}'
+SECOND_RESEND=$(jq -r .token <<<"$RESP_BODY")
+upload_pdf "/api/driver-documents/$SECOND_RESEND/file" "$NEW"
+page "$NEW_DRIVER"
+expect P4y "after a rejection and a resend: the approval counts, the resend waits, the rejection is the last decision" 200 \
+  '(.driverRequirements[] | select(.requirement == "CRIMINAL_RECORD")) as $r
+   | $r.state == "APPROVED" and $r.pending.token == "'"$SECOND_RESEND"'"
+     and $r.lastDecision.status == "REJECTED" and $r.lastDecision.rejectionReasonCode == "ILLEGIBLE"
+     and ($r.lastDecision | has("fileUrl") | not) and $r.lastDecision.supersededAt != null'
+PAGE="$RESP_BODY"
+check P5y "the review queue holds the resend" "[\"$SECOND_RESEND\"]" "$(jq -c '[.reviewQueue[].token]' <<<"$PAGE")"
+check P6y "the decision counts it" "1 ADMIN" "$(jq -r '"\(.decision.pendingReviewCount) \(.decision.nextAction)"' <<<"$PAGE")"
+check P7y "the history has the first sending, its rejection with the code and the second sending" "true" \
+  "$(jq '[.history[] | select(.requirement == "CRIMINAL_RECORD")] as $h
+     | ([$h[] | select(.kind == "SUBMISSION_REJECTED" and .rejectionReasonCode == "ILLEGIBLE" and .actor.token == "'"$ADMIN_UID"'")] | length) >= 1
+       and ([$h[] | select(.kind == "SUBMISSION_SENT" and .actor == null)] | length) >= 3' <<<"$PAGE")"
+check P8y "the van's requirements carry the file metadata" "true" \
+  "$(jq '[.vehicles[0].requirements[].current | select(. != null) | .file.mimeType == "application/pdf" and .file.sizeBytes > 0] | all' <<<"$PAGE")"
+review driver-documents "$SECOND_RESEND" '{"status": "REJECTED", "rejectionReasonCode": "DATA_MISMATCH"}'
+
+table "Who reads the page"
+page "$NEW_DRIVER" "$NEW"
+expect P9y "the driver themself" 403
+page "$NEW_DRIVER" "$CLIENT"
+expect P10y "a client" 403
+page "$NEW_DRIVER" ""
+expect P11y "no token" 401
+page unknown-driver
+expect P12y "an unknown driver" 404 '.code == "driver.not_found"'
+page "$SEED_DRIVER_TOKEN" "$EDITOR"
+expect P13y "an admin token without review_documents still has approve_driver" 200
+
 echo
 echo "TOTAL: $PASSED passed"

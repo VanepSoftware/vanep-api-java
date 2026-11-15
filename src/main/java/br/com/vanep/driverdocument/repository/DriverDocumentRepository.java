@@ -47,6 +47,9 @@ public interface DriverDocumentRepository
   List<DriverDocumentModel> findByDriverIdAndDocumentTypeAndSupersededAtIsNull(
       Long driverId, DriverDocumentType documentType);
 
+  @EntityGraph(attributePaths = {"review.reviewedBy"})
+  List<DriverDocumentModel> findByDriverIdAndSupersededAtIsNotNull(Long driverId);
+
   @EntityGraph(attributePaths = {"driver.user", "file", "review.reviewedBy"})
   List<DriverDocumentModel> findByDriverIdInAndSupersededAtIsNull(Collection<Long> driverIds);
 

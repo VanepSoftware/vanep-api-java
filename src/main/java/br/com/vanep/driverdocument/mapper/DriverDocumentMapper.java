@@ -10,6 +10,8 @@ import org.springframework.stereotype.Component;
 @Component
 public class DriverDocumentMapper {
 
+  public static final String BASE_PATH = "/api/driver-documents";
+
   public DriverDocumentResponseDTO toResponse(DriverDocumentModel document) {
     DocumentReview review = document.getReview();
     String reviewedByUserToken =
@@ -20,7 +22,7 @@ public class DriverDocumentMapper {
         document.getDriver() != null ? document.getDriver().getToken() : null,
         document.getDocumentType(),
         document.getDocumentNumber(),
-        MediaUrl.of("/api/driver-documents", document.getToken(), "file", document.getFile()),
+        MediaUrl.of(BASE_PATH, document.getToken(), "file", document.getFile()),
         DocumentFileMapper.toResponse(document.getFile()),
         document.getExpiresAt(),
         review.getStatus(),
