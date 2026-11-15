@@ -2,6 +2,8 @@ package br.com.vanep.driveroccupancy.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.groups.Tuple.tuple;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 import br.com.vanep.contract.repository.ContractItemRepository;
@@ -46,13 +48,13 @@ class DriverOccupancyServiceTest {
             List.of(
                 new ShiftOccupancyDTO(OperationShift.AFTERNOON, 9L),
                 new ShiftOccupancyDTO(OperationShift.MORNING, 14L)));
-    when(unlinkedPassengers.countPassengersByShift(7L, null))
+    when(unlinkedPassengers.countPassengersByShift(7L, null, TODAY))
         .thenReturn(
             List.of(
                 new ShiftOccupancyDTO(OperationShift.MORNING, 2L),
                 new ShiftOccupancyDTO(OperationShift.AFTERNOON, 3L)));
     when(contractItems.countActiveDependents(7L, TODAY)).thenReturn(24L);
-    when(unlinkedPassengers.countStudents(7L, null)).thenReturn(4L);
+    when(unlinkedPassengers.countStudents(7L, null, TODAY)).thenReturn(4L);
 
     DriverOccupancyResponseDTO occupancy = service.findOccupancy(driver, null, TODAY);
 
@@ -69,7 +71,7 @@ class DriverOccupancyServiceTest {
   @Test
   void answersEveryShiftWithZeroWhenTheDriverHasNoPassengers() {
     when(contractItems.countActivePassengersByShift(7L, TODAY)).thenReturn(List.of());
-    when(unlinkedPassengers.countPassengersByShift(7L, null)).thenReturn(List.of());
+    when(unlinkedPassengers.countPassengersByShift(7L, null, TODAY)).thenReturn(List.of());
 
     DriverOccupancyResponseDTO occupancy = service.findOccupancy(driver, null, TODAY);
 
@@ -95,8 +97,8 @@ class DriverOccupancyServiceTest {
   @Test
   void aMergedUnlinkedPassengerCountsAsAStudentWithFamily() {
     when(contractItems.countActiveDependents(7L, TODAY)).thenReturn(24L);
-    when(unlinkedPassengers.countStudents(7L, null)).thenReturn(4L);
-    when(unlinkedPassengers.countMergedStudents(7L, null)).thenReturn(1L);
+    when(unlinkedPassengers.countStudents(7L, null, TODAY)).thenReturn(4L);
+    when(unlinkedPassengers.countMergedStudents(7L, null, TODAY)).thenReturn(1L);
 
     DriverOccupancyResponseDTO occupancy = service.findOccupancy(driver, null, TODAY);
 
@@ -108,7 +110,7 @@ class DriverOccupancyServiceTest {
   void filtersTheUnlinkedPassengersByTheChosenVan() {
     when(drivers.requireCallerDriver("driver-uid")).thenReturn(driver);
     when(ownVehicles.findOwnVehicleId(driver, "van-a")).thenReturn(30L);
-    when(unlinkedPassengers.countStudents(7L, 30L)).thenReturn(2L);
+    when(unlinkedPassengers.countStudents(eq(7L), eq(30L), any())).thenReturn(2L);
 
     DriverOccupancyResponseDTO occupancy = service.findMyOccupancy("driver-uid", "van-a");
 

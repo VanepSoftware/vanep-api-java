@@ -146,6 +146,16 @@ class FamilyInviteControllerTest {
   }
 
   @Test
+  void aStaleBearerTokenStillSeesTheInvitePreview() throws Exception {
+    String code = invite(createPassenger("Rafael Costa")).get("code").asText();
+
+    mockMvc
+        .perform(get("/api/family-invites/" + code).header("Authorization", "Bearer not-a-jwt"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.driverFirstName").value("Carlos"));
+  }
+
+  @Test
   void anUnknownCodeIsNotFound() throws Exception {
     mockMvc.perform(get("/api/family-invites/NOPE")).andExpect(status().isNotFound());
     mockMvc

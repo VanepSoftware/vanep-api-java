@@ -24,7 +24,9 @@ import br.com.vanep.schedule.model.ScheduleSlotModel;
 import br.com.vanep.schedule.service.ScheduleService;
 import br.com.vanep.school.model.SchoolModel;
 import br.com.vanep.school.repository.SchoolRepository;
+import br.com.vanep.trip.service.TripService;
 import br.com.vanep.unlinkedpassenger.service.UnlinkedPassengerService;
+import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -168,6 +170,7 @@ public class ContractService {
       restoredItems.forEach(item -> ensureNoSlotConflict(item));
     }
     recomputeLinkStatus(contract.getClientDriver());
+    retireMergedPassengers(contract, restoredItems);
     return mapper.toResponse(contract, restoredItems);
   }
 
@@ -193,9 +196,20 @@ public class ContractService {
   }
 
   void retireMergedPassengers(ContractModel contract, Collection<ContractItemModel> contractItems) {
+    if (!inForce(contract)) {
+      return;
+    }
     unlinkedPassengers.retireMergedPassengers(
         contract.getClientDriver().getDriver().getId(),
         contractItems.stream().map(item -> item.getDependent().getId()).toList());
+  }
+
+  boolean inForce(ContractModel contract) {
+    if (contract.getStatus() != ContractStatus.ACTIVE) {
+      return false;
+    }
+    LocalDate today = LocalDate.now(TripService.SERVICE_ZONE);
+    return !contract.getStartsOn().isAfter(today) && !contract.getEndsOn().isBefore(today);
   }
 
   <T> T writeKeepingOneActiveContract(Supplier<T> write) {

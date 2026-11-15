@@ -51,12 +51,12 @@ public class DriverOccupancyService {
     Long driverId = driver.getId();
     long contracted = contractItems.countActiveDependents(driverId, today);
     long studentsWithFamily =
-        contracted + unlinkedPassengers.countMergedStudents(driverId, vehicleId);
-    long students = contracted + unlinkedPassengers.countStudents(driverId, vehicleId);
+        contracted + unlinkedPassengers.countMergedStudents(driverId, vehicleId, today);
+    long students = contracted + unlinkedPassengers.countStudents(driverId, vehicleId, today);
     return new DriverOccupancyResponseDTO(
         sumPassengersPerShift(
             contractItems.countActivePassengersByShift(driverId, today),
-            unlinkedPassengers.countPassengersByShift(driverId, vehicleId)),
+            unlinkedPassengers.countPassengersByShift(driverId, vehicleId, today)),
         students,
         studentsWithFamily);
   }

@@ -43,6 +43,7 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
+import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 import org.springframework.security.web.util.matcher.MediaTypeRequestMatcher;
 import org.springframework.security.web.util.matcher.RequestMatcher;
 
@@ -149,11 +150,29 @@ public class SecurityConfig {
   }
 
   /**
+   * Ahead of the {@code /api/**} chain and without a resource server, so a stale Bearer token does
+   * not turn the public invite preview into a {@code 401}.
+   */
+  @Bean
+  @Order(2)
+  public SecurityFilterChain familyInvitePreviewSecurityFilterChain(HttpSecurity http)
+      throws Exception {
+    http.securityMatcher(
+            PathPatternRequestMatcher.withDefaults()
+                .matcher(HttpMethod.GET, "/api/family-invites/*"))
+        .authorizeHttpRequests(authorize -> authorize.anyRequest().permitAll())
+        .csrf(csrf -> csrf.disable())
+        .sessionManagement(
+            session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
+    return http.build();
+  }
+
+  /**
    * Ahead of the {@code /api/**} chain and without a resource server, so a stale Bearer token from
    * the app does not turn a public account call into a {@code 401}.
    */
   @Bean
-  @Order(2)
+  @Order(3)
   public SecurityFilterChain authApiSecurityFilterChain(HttpSecurity http) throws Exception {
     http.securityMatcher("/api/auth/**")
         .authorizeHttpRequests(authorize -> authorize.anyRequest().permitAll())
@@ -165,17 +184,11 @@ public class SecurityConfig {
   }
 
   @Bean
-  @Order(3)
+  @Order(4)
   public SecurityFilterChain apiSecurityFilterChain(
       HttpSecurity http, JwtAuthenticationConverter jwtAuthenticationConverter) throws Exception {
     http.securityMatcher("/api/**")
-        .authorizeHttpRequests(
-            authorize ->
-                authorize
-                    .requestMatchers(HttpMethod.GET, "/api/family-invites/*")
-                    .permitAll()
-                    .anyRequest()
-                    .authenticated())
+        .authorizeHttpRequests(authorize -> authorize.anyRequest().authenticated())
         .csrf(csrf -> csrf.disable())
         .sessionManagement(
             session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -188,7 +201,7 @@ public class SecurityConfig {
   }
 
   @Bean
-  @Order(4)
+  @Order(5)
   public SecurityFilterChain defaultSecurityFilterChain(
       HttpSecurity http,
       @Value("${vanep.remember-me.key}") String rememberMeKey,

@@ -17,8 +17,8 @@ import br.com.vanep.address.model.AddressModel;
 import br.com.vanep.address.service.AddressService;
 import br.com.vanep.city.model.CityModel;
 import br.com.vanep.driver.DriverApprovalStatus;
-import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
+import br.com.vanep.driver.service.DriverService;
 import br.com.vanep.familyinvite.model.FamilyInviteModel;
 import br.com.vanep.familyinvite.repository.FamilyInviteRepository;
 import br.com.vanep.schedule.dto.ScheduleSlotRequestDTO;
@@ -42,11 +42,10 @@ import br.com.vanep.unlinkedpassenger.dto.UnlinkedPassengerUpdateRequestDTO;
 import br.com.vanep.unlinkedpassenger.mapper.UnlinkedPassengerMapper;
 import br.com.vanep.unlinkedpassenger.model.UnlinkedPassengerModel;
 import br.com.vanep.unlinkedpassenger.repository.UnlinkedPassengerRepository;
-import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
-import br.com.vanep.user.service.UserService;
 import br.com.vanep.vehicle.model.VehicleModel;
 import br.com.vanep.vehicle.repository.VehicleRepository;
+import br.com.vanep.vehicle.service.OwnVehicleService;
 import java.time.DayOfWeek;
 import java.time.LocalTime;
 import java.util.HashMap;
@@ -74,8 +73,7 @@ class UnlinkedPassengerServiceTest {
   private static final String CALLER = "carlos-uid";
 
   @Mock private UnlinkedPassengerRepository passengers;
-  @Mock private DriverRepository drivers;
-  @Mock private UserService users;
+  @Mock private DriverService drivers;
   @Mock private SchoolRepository schools;
   @Mock private AddressService addresses;
   @Mock private ScheduleRepository scheduleRepository;
@@ -101,11 +99,10 @@ class UnlinkedPassengerServiceTest {
         new UnlinkedPassengerService(
             passengers,
             drivers,
-            users,
             schools,
             addresses,
             new ScheduleService(scheduleRepository, new ScheduleSlotPolicy(), messages),
-            vehicles,
+            new OwnVehicleService(vehicles, messages),
             invites,
             families,
             new UnlinkedPassengerMapper(new AddressMapper(), new ScheduleMapper()),
@@ -113,14 +110,11 @@ class UnlinkedPassengerServiceTest {
     when(families.findFamily(any())).thenReturn(UnlinkedPassengerFamilyDTO.NONE);
     when(families.findFamilies(any())).thenReturn(new HashMap<>());
 
-    UserModel user = new UserModel();
-    user.setId(1L);
-    user.setType(UserType.DRIVER);
-    when(users.requireByTokenAndType(CALLER, UserType.DRIVER)).thenReturn(user);
     carlos = new DriverModel();
     carlos.setId(2L);
     carlos.setApprovalStatus(DriverApprovalStatus.APPROVED);
-    when(drivers.findByUserId(1L)).thenReturn(Optional.of(carlos));
+    carlos.setUser(new UserModel());
+    when(drivers.requireCallerDriver(CALLER)).thenReturn(carlos);
 
     school = new SchoolModel();
     school.setId(7L);
@@ -175,7 +169,7 @@ class UnlinkedPassengerServiceTest {
 
   @Test
   void aCallerThatIsNotADriverIsForbidden() {
-    when(users.requireByTokenAndType("maria-uid", UserType.DRIVER))
+    when(drivers.requireCallerDriver("maria-uid"))
         .thenThrow(new ResponseStatusException(HttpStatus.FORBIDDEN, "user.type.forbidden"));
 
     assertThatThrownBy(() -> service.create("maria-uid", createRequest()))

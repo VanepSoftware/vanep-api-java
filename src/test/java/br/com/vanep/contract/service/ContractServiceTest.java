@@ -47,6 +47,7 @@ import br.com.vanep.school.repository.SchoolRepository;
 import br.com.vanep.shared.enums.OperationShift;
 import br.com.vanep.shared.enums.RouteLeg;
 import br.com.vanep.shared.mapper.InstallmentMapper;
+import br.com.vanep.trip.service.TripService;
 import br.com.vanep.unlinkedpassenger.service.UnlinkedPassengerService;
 import br.com.vanep.user.model.UserModel;
 import java.math.BigDecimal;
@@ -186,12 +187,29 @@ class ContractServiceTest {
   @Test
   void activatingAContractRetiresTheMergedPassengersOfItsDependents() {
     when(contracts.findStatusesByClientDriverId(3L)).thenReturn(List.of(ContractStatus.ACTIVE));
+    LocalDate today = LocalDate.now(TripService.SERVICE_ZONE);
 
-    service.create(createRequest(item("lucas", outbound()), item("ana", outbound())));
+    service.create(
+        createRequest(
+            today.minusDays(1),
+            today.plusMonths(6),
+            item("lucas", outbound()),
+            item("ana", outbound())));
 
     verify(unlinkedPassengers)
         .retireMergedPassengers(
             eq(link.getDriver().getId()), argThat(dependentIds -> dependentIds.size() == 2));
+  }
+
+  @Test
+  void aContractThatHasNotStartedYetKeepsTheMergedPassenger() {
+    when(contracts.findStatusesByClientDriverId(3L)).thenReturn(List.of(ContractStatus.ACTIVE));
+    LocalDate today = LocalDate.now(TripService.SERVICE_ZONE);
+
+    service.create(
+        createRequest(today.plusDays(10), today.plusMonths(6), item("lucas", outbound())));
+
+    verify(unlinkedPassengers, never()).retireMergedPassengers(anyLong(), any());
   }
 
   @Test

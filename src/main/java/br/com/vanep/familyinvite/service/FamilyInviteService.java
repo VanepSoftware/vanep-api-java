@@ -10,6 +10,7 @@ import br.com.vanep.dependent.model.DependentModel;
 import br.com.vanep.dependent.repository.DependentRepository;
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
+import br.com.vanep.driver.service.DriverService;
 import br.com.vanep.familyinvite.dto.FamilyInviteAcceptRequestDTO;
 import br.com.vanep.familyinvite.dto.FamilyInviteAcceptResponseDTO;
 import br.com.vanep.familyinvite.dto.FamilyInvitePreviewResponseDTO;
@@ -42,6 +43,7 @@ public class FamilyInviteService {
   private final FamilyInviteRepository invites;
   private final UnlinkedPassengerRepository passengers;
   private final UnlinkedPassengerService passengerService;
+  private final DriverService callerDrivers;
   private final DriverRepository drivers;
   private final ClientRepository clients;
   private final DependentRepository dependents;
@@ -56,6 +58,7 @@ public class FamilyInviteService {
       FamilyInviteRepository invites,
       UnlinkedPassengerRepository passengers,
       UnlinkedPassengerService passengerService,
+      DriverService callerDrivers,
       DriverRepository drivers,
       ClientRepository clients,
       DependentRepository dependents,
@@ -68,6 +71,7 @@ public class FamilyInviteService {
     this.invites = invites;
     this.passengers = passengers;
     this.passengerService = passengerService;
+    this.callerDrivers = callerDrivers;
     this.drivers = drivers;
     this.clients = clients;
     this.dependents = dependents;
@@ -96,7 +100,7 @@ public class FamilyInviteService {
 
   @Transactional
   public FamilyInviteResponseDTO findGroupInvite(String callerUid) {
-    DriverModel driver = passengerService.requireDriver(callerUid);
+    DriverModel driver = callerDrivers.requireCallerDriver(callerUid);
     FamilyInviteModel invite =
         invites
             .findGroupInviteByDriverId(driver.getId())

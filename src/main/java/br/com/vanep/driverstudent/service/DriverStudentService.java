@@ -2,6 +2,7 @@ package br.com.vanep.driverstudent.service;
 
 import br.com.vanep.contract.repository.ContractItemRepository;
 import br.com.vanep.driver.model.DriverModel;
+import br.com.vanep.driver.service.DriverService;
 import br.com.vanep.driverstudent.dto.ContractStudentRowDTO;
 import br.com.vanep.driverstudent.dto.DriverStudentResponseDTO;
 import br.com.vanep.driverstudent.dto.UnlinkedStudentRowDTO;
@@ -35,6 +36,7 @@ public class DriverStudentService {
           (DriverStudentResponseDTO student) -> student.name(),
           Collator.getInstance(Locale.of("pt", "BR")));
 
+  private final DriverService drivers;
   private final UnlinkedPassengerService passengerService;
   private final OwnVehicleService ownVehicles;
   private final ContractItemRepository contractItems;
@@ -45,6 +47,7 @@ public class DriverStudentService {
   private final FamilyStatusPolicy statusPolicy;
 
   public DriverStudentService(
+      DriverService drivers,
       UnlinkedPassengerService passengerService,
       OwnVehicleService ownVehicles,
       ContractItemRepository contractItems,
@@ -53,6 +56,7 @@ public class DriverStudentService {
       ScheduleRepository schedules,
       ScheduleMapper scheduleMapper,
       FamilyStatusPolicy statusPolicy) {
+    this.drivers = drivers;
     this.passengerService = passengerService;
     this.ownVehicles = ownVehicles;
     this.contractItems = contractItems;
@@ -65,13 +69,13 @@ public class DriverStudentService {
 
   @Transactional(readOnly = true)
   public List<DriverStudentResponseDTO> findMyStudents(String callerUid, String vehicleToken) {
-    DriverModel driver = passengerService.requireDriver(callerUid);
+    DriverModel driver = drivers.requireCallerDriver(callerUid);
     Long vehicleId = ownVehicles.findOwnVehicleId(driver, vehicleToken);
     LocalDate today = LocalDate.now(TripService.SERVICE_ZONE);
     List<ContractStudentRowDTO> contracted =
         contractItems.findActiveStudentsOfDriver(driver.getId(), today);
     List<UnlinkedStudentRowDTO> unlinked =
-        passengers.findStudentsOfDriver(driver.getId(), vehicleId);
+        passengers.findStudentsOfDriver(driver.getId(), vehicleId, today);
     Map<Long, List<ScheduleSlotResponseDTO>> slotsBySchedule = findSlots(contracted, unlinked);
     Map<Long, UnlinkedPassengerFamilyDTO> familyByPassenger = findFamilies(unlinked);
     return Stream.concat(

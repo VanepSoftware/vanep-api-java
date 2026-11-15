@@ -93,6 +93,15 @@ public interface ContractItemRepository extends JpaRepository<ContractItemModel,
 
   @Query(
       """
+      select count(item) from ContractItemModel item
+      where item.dependent.id = :dependentId
+        and item.contract.clientDriver.driver.id = :driverId
+        and item.contract.status = br.com.vanep.contract.enums.ContractStatus.ACTIVE
+      """)
+  long countActiveForDriverAndDependent(Long driverId, Long dependentId);
+
+  @Query(
+      """
       select new br.com.vanep.driverstudent.dto.ContractStudentRowDTO(
         item.token, dependent.name, dependent.token, school.token, school.name, schedule.id)
       from ContractItemModel item

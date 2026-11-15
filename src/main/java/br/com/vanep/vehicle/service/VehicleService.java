@@ -2,6 +2,7 @@ package br.com.vanep.vehicle.service;
 
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
+import br.com.vanep.unlinkedpassenger.repository.UnlinkedPassengerRepository;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
@@ -23,6 +24,7 @@ import org.springframework.web.server.ResponseStatusException;
 public class VehicleService {
 
   private final VehicleRepository vehicleRepository;
+  private final UnlinkedPassengerRepository unlinkedPassengers;
   private final DriverRepository driverRepository;
   private final UserRepository userRepository;
   private final UserService userService;
@@ -31,12 +33,14 @@ public class VehicleService {
 
   public VehicleService(
       VehicleRepository vehicleRepository,
+      UnlinkedPassengerRepository unlinkedPassengers,
       DriverRepository driverRepository,
       UserRepository userRepository,
       UserService userService,
       VehicleMapper mapper,
       MessageSource messages) {
     this.vehicleRepository = vehicleRepository;
+    this.unlinkedPassengers = unlinkedPassengers;
     this.driverRepository = driverRepository;
     this.userRepository = userRepository;
     this.userService = userService;
@@ -171,7 +175,9 @@ public class VehicleService {
 
   @Transactional
   public void delete(String token) {
-    vehicleRepository.delete(requireByToken(token));
+    VehicleModel vehicle = requireByToken(token);
+    unlinkedPassengers.clearVehicleId(vehicle.getId());
+    vehicleRepository.delete(vehicle);
   }
 
   @Transactional

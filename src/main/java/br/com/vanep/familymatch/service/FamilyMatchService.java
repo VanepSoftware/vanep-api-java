@@ -1,5 +1,6 @@
 package br.com.vanep.familymatch.service;
 
+import br.com.vanep.contract.repository.ContractItemRepository;
 import br.com.vanep.dependent.model.DependentModel;
 import br.com.vanep.dependent.repository.DependentRepository;
 import br.com.vanep.familyinvite.model.FamilyInviteModel;
@@ -26,6 +27,7 @@ public class FamilyMatchService {
   private final UnlinkedPassengerRepository passengers;
   private final UnlinkedPassengerService passengerService;
   private final DependentRepository dependents;
+  private final ContractItemRepository contractItems;
   private final FamilyMatchCandidatePolicy candidatePolicy;
   private final MessageSource messages;
 
@@ -34,12 +36,14 @@ public class FamilyMatchService {
       UnlinkedPassengerRepository passengers,
       UnlinkedPassengerService passengerService,
       DependentRepository dependents,
+      ContractItemRepository contractItems,
       FamilyMatchCandidatePolicy candidatePolicy,
       MessageSource messages) {
     this.matches = matches;
     this.passengers = passengers;
     this.passengerService = passengerService;
     this.dependents = dependents;
+    this.contractItems = contractItems;
     this.candidatePolicy = candidatePolicy;
     this.messages = messages;
   }
@@ -48,7 +52,7 @@ public class FamilyMatchService {
   public Optional<FamilyMatchModel> suggestMatch(
       FamilyInviteModel invite, DependentModel dependent) {
     return findCandidate(invite, dependent)
-        .map(passenger -> findOrCreatePendingMatch(invite, passenger, dependent));
+        .flatMap(passenger -> findOrCreatePendingMatch(invite, passenger, dependent));
   }
 
   Optional<UnlinkedPassengerModel> findCandidate(
@@ -73,13 +77,17 @@ public class FamilyMatchService {
     return Optional.of(passenger);
   }
 
-  FamilyMatchModel findOrCreatePendingMatch(
+  Optional<FamilyMatchModel> findOrCreatePendingMatch(
       FamilyInviteModel invite, UnlinkedPassengerModel passenger, DependentModel dependent) {
+    matches.dismissPendingIfFamilyGone(passenger.getId(), Instant.now());
     Optional<FamilyMatchModel> pending =
         matches.findPendingByUnlinkedPassengerId(passenger.getId());
     if (pending.isPresent()) {
       if (pending.get().getDependentId().equals(dependent.getId())) {
-        return pending.get();
+        return pending;
+      }
+      if (invite.isGroupInvite()) {
+        return Optional.empty();
       }
       throw new ResponseStatusException(
           HttpStatus.CONFLICT, message("family_match.already_pending"));
@@ -89,16 +97,25 @@ public class FamilyMatchService {
     match.setDependentId(dependent.getId());
     match.setFamilyInviteId(invite.getId());
     match.setStatus(FamilyMatchStatus.PENDING);
-    return matches.save(match);
+    return Optional.of(matches.save(match));
   }
 
   @Transactional
   public UnlinkedPassengerResponseDTO merge(String callerUid, String passengerToken) {
     UnlinkedPassengerModel passenger =
         passengerService.requireOwnPassenger(callerUid, passengerToken);
+    matches.dismissPendingIfFamilyGone(passenger.getId(), Instant.now());
     FamilyMatchModel match = requirePendingMatch(passenger);
     DependentModel dependent =
         dependents.findById(match.getDependentId()).orElseThrow(() -> notPending());
+    if (passengers.existsByDriver_IdAndDependentIdAndIdNot(
+            passenger.getDriver().getId(), dependent.getId(), passenger.getId())
+        || contractItems.countActiveForDriverAndDependent(
+                passenger.getDriver().getId(), dependent.getId())
+            > 0) {
+      throw new ResponseStatusException(
+          HttpStatus.CONFLICT, message("family_match.dependent_already_linked"));
+    }
     respond(match, FamilyMatchStatus.CONFIRMED);
     passenger.setDependentId(dependent.getId());
     passenger.setName(dependent.getName());

@@ -43,7 +43,8 @@ class RoutePassengerQueryServiceTest {
   void returnsContractedAndUnlinkedStudentsTogetherOrderedByTheirPickupTime() {
     when(items.findRoutePassengers(2L, MONDAY, DayOfWeek.MONDAY, OperationShift.MORNING))
         .thenReturn(List.of(passenger(PassengerSource.CONTRACT_ITEM, "Ana", LocalTime.of(7, 0))));
-    when(unlinkedPassengers.findRoutePassengers(2L, DayOfWeek.MONDAY, OperationShift.MORNING))
+    when(unlinkedPassengers.findRoutePassengers(
+            2L, MONDAY, DayOfWeek.MONDAY, OperationShift.MORNING))
         .thenReturn(
             List.of(
                 passenger(PassengerSource.UNLINKED_PASSENGER, "Bruno", LocalTime.of(7, 0)),
@@ -65,7 +66,8 @@ class RoutePassengerQueryServiceTest {
     when(items.findRoutePassengers(
             2L, MONDAY.plusDays(1), DayOfWeek.TUESDAY, OperationShift.AFTERNOON))
         .thenReturn(List.of());
-    when(unlinkedPassengers.findRoutePassengers(2L, DayOfWeek.TUESDAY, OperationShift.AFTERNOON))
+    when(unlinkedPassengers.findRoutePassengers(
+            2L, MONDAY.plusDays(1), DayOfWeek.TUESDAY, OperationShift.AFTERNOON))
         .thenReturn(List.of());
 
     assertThat(service.findPassengers(carlos, MONDAY.plusDays(1), OperationShift.AFTERNOON))

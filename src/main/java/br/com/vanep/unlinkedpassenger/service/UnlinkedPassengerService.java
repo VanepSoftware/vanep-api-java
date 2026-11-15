@@ -2,8 +2,8 @@ package br.com.vanep.unlinkedpassenger.service;
 
 import br.com.vanep.address.dto.DependentAddressRequestDTO;
 import br.com.vanep.address.service.AddressService;
-import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
+import br.com.vanep.driver.service.DriverService;
 import br.com.vanep.familyinvite.repository.FamilyInviteRepository;
 import br.com.vanep.schedule.service.ScheduleService;
 import br.com.vanep.school.model.SchoolModel;
@@ -17,11 +17,8 @@ import br.com.vanep.unlinkedpassenger.dto.UnlinkedPassengerUpdateRequestDTO;
 import br.com.vanep.unlinkedpassenger.mapper.UnlinkedPassengerMapper;
 import br.com.vanep.unlinkedpassenger.model.UnlinkedPassengerModel;
 import br.com.vanep.unlinkedpassenger.repository.UnlinkedPassengerRepository;
-import br.com.vanep.user.enums.UserType;
-import br.com.vanep.user.model.UserModel;
-import br.com.vanep.user.service.UserService;
 import br.com.vanep.vehicle.model.VehicleModel;
-import br.com.vanep.vehicle.repository.VehicleRepository;
+import br.com.vanep.vehicle.service.OwnVehicleService;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -38,12 +35,11 @@ import org.springframework.web.server.ResponseStatusException;
 public class UnlinkedPassengerService {
 
   private final UnlinkedPassengerRepository passengers;
-  private final DriverRepository drivers;
-  private final UserService users;
+  private final DriverService drivers;
   private final SchoolRepository schools;
   private final AddressService addresses;
   private final ScheduleService schedules;
-  private final VehicleRepository vehicles;
+  private final OwnVehicleService ownVehicles;
   private final FamilyInviteRepository invites;
   private final UnlinkedPassengerFamilyService families;
   private final UnlinkedPassengerMapper mapper;
@@ -51,23 +47,21 @@ public class UnlinkedPassengerService {
 
   public UnlinkedPassengerService(
       UnlinkedPassengerRepository passengers,
-      DriverRepository drivers,
-      UserService users,
+      DriverService drivers,
       SchoolRepository schools,
       AddressService addresses,
       ScheduleService schedules,
-      VehicleRepository vehicles,
+      OwnVehicleService ownVehicles,
       FamilyInviteRepository invites,
       UnlinkedPassengerFamilyService families,
       UnlinkedPassengerMapper mapper,
       MessageSource messages) {
     this.passengers = passengers;
     this.drivers = drivers;
-    this.users = users;
     this.schools = schools;
     this.addresses = addresses;
     this.schedules = schedules;
-    this.vehicles = vehicles;
+    this.ownVehicles = ownVehicles;
     this.invites = invites;
     this.families = families;
     this.mapper = mapper;
@@ -144,9 +138,15 @@ public class UnlinkedPassengerService {
     if (dependentIds.isEmpty()) {
       return;
     }
-    passengers
-        .findByDriverIdAndDependentIdIn(driverId, dependentIds)
-        .forEach(passenger -> retire(passenger));
+    List<UnlinkedPassengerModel> merged =
+        passengers.findByDriverIdAndDependentIdIn(driverId, dependentIds);
+    if (merged.isEmpty()) {
+      return;
+    }
+    List<Long> passengerIds = merged.stream().map(passenger -> passenger.getId()).toList();
+    invites.deleteAll(invites.findByUnlinkedPassengerIdIn(passengerIds));
+    merged.forEach(passenger -> passengers.delete(passenger));
+    merged.forEach(passenger -> addresses.clearForUnlinkedPassenger(passenger));
   }
 
   void retire(UnlinkedPassengerModel passenger) {
@@ -207,15 +207,7 @@ public class UnlinkedPassengerService {
   }
 
   VehicleModel requireOwnActiveVehicle(DriverModel driver, String vehicleToken) {
-    return vehicles
-        .findByToken(vehicleToken)
-        .filter(vehicle -> vehicle.isActive())
-        .filter(vehicle -> vehicle.getDriver().getId().equals(driver.getId()))
-        .orElseThrow(
-            () ->
-                new ResponseStatusException(
-                    HttpStatus.UNPROCESSABLE_CONTENT,
-                    message("unlinked_passenger.vehicle.not_owned")));
+    return ownVehicles.requireOwnActiveVehicle(driver, vehicleToken);
   }
 
   <T> T requireNonNullField(T value) {
@@ -243,14 +235,8 @@ public class UnlinkedPassengerService {
                     HttpStatus.NOT_FOUND, message("unlinked_passenger.school.not_found")));
   }
 
-  public DriverModel requireDriver(String callerUid) {
-    UserModel user = users.requireByTokenAndType(callerUid, UserType.DRIVER);
-    return drivers
-        .findByUserId(user.getId())
-        .orElseThrow(
-            () ->
-                new ResponseStatusException(
-                    HttpStatus.NOT_FOUND, message("user.driver_profile.not_found")));
+  DriverModel requireDriver(String callerUid) {
+    return drivers.requireCallerDriver(callerUid);
   }
 
   ResponseStatusException badRequest(String key) {

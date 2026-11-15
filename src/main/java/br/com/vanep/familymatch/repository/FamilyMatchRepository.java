@@ -46,4 +46,20 @@ public interface FamilyMatchRepository extends JpaRepository<FamilyMatchModel, L
       nativeQuery = true)
   int respondIfPending(
       @Param("id") Long id, @Param("status") String status, @Param("now") Instant now);
+
+  @Modifying(flushAutomatically = true)
+  @Query(
+      value =
+          """
+          UPDATE family_match SET status = 'DISMISSED', responded_at = :now, updated_at = :now
+          WHERE status = 'PENDING' AND deleted_at IS NULL
+            AND unlinked_passenger_id = :passengerId
+            AND NOT EXISTS (
+              SELECT 1 FROM dependent d
+              JOIN client c ON c.id = d.client_id AND c.deleted_at IS NULL
+              JOIN users u ON u.id = c.user_id AND u.deleted_at IS NULL
+              WHERE d.id = family_match.dependent_id AND d.deleted_at IS NULL)
+          """,
+      nativeQuery = true)
+  int dismissPendingIfFamilyGone(@Param("passengerId") Long passengerId, @Param("now") Instant now);
 }
