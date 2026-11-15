@@ -75,6 +75,8 @@ Rules that MUST be followed in this codebase. Stack: **Java 25, Spring Boot 4, M
 
     A phase with a failing or skipped scenario is not ready for review. Numbered 55 for the same reason as rule 50.
 
+56. **Every PR description includes screenshots and a video that prove what was done.** When an app (mobile or web) consumes the change, capture that app running for real against this branch's API — an Android emulator (e.g. the `Pixel_9a` AVD), an iOS simulator, a device or a browser — never mockups. For a backend-only change, capture the rule 55 QA run (terminal output and recording) and the key requests and responses. Host the media on the repo's `pr-assets` branch under `van-<N>/` and link it from the description. A PR without this evidence is not ready for review. Numbered 56 for the same reason as rule 50.
+
 ## Code quality (Clean Code)
 
 26. **Write tests before the code** they cover (test-first).
