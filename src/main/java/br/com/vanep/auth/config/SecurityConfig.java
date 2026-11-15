@@ -14,6 +14,9 @@ import br.com.vanep.auth.oauth.grant.MobilePasswordGrantAuthenticationProvider;
 import br.com.vanep.auth.oauth.grant.MobileTokenErrorResponseHandler;
 import br.com.vanep.auth.security.LoginActivityService;
 import br.com.vanep.auth.security.LoginAttemptService;
+import br.com.vanep.auth.security.UserBoundPasswordAuthenticationProvider;
+import br.com.vanep.auth.security.UserPasswordEncoder;
+import br.com.vanep.auth.security.UserPasswordRehashService;
 import br.com.vanep.auth.security.VanepUserDetailsService;
 import br.com.vanep.auth.signup.SignupTicketService;
 import java.util.ArrayList;
@@ -32,7 +35,6 @@ import org.springframework.security.config.annotation.web.configurers.oauth2.ser
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
@@ -81,7 +83,8 @@ public class SecurityConfig {
       OAuth2AuthorizationService authorizations,
       OAuth2TokenGenerator<?> tokenGenerator,
       VanepUserDetailsService userDetailsService,
-      PasswordEncoder passwordEncoder,
+      UserPasswordEncoder userPasswords,
+      UserPasswordRehashService rehash,
       LoginAttemptService loginAttempts,
       LoginActivityService loginActivity,
       GoogleIdTokenValidator googleIdTokenValidator,
@@ -121,7 +124,8 @@ public class SecurityConfig {
                                 .authenticationProvider(
                                     new MobilePasswordGrantAuthenticationProvider(
                                         userDetailsService,
-                                        passwordEncoder,
+                                        userPasswords,
+                                        rehash,
                                         tokenIssuer,
                                         loginAttempts,
                                         loginActivity,
@@ -187,9 +191,15 @@ public class SecurityConfig {
       @Value("${vanep.remember-me.key}") String rememberMeKey,
       ObjectProvider<ClientRegistrationRepository> clientRegistrationRepository,
       VanepOidcUserService oidcUserService,
-      OAuthLoginSuccessHandler oauthLoginSuccessHandler)
+      OAuthLoginSuccessHandler oauthLoginSuccessHandler,
+      VanepUserDetailsService userDetailsService,
+      UserPasswordEncoder userPasswords,
+      UserPasswordRehashService rehash)
       throws Exception {
-    http.authorizeHttpRequests(
+    http.authenticationProvider(
+            UserBoundPasswordAuthenticationProvider.create(
+                userDetailsService, userPasswords, rehash))
+        .authorizeHttpRequests(
             authorize ->
                 authorize
                     .requestMatchers("/login", "/error", "/css/**", "/images/**", "/webjars/**")
