@@ -2,6 +2,8 @@ package br.com.vanep.seed;
 
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
+import br.com.vanep.drivercnh.model.DriverCnhModel;
+import br.com.vanep.drivercnh.repository.DriverCnhRepository;
 import br.com.vanep.driverdocument.enums.DriverDocumentType;
 import br.com.vanep.driverdocument.model.DriverDocumentModel;
 import br.com.vanep.driverdocument.repository.DriverDocumentRepository;
@@ -51,6 +53,7 @@ public class DriverUnderReviewSeeder {
   private final UserRepository users;
   private final DriverRepository drivers;
   private final VehicleRepository vehicles;
+  private final DriverCnhRepository cnhs;
   private final DriverDocumentRepository driverDocuments;
   private final VehicleDocumentRepository vehicleDocuments;
   private final MediaFileService media;
@@ -60,6 +63,7 @@ public class DriverUnderReviewSeeder {
       UserRepository users,
       DriverRepository drivers,
       VehicleRepository vehicles,
+      DriverCnhRepository cnhs,
       DriverDocumentRepository driverDocuments,
       VehicleDocumentRepository vehicleDocuments,
       MediaFileService media,
@@ -67,6 +71,7 @@ public class DriverUnderReviewSeeder {
     this.users = users;
     this.drivers = drivers;
     this.vehicles = vehicles;
+    this.cnhs = cnhs;
     this.driverDocuments = driverDocuments;
     this.vehicleDocuments = vehicleDocuments;
     this.media = media;
@@ -81,6 +86,7 @@ public class DriverUnderReviewSeeder {
       return;
     }
     DriverModel driver = found.get();
+    seedCnh(driver);
     if (!driverDocuments.findByDriverIdAndSupersededAtIsNull(driver.getId()).isEmpty()) {
       return;
     }
@@ -92,6 +98,16 @@ public class DriverUnderReviewSeeder {
         .findFirst()
         .ifPresent(van -> seedVehicleDocuments(van, admin, today));
     log.info("Seed: submissions of the driver under review created ({}).", EMAIL);
+  }
+
+  private void seedCnh(DriverModel driver) {
+    if (!cnhs.findByDriverIdAndSupersededAtIsNull(driver.getId()).isEmpty()) {
+      return;
+    }
+    DriverCnhModel cnh = new DriverCnhModel();
+    cnh.setDriver(driver);
+    cnh.setFile(file(MediaSlot.DRIVER_CNH_FILE, driver.getToken(), "cnh"));
+    cnhs.save(cnh);
   }
 
   private void seedDriverDocuments(DriverModel driver, UserModel admin, LocalDate today) {

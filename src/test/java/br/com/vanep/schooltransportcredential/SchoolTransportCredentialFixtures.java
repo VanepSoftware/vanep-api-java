@@ -76,6 +76,7 @@ public class SchoolTransportCredentialFixtures {
     cnh.setCategory(category);
     cnh.setIssueDate(LocalDate.of(2015, 3, 10));
     cnh.setValidUntil(VALID_UNTIL);
+    cnh.getReview().setStatus(DocumentStatus.APPROVED);
     return cnhs.save(cnh);
   }
 

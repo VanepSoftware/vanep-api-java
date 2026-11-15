@@ -44,16 +44,16 @@ public class DriverCnhModel implements DocumentSubmission {
   @JoinColumn(name = "driver_id", nullable = false)
   private DriverModel driver;
 
-  @Column(name = "registration_number", nullable = false, length = 20)
+  @Column(name = "registration_number", length = 20)
   private String registrationNumber;
 
-  @Column(nullable = false, length = 5)
+  @Column(length = 5)
   private String category;
 
-  @Column(name = "issue_date", nullable = false)
+  @Column(name = "issue_date")
   private LocalDate issueDate;
 
-  @Column(name = "valid_until", nullable = false)
+  @Column(name = "valid_until")
   private LocalDate validUntil;
 
   @Column(name = "first_license_date")
@@ -66,8 +66,8 @@ public class DriverCnhModel implements DocumentSubmission {
   private String issuingState;
 
   @ManyToOne(fetch = FetchType.EAGER)
-  @JoinColumn(name = "photo_media_id")
-  private MediaFileModel photo;
+  @JoinColumn(name = "file_media_id")
+  private MediaFileModel file;
 
   @Embedded private DocumentReview review = DocumentReview.pending();
 
@@ -94,12 +94,12 @@ public class DriverCnhModel implements DocumentSubmission {
 
   @Override
   public MediaFileModel getReviewedFile() {
-    return photo;
+    return file;
   }
 
   @Override
   public void setReviewedFile(MediaFileModel file) {
-    this.photo = file;
+    this.file = file;
   }
 
   @PrePersist

@@ -1,12 +1,16 @@
 # QA — driver-credentials-review (constitution rule 55)
 
-Latest run: API built from `VAN-86/5-review-and-submissions` (PR 5), 2026-11-21, after the file-only submissions, on a fresh database with the seed. Result: `qa.sh` **260/260 passed**, twice in a row on the same database. The dates are checked on approval (K), a document is approved with its data (P) and corrected after approval (Q, DD9c, D25).
+Latest run: API built from `VAN-86/6-cnh-review` (PR 6), 2026-11-21, after the file-only submissions, on a fresh database with the seed. Result: `qa.sh` **301/301 passed**, twice in a row on the same database. The CNH is sent with only its file and approved with its data, category B refused (N), the dates on approval (J), the number of one driver on approval, also in a race of two approvals (C14 to C16), and the correction of its data (CC).
 
-Before the file-only submissions: API built from `VAN-86/5-review-and-submissions` (PR 5), 2026-11-21, after the CNH category rule, on a fresh database with the seed. Result: `qa.sh` **239/239 passed**, twice in a row on the same database: V76 on legacy data, the decisions, the final submissions, the renewals, the dates within each type's limits (D21) and the file caching, and the regression of PRs 1 to 4, whose PR 2 and PR 3 flows now follow the PR 5 rules (the decision carries the version, a rejection carries a code, a renewal is a new submission). The script's dates are relative to today in São Paulo. N4 to N6b check that the API only takes the CNH categories D, E, AD and AE, and that a license saved before with category B is still read and reported as `cnh_category`.
+Before the file-only submissions: API built from `VAN-86/6-cnh-review` (PR 6), 2026-11-21, after the CNH category rule, on a fresh database with the seed. Result: `qa.sh` **274/274 passed**, twice in a row on the same database: the CNH dates within limits (J1 to J4, D21), the `file` of the CNH (C4 and J5, D22), and the regression of PRs 1 to 5. The script's dates are relative to today in São Paulo. N4 to N6b check that the API only takes the CNH categories D, E, AD and AE, and that a license saved before with category B is still read and reported as `cnh_category`.
 
-Before the CNH category rule: API built from `VAN-86/5-review-and-submissions` (PR 5), 2026-11-20, on a fresh database with the seed. Result: `qa.sh` **235/235 passed**, twice in a row on the same database: V76 on legacy data, the decisions, the final submissions, the renewals, the dates within each type's limits (D21) and the file caching, and the regression of PRs 1 to 4, whose PR 2 and PR 3 flows now follow the PR 5 rules (the decision carries the version, a rejection carries a code, a renewal is a new submission). The script's dates are relative to today in São Paulo.
+Before the CNH category rule: API built from `VAN-86/6-cnh-review` (PR 6), 2026-11-20, after the mobile requests, on a fresh database with the seed. Result: `qa.sh` **270/270 passed**, twice in a row on the same database: the CNH dates within limits (J1 to J4, D21), the `file` of the CNH (C4 and J5, D22), and the regression of PRs 1 to 5. The script's dates are relative to today in São Paulo.
 
-Previous runs: API built from `VAN-86/5-review-and-submissions` (PR 5), 2026-11-15: `qa.sh` **224/224 passed**, twice in a row. API built from `VAN-86/4-review-schema` (PR 4), 2026-11-15, rebased on the current `main`, on a fresh database with the seed. `qa.sh` **159/159 passed**, twice in a row on the same database: the 141 scenarios of PRs 1 to 3 as a regression, and the 18 of V75. Before that: API built from `VAN-86/3-credentials-and-onboarding` (PR 3), 2026-11-12: `qa.sh` **141/141 passed**, twice in a row, and `scripts/qa/service-request-proposal/qa.sh` as a regression on its own fresh database with `places-stub.py`: **563/563 passed**. API built from `VAN-86/2-review-and-http` (PR 2), 2026-11-11: `qa.sh` **104/104 passed**, twice in a row.
+Before the mobile requests: API built from `VAN-86/6-cnh-review` (PR 6), 2026-11-20, after the code review fixes, on a fresh database with the seed and the JVM in `Pacific/Kiritimati`. Result: `qa.sh` **254/254 passed**, twice in a row on the same database. N8 now expects `cnh_file` while the new driver's CNH has no file, and N8b checks the step complete after the upload.
+
+Before the code review fixes: API built from `VAN-86/6-cnh-review` (PR 6), 2026-11-15, on a fresh database with the seed. Result: `qa.sh` **253/253 passed**, twice in a row on the same database: the CNH review, the renewal with the same number, the number of one driver (two drivers sending the same new number at once, 8 times in a row: a later run found that PostgreSQL can abort one of the two with a deadlock instead of the violation, and the service now answers that one with the same 409; this run logged 3 such deadlocks and no 500), the CNH file as a PDF (the digital CNH) on the `/file` route, read back as `application/pdf`, with the old `/photo` route gone and the column renamed by V77, the onboarding with a rejected CNH and the seed, and the regression of PRs 1 to 5. The new driver of part 4 now has their CNH approved by the admin before DRIVER_LICENSE counts. As a regression, `scripts/qa/service-request-proposal/qa.sh` on its own fresh database with `places-stub.py` and the JVM in `Etc/GMT+12`: **563/563 passed**.
+
+Previous runs: API built from `VAN-86/5-review-and-submissions` (PR 5), 2026-11-15, on a fresh database with the seed. `qa.sh` **224/224 passed**, twice in a row on the same database: V76 on legacy data, the decisions, the final submissions, the renewals and the file caching, and the regression of PRs 1 to 4, whose PR 2 and PR 3 flows now follow the PR 5 rules (the decision carries the version, a rejection carries a code, a renewal is a new submission). Before that: API built from `VAN-86/4-review-schema` (PR 4), 2026-11-15, rebased on the current `main`, on a fresh database with the seed. `qa.sh` **159/159 passed**, twice in a row on the same database: the 141 scenarios of PRs 1 to 3 as a regression, and the 18 of V75. Before that: API built from `VAN-86/3-credentials-and-onboarding` (PR 3), 2026-11-12: `qa.sh` **141/141 passed**, twice in a row, and `scripts/qa/service-request-proposal/qa.sh` as a regression on its own fresh database with `places-stub.py`: **563/563 passed**. API built from `VAN-86/2-review-and-http` (PR 2), 2026-11-11: `qa.sh` **104/104 passed**, twice in a row.
 
 ## How to run
 
@@ -44,6 +48,8 @@ The first run of part 3 on PR 4 found that the `CHECK` "a rejected row has a rea
 **Part 1c (V76)** (PR 5) adds two `PENDING` submissions of the same owner and type and a rejection without code, applies V76 and checks that the newest stays pending and the older is superseded, the code `OTHER` on the old rejection, the three one-pending indexes and the `CHECK`s of the code on a rejection.
 
 **Part 5** (PR 5) uses the seed driver: a rejection with each reason code (each resend supersedes the previous rejection, which keeps its decision and loses its file), `OTHER` with and without a message, two decisions with the same version, a file swapped while the admin looked, a real token without `review_documents` (the permission is removed from the `ADMIN` bundle by SQL, the admin logs in again and the permission is put back), the renewal of an inspection with the old file deleted from the disk after the commit, every `409` of a decided submission, two simultaneous submissions of the same type and the `Cache-Control` of a document file and of a van photo. Every run ends with no pending submission left, so the script can be repeated.
+
+**Part 6** (PR 6) reviews the CNH of the new driver of part 4: the owner cannot decide, edit or remove it once approved; a renewal with the same number lives next to it, takes a PDF as its file (the digital CNH) on the `/file` route, is refused without file and on an old version, and replaces it when approved (the old file leaves the disk); another driver cannot use the number, also when two drivers send the same new number at once; a driver whose only CNH was rejected sees `cnh_rejected`; and every seed CNH is approved.
 
 **Part 2** runs against the live API, which migrated the main database with Flyway. It uses real tokens from the mobile password grant, for the seed's admin, driver (Fábio) and client (Ana).
 
@@ -191,7 +197,7 @@ The first run of part 4 found a defect from PR 1: with one complete van and anot
 | id | scenario | expected | result |
 |---|---|---|---|
 | Q1 | the reviewer corrects a mistyped number and expiry | 200 | PASS |
-| Q2 | the correction records who corrected and keeps the file | 1d1fdeadfff440adb8147d1b2:yes | PASS |
+| Q2 | the correction records who corrected and keeps the file | 3cd35e1de7464a7e90bb6fade:yes | PASS |
 | Q3 | a correction on the version before is stale | 409 | PASS |
 | Q4 | a correction without the required number | 400 | PASS |
 | Q5 | an expiry before today may be corrected: the document is then expired | 200 | PASS |
@@ -263,16 +269,18 @@ The first run of part 4 found a defect from PR 1: with one complete van and anot
 | N1 | a new driver signs up | 201 | PASS |
 | N2 | the driver adds a van | 201 | PASS |
 | N3 | a new van: nothing satisfied but the optional municipal authorization is not required | 200 | PASS |
-| N4 | a category B license is refused on the category field | 400 | PASS |
-| N4b | the refused license was not saved | 0 | PASS |
-| N4c | the driver registers a category D license | 201 | PASS |
-| N4d | a license saved before the rule with category B is still read | 200 | PASS |
-| N5 | the onboarding reports cnh_category | 200 | PASS |
-| N6 | category B does not satisfy DRIVER_LICENSE | false | PASS |
-| N6b | changing the license to category B is refused | 400 | PASS |
-| N7 | the driver corrects the license to category AD | 200 | PASS |
+| N4 | the driver sends a photo of the license, without typing its data | 201 | PASS |
+| N4b | nothing of the license was typed | ::: | PASS |
+| N5 | the license step counts the CNH sent with its file | 200 | PASS |
+| N6 | a pending CNH does not satisfy DRIVER_LICENSE yet | false | PASS |
+| N6b | approving the license as category B is refused on the category field | 400 | PASS |
+| N6c | approving without the registration number names the field | 400 | PASS |
+| N6d | the refused approvals left the CNH pending, without data | PENDING: | PASS |
+| N7 | the admin approves the CNH with the data read from it, category AD | 200 | PASS |
 | N8 | the license step is complete | 200 | PASS |
-| N9 | category AD satisfies DRIVER_LICENSE | true | PASS |
+| N9 | the approved category AD satisfies DRIVER_LICENSE | true | PASS |
+| N10 | a license saved before the rule with category B is read and reported as cnh_category | 200 | PASS |
+| N11 | category B does not satisfy DRIVER_LICENSE | false | PASS |
 
 == Documents one at a time
 | id | scenario | expected | result |
@@ -314,7 +322,7 @@ The first run of part 4 found a defect from PR 1: with one complete van and anot
 | T8 | an unknown van | 404 | PASS |
 | T9 | a removed van | 404 | PASS |
 
-TOTAL: 260 passed
+TOTAL: 301 passed
 
 ## PR 4 — schema of the new review
 
@@ -454,3 +462,72 @@ The live database: F3 and F4 in the PR 1 table above. The regression of PRs 1 to
 | H3 | a document file with an old v | no-cache, private | PASS |
 | H4 | a van photo with the v of its URL | max-age=86400, private, immutable | PASS |
 | H5 | a van photo without v | no-cache, private | PASS |
+
+## PR 6 — the CNH reviewed like the documents
+
+== The CNH is reviewed by an admin
+| id | scenario | expected | result |
+|---|---|---|---|
+| C1 | the owner cannot decide their own CNH | 403 | PASS |
+| C2 | the owner cannot edit the approved CNH: there is no PUT of a CNH | 405 | PASS |
+| C3 | nor remove it | 409 | PASS |
+
+== Renewing the CNH keeps the current one
+| id | scenario | expected | result |
+|---|---|---|---|
+| C4 | a renewal is sent with its file and without data | 201 | PASS |
+| C5 | the approved CNH still satisfies DRIVER_LICENSE | true | PASS |
+| C6 | a second pending CNH | 409 | PASS |
+| C7 | approving the renewal without its data | 400 | PASS |
+| C7b | the renewal's file is replaced by the digital CNH, a PDF | 201 | PASS |
+| C7c | the admin reads the CNH file back as a PDF | 200 application/pdf | PASS |
+| C7d | the old photo route of the CNH is gone | 404 | PASS |
+| C7e | the CNH column is file_media_id, not photo_media_id | file_media_id | PASS |
+| C8 | approving the version from before the file | 409 | PASS |
+| C9 | the admin approves the renewal with the same number | 200 | PASS |
+| C10 | the previous CNH is superseded, keeps its decision and has no file | APPROVED:true: | PASS |
+| C11 | its file is deleted from the disk | no | PASS |
+| C12 | DRIVER_LICENSE comes from the renewal | 200 | PASS |
+| C13 | the driver lists only the renewal | 200 | PASS |
+
+== The CNH dates stay within limits
+| id | scenario | expected | result |
+|---|---|---|---|
+| J0 | the driver sends another CNH to check the dates on | 201 | PASS |
+| J1 | approving a CNH issued tomorrow | 400 | PASS |
+| J2 | approving a CNH that expired yesterday | 400 | PASS |
+| J3 | approving a CNH valid for ten years and a day | 400 | PASS |
+| J4 | the CNH is still pending, without data | PENDING: | PASS |
+| J4b | the owner removes the pending CNH, so the run can be repeated | 204 | PASS |
+| J5 | the CNH describes its PDF | 200 | PASS |
+
+== A registration number belongs to one driver
+| id | scenario | expected | result |
+|---|---|---|---|
+| C14 | approving another driver's CNH with the same number | 409 | PASS |
+| C14b | that CNH is still pending | PENDING | PASS |
+| C15 | two admins approve CNHs of two drivers with the same new number at once, 8 times: one is approved, the other refused, every time | 200 409;200 409;200 409;200 409;200 409;200 409;200 409;200 409; | PASS |
+| C16 | each number belongs to a single driver | 1 1 1 1 1 1 1 1  | PASS |
+
+== Correcting the data of the approved CNH
+| id | scenario | expected | result |
+|---|---|---|---|
+| CC1 | the reviewer corrects the category and adds the issuing state | 200 | PASS |
+| CC2 | a correction to category B is refused | 400 | PASS |
+| CC3 | the owner cannot correct | 403 | PASS |
+| CC4 | the reviewer puts category D back | 200 | PASS |
+
+== The onboarding reads the CNH review
+| id | scenario | expected | result |
+|---|---|---|---|
+| C17 | a pending CNH counts as sent | 200 | PASS |
+| C18 | the admin rejects the CNH | 200 | PASS |
+| C19 | the onboarding reports cnh_rejected | 200 | PASS |
+| C20 | a new CNH supersedes the rejected one | 201 | PASS |
+| C21 | and the step counts it as sent again | 200 | PASS |
+
+== The seed passes the credentials
+| id | scenario | expected | result |
+|---|---|---|---|
+| C22 | every seed CNH is approved | 0 | PASS |
+| C23 | the seed driver's van passes | 200 | PASS |

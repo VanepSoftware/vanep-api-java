@@ -158,11 +158,12 @@ class DriverOnboardingServiceTest {
         vehicleDocument(vehicle, VehicleDocumentType.SCHOOL_VEHICLE_AUTHORIZATION, true));
   }
 
-  private static DriverCnhModel cnh(String category, LocalDate validUntil) {
+  private DriverCnhModel cnh(String category, LocalDate validUntil) {
     DriverCnhModel cnh = new DriverCnhModel();
     cnh.setActive(true);
     cnh.setCategory(category);
     cnh.setValidUntil(validUntil);
+    cnh.setFile(file("cnh"));
     return cnh;
   }
 
@@ -458,6 +459,63 @@ class DriverOnboardingServiceTest {
 
     assertThat(status.cnhStep().completed()).isFalse();
     assertThat(status.cnhStep().pendingItems()).containsExactly("cnh_category");
+  }
+
+  @Test
+  void aCnhSentWithOnlyItsFileCountsAsSent() {
+    stubDriverWithArea();
+    DriverCnhModel sent = cnh(null, null);
+    when(driverCnhRepository.findByDriverIdAndSupersededAtIsNull(20L)).thenReturn(List.of(sent));
+    when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of());
+    when(driverDocumentRepository.findByDriverIdAndSupersededAtIsNull(20L)).thenReturn(List.of());
+
+    assertThat(service.getOnboardingStatus("user-token-10").cnhStep().completed()).isTrue();
+  }
+
+  @Test
+  void aPendingCnhCountsAsSent() {
+    stubDriverWithArea();
+    DriverCnhModel pending = cnh("D", LocalDate.now().plusYears(2));
+    pending.getReview().setStatus(DocumentStatus.PENDING);
+    when(driverCnhRepository.findByDriverIdAndSupersededAtIsNull(20L)).thenReturn(List.of(pending));
+    when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of());
+    when(driverDocumentRepository.findByDriverIdAndSupersededAtIsNull(20L)).thenReturn(List.of());
+
+    assertThat(service.getOnboardingStatus("user-token-10").cnhStep().completed()).isTrue();
+  }
+
+  @Test
+  void aRejectedCnhIsReportedAsCnhRejected() {
+    stubDriverWithArea();
+    DriverCnhModel rejected = cnh("D", LocalDate.now().plusYears(2));
+    rejected.getReview().setStatus(DocumentStatus.REJECTED);
+    when(driverCnhRepository.findByDriverIdAndSupersededAtIsNull(20L))
+        .thenReturn(List.of(rejected));
+    when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of());
+    when(driverDocumentRepository.findByDriverIdAndSupersededAtIsNull(20L)).thenReturn(List.of());
+
+    DriverOnboardingStatusResponseDTO status = service.getOnboardingStatus("user-token-10");
+
+    assertThat(status.cnhStep().completed()).isFalse();
+    assertThat(status.cnhStep().pendingItems()).containsExactly("cnh_rejected");
+  }
+
+  @Test
+  void submittingWithARejectedCnhIsRefusedWithCnhRejected() {
+    when(userService.requireByTokenAndType("user-token-10", UserType.DRIVER)).thenReturn(user);
+    when(driverRepository.findByUserId(10L)).thenReturn(Optional.of(driver));
+    stubReadyToSubmit(vehicle(1L, "ABC1D23"));
+    DriverCnhModel rejected = cnh("D", LocalDate.now().plusYears(2));
+    rejected.getReview().setStatus(DocumentStatus.REJECTED);
+    when(driverCnhRepository.findByDriverIdAndSupersededAtIsNull(20L))
+        .thenReturn(List.of(rejected));
+
+    assertThatThrownBy(() -> service.submitOnboarding("user-token-10"))
+        .isInstanceOf(ResponseStatusException.class)
+        .satisfies(
+            e ->
+                assertThat(((ResponseStatusException) e).getReason())
+                    .contains("driver.onboarding.cnh_rejected"));
   }
 
   @Test

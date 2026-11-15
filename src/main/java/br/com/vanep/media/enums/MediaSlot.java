@@ -8,7 +8,7 @@ public enum MediaSlot {
   ASSISTANT_PHOTO("assistant", "photo", Kind.IMAGE, MediaVisibility.PUBLIC),
   VEHICLE_PHOTO_FRONT("vehicle", "photo-front", Kind.IMAGE, MediaVisibility.PRIVATE),
   VEHICLE_PHOTO_SIDE("vehicle", "photo-side", Kind.IMAGE, MediaVisibility.PRIVATE),
-  DRIVER_CNH_PHOTO("driver-cnh", "photo", Kind.IMAGE, MediaVisibility.PRIVATE),
+  DRIVER_CNH_FILE("driver-cnh", "file", Kind.DOCUMENT, MediaVisibility.PRIVATE),
   DRIVER_DOCUMENT_FILE("driver-document", "file", Kind.DOCUMENT, MediaVisibility.PRIVATE),
   VEHICLE_DOCUMENT_FILE("vehicle-document", "file", Kind.DOCUMENT, MediaVisibility.PRIVATE);
 

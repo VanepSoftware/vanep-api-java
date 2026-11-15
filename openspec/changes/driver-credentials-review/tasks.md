@@ -177,8 +177,8 @@
 > Depends on: PR 5 | Parallel with: —
 > Order: test → policy → service → controller → onboarding → seed → mensagens
 
-- [ ] 6.1 Criar branch `VAN-86/6-cnh-review` de dentro da branch do PR 5
-- [ ] 6.2 Testes (spec `driver-cnh-review`):
+- [x] 6.1 Criar branch `VAN-86/6-cnh-review` de dentro da branch do PR 5
+- [x] 6.2 Testes (spec `driver-cnh-review`):
   - `POST /api/driver-cnhs` multipart só com o arquivo → 201 `PENDING`, com o `file` e o registro, a categoria e as datas nulos; sem arquivo → 400; `PUT /api/driver-cnhs/{token}` não existe;
   - `PUT /api/driver-cnhs/{token}/status`: com `review_documents` e os dados → 200 com os dados gravados, o dono → 403, sem arquivo → 422, versão velha → 409;
   - aprovação sem `registrationNumber`, `category`, `issueDate` ou `validUntil` → 400 `document.review.field_required` com o `field`; categoria `B` → 400 `driver_cnh.category.invalid`; registro fora do formato → 400; a recusa com `NOT_ELIGIBLE` não grava os dados do corpo;
@@ -187,19 +187,19 @@
   - renovação: o envio → 201 e a aprovação com o mesmo número → 200; segundo pendente → 409;
   - aprovar substitui a anterior;
   - aprovar com o número de outro motorista → 409 `driver_cnh.registration.duplicate`, com o `code`, e a CNH continua `PENDING`
-- [ ] 6.3 Testes da credencial e do onboarding: CNH `PENDING` não satisfaz `DRIVER_LICENSE`, e só a aprovada satisfaz; no onboarding, a CNH `PENDING` conta como enviada e a `REJECTED` dá `cnh_rejected`
-- [ ] 6.4 `DriverCnhService` e `DriverCnhFileService` com o `DocumentSubmissionRules`, sem a recusa de segunda CNH, conferindo o número na aprovação só contra outros motoristas e traduzindo a violação da constraint e o deadlock que ela pode causar (D14); `PUT /status` no `DriverCnhController` pelo `DocumentReviewService`; `version` e revisão no `DriverCnhResponseDTO`. Teste 6.2 verde
-- [ ] 6.4b Arquivo da CNH com PDF (D14): `V77__driver_cnh_file.sql` renomeia `photo_media_id` para `file_media_id` e a FK; slot `DRIVER_CNH_FILE`; `DriverCnhPhotoService` vira `DriverCnhFileService`; rotas `/file`; `fileUrl` no `DriverCnhResponseDTO`, sem o `photoUrl` do `DriverCnhRequestDTO`. Teste 6.2 verde
-- [ ] 6.4c A CNH enviada só com o arquivo e os dados na aprovação (D2, D14): a `V77` deixa `registration_number`, `category`, `issue_date` e `valid_until` anuláveis e cria o `CHECK` da CNH aprovada; `DriverCnhRequestDTO` multipart só com o `file` (e o `driverToken` do admin); sai o `PUT /api/driver-cnhs/{token}`; `DriverCnhStatusUpdateRequestDTO` com a decisão e os dados da CNH, com o formato por Bean Validation e a categoria `D`, `E`, `AD` ou `AE` (a regra sai do `DriverCnhRequestDTO`); o serviço grava os dados na aprovação. Teste 6.2 verde
-- [ ] 6.5 `SchoolTransportCredentialPolicy.findDriverLicense` exigindo `APPROVED`; `cnh_rejected` no passo da CNH. Teste 6.3 verde
-- [ ] 6.6 `DriverCnhSeeder` com a CNH `APPROVED`
-- [ ] 6.7 Mensagem `driver.onboarding.cnh_rejected`
-- [ ] 6.7a Testes das datas da CNH (D21), na aprovação: emissão amanhã → `driver_cnh.issue_date.future`; validade ontem → `document.expires_at.past`; emissão + 10 anos → aceito, e um dia depois → `document.expires_at.too_far`, com o `field` de cada um e a CNH ainda `PENDING`
-- [ ] 6.7b A aprovação da CNH pela `DocumentDatesPolicy`, com o limite tirado da emissão; mensagem `driver_cnh.issue_date.future`. Testes 6.7a verdes
-- [ ] 6.7c `file` no `DriverCnhResponseDTO` pelo `DocumentFileResponseDTO` (D22), com o teste da CNH enviada e da substituída, sem arquivo
-- [ ] 6.7d Correção dos dados da CNH aprovada (D25): `DriverCnhDataCorrectionRequestDTO` e `PUT /api/driver-cnhs/{token}/data`, com as regras da aprovação da CNH; testes como o 5.10c, e o número de outro motorista → 409 `driver_cnh.registration.duplicate`
-- [ ] 6.8 `make lint` + `./mvnw verify -B`
-- [ ] 6.9 QA da regra 55:
+- [x] 6.3 Testes da credencial e do onboarding: CNH `PENDING` não satisfaz `DRIVER_LICENSE`, e só a aprovada satisfaz; no onboarding, a CNH `PENDING` conta como enviada e a `REJECTED` dá `cnh_rejected`
+- [x] 6.4 `DriverCnhService` e `DriverCnhFileService` com o `DocumentSubmissionRules`, sem a recusa de segunda CNH, conferindo o número na aprovação só contra outros motoristas e traduzindo a violação da constraint e o deadlock que ela pode causar (D14); `PUT /status` no `DriverCnhController` pelo `DocumentReviewService`; `version` e revisão no `DriverCnhResponseDTO`. Teste 6.2 verde
+- [x] 6.4b Arquivo da CNH com PDF (D14): `V77__driver_cnh_file.sql` renomeia `photo_media_id` para `file_media_id` e a FK; slot `DRIVER_CNH_FILE`; `DriverCnhPhotoService` vira `DriverCnhFileService`; rotas `/file`; `fileUrl` no `DriverCnhResponseDTO`, sem o `photoUrl` do `DriverCnhRequestDTO`. Teste 6.2 verde
+- [x] 6.4c A CNH enviada só com o arquivo e os dados na aprovação (D2, D14): a `V77` deixa `registration_number`, `category`, `issue_date` e `valid_until` anuláveis e cria o `CHECK` da CNH aprovada; `DriverCnhRequestDTO` multipart só com o `file` (e o `driverToken` do admin); sai o `PUT /api/driver-cnhs/{token}`; `DriverCnhStatusUpdateRequestDTO` com a decisão e os dados da CNH, com o formato por Bean Validation e a categoria `D`, `E`, `AD` ou `AE` (a regra sai do `DriverCnhRequestDTO`); o serviço grava os dados na aprovação. Teste 6.2 verde
+- [x] 6.5 `SchoolTransportCredentialPolicy.findDriverLicense` exigindo `APPROVED`; `cnh_rejected` no passo da CNH. Teste 6.3 verde
+- [x] 6.6 `DriverCnhSeeder` com a CNH `APPROVED`
+- [x] 6.7 Mensagem `driver.onboarding.cnh_rejected`
+- [x] 6.7a Testes das datas da CNH (D21), na aprovação: emissão amanhã → `driver_cnh.issue_date.future`; validade ontem → `document.expires_at.past`; emissão + 10 anos → aceito, e um dia depois → `document.expires_at.too_far`, com o `field` de cada um e a CNH ainda `PENDING`
+- [x] 6.7b A aprovação da CNH pela `DocumentDatesPolicy`, com o limite tirado da emissão; mensagem `driver_cnh.issue_date.future`. Testes 6.7a verdes
+- [x] 6.7c `file` no `DriverCnhResponseDTO` pelo `DocumentFileResponseDTO` (D22), com o teste da CNH enviada e da substituída, sem arquivo
+- [x] 6.7d Correção dos dados da CNH aprovada (D25): `DriverCnhDataCorrectionRequestDTO` e `PUT /api/driver-cnhs/{token}/data`, com as regras da aprovação da CNH; testes como o 5.10c, e o número de outro motorista → 409 `driver_cnh.registration.duplicate`
+- [x] 6.8 `make lint` + `./mvnw verify -B`
+- [x] 6.9 QA da regra 55:
   - motorista manda só a foto da CNH: credencial falha; o admin aprova com os dados e a credencial passa, com o número e a validade que ele preencheu;
   - aprovação sem um dado obrigatório e com a categoria `B` → 400; recusa com `NOT_ELIGIBLE`;
   - a CNH digital em PDF pelo `/file`, lida de volta como `application/pdf`; a rota `/photo` não existe mais;

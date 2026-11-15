@@ -110,7 +110,8 @@ public class SchoolTransportCredentialPolicy {
 
   static Optional<CredentialDTO> findDriverLicense(List<DriverCnhModel> cnhs, LocalDate date) {
     return cnhs.stream()
-        .filter(cnh -> cnh.isActive() && isValidOn(cnh.getValidUntil(), date))
+        .filter(cnh -> cnh.isActive() && cnh.getReview().getStatus() == DocumentStatus.APPROVED)
+        .filter(cnh -> isValidOn(cnh.getValidUntil(), date))
         .filter(cnh -> hasSchoolTransportCategory(cnh.getCategory()))
         .max(Comparator.comparing(cnh -> cnh.getValidUntil()))
         .map(

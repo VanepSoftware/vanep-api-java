@@ -11,18 +11,18 @@ import org.springframework.data.repository.query.Param;
 
 public interface DriverCnhRepository extends JpaRepository<DriverCnhModel, Long> {
 
-  @EntityGraph(attributePaths = {"driver.user", "photo", "review.reviewedBy"})
+  @EntityGraph(attributePaths = {"driver.user", "file", "review.reviewedBy"})
   Optional<DriverCnhModel> findByToken(String token);
 
-  @EntityGraph(attributePaths = {"driver.user", "photo", "review.reviewedBy"})
+  @EntityGraph(attributePaths = {"driver.user", "file", "review.reviewedBy"})
   List<DriverCnhModel> findByDriverIdAndSupersededAtIsNull(Long driverId);
 
-  @EntityGraph(attributePaths = {"driver.user", "photo", "review.reviewedBy"})
+  @EntityGraph(attributePaths = {"driver.user", "file", "review.reviewedBy"})
   List<DriverCnhModel> findBySupersededAtIsNull();
 
   boolean existsByRegistrationNumber(String registrationNumber);
 
-  boolean existsByDriverId(Long driverId);
+  boolean existsByRegistrationNumberAndDriverIdNot(String registrationNumber, Long driverId);
 
   @Modifying
   @Query(value = "UPDATE driver_cnh SET deleted_at = NULL WHERE token = :token", nativeQuery = true)

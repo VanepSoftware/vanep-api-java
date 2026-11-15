@@ -168,10 +168,14 @@ public class DriverOnboardingService {
       errors.add(message("driver.onboarding.vehicle_required"));
     }
     if (!cnhStep.completed()) {
-      if (cnhStep.pendingItems().contains("cnh_expired")) {
+      if (cnhStep.pendingItems().contains("cnh_rejected")) {
+        errors.add(message("driver.onboarding.cnh_rejected"));
+      } else if (cnhStep.pendingItems().contains("cnh_expired")) {
         errors.add(message("driver.onboarding.cnh_expired"));
       } else if (cnhStep.pendingItems().contains("cnh_category")) {
         errors.add(message("driver.onboarding.cnh_category"));
+      } else if (cnhStep.pendingItems().contains("cnh_file")) {
+        errors.add(message("driver.onboarding.cnh_file"));
       } else {
         errors.add(message("driver.onboarding.cnh_required"));
       }
@@ -237,22 +241,30 @@ public class DriverOnboardingService {
   DriverOnboardingStepDTO evaluateCnhStep(DriverModel driver) {
     List<DriverCnhModel> cnhs =
         driverCnhRepository.findByDriverIdAndSupersededAtIsNull(driver.getId());
-    List<DriverCnhModel> activeCnhs = cnhs.stream().filter(cnh -> cnh.isActive()).toList();
+    List<DriverCnhModel> activeCnhs =
+        cnhs.stream()
+            .filter(cnh -> cnh.isActive() && cnh.getReview().getStatus() != DocumentStatus.REJECTED)
+            .toList();
     List<String> pending = new ArrayList<>();
     if (activeCnhs.isEmpty()) {
-      pending.add("cnh");
+      pending.add(cnhs.stream().anyMatch(cnh -> cnh.isActive()) ? "cnh_rejected" : "cnh");
     } else {
+      // A CNH sent with only its file has no expiry nor category until the reviewer approves it.
       LocalDate today = SchoolTransportCredentialService.today();
       List<DriverCnhModel> validCnhs =
           activeCnhs.stream()
-              .filter(cnh -> cnh.getValidUntil() != null && !cnh.getValidUntil().isBefore(today))
+              .filter(cnh -> cnh.getValidUntil() == null || !cnh.getValidUntil().isBefore(today))
               .toList();
+      boolean qualified =
+          validCnhs.stream()
+              .anyMatch(
+                  cnh ->
+                      cnh.getCategory() == null
+                          || SchoolTransportCredentialPolicy.hasSchoolTransportCategory(
+                              cnh.getCategory()));
       if (validCnhs.isEmpty()) {
         pending.add("cnh_expired");
-      } else if (validCnhs.stream()
-          .noneMatch(
-              cnh ->
-                  SchoolTransportCredentialPolicy.hasSchoolTransportCategory(cnh.getCategory()))) {
+      } else if (!qualified) {
         pending.add("cnh_category");
       }
     }

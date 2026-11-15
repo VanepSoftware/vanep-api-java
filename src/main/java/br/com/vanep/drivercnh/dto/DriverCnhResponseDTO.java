@@ -1,5 +1,9 @@
 package br.com.vanep.drivercnh.dto;
 
+import br.com.vanep.shared.document.dto.DocumentFileResponseDTO;
+import br.com.vanep.shared.document.enums.DocumentRejectionReason;
+import br.com.vanep.shared.document.enums.DocumentStatus;
+import br.com.vanep.shared.document.enums.ReviewMethod;
 import java.time.Instant;
 import java.time.LocalDate;
 
@@ -13,6 +17,15 @@ public record DriverCnhResponseDTO(
     LocalDate firstLicenseDate,
     String securityNumber,
     String issuingState,
-    String photoUrl,
+    String fileUrl,
+    DocumentFileResponseDTO file,
+    DocumentStatus status,
+    ReviewMethod reviewMethod,
+    DocumentRejectionReason rejectionReasonCode,
+    String rejectionReason,
+    String reviewedByUserToken,
+    Instant reviewedAt,
+    Instant dataCorrectedAt,
+    Long version,
     boolean active,
     Instant createdAt) {}

@@ -695,6 +695,8 @@ NEW_PLATE=$(random_plate D)
 SECOND_PLATE=$(random_plate E)
 CNH_NUMBER="9$(printf '%010d' $((RUN % 10000000000)))"
 SOON=$(date -v+1y +%F 2>/dev/null || date -d '+1 year' +%F)
+CNH_ISSUED=$(in_days -365)
+CNH_REISSUED=$(in_days -364)
 
 table "A new driver from scratch"
 NEW_PASSWORD='Senha@Forte2026'
@@ -712,29 +714,37 @@ NVAN=$(jq -r .token <<<"$RESP_BODY")
 credentials "$NVAN" "$NEW"
 expect N3 "a new van: nothing satisfied but the optional municipal authorization is not required" 200 \
   '.satisfied == false and ([.requirements[] | select(.optional | not) | .satisfied] | all(. == false)) and ([.requirements[] | select(.optional)] | length == 1)'
-request POST /api/driver-cnhs "$NEW" "{\"registrationNumber\": \"$CNH_NUMBER\", \"category\": \"B\", \"issueDate\": \"2018-04-10\", \"validUntil\": \"$SOON\"}"
-expect N4 "a category B license is refused on the category field" 400 '.field == "category" and (.detail | contains("D, E, AD"))'
-check N4b "the refused license was not saved" "0" \
-  "$(sql "select count(*) from driver_cnh c join driver d on d.id = c.driver_id where d.token = '$NEW_DRIVER'")"
-request POST /api/driver-cnhs "$NEW" "{\"registrationNumber\": \"$CNH_NUMBER\", \"category\": \"D\", \"issueDate\": \"2018-04-10\", \"validUntil\": \"$SOON\"}"
-expect N4c "the driver registers a category D license" 201
+send_doc /api/driver-cnhs "$NEW" "{\"registrationNumber\": \"$CNH_NUMBER\", \"category\": \"B\", \"issueDate\": \"$CNH_ISSUED\", \"validUntil\": \"$SOON\"}"
+expect N4 "the driver sends a photo of the license, without typing its data" 201 \
+  '.status == "PENDING" and .registrationNumber == null and .category == null and .validUntil == null and .file != null'
 CNH=$(jq -r .token <<<"$RESP_BODY")
-# A license saved before the rule with category B is set directly: the API no longer accepts it.
-sql "update driver_cnh set category = 'B' where token = '$CNH'" >/dev/null
-request GET "/api/driver-cnhs/$CNH" "$NEW"
-expect N4d "a license saved before the rule with category B is still read" 200 '.category == "B"'
+check N4b "nothing of the license was typed" ":::" \
+  "$(sql "select coalesce(registration_number, '') || ':' || coalesce(category, '') || ':' || coalesce(issue_date::text, '') || ':' || coalesce(valid_until::text, '') from driver_cnh where token = '$CNH'")"
 request GET /api/drivers/me/onboarding "$NEW"
-expect N5 "the onboarding reports cnh_category" 200 '.cnhStep.completed == false and .cnhStep.pendingItems == ["cnh_category"]'
+expect N5 "the license step counts the CNH sent with its file" 200 '.cnhStep.completed == true'
 credentials "$NVAN" "$NEW"
-check N6 "category B does not satisfy DRIVER_LICENSE" "false" "$(satisfied_of DRIVER_LICENSE)"
-request PUT "/api/driver-cnhs/$CNH" "$NEW" "{\"registrationNumber\": \"$CNH_NUMBER\", \"category\": \"B\", \"issueDate\": \"2018-04-10\", \"validUntil\": \"$SOON\"}"
-expect N6b "changing the license to category B is refused" 400 '.field == "category"'
-request PUT "/api/driver-cnhs/$CNH" "$NEW" "{\"registrationNumber\": \"$CNH_NUMBER\", \"category\": \"AD\", \"issueDate\": \"2018-04-10\", \"validUntil\": \"$SOON\"}"
-expect N7 "the driver corrects the license to category AD" 200
+check N6 "a pending CNH does not satisfy DRIVER_LICENSE yet" "false" "$(satisfied_of DRIVER_LICENSE)"
+review driver-cnhs "$CNH" '{"status": "APPROVED"}'
+expect N6b "approving the license as category B is refused on the category field" 400 '.field == "category" and (.detail | contains("D, E, AD"))'
+review driver-cnhs "$CNH" '{"status": "APPROVED", "category": "AD", "registrationNumber": null}'
+expect N6c "approving without the registration number names the field" 400 '.code == "document.review.field_required" and .field == "registrationNumber"'
+check N6d "the refused approvals left the CNH pending, without data" "PENDING:" \
+  "$(sql "select status || ':' || coalesce(category, '') from driver_cnh where token = '$CNH'")"
+review driver-cnhs "$CNH" '{"status": "APPROVED", "reviewMethod": "MANUAL", "category": " ad "}'
+expect N7 "the admin approves the CNH with the data read from it, category AD" 200 \
+  '.status == "APPROVED" and .category == "AD" and .registrationNumber == "'"$CNH_NUMBER"'" and .validUntil == "'"$SOON"'"'
 request GET /api/drivers/me/onboarding "$NEW"
 expect N8 "the license step is complete" 200 '.cnhStep.completed == true'
 credentials "$NVAN" "$NEW"
-check N9 "category AD satisfies DRIVER_LICENSE" "true" "$(satisfied_of DRIVER_LICENSE)"
+check N9 "the approved category AD satisfies DRIVER_LICENSE" "true" "$(satisfied_of DRIVER_LICENSE)"
+# A license approved before this change with category B is set directly: the API no longer takes it.
+sql "update driver_cnh set category = 'B' where token = '$CNH'" >/dev/null
+request GET /api/drivers/me/onboarding "$NEW"
+expect N10 "a license saved before the rule with category B is read and reported as cnh_category" 200 \
+  '.cnhStep.completed == false and .cnhStep.pendingItems == ["cnh_category"]'
+credentials "$NVAN" "$NEW"
+check N11 "category B does not satisfy DRIVER_LICENSE" "false" "$(satisfied_of DRIVER_LICENSE)"
+sql "update driver_cnh set category = 'AD' where token = '$CNH'" >/dev/null
 
 table "Documents one at a time"
 send_doc "/api/vehicles/$NVAN/documents" "$NEW" '{"documentType": "CRLV", "documentNumber": "RENAVAM-QA", "expiresAt": "'"$IN_300_DAYS"'"}'
@@ -1043,6 +1053,162 @@ request GET "/api/vehicles/$VAN" "$DRIVER"
 PHOTO_URL=$(jq -r .photoSideUrl <<<"$RESP_BODY")
 check H4 "a van photo with the v of its URL" "max-age=86400, private, immutable" "$(cache_control "$PHOTO_URL" "$DRIVER")"
 check H5 "a van photo without v" "no-cache, private" "$(cache_control "${PHOTO_URL%%\?*}" "$DRIVER")"
+
+# ---------------------------------------------------------------------------------------------
+# Part 6 — PR 6: the CNH is reviewed like the documents
+# ---------------------------------------------------------------------------------------------
+
+cnh_body() { printf '{"registrationNumber": "%s", "category": "D", "issueDate": "%s", "validUntil": "%s"}' "$1" "$2" "$3"; }
+LATER=$(date -v+6y +%F 2>/dev/null || date -d '+6 years' +%F)
+
+table "The CNH is reviewed by an admin"
+review driver-cnhs "$CNH" '{"status": "REJECTED", "rejectionReasonCode": "ILLEGIBLE"}' "$NEW"
+expect C1 "the owner cannot decide their own CNH" 403
+request PUT "/api/driver-cnhs/$CNH" "$NEW" "$(cnh_body "$CNH_NUMBER" "$CNH_ISSUED" "$LATER")"
+expect C2 "the owner cannot edit the approved CNH: there is no PUT of a CNH" 405
+request DELETE "/api/driver-cnhs/$CNH" "$NEW"
+expect C3 "nor remove it" 409 '.code == "document.submission.reviewed"'
+
+table "Renewing the CNH keeps the current one"
+send_doc /api/driver-cnhs "$NEW" "$(cnh_body "$CNH_NUMBER" "$CNH_ISSUED" "$LATER")"
+expect C4 "a renewal is sent with its file and without data" 201 '.status == "PENDING" and .registrationNumber == null and .file != null'
+RENEWED_CNH=$(jq -r .token <<<"$RESP_BODY")
+credentials "$NVAN" "$NEW"
+check C5 "the approved CNH still satisfies DRIVER_LICENSE" "true" "$(satisfied_of DRIVER_LICENSE)"
+send_doc /api/driver-cnhs "$NEW" "$(cnh_body "$CNH_NUMBER" "$CNH_REISSUED" "$LATER")"
+expect C6 "a second pending CNH" 409 '.code == "document.submission.pending_exists"'
+request GET "/api/driver-cnhs/$RENEWED_CNH" "$ADMIN"
+request PUT "/api/driver-cnhs/$RENEWED_CNH/status" "$ADMIN" "{\"status\": \"APPROVED\", \"version\": $(jq -r .version <<<"$RESP_BODY")}"
+expect C7 "approving the renewal without its data" 400 '.code == "document.review.field_required" and .field == "registrationNumber"'
+request GET "/api/driver-cnhs/$RENEWED_CNH" "$ADMIN"
+OPENED=$(jq -r .version <<<"$RESP_BODY")
+upload_pdf "/api/driver-cnhs/$RENEWED_CNH/file" "$NEW"
+expect C7b "the renewal's file is replaced by the digital CNH, a PDF" 201
+download "/api/driver-cnhs/$RENEWED_CNH/file" "$ADMIN"
+check C7c "the admin reads the CNH file back as a PDF" "200 application/pdf" "$RESP_STATUS $RESP_TYPE"
+download "/api/driver-cnhs/$RENEWED_CNH/photo" "$ADMIN"
+expect C7d "the old photo route of the CNH is gone" 404
+check C7e "the CNH column is file_media_id, not photo_media_id" "file_media_id" \
+  "$(sql "select string_agg(column_name, ',') from information_schema.columns
+              where table_name = 'driver_cnh' and column_name in ('file_media_id', 'photo_media_id')")"
+decide "/api/driver-cnhs/$RENEWED_CNH/status" "$ADMIN" "{\"status\": \"APPROVED\", \"version\": $OPENED}"
+expect C8 "approving the version from before the file" 409 '.code == "document.review.stale"'
+OLD_FILE=$(sql "select m.object_key from driver_cnh c join media_file m on m.id = c.file_media_id where c.token = '$CNH'")
+review driver-cnhs "$RENEWED_CNH" '{"status": "APPROVED", "reviewMethod": "MANUAL"}'
+expect C9 "the admin approves the renewal with the same number" 200 '.status == "APPROVED" and .registrationNumber == "'"$CNH_NUMBER"'"'
+check C10 "the previous CNH is superseded, keeps its decision and has no file" "APPROVED:true:" \
+  "$(sql "select status || ':' || (superseded_at is not null) || ':' || coalesce(file_media_id::text, '') from driver_cnh where token = '$CNH'")"
+check C11 "its file is deleted from the disk" "no" "$([[ -f $MEDIA_ROOT/$OLD_FILE ]] && echo yes || echo no)"
+credentials "$NVAN" "$NEW"
+expect C12 "DRIVER_LICENSE comes from the renewal" 200 \
+  '[.requirements[] | select(.requirement == "DRIVER_LICENSE")][0] | .satisfied and .validUntil == "'"$LATER"'"'
+request GET /api/driver-cnhs "$NEW"
+expect C13 "the driver lists only the renewal" 200 '[.[].token] == ["'"$RENEWED_CNH"'"]'
+
+table "The CNH dates stay within limits"
+years_after() { date -j -v+"$2"y -f %F "$1" +%F 2>/dev/null || date -d "$1 +$2 years" +%F; }
+day_after() { date -j -v+1d -f %F "$1" +%F 2>/dev/null || date -d "$1 +1 day" +%F; }
+cnhs_of_new() { sql "select count(*) from driver_cnh c join driver d on d.id = c.driver_id join users u on u.id = d.user_id where u.email = '$NEW_EMAIL'"; }
+send_doc /api/driver-cnhs "$NEW" '{}'
+expect J0 "the driver sends another CNH to check the dates on" 201
+DATED_CNH=$(jq -r .token <<<"$RESP_BODY")
+review driver-cnhs "$DATED_CNH" "$(cnh_body "$CNH_NUMBER" "$(in_days +1)" "$LATER" | jq -c '. + {status: "APPROVED"}')"
+expect J1 "approving a CNH issued tomorrow" 400 '.code == "driver_cnh.issue_date.future" and .field == "issueDate"'
+review driver-cnhs "$DATED_CNH" "$(cnh_body "$CNH_NUMBER" "$CNH_ISSUED" "$YESTERDAY" | jq -c '. + {status: "APPROVED"}')"
+expect J2 "approving a CNH that expired yesterday" 400 '.code == "document.expires_at.past" and .field == "validUntil"'
+review driver-cnhs "$DATED_CNH" "$(cnh_body "$CNH_NUMBER" "$CNH_ISSUED" "$(day_after "$(years_after "$CNH_ISSUED" 10)")" | jq -c '. + {status: "APPROVED"}')"
+expect J3 "approving a CNH valid for ten years and a day" 400 '.code == "document.expires_at.too_far" and .field == "validUntil"'
+check J4 "the CNH is still pending, without data" "PENDING:" \
+  "$(sql "select status || ':' || coalesce(valid_until::text, '') from driver_cnh where token = '$DATED_CNH'")"
+request DELETE "/api/driver-cnhs/$DATED_CNH" "$NEW"
+expect J4b "the owner removes the pending CNH, so the run can be repeated" 204
+request GET "/api/driver-cnhs/$RENEWED_CNH" "$NEW"
+expect J5 "the CNH describes its PDF" 200 \
+  '.file.mimeType == "application/pdf" and .file.sizeBytes == '"$(pdf | wc -c | tr -d ' ')"' and (.file.originalName | endswith(".pdf"))'
+
+table "A registration number belongs to one driver"
+new_driver() {
+  local email=$1
+  request POST /api/auth/signup/driver "" "{\"name\": \"Motorista QA\", \"email\": \"$email\", \"password\": \"$NEW_PASSWORD\", \"document\": \"$(valid_cpf)\", \"acceptTerms\": true, \"basePrice\": 150.00}"
+  sql "update users set verified = true where email = '$email'" >/dev/null
+  SEED_PASSWORD=$NEW_PASSWORD login "$email"
+}
+RACE_A=$(new_driver "qa.corrida.a.$RUN@vanep.test")
+RACE_B=$(new_driver "qa.corrida.b.$RUN@vanep.test")
+send_doc /api/driver-cnhs "$RACE_A" '{}'
+DUP_CNH=$(jq -r .token <<<"$RESP_BODY")
+review driver-cnhs "$DUP_CNH" "$(cnh_body "$CNH_NUMBER" "$CNH_ISSUED" "$LATER" | jq -c '. + {status: "APPROVED"}')"
+expect C14 "approving another driver's CNH with the same number" 409 \
+  '.code == "driver_cnh.registration.duplicate" and .detail == "Já existe uma CNH cadastrada com este número de registro."'
+check C14b "that CNH is still pending" "PENDING" "$(sql "select status from driver_cnh where token = '$DUP_CNH'")"
+request DELETE "/api/driver-cnhs/$DUP_CNH" "$RACE_A"
+race_outcomes=""
+race_owners=""
+for round in 1 2 3 4 5 6 7 8; do
+  RACE_NUMBER="8$(printf '%010d' $(( (RUN + 7 + round) % 10000000000 )))"
+  race_dir=$(mktemp -d)
+  bodies=()
+  for who in "$RACE_A" "$RACE_B"; do
+    send_doc /api/driver-cnhs "$who" '{}'
+    token=$(jq -r .token <<<"$RESP_BODY")
+    request GET "/api/driver-cnhs/$token" "$ADMIN"
+    bodies+=("$token $(cnh_body "$RACE_NUMBER" "$CNH_ISSUED" "$LATER" | jq -c --argjson v "$(jq .version <<<"$RESP_BODY")" '. + {status: "APPROVED", version: $v}')")
+  done
+  for entry in "${bodies[@]}"; do
+    curl -s -o /dev/null -w '%{http_code}\n' -X PUT "$BASE_URL/api/driver-cnhs/${entry%% *}/status" -H "Authorization: Bearer $ADMIN" \
+      -H "Content-Type: application/json" --data-binary "${entry#* }" >"$(mktemp "$race_dir/status.XXXXXX")" &
+  done
+  wait
+  race_outcomes="$race_outcomes$(cat "$race_dir"/* | sort | paste -sd ' ' -);"
+  rm -rf "$race_dir"
+  race_owners="$race_owners$(sql "select count(distinct driver_id) from driver_cnh where registration_number = '$RACE_NUMBER' and deleted_at is null") "
+  for entry in "${bodies[@]}"; do
+    request DELETE "/api/driver-cnhs/${entry%% *}" "$ADMIN"
+  done
+done
+check C15 "two admins approve CNHs of two drivers with the same new number at once, 8 times: one is approved, the other refused, every time" \
+  "200 409;200 409;200 409;200 409;200 409;200 409;200 409;200 409;" "$race_outcomes"
+check C16 "each number belongs to a single driver" "1 1 1 1 1 1 1 1 " "$race_owners"
+
+table "Correcting the data of the approved CNH"
+request GET "/api/driver-cnhs/$RENEWED_CNH" "$ADMIN"
+SEEN=$(jq -r .version <<<"$RESP_BODY")
+request PUT "/api/driver-cnhs/$RENEWED_CNH/data" "$ADMIN" "$(cnh_body "$CNH_NUMBER" "$CNH_REISSUED" "$LATER" | jq -c --argjson v "$SEEN" '. + {category: "E", issuingState: "SP", version: $v}')"
+expect CC1 "the reviewer corrects the category and adds the issuing state" 200 \
+  '.status == "APPROVED" and .category == "E" and .issuingState == "SP" and .dataCorrectedAt != null'
+request PUT "/api/driver-cnhs/$RENEWED_CNH/data" "$ADMIN" "$(cnh_body "$CNH_NUMBER" "$CNH_REISSUED" "$LATER" | jq -c --argjson v "$SEEN" '. + {category: "B", version: ($v + 1)}')"
+expect CC2 "a correction to category B is refused" 400 '.field == "category"'
+request PUT "/api/driver-cnhs/$RENEWED_CNH/data" "$NEW" "$(cnh_body "$CNH_NUMBER" "$CNH_REISSUED" "$LATER" | jq -c --argjson v "$SEEN" '. + {version: ($v + 1)}')"
+expect CC3 "the owner cannot correct" 403
+request PUT "/api/driver-cnhs/$RENEWED_CNH/data" "$ADMIN" "$(cnh_body "$CNH_NUMBER" "$CNH_REISSUED" "$LATER" | jq -c --argjson v "$SEEN" '. + {version: ($v + 1)}')"
+expect CC4 "the reviewer puts category D back" 200 '.category == "D" and .issuingState == null'
+
+table "The onboarding reads the CNH review"
+REJECTED_EMAIL="qa.recusado.$RUN@vanep.test"
+request POST /api/auth/signup/driver "" "{\"name\": \"Motorista Recusado\", \"email\": \"$REJECTED_EMAIL\", \"password\": \"$NEW_PASSWORD\", \"document\": \"$(valid_cpf)\", \"acceptTerms\": true, \"basePrice\": 150.00}"
+sql "update users set verified = true where email = '$REJECTED_EMAIL'" >/dev/null
+REJECTED_DRIVER=$(SEED_PASSWORD=$NEW_PASSWORD login "$REJECTED_EMAIL")
+send_doc /api/driver-cnhs "$REJECTED_DRIVER" "$(cnh_body "7$(printf '%010d' $(( (RUN + 3) % 10000000000 )))" "$CNH_ISSUED" "$LATER")"
+REJECTED_CNH=$(jq -r .token <<<"$RESP_BODY")
+upload "/api/driver-cnhs/$REJECTED_CNH/file" "$REJECTED_DRIVER"
+request GET /api/drivers/me/onboarding "$REJECTED_DRIVER"
+expect C17 "a pending CNH counts as sent" 200 '.cnhStep.completed == true'
+review driver-cnhs "$REJECTED_CNH" '{"status": "REJECTED", "rejectionReasonCode": "ILLEGIBLE"}'
+expect C18 "the admin rejects the CNH" 200 '.rejectionReasonCode == "ILLEGIBLE"'
+request GET /api/drivers/me/onboarding "$REJECTED_DRIVER"
+expect C19 "the onboarding reports cnh_rejected" 200 '.cnhStep.completed == false and .cnhStep.pendingItems == ["cnh_rejected"]'
+send_doc /api/driver-cnhs "$REJECTED_DRIVER" "$(cnh_body "7$(printf '%010d' $(( (RUN + 3) % 10000000000 )))" "$CNH_ISSUED" "$LATER")"
+expect C20 "a new CNH supersedes the rejected one" 201 '.status == "PENDING"'
+upload "/api/driver-cnhs/$(jq -r .token <<<"$RESP_BODY")/file" "$REJECTED_DRIVER"
+request GET /api/drivers/me/onboarding "$REJECTED_DRIVER"
+expect C21 "and the step counts it as sent again" 200 '.cnhStep.completed == true'
+
+table "The seed passes the credentials"
+check C22 "every seed CNH is approved" "0" \
+  "$(sql "select count(*) from driver_cnh where registration_number in ('12345678901', '23456789012', '34567890123')
+          and deleted_at is null and superseded_at is null and status <> 'APPROVED'")"
+credentials "$VAN" "$DRIVER"
+expect C23 "the seed driver's van passes" 200 '.satisfied == true'
 
 echo
 echo "TOTAL: $PASSED passed"

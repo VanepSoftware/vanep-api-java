@@ -20,6 +20,7 @@ import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -40,7 +41,7 @@ import org.springframework.web.context.WebApplicationContext;
 @SpringBootTest
 @ActiveProfiles("test")
 @Sql(scripts = "/db/clean.sql", executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
-class DriverCnhPhotoControllerTest {
+class DriverCnhFileControllerTest {
 
   @Autowired private WebApplicationContext context;
   @Autowired private UserRepository users;
@@ -77,17 +78,21 @@ class DriverCnhPhotoControllerTest {
     return new byte[] {(byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x01, 0x02};
   }
 
+  private static byte[] pdf() {
+    return "%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\ntrailer\n%%EOF\n"
+        .getBytes(StandardCharsets.US_ASCII);
+  }
+
   private String path() {
-    return "/api/driver-cnhs/" + cnhToken + "/photo";
+    return "/api/driver-cnhs/" + cnhToken + "/file";
   }
 
   private void upload(JwtRequestPostProcessor who) throws Exception {
-    mockMvc
-        .perform(
-            multipart(path())
-                .file(new MockMultipartFile("file", "cnh.png", "image/png", png()))
-                .with(who))
-        .andExpect(status().isCreated());
+    upload(new MockMultipartFile("file", "cnh.png", "image/png", png()), who);
+  }
+
+  private void upload(MockMultipartFile file, JwtRequestPostProcessor who) throws Exception {
+    mockMvc.perform(multipart(path()).file(file).with(who)).andExpect(status().isCreated());
   }
 
   @Test
@@ -99,35 +104,67 @@ class DriverCnhPhotoControllerTest {
   }
 
   @Test
-  void theOwnerUploadsTheirOwnCnhPhotoAndItIsBornPrivate() throws Exception {
+  void theOwnerUploadsTheirOwnCnhFileAndItIsBornPrivate() throws Exception {
     upload(ownerJwt());
 
     var media = mediaFiles.findAll().get(0);
     assertThat(media.getVisibility()).isEqualTo(MediaVisibility.PRIVATE);
-    assertThat(media.getObjectKey()).startsWith("driver-cnh/" + cnhToken + "/photo/");
-    assertThat(cnhs.findByToken(cnhToken).orElseThrow().getPhoto()).isNotNull();
+    assertThat(media.getObjectKey()).startsWith("driver-cnh/" + cnhToken + "/file/");
+    assertThat(cnhs.findByToken(cnhToken).orElseThrow().getFile()).isNotNull();
   }
 
   @Test
-  void readingTheCnhCarriesThePhotoWithoutAnotherCall() throws Exception {
+  void theDigitalCnhIsAPdfAndIsReadBackAsOne() throws Exception {
+    upload(new MockMultipartFile("file", "cnh-digital.pdf", "application/pdf", pdf()), ownerJwt());
+
+    MvcResult result =
+        mockMvc.perform(get(path()).with(adminJwt())).andExpect(status().isOk()).andReturn();
+
+    assertThat(result.getResponse().getContentType()).isEqualTo("application/pdf");
+    assertThat(result.getResponse().getContentAsByteArray()).isEqualTo(pdf());
+    assertThat(mediaFiles.findAll().get(0).getObjectKey()).endsWith(".pdf");
+  }
+
+  @Test
+  void aFileThatIsNeitherAnImageNorAPdfIsRefusedAndTheCurrentOneStays() throws Exception {
+    upload(ownerJwt());
+
+    mockMvc
+        .perform(
+            multipart(path())
+                .file(
+                    new MockMultipartFile(
+                        "file",
+                        "cnh.txt",
+                        "text/plain",
+                        "não é a CNH".getBytes(StandardCharsets.UTF_8)))
+                .with(ownerJwt()))
+        .andExpect(status().isBadRequest());
+
+    assertThat(mediaFiles.findAll()).hasSize(1);
+    assertThat(mediaFiles.findAll().get(0).getMimeType()).isEqualTo("image/png");
+  }
+
+  @Test
+  void readingTheCnhCarriesTheFileWithoutAnotherCall() throws Exception {
     upload(ownerJwt());
 
     mockMvc
         .perform(get("/api/driver-cnhs/" + cnhToken).with(ownerJwt()))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.photoUrl").value(startsWith(path() + "?v=")));
+        .andExpect(jsonPath("$.fileUrl").value(startsWith(path() + "?v=")));
   }
 
   @Test
-  void aCnhWithoutPhotoCarriesNoUrl() throws Exception {
+  void aCnhWithoutFileCarriesNoUrl() throws Exception {
     mockMvc
         .perform(get("/api/driver-cnhs/" + cnhToken).with(ownerJwt()))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.photoUrl").doesNotExist());
+        .andExpect(jsonPath("$.fileUrl").doesNotExist());
   }
 
   @Test
-  void replacingThePhotoReleasesThePreviousOne() throws Exception {
+  void replacingTheFileReleasesThePreviousOne() throws Exception {
     upload(ownerJwt());
     var first = mediaFiles.findAll().get(0);
     String firstKey = first.getObjectKey();
@@ -139,7 +176,7 @@ class DriverCnhPhotoControllerTest {
   }
 
   @Test
-  void theOwnerDownloadsTheirOwnCnhPhoto() throws Exception {
+  void theOwnerDownloadsTheirOwnCnhFile() throws Exception {
     upload(ownerJwt());
 
     MvcResult result =
@@ -162,14 +199,14 @@ class DriverCnhPhotoControllerTest {
   }
 
   @Test
-  void theAdminReadsTheCnhPhoto() throws Exception {
+  void theAdminReadsTheCnhFile() throws Exception {
     upload(ownerJwt());
 
     mockMvc.perform(get(path()).with(adminJwt())).andExpect(status().isOk());
   }
 
   @Test
-  void downloadingAPhotoThatDoesNotExistIsNotFound() throws Exception {
+  void downloadingAFileThatDoesNotExistIsNotFound() throws Exception {
     mockMvc.perform(get(path()).with(ownerJwt())).andExpect(status().isNotFound());
   }
 

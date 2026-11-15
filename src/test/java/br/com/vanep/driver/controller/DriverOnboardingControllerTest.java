@@ -194,6 +194,8 @@ class DriverOnboardingControllerTest {
     cnh.setIssueDate(LocalDate.now().minusYears(2));
     cnh.setValidUntil(LocalDate.now().plusYears(3));
     cnh.setActive(true);
+    cnh.getReview().setStatus(DocumentStatus.APPROVED);
+    cnh.setFile(saveFile("cnh"));
     driverCnhs.save(cnh);
 
     for (DriverDocumentType type :

@@ -17,11 +17,12 @@ class MediaSlotTest {
     assertThat(MediaSlot.DRIVER_DOCUMENT_FILE.allows("application/pdf")).isTrue();
     assertThat(MediaSlot.DRIVER_DOCUMENT_FILE.allows("image/png")).isTrue();
     assertThat(MediaSlot.VEHICLE_DOCUMENT_FILE.allows("application/pdf")).isTrue();
+    assertThat(MediaSlot.DRIVER_CNH_FILE.allows("application/pdf")).isTrue();
   }
 
   @Test
   void personalDocumentsAreNeverPublic() {
-    assertThat(MediaSlot.DRIVER_CNH_PHOTO.visibility()).isEqualTo(MediaVisibility.PRIVATE);
+    assertThat(MediaSlot.DRIVER_CNH_FILE.visibility()).isEqualTo(MediaVisibility.PRIVATE);
     assertThat(MediaSlot.DRIVER_DOCUMENT_FILE.visibility()).isEqualTo(MediaVisibility.PRIVATE);
     assertThat(MediaSlot.VEHICLE_DOCUMENT_FILE.visibility()).isEqualTo(MediaVisibility.PRIVATE);
   }

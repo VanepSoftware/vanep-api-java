@@ -147,6 +147,25 @@ class SchoolTransportCredentialPolicyTest {
     assertThat(evaluate().failed()).containsExactly(CredentialRequirement.DRIVER_LICENSE);
   }
 
+  @ParameterizedTest
+  @EnumSource(value = DocumentStatus.class, names = "APPROVED", mode = EnumSource.Mode.EXCLUDE)
+  void onlyAnApprovedCnhSatisfiesTheDriverLicense(DocumentStatus status) {
+    DriverCnhModel notApproved = cnh("D", LocalDate.of(2030, 1, 31), true);
+    notApproved.getReview().setStatus(status);
+    cnhs.set(0, notApproved);
+
+    assertThat(evaluate().failed()).containsExactly(CredentialRequirement.DRIVER_LICENSE);
+  }
+
+  @Test
+  void aPendingRenewalNextToTheApprovedCnhKeepsTheLicense() {
+    DriverCnhModel renewal = cnh("D", LocalDate.of(2035, 1, 31), true);
+    renewal.getReview().setStatus(DocumentStatus.PENDING);
+    cnhs.add(renewal);
+
+    assertThat(evaluate().failed()).isEmpty();
+  }
+
   @Test
   void anExpiredCnhFails() {
     cnhs.set(0, cnh("D", DATE.minusDays(1), true));
@@ -242,6 +261,7 @@ class SchoolTransportCredentialPolicyTest {
     cnh.setCategory(category);
     cnh.setValidUntil(validUntil);
     cnh.setActive(active);
+    cnh.getReview().setStatus(DocumentStatus.APPROVED);
     return cnh;
   }
 

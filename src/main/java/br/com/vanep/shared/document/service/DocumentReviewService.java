@@ -3,6 +3,7 @@ package br.com.vanep.shared.document.service;
 import br.com.vanep.shared.document.dto.DocumentDataCorrectionRequestDTO;
 import br.com.vanep.shared.document.dto.DocumentStatusUpdateRequestDTO;
 import br.com.vanep.shared.document.enums.DocumentDataRequirements;
+import br.com.vanep.shared.document.enums.DocumentDecisionStatus;
 import br.com.vanep.shared.document.enums.DocumentReviewViolation;
 import br.com.vanep.shared.document.enums.DocumentStatus;
 import br.com.vanep.shared.document.model.DocumentDecision;
@@ -38,17 +39,33 @@ public class DocumentReviewService {
       DocumentDataRequirements requirements,
       LocalDate today,
       String reviewerUid) {
-    requireSeenVersion(submission, request.version());
+    return review(
+        submission,
+        toDecision(request),
+        request.version(),
+        () ->
+            requireApprovalData(requirements, request.documentNumber(), request.expiresAt(), today),
+        reviewerUid);
+  }
+
+  // The approval data check runs after the version, the pending state and the file are confirmed,
+  // and only on an approval: each kind of submission brings its own data.
+  public DocumentReview review(
+      DocumentSubmission submission,
+      DocumentDecision decision,
+      Long seenVersion,
+      Runnable approvalDataCheck,
+      String reviewerUid) {
+    requireSeenVersion(submission, seenVersion);
     submissionRules.requirePending(submission);
-    DocumentDecision decision = toDecision(request);
     policy
         .validate(decision, submission.getReviewedFile() != null)
         .ifPresent(
             violation -> {
               throw toException(violation);
             });
-    if (request.approves()) {
-      requireApprovalData(requirements, request.documentNumber(), request.expiresAt(), today);
+    if (decision.status() == DocumentDecisionStatus.APPROVED) {
+      approvalDataCheck.run();
     }
     UserModel reviewer = userService.requireByToken(reviewerUid);
     return policy.decide(decision, reviewer, Instant.now());
