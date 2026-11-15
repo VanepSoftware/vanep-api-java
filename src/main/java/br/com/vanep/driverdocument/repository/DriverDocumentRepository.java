@@ -3,6 +3,7 @@ package br.com.vanep.driverdocument.repository;
 import br.com.vanep.driverdocument.enums.DriverDocumentType;
 import br.com.vanep.driverdocument.model.DriverDocumentModel;
 import br.com.vanep.shared.document.enums.DocumentStatus;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
@@ -45,6 +46,9 @@ public interface DriverDocumentRepository
   @EntityGraph(attributePaths = {"file"})
   List<DriverDocumentModel> findByDriverIdAndDocumentTypeAndSupersededAtIsNull(
       Long driverId, DriverDocumentType documentType);
+
+  @EntityGraph(attributePaths = {"driver.user", "file", "review.reviewedBy"})
+  List<DriverDocumentModel> findByDriverIdInAndSupersededAtIsNull(Collection<Long> driverIds);
 
   @Modifying
   @Query(

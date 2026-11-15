@@ -181,6 +181,7 @@ public class DriverDocumentService {
   public void delete(String token, boolean mayRemoveReviewed) {
     DriverDocumentModel document = requireByToken(token);
     submissionRules.requireRemovable(document, mayRemoveReviewed);
+    driverRepository.lockById(document.getDriver().getId());
     driverDocumentRepository.delete(document);
   }
 

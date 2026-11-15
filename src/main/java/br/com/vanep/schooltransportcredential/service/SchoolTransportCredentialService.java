@@ -1,8 +1,6 @@
 package br.com.vanep.schooltransportcredential.service;
 
-import br.com.vanep.drivercnh.model.DriverCnhModel;
 import br.com.vanep.drivercnh.repository.DriverCnhRepository;
-import br.com.vanep.driverdocument.model.DriverDocumentModel;
 import br.com.vanep.driverdocument.repository.DriverDocumentRepository;
 import br.com.vanep.schooltransportcredential.dto.SchoolTransportCredentialsDTO;
 import br.com.vanep.schooltransportcredential.dto.SchoolTransportCredentialsResponseDTO;
@@ -10,12 +8,8 @@ import br.com.vanep.schooltransportcredential.mapper.SchoolTransportCredentialMa
 import br.com.vanep.trip.service.TripService;
 import br.com.vanep.vehicle.model.VehicleModel;
 import br.com.vanep.vehicle.repository.VehicleRepository;
-import br.com.vanep.vehicledocument.model.VehicleDocumentModel;
 import br.com.vanep.vehicledocument.repository.VehicleDocumentRepository;
 import java.time.LocalDate;
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.HttpStatus;
@@ -59,20 +53,6 @@ public class SchoolTransportCredentialService {
         driverDocuments.findByDriverIdAndSupersededAtIsNull(driverId),
         vehicleDocuments.findUnsupersededOfActiveVehicle(driverId, vehicleId),
         date);
-  }
-
-  @Transactional(readOnly = true)
-  public boolean hasAnyQualifiedVehicle(Long driverId, LocalDate date) {
-    List<DriverCnhModel> driverCnhs = cnhs.findByDriverIdAndSupersededAtIsNull(driverId);
-    List<DriverDocumentModel> documents =
-        driverDocuments.findByDriverIdAndSupersededAtIsNull(driverId);
-    Map<Long, List<VehicleDocumentModel>> documentsByVehicle =
-        vehicleDocuments.findUnsupersededOfActiveVehiclesByDriverId(driverId).stream()
-            .collect(Collectors.groupingBy(document -> document.getVehicle().getId()));
-    return documentsByVehicle.values().stream()
-        .anyMatch(
-            vehicleDocumentsOfOneVan ->
-                policy.evaluate(driverCnhs, documents, vehicleDocumentsOfOneVan, date).satisfied());
   }
 
   @Transactional(readOnly = true)

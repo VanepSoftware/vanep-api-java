@@ -85,6 +85,16 @@ public class DriverDocumentModel implements DocumentSubmission {
   private Instant updatedAt;
 
   @Override
+  public String number() {
+    return documentNumber;
+  }
+
+  @Override
+  public LocalDate expiresOn() {
+    return expiresAt;
+  }
+
+  @Override
   public MediaFileModel getReviewedFile() {
     return file;
   }

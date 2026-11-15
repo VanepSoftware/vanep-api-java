@@ -409,7 +409,13 @@ class DriverOnboardingControllerTest {
                     messages.getMessage(
                         "driver.onboarding.documents_not_approved",
                         null,
-                        Locale.forLanguageTag("pt-BR"))));
+                        Locale.forLanguageTag("pt-BR"))))
+        .andExpect(jsonPath("$.code").value("driver.onboarding.documents_not_approved"))
+        .andExpect(jsonPath("$.blockers.length()").value(1))
+        .andExpect(jsonPath("$.blockers[0].kind").value("VEHICLE_REQUIREMENT"))
+        .andExpect(jsonPath("$.blockers[0].requirement").value("VEHICLE_INSPECTION"))
+        .andExpect(jsonPath("$.blockers[0].state").value("PENDING"))
+        .andExpect(jsonPath("$.blockers[0].plate").value("ABC1D23"));
 
     assertThat(drivers.findByToken(driver.getToken()).orElseThrow().getApprovalStatus())
         .isEqualTo(DriverApprovalStatus.UNDER_REVIEW);
@@ -423,7 +429,8 @@ class DriverOnboardingControllerTest {
     mockMvc
         .perform(
             post("/api/drivers/" + driver.getToken() + "/approve").with(adminJwt(adminUserUid)))
-        .andExpect(status().isBadRequest());
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("driver.onboarding.not_under_review"));
   }
 
   @Test
@@ -492,7 +499,27 @@ class DriverOnboardingControllerTest {
                 .with(adminJwt(adminUserUid))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"reason\": \"Foto ilegível\"}"))
-        .andExpect(status().isBadRequest());
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("driver.onboarding.not_under_review"));
+  }
+
+  @Test
+  void anApprovedButExpiredDocumentIsMissingInTheOnboarding() throws Exception {
+    completeAllRequirements();
+    approveEveryDocument();
+    DriverDocumentModel criminalRecord =
+        driverDocuments.findAll().stream()
+            .filter(document -> document.getDocumentType() == DriverDocumentType.CRIMINAL_RECORD)
+            .findFirst()
+            .orElseThrow();
+    criminalRecord.setExpiresAt(LocalDate.now().minusDays(1));
+    driverDocuments.save(criminalRecord);
+
+    mockMvc
+        .perform(get("/api/drivers/me/onboarding").with(driverJwt(driverUserUid)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.documentsStep.completed").value(false))
+        .andExpect(jsonPath("$.documentsStep.missingDriverTypes[0]").value("CRIMINAL_RECORD"));
   }
 
   @Test

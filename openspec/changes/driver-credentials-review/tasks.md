@@ -215,26 +215,26 @@
 > Depends on: PR 6 | Parallel with: —
 > Order: test → policy → service → onboarding → aprovação → mensagens
 
-- [ ] 7.1 Criar branch `VAN-86/7-compliance-policy` de dentro da branch do PR 6
-- [ ] 7.2 Testes da `DriverCompliancePolicy` (spec `driver-compliance`):
+- [x] 7.1 Criar branch `VAN-86/7-compliance-policy` de dentro da branch do PR 6
+- [x] 7.2 Testes da `DriverCompliancePolicy` (spec `driver-compliance`):
   - cada `state`;
   - a renovação pendente ao lado da aprovada;
   - `canApprove` com uma van completa de duas;
   - os `blockers` da van mais perto de completar, e `CNH_CATEGORY`;
   - cada caso de `nextAction` na ordem do D15;
   - as contagens e `nextExpiryOn`
-- [ ] 7.3 Testes do serviço: `evaluateAll` com 3 e com 30 motoristas, cada um com vans e documentos, faz o mesmo número de consultas (`SqlStatementCounter`); `evaluate` de um motorista dá o mesmo resultado que o `evaluateAll`
-- [ ] 7.4 Testes da aprovação e do onboarding:
+- [x] 7.3 Testes do serviço: `evaluateAll` com 3 e com 30 motoristas, cada um com vans e documentos, faz o mesmo número de consultas (`SqlStatementCounter`); `evaluate` de um motorista dá o mesmo resultado que o `evaluateAll`
+- [x] 7.4 Testes da aprovação e do onboarding:
   - 422 com `code` `driver.onboarding.documents_not_approved` e `blockers` no `ProblemDetail`;
   - aprovar ou recusar fora de `UNDER_REVIEW` → 400 com `code` `driver.onboarding.not_under_review`;
   - aprovar e recusar ao mesmo tempo → uma decisão e um 400;
   - documento aprovado mas vencido aparece como faltando no onboarding;
   - os testes do onboarding do PR 3 continuam verdes
-- [ ] 7.5 `drivercompliance`: `ComplianceState`, `NextAction`, `BlockerKind`, os DTOs do D15 e a `DriverCompliancePolicy`. Teste 7.2 verde
-- [ ] 7.6 `DriverComplianceService` com `evaluateAll(drivers, date)` em lote e `evaluate(driver, date)` pelo mesmo caminho. Teste 7.3 verde
-- [ ] 7.7 `DriverRepository.findByTokenForUpdate` (`PESSIMISTIC_WRITE`); `approve` e `reject` com a trava; `approve` e os passos de documentos e de CNH pela policy; o 422 com `blockers` pela `ApiProblemException`; o `hasAnyQualifiedVehicle` sai. Teste 7.4 verde
-- [ ] 7.8 `make lint` + `./mvnw verify -B`
-- [ ] 7.9 QA da regra 55:
+- [x] 7.5 `drivercompliance`: `ComplianceState`, `NextAction`, `BlockerKind`, os DTOs do D15 e a `DriverCompliancePolicy`. Teste 7.2 verde
+- [x] 7.6 `DriverComplianceService` com `evaluateAll(drivers, date)` em lote e `evaluate(driver, date)` pelo mesmo caminho. Teste 7.3 verde
+- [x] 7.7 `DriverRepository.findByTokenForUpdate` (`PESSIMISTIC_WRITE`); `approve` e `reject` com a trava; `approve` e os passos de documentos e de CNH pela policy; o 422 com `blockers` pela `ApiProblemException`; o `hasAnyQualifiedVehicle` sai. Teste 7.4 verde
+- [x] 7.8 `make lint` + `./mvnw verify -B`
+- [x] 7.9 QA da regra 55:
   - a aprovação recusada mostra os `blockers` certos em cada etapa do motorista novo do QA do PR 3;
   - aprovar e recusar em paralelo;
   - a data de São Paulo perto da meia-noite (`TZ` do container em UTC);

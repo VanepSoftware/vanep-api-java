@@ -1,11 +1,13 @@
 package br.com.vanep.driver;
 
 import br.com.vanep.driver.model.DriverModel;
+import jakarta.persistence.LockModeType;
 import java.util.Collection;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -14,6 +16,16 @@ public interface DriverRepository extends JpaRepository<DriverModel, Long> {
   Optional<DriverModel> findByUserId(Long userId);
 
   Optional<DriverModel> findByToken(String token);
+
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("select driver from DriverModel driver where driver.token = :token")
+  Optional<DriverModel> findByTokenForUpdate(@Param("token") String token);
+
+  // Taken by every write that can take a qualification away (removing a van, a document or a CNH),
+  // so it waits for an approval in progress, which holds the same lock.
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("select driver from DriverModel driver where driver.id = :id")
+  Optional<DriverModel> lockById(@Param("id") Long id);
 
   @Query(
       value =

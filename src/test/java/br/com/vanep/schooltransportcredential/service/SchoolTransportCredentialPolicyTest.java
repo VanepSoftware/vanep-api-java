@@ -288,4 +288,14 @@ class SchoolTransportCredentialPolicyTest {
     document.getReview().setStatus(DocumentStatus.APPROVED);
     return document;
   }
+
+  @Test
+  void aCnhSentWithOnlyItsFileLacksNoCategoryYet() {
+    DriverCnhModel sent = new DriverCnhModel();
+    DriverCnhModel categoryB = new DriverCnhModel();
+    categoryB.setCategory("B");
+
+    assertThat(SchoolTransportCredentialPolicy.lacksSchoolTransportCategory(sent)).isFalse();
+    assertThat(SchoolTransportCredentialPolicy.lacksSchoolTransportCategory(categoryB)).isTrue();
+  }
 }

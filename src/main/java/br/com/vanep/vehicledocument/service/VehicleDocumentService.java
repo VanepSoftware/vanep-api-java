@@ -1,5 +1,6 @@
 package br.com.vanep.vehicledocument.service;
 
+import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.media.enums.MediaSlot;
 import br.com.vanep.media.service.MediaFileService;
 import br.com.vanep.schooltransportcredential.service.SchoolTransportCredentialService;
@@ -32,6 +33,7 @@ public class VehicleDocumentService {
 
   private final VehicleDocumentRepository documents;
   private final VehicleRepository vehicles;
+  private final DriverRepository drivers;
   private final DocumentReviewService reviewService;
   private final DocumentSubmissionRules submissionRules;
   private final VehicleDocumentMapper mapper;
@@ -41,6 +43,7 @@ public class VehicleDocumentService {
   public VehicleDocumentService(
       VehicleDocumentRepository documents,
       VehicleRepository vehicles,
+      DriverRepository drivers,
       DocumentReviewService reviewService,
       DocumentSubmissionRules submissionRules,
       VehicleDocumentMapper mapper,
@@ -48,6 +51,7 @@ public class VehicleDocumentService {
       MessageSource messages) {
     this.documents = documents;
     this.vehicles = vehicles;
+    this.drivers = drivers;
     this.reviewService = reviewService;
     this.submissionRules = submissionRules;
     this.mapper = mapper;
@@ -122,6 +126,7 @@ public class VehicleDocumentService {
   public void delete(String token, boolean mayRemoveReviewed) {
     VehicleDocumentModel document = requireByToken(token);
     submissionRules.requireRemovable(document, mayRemoveReviewed);
+    drivers.lockById(document.getVehicle().getDriver().getId());
     documents.delete(document);
   }
 

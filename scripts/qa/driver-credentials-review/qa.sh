@@ -792,8 +792,13 @@ request DELETE "/api/driver-documents/$EXTRA" "$NEW"
 
 table "Approving the driver"
 request POST "/api/drivers/$NEW_DRIVER/approve" "$ADMIN"
-expect A1x "approving with the documents still pending" 422 \
-  '.detail == "O motorista só pode ser aprovado quando pelo menos uma van ativa tiver todos os documentos de transporte escolar aprovados e válidos."'
+expect A1x "approving with the documents still pending: the blockers name the driver's and the closest van's" 422 \
+  '.code == "driver.onboarding.documents_not_approved"
+   and .detail == "O motorista só pode ser aprovado quando pelo menos uma van ativa tiver todos os documentos de transporte escolar aprovados e válidos."
+   and ([.blockers[] | "\(.kind):\(.requirement):\(.state):\(.plate)"] == [
+     "DRIVER_REQUIREMENT:SCHOOL_DRIVER_COURSE:PENDING:null", "DRIVER_REQUIREMENT:CRIMINAL_RECORD:PENDING:null",
+     "VEHICLE_REQUIREMENT:VEHICLE_REGISTRATION:PENDING:'"$NEW_PLATE"'", "VEHICLE_REQUIREMENT:VEHICLE_INSPECTION:PENDING:'"$NEW_PLATE"'",
+     "VEHICLE_REQUIREMENT:SCHOOL_VEHICLE_AUTHORIZATION:PENDING:'"$NEW_PLATE"'"])'
 check A2x "the driver is still under review" "UNDER_REVIEW" "$(sql "select approval_status from driver where token = '$NEW_DRIVER'")"
 request POST "/api/drivers/$NEW_DRIVER/reject" "$ADMIN" '{"reason": "Vistoria ilegível"}'
 expect A3x "the admin rejects the driver: the inspection is unreadable" 200 '.approvalStatus == "REJECTED"'
@@ -810,7 +815,8 @@ credentials "$NVAN" "$NEW"
 expect A5x "with the inspection still pending only VEHICLE_INSPECTION fails" 200 \
   '.satisfied == false and ([.requirements[] | select((.satisfied | not) and (.optional | not)) | .requirement] == ["VEHICLE_INSPECTION"])'
 request POST "/api/drivers/$NEW_DRIVER/approve" "$ADMIN"
-expect A6x "approving with the inspection of the only complete van pending" 422
+expect A6x "approving with the inspection of the only complete van pending: only that blocker" 422 \
+  '[.blockers[] | "\(.kind):\(.requirement):\(.state):\(.plate)"] == ["VEHICLE_REQUIREMENT:VEHICLE_INSPECTION:PENDING:'"$NEW_PLATE"'"]'
 review vehicle-documents "$NINSP" '{"status": "APPROVED", "reviewMethod": "MANUAL"}'
 credentials "$NVAN" "$NEW"
 expect A7x "everything approved: the van passes, with each number and expiry" 200 \
@@ -1209,6 +1215,41 @@ check C22 "every seed CNH is approved" "0" \
           and deleted_at is null and superseded_at is null and status <> 'APPROVED'")"
 credentials "$VAN" "$DRIVER"
 expect C23 "the seed driver's van passes" 200 '.satisfied == true'
+
+# ---------------------------------------------------------------------------------------------
+# Part 7 — PR 7: one evaluation for the approval, with a lock on the driver
+# ---------------------------------------------------------------------------------------------
+
+table "Approving and rejecting at the same time"
+SEED_DRIVER_TOKEN=$(sql "select d.token from driver d join users u on u.id = d.user_id where u.email = '$SEED_DRIVER_EMAIL'")
+sql "update driver set approval_status = 'UNDER_REVIEW' where token = '$SEED_DRIVER_TOKEN'" >/dev/null
+race_dir=$(mktemp -d)
+curl -s -o /dev/null -w '%{http_code}\n' -X POST "$BASE_URL/api/drivers/$SEED_DRIVER_TOKEN/approve" \
+  -H "Authorization: Bearer $ADMIN" >"$(mktemp "$race_dir/status.XXXXXX")" &
+curl -s -o /dev/null -w '%{http_code}\n' -X POST "$BASE_URL/api/drivers/$SEED_DRIVER_TOKEN/reject" \
+  -H "Authorization: Bearer $ADMIN" -H "Content-Type: application/json" \
+  --data-binary '{"reason": "Corrida do QA"}' >"$(mktemp "$race_dir/status.XXXXXX")" &
+wait
+check K1x "an approval and a rejection of the same driver at once: one decision and one 400" "200 400" \
+  "$(cat "$race_dir"/* | sort | paste -sd ' ' -)"
+rm -rf "$race_dir"
+check K2x "the driver holds one of the two decisions" "1" \
+  "$(sql "select count(*) from driver where token = '$SEED_DRIVER_TOKEN' and approval_status in ('APPROVED', 'REJECTED')")"
+sql "update driver set approval_status = 'APPROVED', rejection_reason = null where token = '$SEED_DRIVER_TOKEN'" >/dev/null
+request POST "/api/drivers/$SEED_DRIVER_TOKEN/approve" "$ADMIN"
+expect K3x "approving a driver that is no longer under review" 400 '.code == "driver.onboarding.not_under_review"'
+
+table "The service date is São Paulo's"
+JVM_TODAY=$(sql "select (now() at time zone '${QA_JVM_ZONE:-America/Sao_Paulo}')::date")
+SP_TODAY=$(sql "select (now() at time zone 'America/Sao_Paulo')::date")
+check Z1x "this run's JVM date differs from São Paulo's (QA_JVM_ZONE=${QA_JVM_ZONE:-unset})" "differ" \
+  "$([[ $JVM_TODAY != "$SP_TODAY" ]] && echo differ || echo same)"
+sql "update vehicle_document set expires_at = date '$SP_TODAY' - 1 where token = '$NINSP'" >/dev/null
+credentials "$NVAN" "$NEW"
+check Z2x "valid until yesterday in São Paulo fails, though it is still that day for the JVM" "false" "$(satisfied_of VEHICLE_INSPECTION)"
+sql "update vehicle_document set expires_at = date '$SP_TODAY' where token = '$NINSP'" >/dev/null
+credentials "$NVAN" "$NEW"
+check Z3x "valid until today in São Paulo passes" "true" "$(satisfied_of VEHICLE_INSPECTION)"
 
 echo
 echo "TOTAL: $PASSED passed"

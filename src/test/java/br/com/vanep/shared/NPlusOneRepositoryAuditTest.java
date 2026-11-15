@@ -138,6 +138,50 @@ class NPlusOneRepositoryAuditTest {
     recordHotspot(
         counter,
         hotspots,
+        "VehicleRepository.findByDriverIdInAndActiveTrueOrderByCreatedAtAscIdAsc (touch driver.user + photos)",
+        () -> {},
+        () ->
+            touchVehicles(
+                vehicles.findByDriverIdInAndActiveTrueOrderByCreatedAtAscIdAsc(
+                    List.of(driver.getId()))),
+        () -> {
+          createVehicle(4);
+          createVehicle(5);
+          createVehicle(6);
+        },
+        reporter);
+
+    recordHotspot(
+        counter,
+        hotspots,
+        "DriverDocumentRepository.findByDriverIdInAndSupersededAtIsNull (touch driver.user + file + reviewer)",
+        () -> {},
+        () ->
+            touchDocuments(
+                documents.findByDriverIdInAndSupersededAtIsNull(List.of(driver.getId()))),
+        () -> {
+          createDocument(20);
+          createDocument(21);
+          createDocument(22);
+        },
+        reporter);
+
+    recordHotspot(
+        counter,
+        hotspots,
+        "DriverCnhRepository.findByDriverIdInAndSupersededAtIsNull (touch driver.user)",
+        () -> {},
+        () -> touchCnhs(cnhs.findByDriverIdInAndSupersededAtIsNull(List.of(driver.getId()))),
+        () -> {
+          createCnh(4);
+          createCnh(5);
+          createCnh(6);
+        },
+        reporter);
+
+    recordHotspot(
+        counter,
+        hotspots,
         "DriverDocumentRepository.findFiltered by driver (touch driver.user + file + reviewer)",
         () -> {},
         () ->

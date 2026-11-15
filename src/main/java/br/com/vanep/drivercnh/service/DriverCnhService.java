@@ -204,6 +204,7 @@ public class DriverCnhService {
   public void delete(String token, boolean mayRemoveReviewed) {
     DriverCnhModel cnh = requireByToken(token);
     submissionRules.requireRemovable(cnh, mayRemoveReviewed);
+    driverRepository.lockById(cnh.getDriver().getId());
     cnhRepository.delete(cnh);
   }
 

@@ -279,9 +279,6 @@ class VehicleDocumentRepositoryTest {
     assertThat(documents.findUnsupersededByVehicleIdIn(List.of(van.getId())))
         .extracting(document -> document.getToken())
         .containsExactly(liveToken);
-    assertThat(documents.findUnsupersededOfActiveVehiclesByDriverId(driver.getId()))
-        .extracting(document -> document.getToken())
-        .containsExactly(liveToken);
     assertThat(documents.findUnsupersededOfActiveVehicle(driver.getId(), van.getId()))
         .extracting(document -> document.getToken())
         .containsExactly(liveToken);

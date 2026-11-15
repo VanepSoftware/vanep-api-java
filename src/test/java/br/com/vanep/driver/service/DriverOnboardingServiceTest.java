@@ -24,14 +24,17 @@ import br.com.vanep.driver.mapper.DriverMapper;
 import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.drivercnh.model.DriverCnhModel;
 import br.com.vanep.drivercnh.repository.DriverCnhRepository;
+import br.com.vanep.drivercompliance.service.DriverCompliancePolicy;
+import br.com.vanep.drivercompliance.service.DriverComplianceService;
 import br.com.vanep.driverdocument.enums.DriverDocumentType;
 import br.com.vanep.driverdocument.model.DriverDocumentModel;
 import br.com.vanep.driverdocument.repository.DriverDocumentRepository;
 import br.com.vanep.driverservicearea.model.DriverServiceAreaModel;
 import br.com.vanep.driverservicearea.repository.DriverServiceAreaRepository;
 import br.com.vanep.media.model.MediaFileModel;
-import br.com.vanep.schooltransportcredential.service.SchoolTransportCredentialService;
+import br.com.vanep.schooltransportcredential.service.SchoolTransportCredentialPolicy;
 import br.com.vanep.shared.document.enums.DocumentStatus;
+import br.com.vanep.shared.error.ApiProblemException;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.service.UserService;
@@ -63,13 +66,15 @@ import org.springframework.web.server.ResponseStatusException;
 @ExtendWith(MockitoExtension.class)
 class DriverOnboardingServiceTest {
 
+  private static final DriverCompliancePolicy POLICY =
+      new DriverCompliancePolicy(new SchoolTransportCredentialPolicy());
+
   @Mock private DriverRepository driverRepository;
   @Mock private VehicleRepository vehicleRepository;
   @Mock private DriverCnhRepository driverCnhRepository;
   @Mock private DriverDocumentRepository driverDocumentRepository;
   @Mock private VehicleDocumentRepository vehicleDocumentRepository;
   @Mock private DriverServiceAreaRepository driverServiceAreaRepository;
-  @Mock private SchoolTransportCredentialService credentialService;
   @Mock private UserService userService;
   @Mock private DriverNotificationService driverNotificationService;
   @Mock private DriverMapper mapper;
@@ -85,12 +90,14 @@ class DriverOnboardingServiceTest {
     service =
         new DriverOnboardingService(
             driverRepository,
-            vehicleRepository,
-            driverCnhRepository,
-            driverDocumentRepository,
-            vehicleDocumentRepository,
             driverServiceAreaRepository,
-            credentialService,
+            new DriverComplianceService(
+                driverCnhRepository,
+                driverDocumentRepository,
+                vehicleRepository,
+                vehicleDocumentRepository,
+                POLICY),
+            POLICY,
             userService,
             driverNotificationService,
             mapper,
@@ -116,6 +123,7 @@ class DriverOnboardingServiceTest {
   private DriverDocumentModel driverDocument(DriverDocumentType type, boolean withFile) {
     DriverDocumentModel doc = new DriverDocumentModel();
     doc.setToken("doc-token-" + type.name().toLowerCase());
+    doc.setDriver(driver);
     doc.setActive(true);
     doc.setDocumentType(type);
     if (withFile) {
@@ -130,6 +138,7 @@ class DriverOnboardingServiceTest {
     vehicle.setToken("vehicle-token-" + id);
     vehicle.setPlate(plate);
     vehicle.setActive(true);
+    vehicle.setDriver(driver);
     return vehicle;
   }
 
@@ -160,11 +169,34 @@ class DriverOnboardingServiceTest {
 
   private DriverCnhModel cnh(String category, LocalDate validUntil) {
     DriverCnhModel cnh = new DriverCnhModel();
+    cnh.setDriver(driver);
     cnh.setActive(true);
     cnh.setCategory(category);
     cnh.setValidUntil(validUntil);
     cnh.setFile(file("cnh"));
     return cnh;
+  }
+
+  private void stubQualifiedDriver() {
+    DriverCnhModel license = cnh("D", LocalDate.now().plusYears(2));
+    license.getReview().setStatus(DocumentStatus.APPROVED);
+    List<DriverDocumentModel> documents = completeDriverDocuments();
+    documents.forEach(document -> document.getReview().setStatus(DocumentStatus.APPROVED));
+    VehicleModel van = vehicle(1L, "ABC1D23");
+    List<VehicleDocumentModel> vanDocuments = completeVanDocuments(van);
+    vanDocuments.forEach(
+        document -> {
+          document.setExpiresAt(LocalDate.now().plusYears(1));
+          document.getReview().setStatus(DocumentStatus.APPROVED);
+        });
+    when(driverCnhRepository.findByDriverIdInAndSupersededAtIsNull(List.of(20L)))
+        .thenReturn(List.of(license));
+    when(driverDocumentRepository.findByDriverIdInAndSupersededAtIsNull(List.of(20L)))
+        .thenReturn(documents);
+    when(vehicleRepository.findByDriverIdInAndActiveTrueOrderByCreatedAtAscIdAsc(List.of(20L)))
+        .thenReturn(List.of(van));
+    when(vehicleDocumentRepository.findUnsupersededByVehicleIdIn(List.of(1L)))
+        .thenReturn(vanDocuments);
   }
 
   private MediaFileModel file(String name) {
@@ -175,14 +207,16 @@ class DriverOnboardingServiceTest {
 
   private void stubReadyToSubmit(VehicleModel vehicle) {
     user.setAddressId(55L);
-    when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of(vehicle));
+    when(vehicleRepository.findByDriverIdInAndActiveTrueOrderByCreatedAtAscIdAsc(List.of(20L)))
+        .thenReturn(List.of(vehicle));
     DriverCnhModel cnh = cnh("D", LocalDate.now().plusYears(1));
-    when(driverCnhRepository.findByDriverIdAndSupersededAtIsNull(20L)).thenReturn(List.of(cnh));
+    when(driverCnhRepository.findByDriverIdInAndSupersededAtIsNull(List.of(20L)))
+        .thenReturn(List.of(cnh));
     stubCompleteDocuments(vehicle);
   }
 
   private void stubCompleteDocuments(VehicleModel vehicle) {
-    when(driverDocumentRepository.findByDriverIdAndSupersededAtIsNull(20L))
+    when(driverDocumentRepository.findByDriverIdInAndSupersededAtIsNull(List.of(20L)))
         .thenReturn(completeDriverDocuments());
     when(vehicleDocumentRepository.findUnsupersededByVehicleIdIn(List.of(vehicle.getId())))
         .thenReturn(completeVanDocuments(vehicle));
@@ -195,7 +229,8 @@ class DriverOnboardingServiceTest {
     area.setCity(new CityModel());
     when(driverServiceAreaRepository.findByDriverId(20L)).thenReturn(List.of(area));
     DriverCnhModel cnh = cnh("D", LocalDate.now().plusYears(2));
-    when(driverCnhRepository.findByDriverIdAndSupersededAtIsNull(20L)).thenReturn(List.of(cnh));
+    when(driverCnhRepository.findByDriverIdInAndSupersededAtIsNull(List.of(20L)))
+        .thenReturn(List.of(cnh));
   }
 
   @Test
@@ -204,9 +239,12 @@ class DriverOnboardingServiceTest {
     when(userService.requireByTokenAndType("user-token-10", UserType.DRIVER)).thenReturn(user);
     when(driverRepository.findByUserId(10L)).thenReturn(Optional.of(driver));
     when(driverServiceAreaRepository.findByDriverId(20L)).thenReturn(List.of());
-    when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of());
-    when(driverCnhRepository.findByDriverIdAndSupersededAtIsNull(20L)).thenReturn(List.of());
-    when(driverDocumentRepository.findByDriverIdAndSupersededAtIsNull(20L)).thenReturn(List.of());
+    when(vehicleRepository.findByDriverIdInAndActiveTrueOrderByCreatedAtAscIdAsc(List.of(20L)))
+        .thenReturn(List.of());
+    when(driverCnhRepository.findByDriverIdInAndSupersededAtIsNull(List.of(20L)))
+        .thenReturn(List.of());
+    when(driverDocumentRepository.findByDriverIdInAndSupersededAtIsNull(List.of(20L)))
+        .thenReturn(List.of());
 
     DriverOnboardingStatusResponseDTO status = service.getOnboardingStatus("user-token-10");
 
@@ -229,7 +267,8 @@ class DriverOnboardingServiceTest {
   void getOnboardingStatusReturnsCompleteWhenAllRequirementsMet() {
     stubDriverWithArea();
     VehicleModel van = vehicle(1L, "ABC1D23");
-    when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of(van));
+    when(vehicleRepository.findByDriverIdInAndActiveTrueOrderByCreatedAtAscIdAsc(List.of(20L)))
+        .thenReturn(List.of(van));
     stubCompleteDocuments(van);
 
     DriverOnboardingStatusResponseDTO status = service.getOnboardingStatus("user-token-10");
@@ -254,8 +293,9 @@ class DriverOnboardingServiceTest {
     stubDriverWithArea();
     VehicleModel complete = vehicle(1L, "ABC1D23");
     VehicleModel bare = vehicle(2L, "XYZ9K87");
-    when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of(complete, bare));
-    when(driverDocumentRepository.findByDriverIdAndSupersededAtIsNull(20L))
+    when(vehicleRepository.findByDriverIdInAndActiveTrueOrderByCreatedAtAscIdAsc(List.of(20L)))
+        .thenReturn(List.of(complete, bare));
+    when(driverDocumentRepository.findByDriverIdInAndSupersededAtIsNull(List.of(20L)))
         .thenReturn(completeDriverDocuments());
     when(vehicleDocumentRepository.findUnsupersededByVehicleIdIn(List.of(1L, 2L)))
         .thenReturn(completeVanDocuments(complete));
@@ -278,8 +318,9 @@ class DriverOnboardingServiceTest {
     stubDriverWithArea();
     VehicleModel first = vehicle(1L, "ABC1D23");
     VehicleModel second = vehicle(2L, "XYZ9K87");
-    when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of(first, second));
-    when(driverDocumentRepository.findByDriverIdAndSupersededAtIsNull(20L))
+    when(vehicleRepository.findByDriverIdInAndActiveTrueOrderByCreatedAtAscIdAsc(List.of(20L)))
+        .thenReturn(List.of(first, second));
+    when(driverDocumentRepository.findByDriverIdInAndSupersededAtIsNull(List.of(20L)))
         .thenReturn(completeDriverDocuments());
     when(vehicleDocumentRepository.findUnsupersededByVehicleIdIn(List.of(1L, 2L)))
         .thenReturn(
@@ -302,10 +343,9 @@ class DriverOnboardingServiceTest {
   @Test
   void anInactiveVanIsNotEvaluated() {
     stubDriverWithArea();
-    VehicleModel inactive = vehicle(1L, "ABC1D23");
-    inactive.setActive(false);
-    when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of(inactive));
-    when(driverDocumentRepository.findByDriverIdAndSupersededAtIsNull(20L))
+    when(vehicleRepository.findByDriverIdInAndActiveTrueOrderByCreatedAtAscIdAsc(List.of(20L)))
+        .thenReturn(List.of());
+    when(driverDocumentRepository.findByDriverIdInAndSupersededAtIsNull(List.of(20L)))
         .thenReturn(completeDriverDocuments());
 
     DriverOnboardingStatusResponseDTO status = service.getOnboardingStatus("user-token-10");
@@ -318,10 +358,11 @@ class DriverOnboardingServiceTest {
   void aRejectedVanDocumentDoesNotCount() {
     stubDriverWithArea();
     VehicleModel van = vehicle(1L, "ABC1D23");
-    when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of(van));
+    when(vehicleRepository.findByDriverIdInAndActiveTrueOrderByCreatedAtAscIdAsc(List.of(20L)))
+        .thenReturn(List.of(van));
     VehicleDocumentModel rejected = vehicleDocument(van, VehicleDocumentType.CRLV, true);
     rejected.getReview().setStatus(DocumentStatus.REJECTED);
-    when(driverDocumentRepository.findByDriverIdAndSupersededAtIsNull(20L))
+    when(driverDocumentRepository.findByDriverIdInAndSupersededAtIsNull(List.of(20L)))
         .thenReturn(completeDriverDocuments());
     when(vehicleDocumentRepository.findUnsupersededByVehicleIdIn(List.of(1L)))
         .thenReturn(
@@ -340,7 +381,8 @@ class DriverOnboardingServiceTest {
   void anExpiredDocumentDoesNotCount() {
     stubDriverWithArea();
     VehicleModel van = vehicle(1L, "ABC1D23");
-    when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of(van));
+    when(vehicleRepository.findByDriverIdInAndActiveTrueOrderByCreatedAtAscIdAsc(List.of(20L)))
+        .thenReturn(List.of(van));
     DriverDocumentModel expiredCourse =
         driverDocument(DriverDocumentType.SCHOOL_DRIVER_COURSE, true);
     expiredCourse.setExpiresAt(LocalDate.now().minusDays(1));
@@ -349,7 +391,7 @@ class DriverOnboardingServiceTest {
     expiredInspection.setExpiresAt(LocalDate.now().minusDays(1));
     VehicleDocumentModel crlv = vehicleDocument(van, VehicleDocumentType.CRLV, true);
     crlv.setExpiresAt(LocalDate.now());
-    when(driverDocumentRepository.findByDriverIdAndSupersededAtIsNull(20L))
+    when(driverDocumentRepository.findByDriverIdInAndSupersededAtIsNull(List.of(20L)))
         .thenReturn(
             List.of(expiredCourse, driverDocument(DriverDocumentType.CRIMINAL_RECORD, true)));
     when(vehicleDocumentRepository.findUnsupersededByVehicleIdIn(List.of(1L)))
@@ -371,8 +413,9 @@ class DriverOnboardingServiceTest {
   void getOnboardingStatusReturnsIncompleteWhenDocumentHasNoFileUploaded() {
     stubDriverWithArea();
     VehicleModel van = vehicle(1L, "ABC1D23");
-    when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of(van));
-    when(driverDocumentRepository.findByDriverIdAndSupersededAtIsNull(20L))
+    when(vehicleRepository.findByDriverIdInAndActiveTrueOrderByCreatedAtAscIdAsc(List.of(20L)))
+        .thenReturn(List.of(van));
+    when(driverDocumentRepository.findByDriverIdInAndSupersededAtIsNull(List.of(20L)))
         .thenReturn(completeDriverDocuments());
     when(vehicleDocumentRepository.findUnsupersededByVehicleIdIn(List.of(1L)))
         .thenReturn(
@@ -393,7 +436,8 @@ class DriverOnboardingServiceTest {
   void theMunicipalAuthorizationIsNotRequired() {
     stubDriverWithArea();
     VehicleModel van = vehicle(1L, "ABC1D23");
-    when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of(van));
+    when(vehicleRepository.findByDriverIdInAndActiveTrueOrderByCreatedAtAscIdAsc(List.of(20L)))
+        .thenReturn(List.of(van));
     stubCompleteDocuments(van);
 
     DriverOnboardingStatusResponseDTO status = service.getOnboardingStatus("user-token-10");
@@ -408,8 +452,9 @@ class DriverOnboardingServiceTest {
   void missingTheCourseLeavesTheStepIncompleteWithTheCourse() {
     stubDriverWithArea();
     VehicleModel van = vehicle(1L, "ABC1D23");
-    when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of(van));
-    when(driverDocumentRepository.findByDriverIdAndSupersededAtIsNull(20L))
+    when(vehicleRepository.findByDriverIdInAndActiveTrueOrderByCreatedAtAscIdAsc(List.of(20L)))
+        .thenReturn(List.of(van));
+    when(driverDocumentRepository.findByDriverIdInAndSupersededAtIsNull(List.of(20L)))
         .thenReturn(List.of(driverDocument(DriverDocumentType.CRIMINAL_RECORD, true)));
     when(vehicleDocumentRepository.findUnsupersededByVehicleIdIn(List.of(1L)))
         .thenReturn(completeVanDocuments(van));
@@ -426,8 +471,10 @@ class DriverOnboardingServiceTest {
   void savingOnlyTheCrlvKeepsItAndListsWhatIsLeft() {
     stubDriverWithArea();
     VehicleModel van = vehicle(1L, "ABC1D23");
-    when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of(van));
-    when(driverDocumentRepository.findByDriverIdAndSupersededAtIsNull(20L)).thenReturn(List.of());
+    when(vehicleRepository.findByDriverIdInAndActiveTrueOrderByCreatedAtAscIdAsc(List.of(20L)))
+        .thenReturn(List.of(van));
+    when(driverDocumentRepository.findByDriverIdInAndSupersededAtIsNull(List.of(20L)))
+        .thenReturn(List.of());
     when(vehicleDocumentRepository.findUnsupersededByVehicleIdIn(List.of(1L)))
         .thenReturn(List.of(vehicleDocument(van, VehicleDocumentType.CRLV, true)));
 
@@ -450,10 +497,12 @@ class DriverOnboardingServiceTest {
   @ValueSource(strings = {"B", "AB", "C"})
   void aCnhWithoutCategoryDOrEIsReportedAsCnhCategory(String category) {
     stubDriverWithArea();
-    when(driverCnhRepository.findByDriverIdAndSupersededAtIsNull(20L))
+    when(driverCnhRepository.findByDriverIdInAndSupersededAtIsNull(List.of(20L)))
         .thenReturn(List.of(cnh(category, LocalDate.now().plusYears(2))));
-    when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of());
-    when(driverDocumentRepository.findByDriverIdAndSupersededAtIsNull(20L)).thenReturn(List.of());
+    when(vehicleRepository.findByDriverIdInAndActiveTrueOrderByCreatedAtAscIdAsc(List.of(20L)))
+        .thenReturn(List.of());
+    when(driverDocumentRepository.findByDriverIdInAndSupersededAtIsNull(List.of(20L)))
+        .thenReturn(List.of());
 
     DriverOnboardingStatusResponseDTO status = service.getOnboardingStatus("user-token-10");
 
@@ -465,11 +514,29 @@ class DriverOnboardingServiceTest {
   void aCnhSentWithOnlyItsFileCountsAsSent() {
     stubDriverWithArea();
     DriverCnhModel sent = cnh(null, null);
-    when(driverCnhRepository.findByDriverIdAndSupersededAtIsNull(20L)).thenReturn(List.of(sent));
-    when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of());
-    when(driverDocumentRepository.findByDriverIdAndSupersededAtIsNull(20L)).thenReturn(List.of());
+    when(driverCnhRepository.findByDriverIdInAndSupersededAtIsNull(List.of(20L)))
+        .thenReturn(List.of(sent));
+    when(vehicleRepository.findByDriverIdInAndActiveTrueOrderByCreatedAtAscIdAsc(List.of(20L)))
+        .thenReturn(List.of());
+    when(driverDocumentRepository.findByDriverIdInAndSupersededAtIsNull(List.of(20L)))
+        .thenReturn(List.of());
 
     assertThat(service.getOnboardingStatus("user-token-10").cnhStep().completed()).isTrue();
+  }
+
+  @Test
+  void anExpiredPendingCnhIsReportedAsExpired() {
+    stubDriverWithArea();
+    DriverCnhModel expired = cnh("D", LocalDate.now().minusDays(1));
+    when(driverCnhRepository.findByDriverIdInAndSupersededAtIsNull(List.of(20L)))
+        .thenReturn(List.of(expired));
+    when(vehicleRepository.findByDriverIdInAndActiveTrueOrderByCreatedAtAscIdAsc(List.of(20L)))
+        .thenReturn(List.of());
+    when(driverDocumentRepository.findByDriverIdInAndSupersededAtIsNull(List.of(20L)))
+        .thenReturn(List.of());
+
+    assertThat(service.getOnboardingStatus("user-token-10").cnhStep().pendingItems())
+        .containsExactly("cnh_expired");
   }
 
   @Test
@@ -477,9 +544,12 @@ class DriverOnboardingServiceTest {
     stubDriverWithArea();
     DriverCnhModel pending = cnh("D", LocalDate.now().plusYears(2));
     pending.getReview().setStatus(DocumentStatus.PENDING);
-    when(driverCnhRepository.findByDriverIdAndSupersededAtIsNull(20L)).thenReturn(List.of(pending));
-    when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of());
-    when(driverDocumentRepository.findByDriverIdAndSupersededAtIsNull(20L)).thenReturn(List.of());
+    when(driverCnhRepository.findByDriverIdInAndSupersededAtIsNull(List.of(20L)))
+        .thenReturn(List.of(pending));
+    when(vehicleRepository.findByDriverIdInAndActiveTrueOrderByCreatedAtAscIdAsc(List.of(20L)))
+        .thenReturn(List.of());
+    when(driverDocumentRepository.findByDriverIdInAndSupersededAtIsNull(List.of(20L)))
+        .thenReturn(List.of());
 
     assertThat(service.getOnboardingStatus("user-token-10").cnhStep().completed()).isTrue();
   }
@@ -489,10 +559,12 @@ class DriverOnboardingServiceTest {
     stubDriverWithArea();
     DriverCnhModel rejected = cnh("D", LocalDate.now().plusYears(2));
     rejected.getReview().setStatus(DocumentStatus.REJECTED);
-    when(driverCnhRepository.findByDriverIdAndSupersededAtIsNull(20L))
+    when(driverCnhRepository.findByDriverIdInAndSupersededAtIsNull(List.of(20L)))
         .thenReturn(List.of(rejected));
-    when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of());
-    when(driverDocumentRepository.findByDriverIdAndSupersededAtIsNull(20L)).thenReturn(List.of());
+    when(vehicleRepository.findByDriverIdInAndActiveTrueOrderByCreatedAtAscIdAsc(List.of(20L)))
+        .thenReturn(List.of());
+    when(driverDocumentRepository.findByDriverIdInAndSupersededAtIsNull(List.of(20L)))
+        .thenReturn(List.of());
 
     DriverOnboardingStatusResponseDTO status = service.getOnboardingStatus("user-token-10");
 
@@ -507,7 +579,7 @@ class DriverOnboardingServiceTest {
     stubReadyToSubmit(vehicle(1L, "ABC1D23"));
     DriverCnhModel rejected = cnh("D", LocalDate.now().plusYears(2));
     rejected.getReview().setStatus(DocumentStatus.REJECTED);
-    when(driverCnhRepository.findByDriverIdAndSupersededAtIsNull(20L))
+    when(driverCnhRepository.findByDriverIdInAndSupersededAtIsNull(List.of(20L)))
         .thenReturn(List.of(rejected));
 
     assertThatThrownBy(() -> service.submitOnboarding("user-token-10"))
@@ -521,10 +593,12 @@ class DriverOnboardingServiceTest {
   @Test
   void aCnhWithCategoryAdCompletesTheStep() {
     stubDriverWithArea();
-    when(driverCnhRepository.findByDriverIdAndSupersededAtIsNull(20L))
+    when(driverCnhRepository.findByDriverIdInAndSupersededAtIsNull(List.of(20L)))
         .thenReturn(List.of(cnh("AD", LocalDate.now().plusYears(2))));
-    when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of());
-    when(driverDocumentRepository.findByDriverIdAndSupersededAtIsNull(20L)).thenReturn(List.of());
+    when(vehicleRepository.findByDriverIdInAndActiveTrueOrderByCreatedAtAscIdAsc(List.of(20L)))
+        .thenReturn(List.of());
+    when(driverDocumentRepository.findByDriverIdInAndSupersededAtIsNull(List.of(20L)))
+        .thenReturn(List.of());
 
     assertThat(service.getOnboardingStatus("user-token-10").cnhStep().completed()).isTrue();
   }
@@ -534,7 +608,7 @@ class DriverOnboardingServiceTest {
     when(userService.requireByTokenAndType("user-token-10", UserType.DRIVER)).thenReturn(user);
     when(driverRepository.findByUserId(10L)).thenReturn(Optional.of(driver));
     stubReadyToSubmit(vehicle(1L, "ABC1D23"));
-    when(driverCnhRepository.findByDriverIdAndSupersededAtIsNull(20L))
+    when(driverCnhRepository.findByDriverIdInAndSupersededAtIsNull(List.of(20L)))
         .thenReturn(List.of(cnh("B", LocalDate.now().plusYears(2))));
 
     assertThatThrownBy(() -> service.submitOnboarding("user-token-10"))
@@ -582,10 +656,11 @@ class DriverOnboardingServiceTest {
     VehicleModel complete = vehicle(1L, "ABC1D23");
     VehicleModel bare = vehicle(2L, "XYZ9K87");
     user.setAddressId(55L);
-    when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of(complete, bare));
-    when(driverCnhRepository.findByDriverIdAndSupersededAtIsNull(20L))
+    when(vehicleRepository.findByDriverIdInAndActiveTrueOrderByCreatedAtAscIdAsc(List.of(20L)))
+        .thenReturn(List.of(complete, bare));
+    when(driverCnhRepository.findByDriverIdInAndSupersededAtIsNull(List.of(20L)))
         .thenReturn(List.of(cnh("D", LocalDate.now().plusYears(1))));
-    when(driverDocumentRepository.findByDriverIdAndSupersededAtIsNull(20L))
+    when(driverDocumentRepository.findByDriverIdInAndSupersededAtIsNull(List.of(20L)))
         .thenReturn(completeDriverDocuments());
     when(vehicleDocumentRepository.findUnsupersededByVehicleIdIn(List.of(1L, 2L)))
         .thenReturn(completeVanDocuments(complete));
@@ -650,9 +725,12 @@ class DriverOnboardingServiceTest {
     when(userService.requireByTokenAndType("user-token-10", UserType.DRIVER)).thenReturn(user);
     when(driverRepository.findByUserId(10L)).thenReturn(Optional.of(driver));
     when(driverServiceAreaRepository.findByDriverId(20L)).thenReturn(List.of());
-    when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of());
-    when(driverCnhRepository.findByDriverIdAndSupersededAtIsNull(20L)).thenReturn(List.of());
-    when(driverDocumentRepository.findByDriverIdAndSupersededAtIsNull(20L)).thenReturn(List.of());
+    when(vehicleRepository.findByDriverIdInAndActiveTrueOrderByCreatedAtAscIdAsc(List.of(20L)))
+        .thenReturn(List.of());
+    when(driverCnhRepository.findByDriverIdInAndSupersededAtIsNull(List.of(20L)))
+        .thenReturn(List.of());
+    when(driverDocumentRepository.findByDriverIdInAndSupersededAtIsNull(List.of(20L)))
+        .thenReturn(List.of());
 
     DriverOnboardingStatusResponseDTO status = service.getOnboardingStatus("user-token-10");
 
@@ -684,10 +762,12 @@ class DriverOnboardingServiceTest {
     when(userService.requireByTokenAndType("user-token-10", UserType.DRIVER)).thenReturn(user);
     when(driverRepository.findByUserId(10L)).thenReturn(Optional.of(driver));
     user.setAddressId(55L);
-    when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of());
+    when(vehicleRepository.findByDriverIdInAndActiveTrueOrderByCreatedAtAscIdAsc(List.of(20L)))
+        .thenReturn(List.of());
     DriverCnhModel cnh = cnh("D", LocalDate.now().plusYears(1));
-    when(driverCnhRepository.findByDriverIdAndSupersededAtIsNull(20L)).thenReturn(List.of(cnh));
-    when(driverDocumentRepository.findByDriverIdAndSupersededAtIsNull(20L))
+    when(driverCnhRepository.findByDriverIdInAndSupersededAtIsNull(List.of(20L)))
+        .thenReturn(List.of(cnh));
+    when(driverDocumentRepository.findByDriverIdInAndSupersededAtIsNull(List.of(20L)))
         .thenReturn(completeDriverDocuments());
 
     assertThatThrownBy(() -> service.submitOnboarding("user-token-10"))
@@ -707,10 +787,12 @@ class DriverOnboardingServiceTest {
     when(userService.requireByTokenAndType("user-token-10", UserType.DRIVER)).thenReturn(user);
     when(driverRepository.findByUserId(10L)).thenReturn(Optional.of(driver));
     user.setAddressId(55L);
-    when(vehicleRepository.findByDriverId(20L)).thenReturn(List.of());
+    when(vehicleRepository.findByDriverIdInAndActiveTrueOrderByCreatedAtAscIdAsc(List.of(20L)))
+        .thenReturn(List.of());
     DriverCnhModel cnh = cnh("D", LocalDate.now().plusYears(1));
-    when(driverCnhRepository.findByDriverIdAndSupersededAtIsNull(20L)).thenReturn(List.of(cnh));
-    when(driverDocumentRepository.findByDriverIdAndSupersededAtIsNull(20L))
+    when(driverCnhRepository.findByDriverIdInAndSupersededAtIsNull(List.of(20L)))
+        .thenReturn(List.of(cnh));
+    when(driverDocumentRepository.findByDriverIdInAndSupersededAtIsNull(List.of(20L)))
         .thenReturn(completeDriverDocuments());
 
     assertThatThrownBy(() -> service.submitOnboarding("user-token-10"))
@@ -729,10 +811,10 @@ class DriverOnboardingServiceTest {
     when(driverRepository.findByUserId(10L)).thenReturn(Optional.of(driver));
     VehicleModel van = vehicle(1L, "ABC1D23");
     stubReadyToSubmit(van);
-    DriverCnhModel expired = new DriverCnhModel();
-    expired.setActive(true);
-    expired.setValidUntil(LocalDate.now().minusDays(1));
-    when(driverCnhRepository.findByDriverIdAndSupersededAtIsNull(20L)).thenReturn(List.of(expired));
+    DriverCnhModel expired = cnh("D", LocalDate.now().minusDays(1));
+    expired.getReview().setStatus(DocumentStatus.APPROVED);
+    when(driverCnhRepository.findByDriverIdInAndSupersededAtIsNull(List.of(20L)))
+        .thenReturn(List.of(expired));
 
     assertThatThrownBy(() -> service.submitOnboarding("user-token-10"))
         .isInstanceOf(ResponseStatusException.class)
@@ -750,7 +832,8 @@ class DriverOnboardingServiceTest {
     when(driverRepository.findByUserId(10L)).thenReturn(Optional.of(driver));
     VehicleModel van = vehicle(1L, "ABC1D23");
     stubReadyToSubmit(van);
-    when(driverDocumentRepository.findByDriverIdAndSupersededAtIsNull(20L)).thenReturn(List.of());
+    when(driverDocumentRepository.findByDriverIdInAndSupersededAtIsNull(List.of(20L)))
+        .thenReturn(List.of());
 
     assertThatThrownBy(() -> service.submitOnboarding("user-token-10"))
         .isInstanceOf(ResponseStatusException.class)
@@ -819,7 +902,7 @@ class DriverOnboardingServiceTest {
     adminUser.setToken("admin-uid");
 
     when(userService.requireByToken("admin-uid")).thenReturn(adminUser);
-    when(driverRepository.findByToken("driver-token-20")).thenReturn(Optional.of(driver));
+    when(driverRepository.findByTokenForUpdate("driver-token-20")).thenReturn(Optional.of(driver));
     when(driverRepository.save(any(DriverModel.class))).thenAnswer(inv -> inv.getArgument(0));
 
     DriverResponseDTO expectedResponse =
@@ -845,7 +928,7 @@ class DriverOnboardingServiceTest {
             null,
             null);
     when(mapper.toResponse(driver)).thenReturn(expectedResponse);
-    when(credentialService.hasAnyQualifiedVehicle(eq(20L), any())).thenReturn(true);
+    stubQualifiedDriver();
 
     DriverResponseDTO response = service.approve("driver-token-20", "admin-uid");
 
@@ -864,9 +947,9 @@ class DriverOnboardingServiceTest {
     driver.setAvailable(false);
 
     when(userService.requireByToken("admin-uid")).thenReturn(new UserModel());
-    when(driverRepository.findByToken("driver-token-20")).thenReturn(Optional.of(driver));
+    when(driverRepository.findByTokenForUpdate("driver-token-20")).thenReturn(Optional.of(driver));
     when(driverRepository.save(any(DriverModel.class))).thenAnswer(inv -> inv.getArgument(0));
-    when(credentialService.hasAnyQualifiedVehicle(eq(20L), any())).thenReturn(true);
+    stubQualifiedDriver();
 
     service.approve("driver-token-20", "admin-uid");
 
@@ -877,16 +960,16 @@ class DriverOnboardingServiceTest {
   void approvingWithoutAnyVanQualifiedOnTheCredentialsIsRefused() {
     driver.setApprovalStatus(DriverApprovalStatus.UNDER_REVIEW);
     when(userService.requireByToken("admin-uid")).thenReturn(new UserModel());
-    when(driverRepository.findByToken("driver-token-20")).thenReturn(Optional.of(driver));
-    when(credentialService.hasAnyQualifiedVehicle(eq(20L), any())).thenReturn(false);
+    when(driverRepository.findByTokenForUpdate("driver-token-20")).thenReturn(Optional.of(driver));
 
     assertThatThrownBy(() -> service.approve("driver-token-20", "admin-uid"))
-        .isInstanceOf(ResponseStatusException.class)
-        .satisfies(
-            e -> {
-              ResponseStatusException ex = (ResponseStatusException) e;
-              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
-              assertThat(ex.getReason()).isEqualTo("driver.onboarding.documents_not_approved");
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            problem -> {
+              assertThat(problem.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
+              assertThat(problem.getMessageKey())
+                  .isEqualTo("driver.onboarding.documents_not_approved");
+              assertThat(problem.getBody().getProperties()).containsKey("blockers");
             });
 
     assertThat(driver.getApprovalStatus()).isEqualTo(DriverApprovalStatus.UNDER_REVIEW);
@@ -900,7 +983,7 @@ class DriverOnboardingServiceTest {
     driver.setAvailable(false);
 
     when(userService.requireByToken("admin-uid")).thenReturn(new UserModel());
-    when(driverRepository.findByToken("driver-token-20")).thenReturn(Optional.of(driver));
+    when(driverRepository.findByTokenForUpdate("driver-token-20")).thenReturn(Optional.of(driver));
     when(driverRepository.save(any(DriverModel.class))).thenAnswer(inv -> inv.getArgument(0));
 
     service.reject(
@@ -912,7 +995,7 @@ class DriverOnboardingServiceTest {
   @Test
   void approveDriverThrowsNotFoundWhenDriverMissing() {
     when(userService.requireByToken("admin-uid")).thenReturn(new UserModel());
-    when(driverRepository.findByToken("unknown")).thenReturn(Optional.empty());
+    when(driverRepository.findByTokenForUpdate("unknown")).thenReturn(Optional.empty());
 
     assertThatThrownBy(() -> service.approve("unknown", "admin-uid"))
         .isInstanceOf(ResponseStatusException.class)
@@ -924,12 +1007,15 @@ class DriverOnboardingServiceTest {
   void approveDriverThrowsBadRequestWhenNotUnderReview() {
     driver.setApprovalStatus(DriverApprovalStatus.PENDING);
     when(userService.requireByToken("admin-uid")).thenReturn(new UserModel());
-    when(driverRepository.findByToken("driver-token-20")).thenReturn(Optional.of(driver));
+    when(driverRepository.findByTokenForUpdate("driver-token-20")).thenReturn(Optional.of(driver));
 
     assertThatThrownBy(() -> service.approve("driver-token-20", "admin-uid"))
-        .isInstanceOf(ResponseStatusException.class)
-        .extracting(e -> ((ResponseStatusException) e).getStatusCode())
-        .isEqualTo(HttpStatus.BAD_REQUEST);
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            problem -> {
+              assertThat(problem.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+              assertThat(problem.getMessageKey()).isEqualTo("driver.onboarding.not_under_review");
+            });
   }
 
   @Test
@@ -941,7 +1027,7 @@ class DriverOnboardingServiceTest {
     adminUser.setToken("admin-uid");
 
     when(userService.requireByToken("admin-uid")).thenReturn(adminUser);
-    when(driverRepository.findByToken("driver-token-20")).thenReturn(Optional.of(driver));
+    when(driverRepository.findByTokenForUpdate("driver-token-20")).thenReturn(Optional.of(driver));
     when(driverRepository.save(any(DriverModel.class))).thenAnswer(inv -> inv.getArgument(0));
 
     DriverResponseDTO expectedResponse =
@@ -1027,7 +1113,7 @@ class DriverOnboardingServiceTest {
   @Test
   void rejectDriverThrowsNotFoundWhenDriverMissing() {
     when(userService.requireByToken("admin-uid")).thenReturn(new UserModel());
-    when(driverRepository.findByToken("unknown")).thenReturn(Optional.empty());
+    when(driverRepository.findByTokenForUpdate("unknown")).thenReturn(Optional.empty());
 
     DriverRejectionRequestDTO request = new DriverRejectionRequestDTO("Motivo qualquer");
     assertThatThrownBy(() -> service.reject("unknown", request, "admin-uid"))
@@ -1040,12 +1126,15 @@ class DriverOnboardingServiceTest {
   void rejectDriverThrowsBadRequestWhenNotUnderReview() {
     driver.setApprovalStatus(DriverApprovalStatus.APPROVED);
     when(userService.requireByToken("admin-uid")).thenReturn(new UserModel());
-    when(driverRepository.findByToken("driver-token-20")).thenReturn(Optional.of(driver));
+    when(driverRepository.findByTokenForUpdate("driver-token-20")).thenReturn(Optional.of(driver));
 
     DriverRejectionRequestDTO request = new DriverRejectionRequestDTO("Motivo qualquer");
     assertThatThrownBy(() -> service.reject("driver-token-20", request, "admin-uid"))
-        .isInstanceOf(ResponseStatusException.class)
-        .extracting(e -> ((ResponseStatusException) e).getStatusCode())
-        .isEqualTo(HttpStatus.BAD_REQUEST);
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            problem -> {
+              assertThat(problem.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+              assertThat(problem.getMessageKey()).isEqualTo("driver.onboarding.not_under_review");
+            });
   }
 }

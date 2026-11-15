@@ -52,7 +52,6 @@ class SchoolTransportCredentialServiceTest {
   @Test
   void theDriverAndTheVanWithEverythingApprovedAreQualified() {
     assertThat(service.findCredentials(driver.getId(), van.getId(), TODAY).failed()).isEmpty();
-    assertThat(service.hasAnyQualifiedVehicle(driver.getId(), TODAY)).isTrue();
   }
 
   @Test
@@ -75,17 +74,6 @@ class SchoolTransportCredentialServiceTest {
 
     assertThat(withFew).isEqualTo(3);
     assertThat(withMany).isEqualTo(3);
-  }
-
-  @Test
-  void checksEveryActiveVanInThreeStatements() {
-    for (int index = 0; index < 3; index++) {
-      fixtures.approveTheVansDocuments(fixtures.createVehicle(driver, "QAA" + index + "B12"));
-    }
-    SqlStatementCounter counter = new SqlStatementCounter(entityManagerFactory);
-
-    assertThat(counter.countStatements(() -> service.hasAnyQualifiedVehicle(driver.getId(), TODAY)))
-        .isEqualTo(3);
   }
 
   @Test
@@ -118,32 +106,6 @@ class SchoolTransportCredentialServiceTest {
 
     assertThat(service.findCredentials(driver.getId(), van.getId(), TODAY).failed())
         .contains(CredentialRequirement.VEHICLE_REGISTRATION);
-    assertThat(service.hasAnyQualifiedVehicle(driver.getId(), TODAY)).isFalse();
-  }
-
-  @Test
-  void aRemovedVanIsNeverQualified() {
-    vehicles.delete(van);
-
-    assertThat(service.hasAnyQualifiedVehicle(driver.getId(), TODAY)).isFalse();
-  }
-
-  @Test
-  void aVanWithAPendingInspectionDoesNotQualifyTheDriver() {
-    VehicleModel onlyVan = van;
-    vehicles.delete(onlyVan);
-    VehicleModel pendingVan = fixtures.createVehicle(driver, "PEN1D23");
-    fixtures.createVehicleDocument(
-        pendingVan, VehicleDocumentType.CRLV, "RENAVAM-2", DocumentStatus.APPROVED);
-    fixtures.createVehicleDocument(
-        pendingVan, VehicleDocumentType.VEHICLE_INSPECTION, null, DocumentStatus.PENDING);
-    fixtures.createVehicleDocument(
-        pendingVan,
-        VehicleDocumentType.SCHOOL_VEHICLE_AUTHORIZATION,
-        "AUT-2",
-        DocumentStatus.APPROVED);
-
-    assertThat(service.hasAnyQualifiedVehicle(driver.getId(), TODAY)).isFalse();
   }
 
   @Test

@@ -93,6 +93,16 @@ public class DriverCnhModel implements DocumentSubmission {
   private Instant updatedAt;
 
   @Override
+  public String number() {
+    return registrationNumber;
+  }
+
+  @Override
+  public LocalDate expiresOn() {
+    return validUntil;
+  }
+
+  @Override
   public MediaFileModel getReviewedFile() {
     return file;
   }

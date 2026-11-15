@@ -141,10 +141,12 @@ class VehicleServiceTest {
     VehicleModel vehicle = new VehicleModel();
     vehicle.setId(30L);
     vehicle.setToken("veh-123");
+    vehicle.setDriver(driver);
     when(vehicleRepository.findByToken("veh-123")).thenReturn(Optional.of(vehicle));
 
     service.delete("veh-123");
 
+    verify(driverRepository).lockById(driver.getId());
     verify(unlinkedPassengers).clearVehicleId(30L);
     verify(vehicleRepository).delete(vehicle);
   }

@@ -1,6 +1,7 @@
 package br.com.vanep.drivercnh.repository;
 
 import br.com.vanep.drivercnh.model.DriverCnhModel;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -19,6 +20,9 @@ public interface DriverCnhRepository extends JpaRepository<DriverCnhModel, Long>
 
   @EntityGraph(attributePaths = {"driver.user", "file", "review.reviewedBy"})
   List<DriverCnhModel> findBySupersededAtIsNull();
+
+  @EntityGraph(attributePaths = {"driver.user", "file", "review.reviewedBy"})
+  List<DriverCnhModel> findByDriverIdInAndSupersededAtIsNull(Collection<Long> driverIds);
 
   boolean existsByRegistrationNumber(String registrationNumber);
 

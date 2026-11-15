@@ -176,6 +176,7 @@ public class VehicleService {
   @Transactional
   public void delete(String token) {
     VehicleModel vehicle = requireByToken(token);
+    driverRepository.lockById(vehicle.getDriver().getId());
     unlinkedPassengers.clearVehicleId(vehicle.getId());
     vehicleRepository.delete(vehicle);
   }

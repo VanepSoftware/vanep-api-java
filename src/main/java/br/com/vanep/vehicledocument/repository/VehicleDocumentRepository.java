@@ -77,22 +77,6 @@ public interface VehicleDocumentRepository extends JpaRepository<VehicleDocument
       left join fetch vehicle.photoSide
       left join fetch document.file
       left join fetch document.review.reviewedBy
-      where vehicleDriver.id = :driverId and vehicle.active = true
-        and document.supersededAt is null
-      """)
-  List<VehicleDocumentModel> findUnsupersededOfActiveVehiclesByDriverId(
-      @Param("driverId") Long driverId);
-
-  @Query(
-      """
-      select document from VehicleDocumentModel document
-      join fetch document.vehicle vehicle
-      join fetch vehicle.driver vehicleDriver
-      join fetch vehicleDriver.user
-      left join fetch vehicle.photoFront
-      left join fetch vehicle.photoSide
-      left join fetch document.file
-      left join fetch document.review.reviewedBy
       where vehicle.id = :vehicleId and vehicleDriver.id = :driverId and vehicle.active = true
         and document.supersededAt is null
       """)

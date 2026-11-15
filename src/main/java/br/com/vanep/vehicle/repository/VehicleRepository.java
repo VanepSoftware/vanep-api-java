@@ -20,6 +20,10 @@ public interface VehicleRepository extends JpaRepository<VehicleModel, Long> {
   @EntityGraph(attributePaths = {"driver.user", "photoFront", "photoSide"})
   List<VehicleModel> findByDriverId(Long driverId);
 
+  @EntityGraph(attributePaths = {"driver.user", "photoFront", "photoSide"})
+  List<VehicleModel> findByDriverIdInAndActiveTrueOrderByCreatedAtAscIdAsc(
+      Collection<Long> driverIds);
+
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   @Query("select vehicle from VehicleModel vehicle where vehicle.id = :id")
   Optional<VehicleModel> lockById(@Param("id") Long id);
