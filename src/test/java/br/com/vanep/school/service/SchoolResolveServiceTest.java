@@ -132,7 +132,19 @@ class SchoolResolveServiceTest {
 
   private AddressResponseDTO address(String token) {
     return new AddressResponseDTO(
-        token, null, "Rua Estela", "268", null, "Vila Mariana", "c", "São Paulo", "SP", true, null);
+        token,
+        null,
+        "Rua Estela",
+        "268",
+        null,
+        "Vila Mariana",
+        "c",
+        "São Paulo",
+        "SP",
+        null,
+        null,
+        true,
+        null);
   }
 
   @Test

@@ -12,6 +12,7 @@ import br.com.vanep.city.dto.CityResponseDTO;
 import br.com.vanep.city.mapper.CityMapper;
 import br.com.vanep.city.model.CityModel;
 import br.com.vanep.city.repository.CityRepository;
+import br.com.vanep.city.seed.IbgeCityCoordinateCatalog;
 import br.com.vanep.country.model.CountryModel;
 import br.com.vanep.state.model.StateModel;
 import br.com.vanep.state.repository.StateRepository;
@@ -81,7 +82,7 @@ class CityServiceTest {
   }
 
   private CityResponseDTO responseFor(String token) {
-    return new CityResponseDTO(token, "Campinas", "state-sp", "SP", true, null);
+    return new CityResponseDTO(token, "Campinas", "state-sp", "SP", null, null, true, null);
   }
 
   @Test
@@ -139,7 +140,8 @@ class CityServiceTest {
     city.setToken("bsb");
     city.setName("Brasília");
     city.setState(state);
-    CityResponseDTO response = new CityResponseDTO("bsb", "Brasília", "state-df", "DF", true, null);
+    CityResponseDTO response =
+        new CityResponseDTO("bsb", "Brasília", "state-df", "DF", null, null, true, null);
     when(stateRepository.findByUf("DF")).thenReturn(Optional.of(state));
     when(cityRepository.findByStateIdAndActiveTrueAndNormalizedNameContaining(
             eq(2L), eq("brasilia"), any(Pageable.class)))
@@ -168,5 +170,14 @@ class CityServiceTest {
     assertThatThrownBy(() -> service.findByToken("missing"))
         .isInstanceOf(ResponseStatusException.class)
         .hasMessageContaining("404");
+  }
+
+  @Test
+  void ibgeCoordinateCatalogCoversEveryMunicipality() {
+    var coordinates = IbgeCityCoordinateCatalog.load();
+
+    assertThat(coordinates).hasSize(5571);
+    assertThat(coordinates.get("5300108").latitude()).isEqualByComparingTo("-15.784300");
+    assertThat(coordinates.get("5300108").longitude()).isEqualByComparingTo("-47.908100");
   }
 }

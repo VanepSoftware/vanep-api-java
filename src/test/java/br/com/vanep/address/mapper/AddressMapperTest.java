@@ -6,6 +6,7 @@ import br.com.vanep.address.dto.AddressResponseDTO;
 import br.com.vanep.address.model.AddressModel;
 import br.com.vanep.city.model.CityModel;
 import br.com.vanep.state.model.StateModel;
+import java.math.BigDecimal;
 import org.junit.jupiter.api.Test;
 
 class AddressMapperTest {
@@ -18,6 +19,8 @@ class AddressMapperTest {
     city.setToken("city-campinas");
     city.setName("Campinas");
     city.setState(state);
+    city.setLatitude(new BigDecimal("-22.901100"));
+    city.setLongitude(new BigDecimal("-47.057301"));
     AddressModel address = new AddressModel();
     address.setToken("addr-tok");
     address.setCity(city);
@@ -36,6 +39,8 @@ class AddressMapperTest {
     assertThat(response.neighborhood()).isEqualTo("Centro");
     assertThat(response.cityToken()).isEqualTo("city-campinas");
     assertThat(response.stateUf()).isEqualTo("SP");
+    assertThat(response.cityLatitude()).isEqualByComparingTo("-22.901100");
+    assertThat(response.cityLongitude()).isEqualByComparingTo("-47.057301");
   }
 
   @Test

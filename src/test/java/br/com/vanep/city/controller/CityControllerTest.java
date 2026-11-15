@@ -14,6 +14,7 @@ import br.com.vanep.country.model.CountryModel;
 import br.com.vanep.country.repository.CountryRepository;
 import br.com.vanep.state.model.StateModel;
 import br.com.vanep.state.repository.StateRepository;
+import java.math.BigDecimal;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -71,6 +72,8 @@ class CityControllerTest {
     brasilia.setState(distritoFederal);
     brasilia.setName("Brasília");
     brasilia.setIbgeCode("5300108");
+    brasilia.setLatitude(new BigDecimal("-15.784300"));
+    brasilia.setLongitude(new BigDecimal("-47.908100"));
     brasilia = cities.save(brasilia);
     brasiliaToken = brasilia.getToken();
 
@@ -84,6 +87,8 @@ class CityControllerTest {
     campinas.setState(saoPaulo);
     campinas.setName("Campinas");
     campinas.setIbgeCode("3509502");
+    campinas.setLatitude(new BigDecimal("-22.901100"));
+    campinas.setLongitude(new BigDecimal("-47.057301"));
     campinas = cities.save(campinas);
     campinasToken = campinas.getToken();
   }
@@ -131,6 +136,8 @@ class CityControllerTest {
         .andExpect(jsonPath("$.content[0].token").value(brasiliaToken))
         .andExpect(jsonPath("$.content[0].name").value("Brasília"))
         .andExpect(jsonPath("$.content[0].stateUf").value("DF"))
+        .andExpect(jsonPath("$.content[0].cityLatitude").value(-15.784300))
+        .andExpect(jsonPath("$.content[0].cityLongitude").value(-47.908100))
         .andExpect(jsonPath("$.content[0].id").doesNotExist());
   }
 
@@ -226,6 +233,8 @@ class CityControllerTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.token").value(campinasToken))
         .andExpect(jsonPath("$.name").value("Campinas"))
+        .andExpect(jsonPath("$.cityLatitude").value(-22.901100))
+        .andExpect(jsonPath("$.cityLongitude").value(-47.057301))
         .andExpect(jsonPath("$.stateToken").value(stateToken));
   }
 
