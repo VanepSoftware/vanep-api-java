@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Manual QA for the client-driver-chat change (constitution rule 55).
-# Runs against a live API backed by a THROWAWAY database: it wipes the chat tables
-# and flips a seeded driver's approval while it runs. See qa.md next to the change.
+# Runs against a live API backed by a THROWAWAY database: it wipes the chat tables while it
+# runs. See qa.md next to the change.
 set -euo pipefail
 
 BASE_URL="${BASE_URL:-http://localhost:8081}"
@@ -70,12 +70,17 @@ message_count() {
   jq -r '.totalElements' <<<"$RESP_BODY"
 }
 
-restore_helena() {
-  sql "update driver set approval_status = 'APPROVED' where user_id = (select id from users where email = 'helena.costa@seed.vanep.com.br');" >/dev/null || true
+# A conversation opens only with the pair's first service request; that path is exercised by
+# scripts/qa/service-request-proposal/conversation.sh, so here the conversations are inserted.
+open_conversation() {
+  sql "insert into conversation (token, client_id, driver_id)
+       select substr(replace(gen_random_uuid()::text, '-', ''), 1, 25), client.id, driver.id
+       from client join users on users.id = client.user_id, driver
+       where users.email = '$1' and driver.token = '$2'
+       returning token"
 }
 
 cleanup() {
-  restore_helena
   rm -f "$BODY_FILE"
 }
 trap cleanup EXIT
@@ -89,64 +94,20 @@ FABIO=$(login fabio.teixeira@seed.vanep.com.br)
 GUSTAVO=$(login gustavo.santos@seed.vanep.com.br)
 FABIO_DRIVER=$(driver_token_named "Fabio Teixeira")
 GUSTAVO_DRIVER=$(driver_token_named "Gustavo Santos")
-HELENA_DRIVER=$(driver_token_named "Helena Costa")
-echo "tokens ok"
+CONV_ANA=$(open_conversation ana.souza@seed.vanep.com.br "$FABIO_DRIVER")
+CONV_BRUNO=$(open_conversation bruno.lima@seed.vanep.com.br "$FABIO_DRIVER")
+CONV_CARLA=$(open_conversation carla.nunes@seed.vanep.com.br "$GUSTAVO_DRIVER")
+echo "tokens and conversations ok"
 
 echo
-echo "== POST /api/conversations (open or resume)"
+echo "== POST /api/conversations (removed: the service request opens the conversation)"
 echo "| id | scenario | expected | result |"
 echo "|---|---|---|---|"
-request POST /api/conversations "$ANA" "{\"driverToken\":\"$FABIO_DRIVER\"}"
-expect H1 "client opens a new conversation" 201 '.token != "" and .driverName == "Fabio Teixeira" and .clientName == "Ana Souza" and .lastMessageAt == null'
-CONV_ANA=$(jq -r .token <<<"$RESP_BODY")
-request POST /api/conversations "$ANA" "{\"driverToken\":\"$FABIO_DRIVER\"}"
-expect H2 "same client and driver resume it" 200 ".token == \"$CONV_ANA\""
-request POST /api/conversations "$BRUNO" "{\"driverToken\":\"$FABIO_DRIVER\"}"
-expect H3 "another client gets their own conversation" 201 ".token != \"$CONV_ANA\""
-CONV_BRUNO=$(jq -r .token <<<"$RESP_BODY")
-request POST /api/conversations "" "{\"driverToken\":\"$FABIO_DRIVER\"}"
+request POST /api/conversations "" "{\"driverToken\":\"$GUSTAVO_DRIVER\"}"
 expect M1 "no token" 401
-request POST /api/conversations "not-a-jwt" "{\"driverToken\":\"$FABIO_DRIVER\"}"
-expect M2 "invalid token" 401
-request POST /api/conversations "$FABIO" "{\"driverToken\":\"$GUSTAVO_DRIVER\"}"
-expect M3 "a driver cannot open a conversation" 403
-request POST /api/conversations "$ANA" '{}'
-expect M4 "missing driverToken" 400
-request POST /api/conversations "$ANA" '{"driverToken":"   "}'
-expect M5 "blank driverToken" 400
-request POST /api/conversations "$ANA" '{"driverToken":null}'
-expect M6 "null driverToken" 400
-request POST /api/conversations "$ANA" '{"driverToken":'
-expect M7 "malformed JSON" 400
-request POST /api/conversations "$ANA" "driverToken=$FABIO_DRIVER" "text/plain"
-expect M8 "wrong content type" 415
-request POST /api/conversations "$ANA" '{"driverToken":"doesnotexist"}'
-expect M9 "unknown driver, pt-BR message" 404 '.detail == "Motorista não encontrado."'
-sql "update driver set approval_status = 'UNDER_REVIEW' where user_id = (select id from users where email = 'helena.costa@seed.vanep.com.br');"
-request POST /api/conversations "$ANA" "{\"driverToken\":\"$HELENA_DRIVER\"}"
-expect M10 "driver not searchable (under review)" 404
-restore_helena
-request POST /api/conversations "$ANA" '{"driverToken":["a"]}'
-expect M11 "driverToken with the wrong JSON type" 400
-
-PARALLEL_DIR="$(mktemp -d)"
-for attempt in 1 2 3 4 5 6; do
-  curl -s -o "$PARALLEL_DIR/$attempt.json" -w '%{http_code}\n' -X POST "$BASE_URL/api/conversations" \
-    -H "Authorization: Bearer $CARLA" -H "Content-Type: application/json" \
-    --data-binary "{\"driverToken\":\"$GUSTAVO_DRIVER\"}" >"$PARALLEL_DIR/$attempt.status" &
-done
-wait
-CREATED=$(cat "$PARALLEL_DIR"/*.status | grep -c '^201$' || true)
-RESUMED=$(cat "$PARALLEL_DIR"/*.status | grep -c '^200$' || true)
-DISTINCT=$(jq -r .token "$PARALLEL_DIR"/*.json | sort -u | wc -l | tr -d ' ')
-RESP_STATUS="201x$CREATED+200x$RESUMED/$DISTINCT"
-RESP_BODY="statuses: $(cat "$PARALLEL_DIR"/*.status | tr '\n' ' ')"
-[[ $CREATED == 1 && $RESUMED == 5 && $DISTINCT == 1 ]] ||
-  fail "M12 six concurrent opens" "one 201, five 200, one token" "$RESP_STATUS"
-PASSED=$((PASSED + 1))
-printf '| %s | %s | %s | PASS |\n' M12 "six concurrent opens for the same pair" "one 201, five 200, one token"
-CONV_CARLA=$(jq -r .token "$PARALLEL_DIR/1.json")
-rm -rf "$PARALLEL_DIR"
+request POST /api/conversations "$ANA" "{\"driverToken\":\"$GUSTAVO_DRIVER\"}"
+expect M35 "the client can no longer open a conversation directly" 404
+[[ $(sql "select count(*) from conversation") == 3 ]] || fail "M35 nothing created" "3 conversations" "$(sql "select count(*) from conversation")"
 
 echo
 echo "== POST /api/conversations/{token}/messages"

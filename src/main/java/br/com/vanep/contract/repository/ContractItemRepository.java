@@ -2,6 +2,7 @@ package br.com.vanep.contract.repository;
 
 import br.com.vanep.contract.enums.ContractStatus;
 import br.com.vanep.contract.model.ContractItemModel;
+import br.com.vanep.driveroccupancy.dto.ShiftOccupancyDTO;
 import br.com.vanep.routepassenger.dto.RoutePassengerDTO;
 import br.com.vanep.schedule.model.ScheduleSlotModel;
 import br.com.vanep.shared.enums.OperationShift;
@@ -21,9 +22,7 @@ public interface ContractItemRepository extends JpaRepository<ContractItemModel,
       join fetch item.dependent
       join fetch item.school school
       left join fetch school.city
-      left join fetch school.district
       join fetch item.pickupCity
-      left join fetch item.pickupDistrict
       join fetch item.schedule schedule
       left join fetch schedule.slots
       where item.contract.id in :contractIds
@@ -47,15 +46,14 @@ public interface ContractItemRepository extends JpaRepository<ContractItemModel,
       select new br.com.vanep.routepassenger.dto.RoutePassengerDTO(
         br.com.vanep.routepassenger.enums.PassengerSource.CONTRACT_ITEM,
         item.token, dependent.name, school.token, school.name,
-        slot.leg, slot.windowStart, slot.windowEnd,
+        slot.leg, slot.pickupTime,
         item.pickupZipCode, item.pickupStreet, item.pickupNumber, item.pickupComplement,
-        item.pickupNeighborhood, district.name, city.token, city.name, item.pickupGooglePlaceId)
+        item.pickupNeighborhood, city.token, city.name, item.pickupGooglePlaceId)
       from ContractItemModel item
       join item.contract contract
       join item.dependent dependent
       join item.school school
       join item.pickupCity city
-      left join item.pickupDistrict district
       join item.schedule schedule
       join schedule.slots slot
       where contract.clientDriver.driver.id = :driverId
@@ -65,6 +63,32 @@ public interface ContractItemRepository extends JpaRepository<ContractItemModel,
       """)
   List<RoutePassengerDTO> findRoutePassengers(
       Long driverId, LocalDate serviceDate, DayOfWeek weekday, OperationShift shift);
+
+  @Query(
+      """
+      select new br.com.vanep.driveroccupancy.dto.ShiftOccupancyDTO(
+        slot.shift, count(distinct item.dependent.id))
+      from ContractItemModel item
+      join item.contract contract
+      join item.schedule schedule
+      join schedule.slots slot
+      where contract.clientDriver.driver.id = :driverId
+        and contract.status = br.com.vanep.contract.enums.ContractStatus.ACTIVE
+        and contract.startsOn <= :today and contract.endsOn >= :today
+      group by slot.shift
+      """)
+  List<ShiftOccupancyDTO> countActivePassengersByShift(Long driverId, LocalDate today);
+
+  @Query(
+      """
+      select count(distinct item.dependent.id)
+      from ContractItemModel item
+      join item.contract contract
+      where contract.clientDriver.driver.id = :driverId
+        and contract.status = br.com.vanep.contract.enums.ContractStatus.ACTIVE
+        and contract.startsOn <= :today and contract.endsOn >= :today
+      """)
+  long countActiveDependents(Long driverId, LocalDate today);
 
   @Modifying
   @Query(

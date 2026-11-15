@@ -456,6 +456,35 @@ class DriverOnboardingServiceTest {
   }
 
   @Test
+  void approvingADriverMakesThemAvailableForNewStudents() {
+    driver.setApprovalStatus(DriverApprovalStatus.UNDER_REVIEW);
+    driver.setAvailable(false);
+
+    when(userService.requireByToken("admin-uid")).thenReturn(new UserModel());
+    when(driverRepository.findByToken("driver-token-20")).thenReturn(Optional.of(driver));
+    when(driverRepository.save(any(DriverModel.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    service.approve("driver-token-20", "admin-uid");
+
+    assertThat(driver.isAvailable()).isTrue();
+  }
+
+  @Test
+  void rejectingADriverLeavesThemUnavailable() {
+    driver.setApprovalStatus(DriverApprovalStatus.UNDER_REVIEW);
+    driver.setAvailable(false);
+
+    when(userService.requireByToken("admin-uid")).thenReturn(new UserModel());
+    when(driverRepository.findByToken("driver-token-20")).thenReturn(Optional.of(driver));
+    when(driverRepository.save(any(DriverModel.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    service.reject(
+        "driver-token-20", new DriverRejectionRequestDTO("Unreadable document"), "admin-uid");
+
+    assertThat(driver.isAvailable()).isFalse();
+  }
+
+  @Test
   void approveDriverThrowsNotFoundWhenDriverMissing() {
     when(userService.requireByToken("admin-uid")).thenReturn(new UserModel());
     when(driverRepository.findByToken("unknown")).thenReturn(Optional.empty());

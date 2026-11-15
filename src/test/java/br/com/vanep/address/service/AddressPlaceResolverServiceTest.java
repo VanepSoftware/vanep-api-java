@@ -4,10 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 import br.com.vanep.address.model.AddressModel;
 import br.com.vanep.city.model.CityModel;
-import br.com.vanep.district.model.DistrictModel;
 import br.com.vanep.location.dto.ResolvedLocationChainDTO;
 import br.com.vanep.location.service.LocationResolverService;
 import br.com.vanep.places.client.PlacesClient;
@@ -29,7 +29,6 @@ class AddressPlaceResolverServiceTest {
 
   private AddressPlaceResolverService service;
   private CityModel city;
-  private DistrictModel district;
 
   @BeforeEach
   void setUp() {
@@ -39,9 +38,6 @@ class AddressPlaceResolverServiceTest {
 
     city = new CityModel();
     city.setName("Brasilia");
-
-    district = new DistrictModel();
-    district.setName("Taguatinga");
   }
 
   @Test
@@ -52,11 +48,22 @@ class AddressPlaceResolverServiceTest {
     service.applyPlace(address, "place-1", "session-1", null, "Apartamento 22");
 
     assertThat(address.getCity()).isSameAs(city);
-    assertThat(address.getDistrict()).isSameAs(district);
     assertThat(address.getStreet()).isEqualTo("Rua Barao de Jaguara");
     assertThat(address.getZipCode()).isEqualTo("13015904");
+    assertThat(address.getNeighborhood()).isEqualTo("Taguatinga Norte");
     assertThat(address.getGooglePlaceId()).isEqualTo("place-1");
     assertThat(address.getComplement()).isEqualTo("Apartamento 22");
+  }
+
+  @Test
+  void replacesTheNeighborhoodOfThePostalForm() {
+    givenResolvedPlace(streetPlaceWithNumber("1481"));
+    AddressModel address = new AddressModel();
+    address.setNeighborhood("Centro");
+
+    service.applyPlace(address, "place-1", null, null, null);
+
+    assertThat(address.getNeighborhood()).isEqualTo("Taguatinga Norte");
   }
 
   @Test
@@ -102,22 +109,44 @@ class AddressPlaceResolverServiceTest {
   }
 
   @Test
-  void acceptsAPlaceWithoutADistrict() {
-    given(places.findPlaceDetails("place-1", null)).willReturn(streetPlaceWithNumber("10"));
+  void storesNoNeighborhoodWhenThePlaceHasNoSublocality() {
+    given(places.findPlaceDetails("place-1", null)).willReturn(streetPlaceWithoutSublocality());
     given(resolver.resolveAndPersist(any()))
         .willReturn(new ResolvedLocationChainDTO(null, null, city, List.of(), false));
     AddressModel address = new AddressModel();
+    address.setNeighborhood("Centro");
 
     service.applyPlace(address, "place-1", null, null, null);
 
-    assertThat(address.getDistrict()).isNull();
+    assertThat(address.getNeighborhood()).isNull();
     assertThat(address.getCity()).isSameAs(city);
+  }
+
+  @Test
+  void buildsAnAddressFromPlaceDetailsAlreadyFetched() {
+    AddressModel address =
+        service.buildFromPlace(streetPlaceWithNumber("1481"), city).orElseThrow();
+
+    assertThat(address.getCity()).isSameAs(city);
+    assertThat(address.getStreet()).isEqualTo("Rua Barao de Jaguara");
+    assertThat(address.getNumber()).isEqualTo("1481");
+    assertThat(address.getZipCode()).isEqualTo("13015904");
+    assertThat(address.getNeighborhood()).isEqualTo("Taguatinga Norte");
+    assertThat(address.getGooglePlaceId()).isEqualTo("place-1");
+    assertThat(address.getComplement()).isNull();
+    verifyNoInteractions(places, resolver);
+  }
+
+  @Test
+  void buildsNoAddressFromAPlaceWithoutAStreet() {
+    assertThat(service.buildFromPlace(cityWidePlace(), city)).isEmpty();
+    verifyNoInteractions(places, resolver);
   }
 
   private void givenResolvedPlace(PlaceDetailsResponseDTO details) {
     given(places.findPlaceDetails(any(), any())).willReturn(details);
     given(resolver.resolveAndPersist(any()))
-        .willReturn(new ResolvedLocationChainDTO(null, null, city, List.of(district), true));
+        .willReturn(new ResolvedLocationChainDTO(null, null, city, List.of(), true));
   }
 
   private PlaceDetailsResponseDTO streetPlaceWithNumber(String number) {
@@ -126,11 +155,20 @@ class AddressPlaceResolverServiceTest {
             List.of(
                 component("Rua Barao de Jaguara", "route"),
                 component("13015904", "postal_code"),
-                component("Taguatinga", "administrative_area_level_4")));
+                component("Taguatinga", "administrative_area_level_4"),
+                component("Taguatinga Norte", "sublocality_level_2"),
+                component("QI 21", "sublocality_level_3")));
     if (number != null) {
       components.add(component(number, "street_number"));
     }
     return new PlaceDetailsResponseDTO("place-1", "Rua Barao de Jaguara", components);
+  }
+
+  private PlaceDetailsResponseDTO streetPlaceWithoutSublocality() {
+    return new PlaceDetailsResponseDTO(
+        "place-1",
+        "Rua Barao de Jaguara",
+        List.of(component("Rua Barao de Jaguara", "route"), component("10", "street_number")));
   }
 
   private PlaceDetailsResponseDTO cityWidePlace() {

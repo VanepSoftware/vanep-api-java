@@ -1,6 +1,7 @@
 package br.com.vanep.unlinkedpassenger.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.groups.Tuple.tuple;
 
 import br.com.vanep.address.model.AddressModel;
 import br.com.vanep.address.repository.AddressRepository;
@@ -139,7 +140,7 @@ class UnlinkedPassengerRepositoryTest {
               assertThat(passenger.name()).isEqualTo("Lucas");
               assertThat(passenger.schoolName()).isEqualTo("Escola Municipal");
               assertThat(passenger.leg()).isEqualTo(RouteLeg.OUTBOUND);
-              assertThat(passenger.windowStart()).isEqualTo(LocalTime.of(6, 40));
+              assertThat(passenger.pickupTime()).isEqualTo(LocalTime.of(6, 40));
               assertThat(passenger.pickupStreet()).isEqualTo("Rua A");
               assertThat(passenger.pickupCityToken()).isEqualTo(city.getToken());
             });
@@ -183,6 +184,33 @@ class UnlinkedPassengerRepositoryTest {
     assertThat(withThree).isEqualTo(1);
   }
 
+  @Test
+  void countsTheDriversOwnPassengersOncePerShift() {
+    passengers.save(newPassenger(driver, "Lucas", "Rua A"));
+    passengers.save(newPassenger(driver, "Ana", "Rua B"));
+    passengers.save(newPassenger(otherDriver, "Bia", "Rua C"));
+    passengers.delete(passengers.save(newPassenger(driver, "Caio", "Rua D")));
+
+    assertThat(passengers.countPassengersByShift(driver.getId()))
+        .extracting(count -> count.shift(), count -> count.passengers())
+        .containsExactlyInAnyOrder(
+            tuple(OperationShift.MORNING, 2L), tuple(OperationShift.AFTERNOON, 2L));
+    assertThat(passengers.countByDriverId(driver.getId())).isEqualTo(2);
+  }
+
+  @Test
+  void countsThePassengersPerShiftInOneStatementWhateverTheirNumber() {
+    SqlStatementCounter counter = new SqlStatementCounter(entityManagerFactory);
+    passengers.save(newPassenger(driver, "Lucas", "Rua A"));
+    long withOne = counter.countStatements(() -> passengers.countPassengersByShift(driver.getId()));
+
+    passengers.save(newPassenger(driver, "Ana", "Rua B"));
+    long withTwo = counter.countStatements(() -> passengers.countPassengersByShift(driver.getId()));
+
+    assertThat(withOne).isEqualTo(1);
+    assertThat(withTwo).isEqualTo(1);
+  }
+
   private List<RoutePassengerDTO> findMondayMorningPassengers() {
     return passengers.findRoutePassengers(driver.getId(), DayOfWeek.MONDAY, OperationShift.MORNING);
   }
@@ -206,12 +234,12 @@ class UnlinkedPassengerRepositoryTest {
     return schedule;
   }
 
-  private ScheduleSlotModel slot(RouteLeg leg, OperationShift shift, LocalTime windowStart) {
+  private ScheduleSlotModel slot(RouteLeg leg, OperationShift shift, LocalTime pickupTime) {
     ScheduleSlotModel slot = new ScheduleSlotModel();
     slot.setWeekday(DayOfWeek.MONDAY);
     slot.setLeg(leg);
     slot.setShift(shift);
-    slot.setWindowStart(windowStart);
+    slot.setPickupTime(pickupTime);
     return slot;
   }
 

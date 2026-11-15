@@ -278,6 +278,7 @@ public class DriverOnboardingService {
 
     driver.setApprovalStatus(DriverApprovalStatus.APPROVED);
     driver.setActive(true);
+    driver.setAvailable(true);
     driver.setReviewedAt(Instant.now());
     driver.setReviewedBy(adminUser);
     DriverModel saved = driverRepository.save(driver);

@@ -1,7 +1,7 @@
 package br.com.vanep.dependent.dto;
 
 import br.com.vanep.address.dto.DependentAddressRequestDTO;
-import br.com.vanep.shared.enums.SchoolShift;
+import br.com.vanep.shared.validation.Cpf;
 import br.com.vanep.user.enums.Gender;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
@@ -13,7 +13,7 @@ public record DependentUpdateDTO(
     JsonNullable<@Size(max = 255, message = "{dependent.name.too_long}") String> name,
     JsonNullable<LocalDate> birthDate,
     JsonNullable<Gender> gender,
-    JsonNullable<@Size(max = 64, message = "{dependent.document.too_long}") String> document,
+    JsonNullable<@Cpf(message = "{dependent.document.invalid}") String> document,
     JsonNullable<@Size(max = 32, message = "{dependent.phone.too_long}") String> phone,
     JsonNullable<
             @Email(message = "{user.profile.email.invalid}")
@@ -21,7 +21,6 @@ public record DependentUpdateDTO(
         email,
     JsonNullable<Boolean> isSelf,
     JsonNullable<Boolean> isDefault,
-    JsonNullable<SchoolShift> shift,
     JsonNullable<@Valid DependentAddressRequestDTO> address,
     JsonNullable<String> schoolToken) {
 
@@ -49,9 +48,6 @@ public record DependentUpdateDTO(
     }
     if (isDefault == null) {
       isDefault = JsonNullable.undefined();
-    }
-    if (shift == null) {
-      shift = JsonNullable.undefined();
     }
     if (address == null) {
       address = JsonNullable.undefined();

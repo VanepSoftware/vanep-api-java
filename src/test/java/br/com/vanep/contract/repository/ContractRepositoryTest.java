@@ -7,6 +7,7 @@ import br.com.vanep.city.model.CityModel;
 import br.com.vanep.city.repository.CityRepository;
 import br.com.vanep.client.model.ClientModel;
 import br.com.vanep.client.repository.ClientRepository;
+import br.com.vanep.clientdriver.enums.LinkOrigin;
 import br.com.vanep.clientdriver.model.ClientDriverModel;
 import br.com.vanep.clientdriver.repository.ClientDriverRepository;
 import br.com.vanep.contract.enums.ContractStatus;
@@ -109,7 +110,6 @@ class ContractRepositoryTest {
     assertThat(first.getSchool().getName()).isEqualTo("Escola Municipal");
     assertThat(first.getPickupStreet()).isEqualTo("Rua A");
     assertThat(first.getPickupCity().getName()).isEqualTo("Campinas");
-    assertThat(first.getMonthlyAmount()).isEqualByComparingTo("350.00");
     assertThat(first.getSchedule().getSlots())
         .extracting(slot -> slot.getLeg())
         .containsExactly(RouteLeg.OUTBOUND);
@@ -322,7 +322,7 @@ class ContractRepositoryTest {
               assertThat(passenger.name()).isEqualTo("Lucas");
               assertThat(passenger.schoolToken()).isEqualTo(school.getToken());
               assertThat(passenger.leg()).isEqualTo(RouteLeg.OUTBOUND);
-              assertThat(passenger.windowStart()).isEqualTo(LocalTime.of(6, 40));
+              assertThat(passenger.pickupTime()).isEqualTo(LocalTime.of(6, 40));
               assertThat(passenger.pickupStreet()).isEqualTo("Rua A");
               assertThat(passenger.pickupCityToken()).isEqualTo(city.getToken());
             });
@@ -398,6 +398,81 @@ class ContractRepositoryTest {
     assertThat(withFour).isEqualTo(1);
   }
 
+  @Test
+  void countsEachActiveDependentOncePerShiftAcrossWeekdaysAndLegs() {
+    contracts.save(
+        newContract(
+            link,
+            ContractStatus.ACTIVE,
+            newItemOnShifts(lucas, OperationShift.MORNING, OperationShift.AFTERNOON),
+            newItemOnShifts(ana, OperationShift.MORNING)));
+
+    assertThat(items.countActivePassengersByShift(driverId(), MONDAY_IN_TERM))
+        .extracting(count -> count.shift(), count -> count.passengers())
+        .containsExactlyInAnyOrder(
+            tuple(OperationShift.MORNING, 2L), tuple(OperationShift.AFTERNOON, 1L));
+    assertThat(items.countActiveDependents(driverId(), MONDAY_IN_TERM)).isEqualTo(2);
+  }
+
+  @Test
+  void leavesContractsThatAreNotActiveOrOutOfTermOutOfTheOccupancy() {
+    contracts.save(newContract(link, ContractStatus.SIGNED, newItem(lucas, RouteLeg.OUTBOUND)));
+    contracts.save(newContract(link, ContractStatus.ACTIVE, newItem(ana, RouteLeg.OUTBOUND)));
+
+    LocalDate beforeTerm = STARTS_ON.minusDays(1);
+
+    assertThat(items.countActivePassengersByShift(driverId(), beforeTerm)).isEmpty();
+    assertThat(items.countActiveDependents(driverId(), beforeTerm)).isZero();
+    assertThat(items.countActivePassengersByShift(driverId(), MONDAY_IN_TERM))
+        .extracting(count -> count.passengers())
+        .containsExactly(1L);
+  }
+
+  @Test
+  void anotherDriversContractsDoNotCountInTheOccupancy() {
+    contracts.save(newContract(link, ContractStatus.ACTIVE, newItem(lucas, RouteLeg.OUTBOUND)));
+    DriverModel otherDriver = createDriver("other@vanep.com", "52998224725");
+
+    assertThat(items.countActivePassengersByShift(otherDriver.getId(), MONDAY_IN_TERM)).isEmpty();
+    assertThat(items.countActiveDependents(otherDriver.getId(), MONDAY_IN_TERM)).isZero();
+  }
+
+  @Test
+  void countsTheOccupancyInOneStatementWhateverTheNumberOfPassengers() {
+    SqlStatementCounter counter = new SqlStatementCounter(entityManagerFactory);
+    contracts.save(newContract(link, ContractStatus.ACTIVE, newItem(lucas, RouteLeg.OUTBOUND)));
+    long withOne =
+        counter.countStatements(
+            () -> items.countActivePassengersByShift(driverId(), MONDAY_IN_TERM));
+
+    contracts.save(newContract(link, ContractStatus.ACTIVE, newItem(ana, RouteLeg.RETURN)));
+    long withTwo =
+        counter.countStatements(
+            () -> items.countActivePassengersByShift(driverId(), MONDAY_IN_TERM));
+
+    assertThat(withOne).isEqualTo(1);
+    assertThat(withTwo).isEqualTo(1);
+  }
+
+  private ContractItemModel newItemOnShifts(DependentModel dependent, OperationShift... shifts) {
+    ContractItemModel item = newItem(dependent, RouteLeg.OUTBOUND);
+    ScheduleModel schedule = new ScheduleModel();
+    for (OperationShift shift : shifts) {
+      for (DayOfWeek weekday : List.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY)) {
+        for (RouteLeg leg : RouteLeg.values()) {
+          ScheduleSlotModel slot = new ScheduleSlotModel();
+          slot.setWeekday(weekday);
+          slot.setLeg(leg);
+          slot.setShift(shift);
+          slot.setPickupTime(LocalTime.of(7, 0));
+          schedule.addSlot(slot);
+        }
+      }
+    }
+    item.setSchedule(schedule);
+    return item;
+  }
+
   private List<RoutePassengerDTO> findMondayMorningPassengers(LocalDate serviceDate) {
     return items.findRoutePassengers(
         driverId(), serviceDate, DayOfWeek.MONDAY, OperationShift.MORNING);
@@ -435,7 +510,6 @@ class ContractRepositoryTest {
     item.setPickupZipCode("13015904");
     item.setPickupStreet("Rua A");
     item.setPickupNumber("10");
-    item.setMonthlyAmount(new BigDecimal("350.00"));
     item.setSchedule(mondaySchedule(leg));
     return item;
   }
@@ -445,7 +519,7 @@ class ContractRepositoryTest {
     slot.setWeekday(DayOfWeek.MONDAY);
     slot.setLeg(leg);
     slot.setShift(leg == RouteLeg.OUTBOUND ? OperationShift.MORNING : OperationShift.AFTERNOON);
-    slot.setWindowStart(leg == RouteLeg.OUTBOUND ? LocalTime.of(6, 40) : LocalTime.of(17, 0));
+    slot.setPickupTime(leg == RouteLeg.OUTBOUND ? LocalTime.of(6, 40) : LocalTime.of(17, 0));
     ScheduleModel schedule = new ScheduleModel();
     schedule.addSlot(slot);
     return schedule;
@@ -462,6 +536,7 @@ class ContractRepositoryTest {
     ClientDriverModel model = new ClientDriverModel();
     model.setClient(client);
     model.setDriver(driver);
+    model.setOrigin(LinkOrigin.CLIENT_SEARCH);
     return links.save(model);
   }
 

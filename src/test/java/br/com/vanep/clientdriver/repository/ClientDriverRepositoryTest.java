@@ -4,21 +4,26 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import br.com.vanep.client.model.ClientModel;
 import br.com.vanep.client.repository.ClientRepository;
+import br.com.vanep.clientdriver.enums.LinkOrigin;
 import br.com.vanep.clientdriver.enums.RelationshipStatus;
 import br.com.vanep.clientdriver.model.ClientDriverModel;
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
+import br.com.vanep.shared.SqlStatementCounter;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
+import jakarta.persistence.EntityManagerFactory;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.jdbc.Sql;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -29,6 +34,8 @@ class ClientDriverRepositoryTest {
   @Autowired private ClientRepository clients;
   @Autowired private DriverRepository drivers;
   @Autowired private UserRepository users;
+  @Autowired private EntityManagerFactory entityManagerFactory;
+  @Autowired private TransactionTemplate transactions;
 
   private ClientModel maria;
   private DriverModel carlos;
@@ -47,6 +54,20 @@ class ClientDriverRepositoryTest {
         .get()
         .extracting(link -> link.getId())
         .isEqualTo(saved.getId());
+  }
+
+  @Test
+  void locksTheLinkOfThePairOnly() {
+    ClientDriverModel saved = repository.save(newLink(maria, carlos));
+    DriverModel helena = createDriver("helena@vanep.com", "15350946056");
+
+    Optional<ClientDriverModel> locked =
+        transactions.execute(status -> repository.lockByPair(maria.getId(), carlos.getId()));
+    Optional<ClientDriverModel> other =
+        transactions.execute(status -> repository.lockByPair(maria.getId(), helena.getId()));
+
+    assertThat(locked).get().extracting(link -> link.getId()).isEqualTo(saved.getId());
+    assertThat(other).isEmpty();
   }
 
   @Test
@@ -110,16 +131,137 @@ class ClientDriverRepositoryTest {
   }
 
   @Test
-  void blockingKeepsTheLinkVisible() {
+  void blockingKeepsTheLinkVisibleWithWhoBlockedItAndWhen() {
+    Instant blockedAt = Instant.parse("2026-10-17T12:00:00Z");
     ClientDriverModel saved = repository.save(newLink(maria, carlos));
     saved.setStatus(RelationshipStatus.BLOCKED);
+    saved.setBlockedBy(carlos.getUser());
+    saved.setBlockedAt(blockedAt);
     repository.save(saved);
+
+    ClientDriverModel reread = repository.findByToken(saved.getToken()).orElseThrow();
+    assertThat(reread.getStatus()).isEqualTo(RelationshipStatus.BLOCKED);
+    assertThat(reread.getBlockedBy().getId()).isEqualTo(carlos.getUser().getId());
+    assertThat(reread.getBlockedAt()).isEqualTo(blockedAt);
+    assertThat(repository.findByPair(maria.getId(), carlos.getId())).isPresent();
+  }
+
+  @Test
+  void blocksALinkOnlyWhileItIsNotBlocked() {
+    ClientDriverModel saved = repository.save(newLink(maria, carlos));
+    Instant blockedAt = Instant.parse("2026-10-17T12:00:00Z");
+
+    Integer first =
+        transactions.execute(
+            status -> repository.block(saved.getId(), maria.getUser().getId(), blockedAt));
+    Integer second =
+        transactions.execute(
+            status -> repository.block(saved.getId(), carlos.getUser().getId(), Instant.now()));
+
+    ClientDriverModel reread = repository.findByToken(saved.getToken()).orElseThrow();
+    assertThat(first).isEqualTo(1);
+    assertThat(second).isZero();
+    assertThat(reread.getStatus()).isEqualTo(RelationshipStatus.BLOCKED);
+    assertThat(reread.getBlockedBy().getId()).isEqualTo(maria.getUser().getId());
+    assertThat(reread.getBlockedAt()).isEqualTo(blockedAt);
+  }
+
+  @Test
+  void theStatusRecomputeNeverRewritesABlock() {
+    ClientDriverModel saved = repository.save(newLink(maria, carlos));
+    Instant blockedAt = Instant.parse("2026-10-17T12:00:00Z");
+    transactions.execute(
+        status -> repository.block(saved.getId(), maria.getUser().getId(), blockedAt));
+
+    Integer updated =
+        transactions.execute(
+            status -> repository.updateStatusUnlessBlocked(saved.getId(), "ACTIVE"));
+
+    ClientDriverModel reread = repository.findByToken(saved.getToken()).orElseThrow();
+    assertThat(updated).isZero();
+    assertThat(reread.getStatus()).isEqualTo(RelationshipStatus.BLOCKED);
+    assertThat(reread.getBlockedBy().getId()).isEqualTo(maria.getUser().getId());
+    assertThat(reread.getBlockedAt()).isEqualTo(blockedAt);
+  }
+
+  @Test
+  void theStatusRecomputeMovesALinkThatIsNotBlocked() {
+    ClientDriverModel saved = repository.save(newLink(maria, carlos));
+
+    Integer updated =
+        transactions.execute(
+            status -> repository.updateStatusUnlessBlocked(saved.getId(), "ACTIVE"));
+
+    assertThat(updated).isEqualTo(1);
+    assertThat(repository.findByToken(saved.getToken()).orElseThrow().getStatus())
+        .isEqualTo(RelationshipStatus.ACTIVE);
+  }
+
+  @Test
+  void unblocksALinkOnlyForItsBlocker() {
+    ClientDriverModel saved = repository.save(newLink(maria, carlos));
+    transactions.execute(
+        status -> repository.block(saved.getId(), carlos.getUser().getId(), Instant.now()));
+
+    Integer byTheBlockedParty =
+        transactions.execute(
+            status -> repository.unblock(saved.getId(), maria.getUser().getId(), "PENDING"));
+    Integer byTheBlocker =
+        transactions.execute(
+            status -> repository.unblock(saved.getId(), carlos.getUser().getId(), "INACTIVE"));
+    Integer again =
+        transactions.execute(
+            status -> repository.unblock(saved.getId(), carlos.getUser().getId(), "PENDING"));
+
+    ClientDriverModel reread = repository.findByToken(saved.getToken()).orElseThrow();
+    assertThat(byTheBlockedParty).isZero();
+    assertThat(byTheBlocker).isEqualTo(1);
+    assertThat(again).isZero();
+    assertThat(reread.getStatus()).isEqualTo(RelationshipStatus.INACTIVE);
+    assertThat(reread.getBlockedBy()).isNull();
+    assertThat(reread.getBlockedAt()).isNull();
+  }
+
+  @Test
+  void listsBlockedLinksInOneStatementWhoeverBlockedThem() {
+    SqlStatementCounter counter = new SqlStatementCounter(entityManagerFactory);
+    for (int index = 1; index <= 3; index++) {
+      ClientModel client = createClient("client" + index + "@vanep.com", "2000000000" + index);
+      ClientDriverModel link = newLink(client, carlos);
+      link.setStatus(RelationshipStatus.BLOCKED);
+      link.setBlockedBy(index % 2 == 0 ? carlos.getUser() : client.getUser());
+      link.setBlockedAt(Instant.now());
+      repository.save(link);
+    }
+
+    long statements =
+        counter.countStatements(() -> repository.findByDriverUserId(carlos.getUser().getId()));
+
+    assertThat(statements).isEqualTo(1);
+  }
+
+  @Test
+  void storesTheOriginTheLinkWasCreatedWith() {
+    ClientDriverModel link = newLink(maria, carlos);
+    link.setOrigin(LinkOrigin.DRIVER_INVITE);
+    ClientDriverModel saved = repository.save(link);
 
     assertThat(repository.findByToken(saved.getToken()))
         .get()
-        .extracting(link -> link.getStatus())
-        .isEqualTo(RelationshipStatus.BLOCKED);
-    assertThat(repository.findByPair(maria.getId(), carlos.getId())).isPresent();
+        .extracting(stored -> stored.getOrigin())
+        .isEqualTo(LinkOrigin.DRIVER_INVITE);
+  }
+
+  @Test
+  void aLaterSaveDoesNotChangeTheOrigin() {
+    ClientDriverModel saved = repository.save(newLink(maria, carlos));
+    saved.setOrigin(LinkOrigin.DRIVER_INVITE);
+    saved.setStatus(RelationshipStatus.INACTIVE);
+    repository.save(saved);
+
+    ClientDriverModel reread = repository.findByToken(saved.getToken()).orElseThrow();
+    assertThat(reread.getOrigin()).isEqualTo(LinkOrigin.CLIENT_SEARCH);
+    assertThat(reread.getStatus()).isEqualTo(RelationshipStatus.INACTIVE);
   }
 
   @Test
@@ -152,6 +294,7 @@ class ClientDriverRepositoryTest {
     ClientDriverModel link = new ClientDriverModel();
     link.setClient(client);
     link.setDriver(driver);
+    link.setOrigin(LinkOrigin.CLIENT_SEARCH);
     return link;
   }
 

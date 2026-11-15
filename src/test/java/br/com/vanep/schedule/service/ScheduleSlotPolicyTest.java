@@ -29,8 +29,8 @@ class ScheduleSlotPolicyTest {
   void theSameWeekdayAndLegTwiceIsRefused() {
     List<ScheduleSlotRequestDTO> slots =
         List.of(
-            outbound(DayOfWeek.MONDAY, LocalTime.of(6, 40), LocalTime.of(6, 50)),
-            outbound(DayOfWeek.MONDAY, LocalTime.of(7, 10), null));
+            outbound(DayOfWeek.MONDAY, LocalTime.of(6, 40)),
+            outbound(DayOfWeek.MONDAY, LocalTime.of(7, 10)));
 
     assertThat(policy.validate(slots)).contains(ScheduleSlotViolation.SLOT_DUPLICATE);
   }
@@ -39,32 +39,8 @@ class ScheduleSlotPolicyTest {
   void theSameLegOnDifferentWeekdaysIsAccepted() {
     List<ScheduleSlotRequestDTO> slots =
         List.of(
-            outbound(DayOfWeek.MONDAY, LocalTime.of(6, 40), null),
-            outbound(DayOfWeek.TUESDAY, LocalTime.of(6, 40), null));
-
-    assertThat(policy.validate(slots)).isEmpty();
-  }
-
-  @Test
-  void aWindowEndBeforeItsStartIsRefused() {
-    List<ScheduleSlotRequestDTO> slots =
-        List.of(outbound(DayOfWeek.MONDAY, LocalTime.of(7, 0), LocalTime.of(6, 50)));
-
-    assertThat(policy.validate(slots)).contains(ScheduleSlotViolation.WINDOW_INVALID);
-  }
-
-  @Test
-  void aWindowEndingWhenItStartsIsRefused() {
-    List<ScheduleSlotRequestDTO> slots =
-        List.of(outbound(DayOfWeek.MONDAY, LocalTime.of(7, 0), LocalTime.of(7, 0)));
-
-    assertThat(policy.validate(slots)).contains(ScheduleSlotViolation.WINDOW_INVALID);
-  }
-
-  @Test
-  void aWindowWithoutEndIsAccepted() {
-    List<ScheduleSlotRequestDTO> slots =
-        List.of(outbound(DayOfWeek.MONDAY, LocalTime.of(6, 40), null));
+            outbound(DayOfWeek.MONDAY, LocalTime.of(6, 40)),
+            outbound(DayOfWeek.TUESDAY, LocalTime.of(6, 40)));
 
     assertThat(policy.validate(slots)).isEmpty();
   }
@@ -73,20 +49,15 @@ class ScheduleSlotPolicyTest {
   void aFullTimeDayWithMorningOutboundAndAfternoonReturnIsAccepted() {
     List<ScheduleSlotRequestDTO> slots =
         List.of(
-            outbound(DayOfWeek.MONDAY, LocalTime.of(6, 40), LocalTime.of(6, 50)),
+            outbound(DayOfWeek.MONDAY, LocalTime.of(6, 40)),
             new ScheduleSlotRequestDTO(
-                DayOfWeek.MONDAY,
-                RouteLeg.RETURN,
-                OperationShift.AFTERNOON,
-                LocalTime.of(17, 0),
-                null));
+                DayOfWeek.MONDAY, RouteLeg.RETURN, OperationShift.AFTERNOON, LocalTime.of(17, 0)));
 
     assertThat(policy.validate(slots)).isEmpty();
   }
 
-  private ScheduleSlotRequestDTO outbound(
-      DayOfWeek weekday, LocalTime windowStart, LocalTime windowEnd) {
+  private ScheduleSlotRequestDTO outbound(DayOfWeek weekday, LocalTime pickupTime) {
     return new ScheduleSlotRequestDTO(
-        weekday, RouteLeg.OUTBOUND, OperationShift.MORNING, windowStart, windowEnd);
+        weekday, RouteLeg.OUTBOUND, OperationShift.MORNING, pickupTime);
   }
 }

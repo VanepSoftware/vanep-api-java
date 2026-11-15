@@ -1,7 +1,7 @@
 package br.com.vanep.auth.web;
 
 import br.com.vanep.auth.dto.SignupCompletionFields;
-import br.com.vanep.auth.validation.Cpf;
+import br.com.vanep.shared.validation.Cpf;
 import br.com.vanep.user.enums.Gender;
 import br.com.vanep.user.enums.UserType;
 import jakarta.validation.constraints.AssertTrue;

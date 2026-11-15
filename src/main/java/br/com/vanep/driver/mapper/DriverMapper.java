@@ -45,6 +45,7 @@ public class DriverMapper {
         driver.getApprovalStatus(),
         driver.isAvailable(),
         driver.isActive(),
+        driver.getBasePrice(),
         user);
   }
 

@@ -16,6 +16,7 @@ import br.com.vanep.city.model.CityModel;
 import br.com.vanep.city.repository.CityRepository;
 import br.com.vanep.client.model.ClientModel;
 import br.com.vanep.client.repository.ClientRepository;
+import br.com.vanep.clientdriver.enums.LinkOrigin;
 import br.com.vanep.clientdriver.enums.RelationshipStatus;
 import br.com.vanep.clientdriver.model.ClientDriverModel;
 import br.com.vanep.clientdriver.repository.ClientDriverRepository;
@@ -50,17 +51,14 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.MessageSource;
-import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.ResultMatcher;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.context.WebApplicationContext;
 
 @SpringBootTest
@@ -123,9 +121,12 @@ class ContractControllerTest {
         .andExpect(jsonPath("$.token").isNotEmpty())
         .andExpect(jsonPath("$.status").value("ACTIVE"))
         .andExpect(jsonPath("$.clientDriverToken").value(link.getToken()))
+        .andExpect(jsonPath("$.installmentAmount").value(350.0))
+        .andExpect(jsonPath("$.lastInstallmentAmount").value(350.0))
         .andExpect(jsonPath("$.items.length()").value(1))
         .andExpect(jsonPath("$.items[0].dependentToken").value(lucas.getToken()))
         .andExpect(jsonPath("$.items[0].pickupStreet").value("Rua A"))
+        .andExpect(jsonPath("$.items[0].monthlyAmount").doesNotExist())
         .andExpect(jsonPath("$.items[0].slots[0].leg").value("OUTBOUND"));
   }
 
@@ -306,7 +307,23 @@ class ContractControllerTest {
     mockMvc
         .perform(postContract(request, adminJwt()))
         .andExpect(status().isBadRequest())
-        .andExpect(fieldErrorMessage(field, message(key)));
+        .andExpect(jsonPath("$.detail").value(message(key)))
+        .andExpect(jsonPath("$.field").value(field))
+        .andExpect(jsonPath("$.errors.length()").value(1))
+        .andExpect(jsonPath("$.errors[0].field").value(field))
+        .andExpect(jsonPath("$.errors[0].message").value(message(key)));
+  }
+
+  @Test
+  void rejectsATotalWithMoreThanTwoDecimalPlaces() throws Exception {
+    Map<String, Object> request = createRequest();
+    request.put("totalAmount", new BigDecimal("4200.009"));
+
+    mockMvc
+        .perform(postContract(request, adminJwt()))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.field").value("totalAmount"))
+        .andExpect(jsonPath("$.detail").value(message("contract.amount.scale")));
   }
 
   @Test
@@ -385,7 +402,6 @@ class ContractControllerTest {
   private Map<String, Object> createRequest(Map<String, Object> slot) {
     Map<String, Object> item = new LinkedHashMap<>();
     item.put("dependentToken", lucas.getToken());
-    item.put("monthlyAmount", new BigDecimal("350.00"));
     item.put("slots", List.of(slot));
 
     Map<String, Object> request = new LinkedHashMap<>();
@@ -404,27 +420,19 @@ class ContractControllerTest {
     slot.put("weekday", "MONDAY");
     slot.put("leg", "OUTBOUND");
     slot.put("shift", "MORNING");
-    slot.put("windowStart", "06:40");
+    slot.put("pickupTime", "06:40");
     return slot;
   }
 
-  private ResultMatcher fieldErrorMessage(String field, String expected) {
-    return result -> {
-      MethodArgumentNotValidException exception =
-          (MethodArgumentNotValidException) result.getResolvedException();
-      assertThat(exception.getBindingResult().getFieldError(field).getDefaultMessage())
-          .isEqualTo(expected);
-    };
-  }
-
   private String message(String key) {
-    return messages.getMessage(key, null, LocaleContextHolder.getLocale());
+    return messages.getMessage(key, null, java.util.Locale.forLanguageTag("pt-BR"));
   }
 
   private ClientDriverModel createLink(ClientModel client, DriverModel driver) {
     ClientDriverModel model = new ClientDriverModel();
     model.setClient(client);
     model.setDriver(driver);
+    model.setOrigin(LinkOrigin.CLIENT_SEARCH);
     model.setStatus(RelationshipStatus.PENDING);
     return links.save(model);
   }

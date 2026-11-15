@@ -18,8 +18,6 @@ public class SchoolMapper {
         school.getGooglePlaceId(),
         school.getCity() == null ? null : school.getCity().getName(),
         school.getCity() == null ? null : school.getCity().getToken(),
-        school.getDistrict() == null ? null : school.getDistrict().getName(),
-        school.getDistrict() == null ? null : school.getDistrict().getToken(),
         address,
         school.isActive(),
         school.getCreatedAt());

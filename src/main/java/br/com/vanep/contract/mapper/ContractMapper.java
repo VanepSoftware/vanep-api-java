@@ -6,6 +6,7 @@ import br.com.vanep.contract.dto.ContractResponseDTO;
 import br.com.vanep.contract.model.ContractItemModel;
 import br.com.vanep.contract.model.ContractModel;
 import br.com.vanep.schedule.mapper.ScheduleMapper;
+import br.com.vanep.shared.mapper.InstallmentMapper;
 import java.util.Collection;
 import org.springframework.stereotype.Component;
 
@@ -13,9 +14,11 @@ import org.springframework.stereotype.Component;
 public class ContractMapper {
 
   private final ScheduleMapper scheduleMapper;
+  private final InstallmentMapper installmentMapper;
 
-  public ContractMapper(ScheduleMapper scheduleMapper) {
+  public ContractMapper(ScheduleMapper scheduleMapper, InstallmentMapper installmentMapper) {
     this.scheduleMapper = scheduleMapper;
+    this.installmentMapper = installmentMapper;
   }
 
   public ContractResponseDTO toResponse(
@@ -33,6 +36,8 @@ public class ContractMapper {
         contract.getEndsOn(),
         contract.getTotalAmount(),
         contract.getInstallments(),
+        installmentMapper.amountOf(contract.getTotalAmount(), contract.getInstallments()),
+        installmentMapper.lastAmountOf(contract.getTotalAmount(), contract.getInstallments()),
         contract.getDueDay(),
         contractItems.stream().map(item -> toItemResponse(item)).toList(),
         contract.getCreatedAt(),
@@ -51,10 +56,8 @@ public class ContractMapper {
         item.getPickupNumber(),
         item.getPickupComplement(),
         item.getPickupNeighborhood(),
-        item.getPickupDistrict() == null ? null : item.getPickupDistrict().getName(),
         item.getPickupCity().getToken(),
         item.getPickupCity().getName(),
-        item.getMonthlyAmount(),
         scheduleMapper.toSlotResponses(item.getSchedule()));
   }
 }

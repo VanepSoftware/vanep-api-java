@@ -1,9 +1,12 @@
 package br.com.vanep.vehicle.repository;
 
 import br.com.vanep.vehicle.model.VehicleModel;
+import jakarta.persistence.LockModeType;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -13,6 +16,10 @@ public interface VehicleRepository extends JpaRepository<VehicleModel, Long> {
   Optional<VehicleModel> findByToken(String token);
 
   List<VehicleModel> findByDriverId(Long driverId);
+
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("select vehicle from VehicleModel vehicle where vehicle.id = :id")
+  Optional<VehicleModel> lockById(@Param("id") Long id);
 
   boolean existsByPlate(String plate);
 
@@ -52,4 +59,14 @@ public interface VehicleRepository extends JpaRepository<VehicleModel, Long> {
           "SELECT u.token FROM vehicle v JOIN driver d ON v.driver_id = d.id JOIN users u ON d.user_id = u.id WHERE v.token = :token",
       nativeQuery = true)
   Optional<String> findDriverUserTokenByVehicleToken(@Param("token") String token);
+
+  // Native, so it also finds removed vehicles: the proposals that offered them outlive them.
+  @Query(value = "SELECT id, token FROM vehicle WHERE id IN (:ids)", nativeQuery = true)
+  List<IdAndToken> findTokensByIdIn(@Param("ids") Collection<Long> ids);
+
+  interface IdAndToken {
+    Long getId();
+
+    String getToken();
+  }
 }

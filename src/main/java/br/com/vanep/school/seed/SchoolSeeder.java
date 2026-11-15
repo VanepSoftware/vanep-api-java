@@ -1,5 +1,7 @@
 package br.com.vanep.school.seed;
 
+import br.com.vanep.address.model.AddressModel;
+import br.com.vanep.address.repository.AddressRepository;
 import br.com.vanep.city.model.CityModel;
 import br.com.vanep.city.repository.CityRepository;
 import br.com.vanep.school.model.SchoolModel;
@@ -18,14 +20,19 @@ public class SchoolSeeder {
 
   private final SchoolRepository schools;
   private final CityRepository cities;
+  private final AddressRepository addresses;
 
-  public SchoolSeeder(SchoolRepository schools, CityRepository cities) {
+  public SchoolSeeder(
+      SchoolRepository schools, CityRepository cities, AddressRepository addresses) {
     this.schools = schools;
     this.cities = cities;
+    this.addresses = addresses;
   }
 
   public void seed() {
-    if (schools.findFirstByName(SEED_SCHOOL_NAME).isPresent()) {
+    Optional<SchoolModel> existing = schools.findFirstByName(SEED_SCHOOL_NAME);
+    if (existing.isPresent()) {
+      addAddressWhenMissing(existing.get());
       return;
     }
     Optional<CityModel> city = cities.findByIbgeCode(SEED_CITY_IBGE_CODE);
@@ -36,7 +43,28 @@ public class SchoolSeeder {
     SchoolModel school = new SchoolModel();
     school.setName(SEED_SCHOOL_NAME);
     school.setCity(city.get());
+    school.setAddressId(addresses.save(campus(city.get())).getId());
     schools.save(school);
     log.info("Seed: school created ({}).", SEED_SCHOOL_NAME);
+  }
+
+  // Databases seeded before the school had an address get it on the next start.
+  private void addAddressWhenMissing(SchoolModel school) {
+    if (school.getAddressId() != null || school.getCity() == null) {
+      return;
+    }
+    school.setAddressId(addresses.save(campus(school.getCity())).getId());
+    schools.save(school);
+    log.info("Seed: school address created ({}).", SEED_SCHOOL_NAME);
+  }
+
+  private AddressModel campus(CityModel city) {
+    AddressModel address = new AddressModel();
+    address.setCity(city);
+    address.setZipCode("01504001");
+    address.setStreet("Rua Vergueiro");
+    address.setNumber("1000");
+    address.setNeighborhood("Liberdade");
+    return address;
   }
 }

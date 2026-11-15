@@ -64,61 +64,19 @@ class ConversationControllerTest {
   @Test
   void rejectsUnauthenticated() throws Exception {
     mockMvc.perform(get("/api/conversations/me")).andExpect(status().isUnauthorized());
-    mockMvc
-        .perform(post("/api/conversations").contentType(MediaType.APPLICATION_JSON).content("{}"))
-        .andExpect(status().isUnauthorized());
   }
 
   @Test
-  void aClientOpensANewConversation() throws Exception {
-    mockMvc
-        .perform(open(carlos.getToken()).with(clientJwt(maria)))
-        .andExpect(status().isCreated())
-        .andExpect(jsonPath("$.token").isNotEmpty())
-        .andExpect(jsonPath("$.driverToken").value(carlos.getToken()))
-        .andExpect(jsonPath("$.driverName").value("Carlos"))
-        .andExpect(jsonPath("$.clientName").value("Maria"));
-  }
-
-  @Test
-  void aClientReopensTheSameConversation() throws Exception {
-    ConversationModel existing = conversations.save(newConversation(maria, carlos));
-
-    mockMvc
-        .perform(open(carlos.getToken()).with(clientJwt(maria)))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.token").value(existing.getToken()));
-    assertThat(conversations.count()).isEqualTo(1);
-  }
-
-  @Test
-  void aDriverCannotOpenAConversation() throws Exception {
-    mockMvc
-        .perform(open(carlos.getToken()).with(driverJwt(carlos)))
-        .andExpect(status().isForbidden());
-  }
-
-  @Test
-  void aDriverThatIsNotSearchableCannotBeContacted() throws Exception {
-    DriverModel underReview = createDriver("Helena", "helena@vanep.com", "15350946056");
-    underReview.setApprovalStatus(DriverApprovalStatus.UNDER_REVIEW);
-    drivers.save(underReview);
-
-    mockMvc
-        .perform(open(underReview.getToken()).with(clientJwt(maria)))
-        .andExpect(status().isNotFound());
-    mockMvc.perform(open("unknown").with(clientJwt(maria))).andExpect(status().isNotFound());
-  }
-
-  @Test
-  void openingRequiresTheDriverToken() throws Exception {
+  void noOneOpensAConversationOutsideAServiceRequest() throws Exception {
     mockMvc
         .perform(
             post("/api/conversations")
-                .with(clientJwt(maria))
+                .with(
+                    clientJwt(maria).authorities(new SimpleGrantedAuthority("create_conversation")))
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"driverToken\":\" \"}"))
-        .andExpect(status().isBadRequest());
+                .content("{\"driverToken\":\"" + carlos.getToken() + "\"}"))
+        .andExpect(status().isNotFound());
+    assertThat(conversations.count()).isZero();
   }
 
   @Test
@@ -228,12 +186,6 @@ class ConversationControllerTest {
         .andExpect(jsonPath("$.totalElements").value(45));
   }
 
-  private MockHttpServletRequestBuilder open(String driverToken) {
-    return post("/api/conversations")
-        .contentType(MediaType.APPLICATION_JSON)
-        .content("{\"driverToken\":\"" + driverToken + "\"}");
-  }
-
   private MockHttpServletRequestBuilder send(ConversationModel conversation, String body) {
     return post("/api/conversations/" + conversation.getToken() + "/messages")
         .contentType(MediaType.APPLICATION_JSON)
@@ -248,7 +200,6 @@ class ConversationControllerTest {
     return partyJwt(client.getUser())
         .authorities(
             new SimpleGrantedAuthority("ROLE_CLIENT"),
-            new SimpleGrantedAuthority("create_conversation"),
             new SimpleGrantedAuthority("list_client_conversations"));
   }
 

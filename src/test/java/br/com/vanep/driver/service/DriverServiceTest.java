@@ -10,10 +10,13 @@ import static org.mockito.Mockito.when;
 
 import br.com.vanep.driver.DriverApprovalStatus;
 import br.com.vanep.driver.DriverRepository;
+import br.com.vanep.driver.dto.DriverAvailabilityRequestDTO;
+import br.com.vanep.driver.dto.DriverMeSummaryResponseDTO;
 import br.com.vanep.driver.dto.DriverResponseDTO;
 import br.com.vanep.driver.dto.DriverUpdateRequestDTO;
 import br.com.vanep.driver.mapper.DriverMapper;
 import br.com.vanep.driver.model.DriverModel;
+import br.com.vanep.user.dto.UserMeResponseDTO;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.service.UserService;
@@ -205,5 +208,49 @@ class DriverServiceTest {
     assertThatThrownBy(() -> service.restore("tok"))
         .isInstanceOf(ResponseStatusException.class)
         .hasMessageContaining("404");
+  }
+
+  @Test
+  void updateMyAvailabilitySetsTheFlagAndReturnsTheSummary() {
+    DriverModel driver = driverWithToken("tok");
+    UserModel user = driver.getUser();
+    UserMeResponseDTO me = null;
+    DriverMeSummaryResponseDTO summary =
+        new DriverMeSummaryResponseDTO(
+            "tok", null, null, DriverApprovalStatus.APPROVED, true, true, BigDecimal.TEN, me);
+    when(userService.requireByTokenAndType("owner-uid", UserType.DRIVER)).thenReturn(user);
+    when(repository.findByUserId(1L)).thenReturn(Optional.of(driver));
+    when(repository.save(driver)).thenReturn(driver);
+    when(userService.toMeResponse(user)).thenReturn(me);
+    when(mapper.toMeSummary(driver, me)).thenReturn(summary);
+
+    var result = service.updateMyAvailability("owner-uid", new DriverAvailabilityRequestDTO(true));
+
+    assertThat(driver.isAvailable()).isTrue();
+    assertThat(result).isEqualTo(summary);
+    verify(repository).save(driver);
+  }
+
+  @Test
+  void updateMyAvailabilityRejectsACallerWithoutDriverProfile() {
+    UserModel user = driverWithToken("tok").getUser();
+    when(userService.requireByTokenAndType("owner-uid", UserType.DRIVER)).thenReturn(user);
+    when(repository.findByUserId(1L)).thenReturn(Optional.empty());
+
+    assertThatThrownBy(
+            () ->
+                service.updateMyAvailability("owner-uid", new DriverAvailabilityRequestDTO(false)))
+        .isInstanceOf(ResponseStatusException.class)
+        .hasMessageContaining("404");
+  }
+
+  @Test
+  void requireCallerDriverResolvesTheDriverOfTheCaller() {
+    DriverModel driver = driverWithToken("tok");
+    when(userService.requireByTokenAndType("owner-uid", UserType.DRIVER))
+        .thenReturn(driver.getUser());
+    when(repository.findByUserId(1L)).thenReturn(Optional.of(driver));
+
+    assertThat(service.requireCallerDriver("owner-uid")).isSameAs(driver);
   }
 }

@@ -1,5 +1,6 @@
 package br.com.vanep.unlinkedpassenger.repository;
 
+import br.com.vanep.driveroccupancy.dto.ShiftOccupancyDTO;
 import br.com.vanep.routepassenger.dto.RoutePassengerDTO;
 import br.com.vanep.shared.enums.OperationShift;
 import br.com.vanep.unlinkedpassenger.model.UnlinkedPassengerModel;
@@ -15,10 +16,8 @@ public interface UnlinkedPassengerRepository extends JpaRepository<UnlinkedPasse
       select passenger from UnlinkedPassengerModel passenger
       join fetch passenger.school school
       left join fetch school.city
-      left join fetch school.district
       join fetch passenger.address address
       join fetch address.city
-      left join fetch address.district
       join fetch passenger.schedule schedule
       left join fetch schedule.slots
       where passenger.driver.id = :driverId
@@ -31,10 +30,8 @@ public interface UnlinkedPassengerRepository extends JpaRepository<UnlinkedPasse
       select passenger from UnlinkedPassengerModel passenger
       join fetch passenger.school school
       left join fetch school.city
-      left join fetch school.district
       join fetch passenger.address address
       join fetch address.city
-      left join fetch address.district
       join fetch passenger.schedule schedule
       left join fetch schedule.slots
       where passenger.token = :token and passenger.driver.id = :driverId
@@ -46,14 +43,13 @@ public interface UnlinkedPassengerRepository extends JpaRepository<UnlinkedPasse
       select new br.com.vanep.routepassenger.dto.RoutePassengerDTO(
         br.com.vanep.routepassenger.enums.PassengerSource.UNLINKED_PASSENGER,
         passenger.token, passenger.name, school.token, school.name,
-        slot.leg, slot.windowStart, slot.windowEnd,
+        slot.leg, slot.pickupTime,
         address.zipCode, address.street, address.number, address.complement,
-        address.neighborhood, district.name, city.token, city.name, address.googlePlaceId)
+        address.neighborhood, city.token, city.name, address.googlePlaceId)
       from UnlinkedPassengerModel passenger
       join passenger.school school
       join passenger.address address
       join address.city city
-      left join address.district district
       join passenger.schedule schedule
       join schedule.slots slot
       where passenger.driver.id = :driverId
@@ -61,4 +57,18 @@ public interface UnlinkedPassengerRepository extends JpaRepository<UnlinkedPasse
       """)
   List<RoutePassengerDTO> findRoutePassengers(
       Long driverId, DayOfWeek weekday, OperationShift shift);
+
+  @Query(
+      """
+      select new br.com.vanep.driveroccupancy.dto.ShiftOccupancyDTO(
+        slot.shift, count(distinct passenger.id))
+      from UnlinkedPassengerModel passenger
+      join passenger.schedule schedule
+      join schedule.slots slot
+      where passenger.driver.id = :driverId
+      group by slot.shift
+      """)
+  List<ShiftOccupancyDTO> countPassengersByShift(Long driverId);
+
+  long countByDriverId(Long driverId);
 }

@@ -1,7 +1,7 @@
 package br.com.vanep.auth.web;
 
 import br.com.vanep.auth.oauth.OAuthAccountService;
-import br.com.vanep.auth.validation.CpfValidator;
+import br.com.vanep.shared.validation.CpfValidator;
 import br.com.vanep.user.enums.AuthProvider;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;

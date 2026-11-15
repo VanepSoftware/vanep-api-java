@@ -1,7 +1,6 @@
 package br.com.vanep.conversation.controller;
 
 import br.com.vanep.auth.security.SecurityHelper;
-import br.com.vanep.conversation.dto.ConversationCreateRequestDTO;
 import br.com.vanep.conversation.dto.ConversationMessageCreateRequestDTO;
 import br.com.vanep.conversation.dto.ConversationMessageResponseDTO;
 import br.com.vanep.conversation.dto.ConversationResponseDTO;
@@ -12,7 +11,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -31,16 +29,6 @@ public class ConversationController {
 
   public ConversationController(ConversationService service) {
     this.service = service;
-  }
-
-  @PostMapping
-  @PreAuthorize("hasAuthority('create_conversation')")
-  public ResponseEntity<ConversationResponseDTO> open(
-      @Valid @RequestBody ConversationCreateRequestDTO request, Authentication authentication) {
-    ConversationService.OpenedConversation opened =
-        service.openConversation(SecurityHelper.requireCallerUid(authentication), request);
-    return ResponseEntity.status(opened.created() ? HttpStatus.CREATED : HttpStatus.OK)
-        .body(opened.conversation());
   }
 
   @GetMapping("/me")

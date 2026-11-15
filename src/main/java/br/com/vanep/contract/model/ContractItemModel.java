@@ -2,7 +2,6 @@ package br.com.vanep.contract.model;
 
 import br.com.vanep.city.model.CityModel;
 import br.com.vanep.dependent.model.DependentModel;
-import br.com.vanep.district.model.DistrictModel;
 import br.com.vanep.schedule.model.ScheduleModel;
 import br.com.vanep.school.model.SchoolModel;
 import jakarta.persistence.CascadeType;
@@ -17,7 +16,6 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
-import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 import lombok.Getter;
@@ -71,15 +69,8 @@ public class ContractItemModel {
   @Column(name = "pickup_neighborhood", length = 128)
   private String pickupNeighborhood;
 
-  @ManyToOne(fetch = FetchType.EAGER)
-  @JoinColumn(name = "pickup_district_id")
-  private DistrictModel pickupDistrict;
-
   @Column(name = "pickup_google_place_id")
   private String pickupGooglePlaceId;
-
-  @Column(name = "monthly_amount", nullable = false, precision = 12, scale = 2)
-  private BigDecimal monthlyAmount;
 
   @OneToOne(fetch = FetchType.EAGER, optional = false, cascade = CascadeType.ALL)
   @JoinColumn(name = "schedule_id", nullable = false)

@@ -15,17 +15,10 @@ public class ScheduleSlotPolicy {
     if (slots == null || slots.isEmpty()) {
       return Optional.of(ScheduleSlotViolation.SLOTS_REQUIRED);
     }
-    if (slots.stream().anyMatch(slot -> hasInvalidWindow(slot))) {
-      return Optional.of(ScheduleSlotViolation.WINDOW_INVALID);
-    }
     if (hasRepeatedWeekdayAndLeg(slots)) {
       return Optional.of(ScheduleSlotViolation.SLOT_DUPLICATE);
     }
     return Optional.empty();
-  }
-
-  boolean hasInvalidWindow(ScheduleSlotRequestDTO slot) {
-    return slot.windowEnd() != null && !slot.windowEnd().isAfter(slot.windowStart());
   }
 
   boolean hasRepeatedWeekdayAndLeg(List<ScheduleSlotRequestDTO> slots) {
@@ -34,5 +27,5 @@ public class ScheduleSlotPolicy {
     return distinctWeekdayLegs < slots.size();
   }
 
-  record WeekdayLeg(DayOfWeek weekday, RouteLeg leg) {}
+  public record WeekdayLeg(DayOfWeek weekday, RouteLeg leg) {}
 }

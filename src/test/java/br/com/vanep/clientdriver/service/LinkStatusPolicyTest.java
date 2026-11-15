@@ -56,6 +56,27 @@ class LinkStatusPolicyTest {
     }
   }
 
+  @Test
+  void aContractAwaitingSignaturesIsInProgressButDoesNotActivateTheLink() {
+    List<ContractStatus> awaiting =
+        List.of(ContractStatus.ENDED, ContractStatus.AWAITING_SIGNATURES);
+
+    assertThat(policy.hasContractInProgress(awaiting)).isTrue();
+    assertThat(policy.hasSignedContractNotEnded(awaiting)).isFalse();
+  }
+
+  @Test
+  void contractsThatEndedAreNotInProgress() {
+    assertThat(
+            policy.hasContractInProgress(
+                List.of(
+                    ContractStatus.ENDED,
+                    ContractStatus.TERMINATED,
+                    ContractStatus.CANCELLED,
+                    ContractStatus.SUPERSEDED)))
+        .isFalse();
+  }
+
   private void assertDerives(List<ContractStatus> contracts, RelationshipStatus expected) {
     for (RelationshipStatus current : DERIVED_STATUSES) {
       assertThat(policy.deriveStatus(current, contracts))

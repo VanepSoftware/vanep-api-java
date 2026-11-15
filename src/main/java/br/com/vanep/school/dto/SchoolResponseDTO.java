@@ -9,8 +9,6 @@ public record SchoolResponseDTO(
     String googlePlaceId,
     String cityName,
     String cityToken,
-    String districtName,
-    String districtToken,
     AddressResponseDTO address,
     boolean active,
     Instant createdAt) {}

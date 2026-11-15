@@ -1,7 +1,6 @@
 package br.com.vanep.address.model;
 
 import br.com.vanep.city.model.CityModel;
-import br.com.vanep.district.model.DistrictModel;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -52,10 +51,6 @@ public class AddressModel {
 
   @Column(length = 128)
   private String neighborhood;
-
-  @ManyToOne(fetch = FetchType.EAGER)
-  @JoinColumn(name = "district_id")
-  private DistrictModel district;
 
   @Column(name = "google_place_id", length = 255)
   private String googlePlaceId;

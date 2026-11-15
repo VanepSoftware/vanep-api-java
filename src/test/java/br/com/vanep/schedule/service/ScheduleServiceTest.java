@@ -36,14 +36,10 @@ class ScheduleServiceTest {
 
   private static final ScheduleSlotRequestDTO MONDAY_OUTBOUND =
       new ScheduleSlotRequestDTO(
-          DayOfWeek.MONDAY,
-          RouteLeg.OUTBOUND,
-          OperationShift.MORNING,
-          LocalTime.of(6, 40),
-          LocalTime.of(6, 50));
+          DayOfWeek.MONDAY, RouteLeg.OUTBOUND, OperationShift.MORNING, LocalTime.of(6, 40));
   private static final ScheduleSlotRequestDTO MONDAY_RETURN =
       new ScheduleSlotRequestDTO(
-          DayOfWeek.MONDAY, RouteLeg.RETURN, OperationShift.AFTERNOON, LocalTime.of(17, 0), null);
+          DayOfWeek.MONDAY, RouteLeg.RETURN, OperationShift.AFTERNOON, LocalTime.of(17, 0));
 
   @Mock private ScheduleRepository schedules;
   @Mock private MessageSource messages;
@@ -68,23 +64,20 @@ class ScheduleServiceTest {
             slot -> slot.getWeekday(),
             slot -> slot.getLeg(),
             slot -> slot.getShift(),
-            slot -> slot.getWindowStart(),
-            slot -> slot.getWindowEnd())
+            slot -> slot.getPickupTime())
         .containsExactly(
             tuple(
                 created,
                 DayOfWeek.MONDAY,
                 RouteLeg.OUTBOUND,
                 OperationShift.MORNING,
-                LocalTime.of(6, 40),
-                LocalTime.of(6, 50)),
+                LocalTime.of(6, 40)),
             tuple(
                 created,
                 DayOfWeek.MONDAY,
                 RouteLeg.RETURN,
                 OperationShift.AFTERNOON,
-                LocalTime.of(17, 0),
-                null));
+                LocalTime.of(17, 0)));
   }
 
   @Test
@@ -106,27 +99,11 @@ class ScheduleServiceTest {
   }
 
   @Test
-  void aWindowEndingBeforeItStartsIsRefused() {
-    ScheduleSlotRequestDTO inverted =
-        new ScheduleSlotRequestDTO(
-            DayOfWeek.MONDAY,
-            RouteLeg.OUTBOUND,
-            OperationShift.MORNING,
-            LocalTime.of(7, 0),
-            LocalTime.of(6, 50));
-
-    assertThatThrownBy(() -> service.create(List.of(inverted)))
-        .isInstanceOf(ResponseStatusException.class)
-        .hasMessageContaining("400")
-        .hasMessageContaining("schedule.slot.window_invalid");
-  }
-
-  @Test
   void replacingFlushesTheRemovalBeforeSavingTheNewSlots() {
     ScheduleModel schedule = scheduleWith(MONDAY_OUTBOUND, MONDAY_RETURN);
     ScheduleSlotRequestDTO tuesdayOutbound =
         new ScheduleSlotRequestDTO(
-            DayOfWeek.TUESDAY, RouteLeg.OUTBOUND, OperationShift.MORNING, LocalTime.of(7, 0), null);
+            DayOfWeek.TUESDAY, RouteLeg.OUTBOUND, OperationShift.MORNING, LocalTime.of(7, 0));
 
     ScheduleModel replaced = service.replace(schedule, List.of(tuesdayOutbound));
 

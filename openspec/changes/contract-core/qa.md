@@ -1,8 +1,8 @@
 # QA — contract-core (constitution rule 55)
 
-Latest run: API built from `feat/contract-core-route-passengers`, which contains phases 1 to 9. Run date: 2026-10-13. Result: **269/269 passed**.
+Latest run: API built from `fix/van-94-strict-json-types`. Run date: 2026-11-02. Result: **269/269 passed**.
 
-Phase 9 adds `RoutePassengerQueryService` without an HTTP endpoint (the spec forbids one in this change), so this branch runs the whole script as a regression. The query is covered by its repository and service tests (task 9.2).
+The VAN-94 run verifies the global strict JSON type configuration and runs the whole script as a regression.
 
 ## How to run
 
@@ -45,7 +45,7 @@ Flyway applied `V56` to `V60` on an empty database at boot, after the `main` mig
 | S4 | unknown shift | 400 | PASS |
 | S5 | missing shift | 400 | PASS |
 | S6 | null shift | 400 | PASS |
-| S7 | shift with the wrong JSON type | 400 | PASS |
+| S7 | numeric shift | 400 | PASS |
 | S8 | malformed JSON | 400 | PASS |
 | S9 | no token | 401 | PASS |
 | S10 | invalid token | 401 | PASS |
@@ -351,7 +351,7 @@ Flyway applied `V56` to `V60` on an empty database at boot, after the `main` mig
 | N14 | the same weekday and leg twice | 400 | PASS |
 | N15 | window end before its start | 400 | PASS |
 | N16 | a slot with the FULLTIME shift | 400 | PASS |
-| N17 | name with the wrong JSON type | 400 | PASS |
+| N17 | numeric name | 400 | PASS |
 | N18 | malformed JSON | 400 | PASS |
 | N19 | wrong content type | 415 | PASS |
 | N20 | the rejected creates stored nothing | 1 71 | PASS |
@@ -396,7 +396,6 @@ Flyway applied `V56` to `V60` on an empty database at boot, after the `main` mig
 
 ## Behaviors worth knowing
 
-- **A JSON number is accepted where an enum is expected.** `{"shift": 1}` starts the `AFTERNOON` route: Jackson reads the number as the enum position. This is the API-wide default, not something this change introduced. S7 checks a wrong type that is refused (an array).
 - **Re-applying a migration (S22, P3, M1) runs its SQL again through `psql`** against rows written by the script. The data migrations of this change are idempotent, which is what makes this a fair test of what they do to rows that already exist.
 - **The schema checks (D, K) run each statement in a transaction that is rolled back**, on the same database the API migrated at boot, so they prove the indexes and `CHECK`s exactly as Flyway applied them and leave nothing behind (D12, K15).
 - **A Bean Validation failure is a 400 with the generic detail `Invalid request content.`**, as on every endpoint of the API (the dependent endpoint does the same). The key the spec names for those cases (`contract.due_day.invalid`, `contract.installments.invalid`, `contract.amount.invalid`) is resolved into the field error but not shown in the body. Errors raised by the services (422, 409 and the schedule 400s) carry the pt-BR message, and the script asserts it.
@@ -405,5 +404,4 @@ Flyway applied `V56` to `V60` on an empty database at boot, after the `main` mig
 - **The weekday-and-leg collision is enforced by the service only** (R5 in `design.md`). Two simultaneous creates for the same dependent on different links are not guarded by the database in this phase, and the script does not race them.
 - **Unknown and read-only fields in the create body are ignored (L5).** A contract always starts `ACTIVE`, and the pickup address always comes from the dependent.
 - **B13 is the accepted effect of R2:** with the link status derived from contracts, a client cannot rate a driver until the admin registers the contract of the pair.
-- **A JSON number is accepted where text is expected.** `{"name": 42}` creates a passenger named "42", the same API-wide Jackson default as above. N17 checks an object, which is refused.
 - **The admin also gets 403 on `/api/drivers/me/unlinked-passengers` (U10):** the caller must be a driver, and the token in the URL is resolved among the caller's own passengers (U5 to U8 are 404).

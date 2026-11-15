@@ -49,11 +49,8 @@ public class ScheduleSlotModel {
   @Column(nullable = false, length = 16)
   private OperationShift shift;
 
-  @Column(name = "window_start", nullable = false)
-  private LocalTime windowStart;
-
-  @Column(name = "window_end")
-  private LocalTime windowEnd;
+  @Column(name = "pickup_time", nullable = false)
+  private LocalTime pickupTime;
 
   @CreationTimestamp
   @Column(name = "created_at", nullable = false, updatable = false)

@@ -1,6 +1,7 @@
 package br.com.vanep.driver.service;
 
 import br.com.vanep.driver.DriverRepository;
+import br.com.vanep.driver.dto.DriverAvailabilityRequestDTO;
 import br.com.vanep.driver.dto.DriverMeSummaryResponseDTO;
 import br.com.vanep.driver.dto.DriverResponseDTO;
 import br.com.vanep.driver.dto.DriverUpdateRequestDTO;
@@ -55,6 +56,19 @@ public class DriverService {
     UserModel user = userService.requireByTokenAndType(uid, UserType.DRIVER);
     DriverModel driver = requireByUserId(user.getId());
     return mapper.toMeSummary(driver, userService.toMeResponse(user));
+  }
+
+  @Transactional
+  public DriverMeSummaryResponseDTO updateMyAvailability(
+      String uid, DriverAvailabilityRequestDTO request) {
+    UserModel user = userService.requireByTokenAndType(uid, UserType.DRIVER);
+    DriverModel driver = requireByUserId(user.getId());
+    driver.setAvailable(request.available());
+    return mapper.toMeSummary(driverRepository.save(driver), userService.toMeResponse(user));
+  }
+
+  public DriverModel requireCallerDriver(String uid) {
+    return requireByUserId(userService.requireByTokenAndType(uid, UserType.DRIVER).getId());
   }
 
   @Transactional

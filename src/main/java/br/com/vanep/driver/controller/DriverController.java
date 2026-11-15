@@ -1,6 +1,7 @@
 package br.com.vanep.driver.controller;
 
 import br.com.vanep.auth.security.SecurityHelper;
+import br.com.vanep.driver.dto.DriverAvailabilityRequestDTO;
 import br.com.vanep.driver.dto.DriverMeSummaryResponseDTO;
 import br.com.vanep.driver.dto.DriverProfileResponseDTO;
 import br.com.vanep.driver.dto.DriverResponseDTO;
@@ -83,6 +84,13 @@ public class DriverController {
   @PreAuthorize("isAuthenticated()")
   public DriverMeSummaryResponseDTO getMe(Authentication authentication) {
     return service.getMyProfile(SecurityHelper.requireCallerUid(authentication));
+  }
+
+  @PutMapping("/me/availability")
+  @PreAuthorize("isAuthenticated()")
+  public DriverMeSummaryResponseDTO updateMyAvailability(
+      Authentication authentication, @Valid @RequestBody DriverAvailabilityRequestDTO request) {
+    return service.updateMyAvailability(SecurityHelper.requireCallerUid(authentication), request);
   }
 
   @GetMapping

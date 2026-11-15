@@ -20,6 +20,7 @@ import br.com.vanep.city.model.CityModel;
 import br.com.vanep.country.model.CountryModel;
 import br.com.vanep.dependent.model.DependentModel;
 import br.com.vanep.dependent.repository.DependentRepository;
+import br.com.vanep.places.dto.PlaceDetailsResponseDTO;
 import br.com.vanep.school.model.SchoolModel;
 import br.com.vanep.school.repository.SchoolRepository;
 import br.com.vanep.state.model.StateModel;
@@ -96,6 +97,65 @@ class AddressServiceTest {
     return address;
   }
 
+  private SchoolModel schoolInCampinas() {
+    SchoolModel school = new SchoolModel();
+    school.setId(7L);
+    school.setCity(city());
+    return school;
+  }
+
+  private PlaceDetailsResponseDTO schoolPlace() {
+    return new PlaceDetailsResponseDTO("school-place", "Rua Barão de Jaguara, 1481", List.of());
+  }
+
+  @Test
+  void createsTheSchoolAddressFromThePlaceAlreadyFetched() {
+    SchoolModel school = schoolInCampinas();
+    AddressModel built = addressWithToken("addr-school");
+    built.setId(50L);
+    when(placeResolver.buildFromPlace(schoolPlace(), school.getCity()))
+        .thenReturn(Optional.of(built));
+    when(addressRepository.save(built)).thenReturn(built);
+    when(schools.attachAddressWhenMissing(7L, 50L)).thenReturn(1);
+    when(mapper.toResponse(built)).thenReturn(responseFor("addr-school"));
+
+    assertThat(service.createForSchoolFromPlace(school, schoolPlace()))
+        .contains(responseFor("addr-school"));
+    verify(addressRepository, never()).delete(any());
+  }
+
+  @Test
+  void createsNoSchoolAddressFromAPlaceWithoutAStreet() {
+    SchoolModel school = schoolInCampinas();
+    when(placeResolver.buildFromPlace(schoolPlace(), school.getCity()))
+        .thenReturn(Optional.empty());
+
+    assertThat(service.createForSchoolFromPlace(school, schoolPlace())).isEmpty();
+    verifyNoInteractions(addressRepository);
+    verify(schools, never()).attachAddressWhenMissing(anyLong(), anyLong());
+  }
+
+  @Test
+  void keepsTheAddressOfTheResolveThatAttachedFirst() {
+    SchoolModel school = schoolInCampinas();
+    AddressModel built = addressWithToken("addr-late");
+    built.setId(51L);
+    AddressModel first = addressWithToken("addr-first");
+    SchoolModel attached = schoolInCampinas();
+    attached.setAddressId(49L);
+    when(placeResolver.buildFromPlace(schoolPlace(), school.getCity()))
+        .thenReturn(Optional.of(built));
+    when(addressRepository.save(built)).thenReturn(built);
+    when(schools.attachAddressWhenMissing(7L, 51L)).thenReturn(0);
+    when(schools.findById(7L)).thenReturn(Optional.of(attached));
+    when(addressRepository.findById(49L)).thenReturn(Optional.of(first));
+    when(mapper.toResponse(first)).thenReturn(responseFor("addr-first"));
+
+    assertThat(service.createForSchoolFromPlace(school, schoolPlace()))
+        .contains(responseFor("addr-first"));
+    verify(addressRepository).delete(built);
+  }
+
   private AddressResponseDTO responseFor(String token) {
     return new AddressResponseDTO(
         token,
@@ -103,7 +163,6 @@ class AddressServiceTest {
         "Rua Barão de Jaguara",
         "1481",
         null,
-        "Centro",
         "Centro",
         "city-campinas",
         "Campinas",
@@ -244,6 +303,7 @@ class AddressServiceTest {
 
     assertThat(result).isEqualTo(response);
     assertThat(school.getAddressId()).isEqualTo(30L);
+    assertThat(school.getCity().getToken()).isEqualTo("city-campinas");
     verify(schools).save(school);
   }
 
@@ -270,8 +330,33 @@ class AddressServiceTest {
   }
 
   @Test
+  void upsertForSchoolMovesTheSchoolCityWithANewPlace() {
+    SchoolModel school = schoolWithId(3L);
+    CityModel sorocaba = new CityModel();
+    sorocaba.setId(20L);
+    sorocaba.setToken("city-sorocaba");
+    school.setCity(sorocaba);
+    school.setAddressId(30L);
+    AddressModel existing = addressWithToken("sch-tok");
+    existing.setId(30L);
+    existing.setCity(sorocaba);
+    when(schools.findById(3L)).thenReturn(Optional.of(school));
+    when(addressRepository.findById(30L)).thenReturn(Optional.of(existing));
+    resolvePlaceInto("Rua Barão de Jaguara");
+    when(addressRepository.save(existing)).thenReturn(existing);
+    when(mapper.toResponse(existing)).thenReturn(responseFor("sch-tok"));
+
+    service.upsertForSchool(3L, placeRequest("place-campinas"));
+
+    assertThat(existing.getCity().getToken()).isEqualTo("city-campinas");
+    assertThat(school.getCity().getToken()).isEqualTo("city-campinas");
+    verify(schools).save(school);
+  }
+
+  @Test
   void upsertForSchoolUpdatesSameRowOnSecondSave() {
     SchoolModel school = schoolWithId(3L);
+    school.setCity(city());
     school.setAddressId(30L);
     AddressModel existing = addressWithToken("sch-tok");
     existing.setId(30L);

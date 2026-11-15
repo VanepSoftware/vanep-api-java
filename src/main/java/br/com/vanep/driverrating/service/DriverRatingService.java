@@ -4,6 +4,7 @@ import br.com.vanep.client.model.ClientModel;
 import br.com.vanep.client.repository.ClientRepository;
 import br.com.vanep.clientdriver.model.ClientDriverModel;
 import br.com.vanep.clientdriver.repository.ClientDriverRepository;
+import br.com.vanep.contract.repository.ContractRepository;
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.driverrating.dto.DriverRatingCreateRequestDTO;
@@ -37,6 +38,7 @@ public class DriverRatingService {
   private final DriverRatingMapper mapper;
   private final MessageSource messages;
   private final DriverRatingEligibilityPolicy eligibility;
+  private final ContractRepository contracts;
 
   public DriverRatingService(
       DriverRatingRepository driverRatingRepository,
@@ -46,7 +48,8 @@ public class DriverRatingService {
       UserRepository userRepository,
       DriverRatingMapper mapper,
       MessageSource messages,
-      DriverRatingEligibilityPolicy eligibility) {
+      DriverRatingEligibilityPolicy eligibility,
+      ContractRepository contracts) {
     this.driverRatingRepository = driverRatingRepository;
     this.driverRepository = driverRepository;
     this.clientRepository = clientRepository;
@@ -55,6 +58,7 @@ public class DriverRatingService {
     this.mapper = mapper;
     this.messages = messages;
     this.eligibility = eligibility;
+    this.contracts = contracts;
   }
 
   private String message(String key) {
@@ -79,9 +83,10 @@ public class DriverRatingService {
                     new ResponseStatusException(
                         HttpStatus.NOT_FOUND, message("driver_rating.link.not_found")));
 
-    if (!eligibility.isLinkActive(link.getStatus())) {
+    if (!eligibility.hasContractThatReachedActive(
+        contracts.findStatusesByClientDriverId(link.getId()))) {
       throw new ResponseStatusException(
-          HttpStatus.UNPROCESSABLE_CONTENT, message("driver_rating.link.not_active"));
+          HttpStatus.UNPROCESSABLE_CONTENT, message("driver_rating.link.never_contracted"));
     }
 
     if (!eligibility.isLinkOldEnough(link.getCreatedAt(), Instant.now())) {
@@ -131,7 +136,10 @@ public class DriverRatingService {
               boolean rated = driverRatingRepository.existsByLinkId(link.getId());
               boolean canRate =
                   !rated
-                      && eligibility.canRate(link.getStatus(), link.getCreatedAt(), Instant.now());
+                      && eligibility.canRate(
+                          contracts.findStatusesByClientDriverId(link.getId()),
+                          link.getCreatedAt(),
+                          Instant.now());
               return new DriverRatingStatusResponseDTO(rated, canRate);
             })
         .orElse(new DriverRatingStatusResponseDTO(false, false));

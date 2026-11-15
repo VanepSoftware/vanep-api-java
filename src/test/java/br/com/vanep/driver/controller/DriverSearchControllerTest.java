@@ -42,7 +42,6 @@ import org.mockito.BDDMockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.MessageSource;
-import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor;
@@ -129,6 +128,7 @@ class DriverSearchControllerTest {
     driver.setUser(driverUser);
     driver.setBasePrice(BigDecimal.valueOf(75));
     driver.setApprovalStatus(approvalStatus);
+    driver.setAvailable(true);
     return drivers.save(driver);
   }
 
@@ -216,7 +216,7 @@ class DriverSearchControllerTest {
   }
 
   private String message(String key) {
-    return messages.getMessage(key, null, LocaleContextHolder.getLocale());
+    return messages.getMessage(key, null, java.util.Locale.forLanguageTag("pt-BR"));
   }
 
   private void stubPlaces() throws IOException {
@@ -280,6 +280,22 @@ class DriverSearchControllerTest {
         .perform(get("/api/drivers/search").with(as(clientUid)).param("placeId", "taguatinga"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.content.length()").value(0));
+  }
+
+  @Test
+  void excludesDriverWhoIsNotAcceptingNewStudentsAndDoesNotCountThem() throws Exception {
+    stubPlaces();
+    createDriverWithAreas("aberto@vanep.com", "taguatinga");
+    DriverModel notAccepting = giveArea("fechado@vanep.com", districtNamed("Taguatinga"));
+    notAccepting.setAvailable(false);
+    drivers.save(notAccepting);
+
+    mockMvc
+        .perform(get("/api/drivers/search").with(as(clientUid)).param("placeId", "taguatinga"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content.length()").value(1))
+        .andExpect(jsonPath("$.totalElements").value(1))
+        .andExpect(jsonPath("$.content[0].name").value("Motorista aberto@vanep.com"));
   }
 
   @Test

@@ -23,10 +23,6 @@ public class ScheduleMapper {
 
   public ScheduleSlotResponseDTO toSlotResponse(ScheduleSlotModel slot) {
     return new ScheduleSlotResponseDTO(
-        slot.getWeekday(),
-        slot.getLeg(),
-        slot.getShift(),
-        slot.getWindowStart(),
-        slot.getWindowEnd());
+        slot.getWeekday(), slot.getLeg(), slot.getShift(), slot.getPickupTime());
   }
 }
