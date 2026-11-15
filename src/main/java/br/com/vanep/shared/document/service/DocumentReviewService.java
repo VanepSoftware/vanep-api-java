@@ -6,6 +6,7 @@ import br.com.vanep.shared.document.enums.DocumentDataRequirements;
 import br.com.vanep.shared.document.enums.DocumentDecisionStatus;
 import br.com.vanep.shared.document.enums.DocumentReviewViolation;
 import br.com.vanep.shared.document.enums.DocumentStatus;
+import br.com.vanep.shared.document.event.DocumentRejectedEvent;
 import br.com.vanep.shared.document.model.DocumentDecision;
 import br.com.vanep.shared.document.model.DocumentReview;
 import br.com.vanep.shared.document.model.DocumentSubmission;
@@ -15,6 +16,7 @@ import br.com.vanep.user.service.UserService;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Objects;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -23,14 +25,17 @@ public class DocumentReviewService {
   private final DocumentReviewPolicy policy;
   private final DocumentSubmissionRules submissionRules;
   private final UserService userService;
+  private final ApplicationEventPublisher events;
 
   public DocumentReviewService(
       DocumentReviewPolicy policy,
       DocumentSubmissionRules submissionRules,
-      UserService userService) {
+      UserService userService,
+      ApplicationEventPublisher events) {
     this.policy = policy;
     this.submissionRules = submissionRules;
     this.userService = userService;
+    this.events = events;
   }
 
   public DocumentReview review(
@@ -68,7 +73,11 @@ public class DocumentReviewService {
       approvalDataCheck.run();
     }
     UserModel reviewer = userService.requireByToken(reviewerUid);
-    return policy.decide(decision, reviewer, Instant.now());
+    DocumentReview review = policy.decide(decision, reviewer, Instant.now());
+    if (review.getStatus() == DocumentStatus.REJECTED) {
+      events.publishEvent(new DocumentRejectedEvent(submission.kind(), submission.getToken()));
+    }
+    return review;
   }
 
   public DocumentReview clear() {

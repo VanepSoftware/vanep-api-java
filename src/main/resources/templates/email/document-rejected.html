@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+  <head>
+    <meta charset="utf-8" />
+  </head>
+  <body style="font-family: Arial, Helvetica, sans-serif; color: #111">
+    <h2>Documento recusado</h2>
+    <p th:text="'Olá, ' + ${name} + '!'">Olá!</p>
+    <p th:text="${intro}">Recusamos o documento.</p>
+    <blockquote
+      style="
+        margin: 16px 0;
+        padding: 12px 16px;
+        background-color: #f7f7f7;
+        border-left: 4px solid #e53e3e;
+        color: #333;
+      "
+    >
+      <p style="margin: 0" th:text="${reason}">Motivo da recusa</p>
+      <p style="margin: 8px 0 0" th:if="${details != null}" th:text="${details}">Mensagem</p>
+    </blockquote>
+    <p th:text="${action}">Envie um novo documento pelo aplicativo.</p>
+    <p style="color: #666; font-size: 12px">
+      Equipe Vanep.
+    </p>
+  </body>
+</html>

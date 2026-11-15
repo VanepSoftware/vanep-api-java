@@ -20,6 +20,8 @@ import br.com.vanep.driver.dto.DriverOnboardingStatusResponseDTO;
 import br.com.vanep.driver.dto.DriverRejectionRequestDTO;
 import br.com.vanep.driver.dto.DriverResponseDTO;
 import br.com.vanep.driver.dto.VehicleDocumentsStepDTO;
+import br.com.vanep.driver.enums.DriverRejectionReason;
+import br.com.vanep.driver.event.DriverReviewEvent;
 import br.com.vanep.driver.mapper.DriverMapper;
 import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.drivercnh.model.DriverCnhModel;
@@ -55,6 +57,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.MessageSource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -76,7 +79,7 @@ class DriverOnboardingServiceTest {
   @Mock private VehicleDocumentRepository vehicleDocumentRepository;
   @Mock private DriverServiceAreaRepository driverServiceAreaRepository;
   @Mock private UserService userService;
-  @Mock private DriverNotificationService driverNotificationService;
+  @Mock private ApplicationEventPublisher events;
   @Mock private DriverMapper mapper;
   @Mock private MessageSource messages;
 
@@ -99,7 +102,7 @@ class DriverOnboardingServiceTest {
                 POLICY),
             POLICY,
             userService,
-            driverNotificationService,
+            events,
             mapper,
             messages);
 
@@ -717,6 +720,29 @@ class DriverOnboardingServiceTest {
   }
 
   @Test
+  void aRejectionWithACodeAndNoMessageShowsTheCodesText() {
+    stubDriverWithArea();
+    driver.setApprovalStatus(DriverApprovalStatus.REJECTED);
+    driver.setRejectionReasonCode(DriverRejectionReason.DUPLICATE_ACCOUNT);
+
+    DriverOnboardingStatusResponseDTO status = service.getOnboardingStatus("user-token-10");
+
+    assertThat(status.rejectionReasonCode()).isEqualTo(DriverRejectionReason.DUPLICATE_ACCOUNT);
+    assertThat(status.rejectionReason()).isEqualTo("driver.rejection_reason.DUPLICATE_ACCOUNT");
+  }
+
+  @Test
+  void aRejectionWithAMessageShowsTheMessage() {
+    stubDriverWithArea();
+    driver.setApprovalStatus(DriverApprovalStatus.REJECTED);
+    driver.setRejectionReasonCode(DriverRejectionReason.DATA_MISMATCH);
+    driver.setRejectionReason("O nome difere da CNH.");
+
+    assertThat(service.getOnboardingStatus("user-token-10").rejectionReason())
+        .isEqualTo("O nome difere da CNH.");
+  }
+
+  @Test
   void getOnboardingStatusUnderReviewCannotSubmit() {
     driver.setApprovalStatus(DriverApprovalStatus.UNDER_REVIEW);
     Instant now = Instant.now();
@@ -938,7 +964,7 @@ class DriverOnboardingServiceTest {
     assertThat(driver.getReviewedAt()).isNotNull();
     assertThat(driver.getReviewedBy()).isEqualTo(adminUser);
     verify(driverRepository).save(driver);
-    verify(driverNotificationService).notifyApproval(driver);
+    verify(events).publishEvent(new DriverReviewEvent.Approved("driver-token-20"));
   }
 
   @Test
@@ -974,7 +1000,7 @@ class DriverOnboardingServiceTest {
 
     assertThat(driver.getApprovalStatus()).isEqualTo(DriverApprovalStatus.UNDER_REVIEW);
     verify(driverRepository, never()).save(any(DriverModel.class));
-    verify(driverNotificationService, never()).notifyApproval(any());
+    verify(events, never()).publishEvent(any(Object.class));
   }
 
   @Test
@@ -987,7 +1013,9 @@ class DriverOnboardingServiceTest {
     when(driverRepository.save(any(DriverModel.class))).thenAnswer(inv -> inv.getArgument(0));
 
     service.reject(
-        "driver-token-20", new DriverRejectionRequestDTO("Unreadable document"), "admin-uid");
+        "driver-token-20",
+        new DriverRejectionRequestDTO(DriverRejectionReason.OTHER, "Unreadable document"),
+        "admin-uid");
 
     assertThat(driver.isAvailable()).isFalse();
   }
@@ -1054,7 +1082,8 @@ class DriverOnboardingServiceTest {
             null);
     when(mapper.toResponse(driver)).thenReturn(expectedResponse);
 
-    DriverRejectionRequestDTO request = new DriverRejectionRequestDTO("Foto da CNH ilegível");
+    DriverRejectionRequestDTO request =
+        new DriverRejectionRequestDTO(DriverRejectionReason.OTHER, " Foto da CNH ilegível ");
     DriverResponseDTO response = service.reject("driver-token-20", request, "admin-uid");
 
     assertThat(response).isEqualTo(expectedResponse);
@@ -1063,7 +1092,8 @@ class DriverOnboardingServiceTest {
     assertThat(driver.getReviewedAt()).isNotNull();
     assertThat(driver.getReviewedBy()).isEqualTo(adminUser);
     verify(driverRepository).save(driver);
-    verify(driverNotificationService).notifyRejection(driver, "Foto da CNH ilegível");
+    assertThat(driver.getRejectionReasonCode()).isEqualTo(DriverRejectionReason.OTHER);
+    verify(events).publishEvent(new DriverReviewEvent.Rejected("driver-token-20"));
   }
 
   @Test
@@ -1111,11 +1141,42 @@ class DriverOnboardingServiceTest {
   }
 
   @Test
+  void rejectingForAnotherReasonWithoutAMessageIsRefusedBeforeAnyLookup() {
+    when(userService.requireByToken("admin-uid")).thenReturn(new UserModel());
+    DriverRejectionRequestDTO request =
+        new DriverRejectionRequestDTO(DriverRejectionReason.OTHER, " ");
+
+    assertThatThrownBy(() -> service.reject("driver-token-20", request, "admin-uid"))
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            problem ->
+                assertThat(problem.getMessageKey()).isEqualTo("driver.rejection.reason.required"));
+    verify(driverRepository, never()).findByTokenForUpdate(any());
+  }
+
+  @Test
+  void aDuplicateAccountIsRejectedWithoutAMessage() {
+    driver.setApprovalStatus(DriverApprovalStatus.UNDER_REVIEW);
+    when(userService.requireByToken("admin-uid")).thenReturn(new UserModel());
+    when(driverRepository.findByTokenForUpdate("driver-token-20")).thenReturn(Optional.of(driver));
+    when(driverRepository.save(any(DriverModel.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    service.reject(
+        "driver-token-20",
+        new DriverRejectionRequestDTO(DriverRejectionReason.DUPLICATE_ACCOUNT, null),
+        "admin-uid");
+
+    assertThat(driver.getRejectionReasonCode()).isEqualTo(DriverRejectionReason.DUPLICATE_ACCOUNT);
+    assertThat(driver.getRejectionReason()).isNull();
+  }
+
+  @Test
   void rejectDriverThrowsNotFoundWhenDriverMissing() {
     when(userService.requireByToken("admin-uid")).thenReturn(new UserModel());
     when(driverRepository.findByTokenForUpdate("unknown")).thenReturn(Optional.empty());
 
-    DriverRejectionRequestDTO request = new DriverRejectionRequestDTO("Motivo qualquer");
+    DriverRejectionRequestDTO request =
+        new DriverRejectionRequestDTO(DriverRejectionReason.OTHER, "Motivo qualquer");
     assertThatThrownBy(() -> service.reject("unknown", request, "admin-uid"))
         .isInstanceOf(ResponseStatusException.class)
         .extracting(e -> ((ResponseStatusException) e).getStatusCode())
@@ -1128,7 +1189,8 @@ class DriverOnboardingServiceTest {
     when(userService.requireByToken("admin-uid")).thenReturn(new UserModel());
     when(driverRepository.findByTokenForUpdate("driver-token-20")).thenReturn(Optional.of(driver));
 
-    DriverRejectionRequestDTO request = new DriverRejectionRequestDTO("Motivo qualquer");
+    DriverRejectionRequestDTO request =
+        new DriverRejectionRequestDTO(DriverRejectionReason.OTHER, "Motivo qualquer");
     assertThatThrownBy(() -> service.reject("driver-token-20", request, "admin-uid"))
         .isInstanceOfSatisfying(
             ApiProblemException.class,

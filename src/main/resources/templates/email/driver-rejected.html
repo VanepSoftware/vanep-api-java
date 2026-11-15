@@ -18,9 +18,9 @@
         border-left: 4px solid #e53e3e;
         color: #333;
       "
-      th:text="${reason}"
     >
-      Motivo da rejeição
+      <p style="margin: 0" th:text="${reason}">Motivo da rejeição</p>
+      <p style="margin: 8px 0 0" th:if="${details != null}" th:text="${details}">Mensagem</p>
     </blockquote>
     <p>
       Você pode acessar o aplicativo Vanep para atualizar suas informações e reenviar os documentos para uma nova análise.

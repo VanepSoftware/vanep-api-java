@@ -246,17 +246,17 @@
 > Depends on: PR 7 | Parallel with: PRs 9 e 10
 > Order: test → request DTO → service → template → mensagens
 
-- [ ] 8.1 Criar branch `VAN-86/8-review-notifications` de dentro da branch do PR 7
-- [ ] 8.2 Testes (spec `driver-review-notifications`):
+- [x] 8.1 Criar branch `VAN-86/8-review-notifications` de dentro da branch do PR 7
+- [x] 8.2 Testes (spec `driver-review-notifications`):
   - aprovação e recusa com rollback → nenhum e-mail;
   - documento, documento da van e CNH recusados → um e-mail com o nome, a placa, o motivo e a mensagem, e o `notifiedAt` gravado;
   - falha no envio → log e `notifiedAt` nulo
-- [ ] 8.3 Testes da recusa do cadastro: sem `reasonCode` → 400; `OTHER` sem `reason` → 400 com `code` `driver.rejection.reason.required`; `DUPLICATE_ACCOUNT` sem `reason` → 200 com o código gravado
-- [ ] 8.4 `DriverRejectionRequestDTO` com `reasonCode`; `reject` gravando o código. Teste 8.3 verde
-- [ ] 8.5 `DriverReviewEvent`; `DriverNotificationService` em `AFTER_COMMIT`; `DocumentRejectedEvent` no `DocumentReviewService`; `DocumentNotificationService` com o `notifiedAt` em `REQUIRES_NEW`; `templates/email/document-rejected.html`. Teste 8.2 verde
-- [ ] 8.6 Mensagens `email.document_rejected.*`, `driver.rejection_reason.*` e os nomes dos tipos de documento; os textos de `document.rejection_reason.*` em pt-BR são os do D18, que o front copia
-- [ ] 8.7 `make lint` + `./mvnw verify -B`
-- [ ] 8.8 QA da regra 55:
+- [x] 8.3 Testes da recusa do cadastro: sem `reasonCode` → 400; `OTHER` sem `reason` → 400 com `code` `driver.rejection.reason.required`; `DUPLICATE_ACCOUNT` sem `reason` → 200 com o código gravado
+- [x] 8.4 `DriverRejectionRequestDTO` com `reasonCode`; `reject` gravando o código. Teste 8.3 verde
+- [x] 8.5 `DriverReviewEvent`; `DriverNotificationService` em `AFTER_COMMIT`; `DocumentRejectedEvent` no `DocumentReviewService`; `DocumentNotificationService` com o `notifiedAt` em `REQUIRES_NEW`; `templates/email/document-rejected.html`. Teste 8.2 verde
+- [x] 8.6 Mensagens `email.document_rejected.*`, `driver.rejection_reason.*` e os nomes dos tipos de documento; os textos de `document.rejection_reason.*` em pt-BR são os do D18, que o front copia
+- [x] 8.7 `make lint` + `./mvnw verify -B`
+- [x] 8.8 QA da regra 55:
   - no Mailpit, o e-mail de cada recusa de documento (motorista, van, CNH) em pt-BR e o `notified_at` no banco;
   - aprovação e recusa do cadastro só depois do commit;
   - regressão do QA dos PRs 1 a 7

@@ -3,6 +3,7 @@ package br.com.vanep.driverdocument.model;
 import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.driverdocument.enums.DriverDocumentType;
 import br.com.vanep.media.model.MediaFileModel;
+import br.com.vanep.shared.document.enums.DocumentKind;
 import br.com.vanep.shared.document.model.DocumentReview;
 import br.com.vanep.shared.document.model.DocumentSubmission;
 import jakarta.persistence.Column;
@@ -83,6 +84,11 @@ public class DriverDocumentModel implements DocumentSubmission {
   @UpdateTimestamp
   @Column(name = "updated_at", nullable = false)
   private Instant updatedAt;
+
+  @Override
+  public DocumentKind kind() {
+    return DocumentKind.DRIVER_DOCUMENT;
+  }
 
   @Override
   public String number() {

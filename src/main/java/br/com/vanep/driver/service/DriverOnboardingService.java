@@ -10,6 +10,8 @@ import br.com.vanep.driver.dto.DriverRejectionRequestDTO;
 import br.com.vanep.driver.dto.DriverResponseDTO;
 import br.com.vanep.driver.dto.VehicleDocumentSummaryDTO;
 import br.com.vanep.driver.dto.VehicleDocumentsStepDTO;
+import br.com.vanep.driver.enums.DriverRejectionReason;
+import br.com.vanep.driver.event.DriverReviewEvent;
 import br.com.vanep.driver.mapper.DriverMapper;
 import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.drivercompliance.dto.DriverComplianceDTO;
@@ -39,6 +41,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.data.domain.Page;
@@ -56,7 +59,7 @@ public class DriverOnboardingService {
   private final DriverComplianceService complianceService;
   private final DriverCompliancePolicy compliancePolicy;
   private final UserService userService;
-  private final DriverNotificationService driverNotificationService;
+  private final ApplicationEventPublisher events;
   private final DriverMapper mapper;
   private final MessageSource messages;
 
@@ -66,7 +69,7 @@ public class DriverOnboardingService {
       DriverComplianceService complianceService,
       DriverCompliancePolicy compliancePolicy,
       UserService userService,
-      DriverNotificationService driverNotificationService,
+      ApplicationEventPublisher events,
       DriverMapper mapper,
       MessageSource messages) {
     this.driverRepository = driverRepository;
@@ -74,7 +77,7 @@ public class DriverOnboardingService {
     this.complianceService = complianceService;
     this.compliancePolicy = compliancePolicy;
     this.userService = userService;
-    this.driverNotificationService = driverNotificationService;
+    this.events = events;
     this.mapper = mapper;
     this.messages = messages;
   }
@@ -119,7 +122,8 @@ public class DriverOnboardingService {
         driver.getApprovalStatus(),
         canSubmit,
         driver.getSubmittedAt(),
-        driver.getRejectionReason(),
+        describeRejection(driver),
+        driver.getRejectionReasonCode(),
         profileStep,
         vehicleStep,
         cnhStep,
@@ -182,6 +186,7 @@ public class DriverOnboardingService {
     driver.setApprovalStatus(DriverApprovalStatus.UNDER_REVIEW);
     driver.setSubmittedAt(Instant.now());
     driver.setRejectionReason(null);
+    driver.setRejectionReasonCode(null);
     DriverModel savedDriver = driverRepository.save(driver);
 
     return new DriverOnboardingStatusResponseDTO(
@@ -189,11 +194,20 @@ public class DriverOnboardingService {
         savedDriver.getApprovalStatus(),
         false,
         savedDriver.getSubmittedAt(),
-        savedDriver.getRejectionReason(),
+        null,
+        null,
         profileStep,
         vehicleStep,
         cnhStep,
         documentsStep);
+  }
+
+  // A rejection with a code and no message still tells the driver why, in the code's words.
+  String describeRejection(DriverModel driver) {
+    if (driver.getRejectionReason() != null || driver.getRejectionReasonCode() == null) {
+      return driver.getRejectionReason();
+    }
+    return message("driver.rejection_reason." + driver.getRejectionReasonCode().name());
   }
 
   DriverOnboardingStepDTO evaluateProfileStep(DriverModel driver, UserModel user) {
@@ -352,7 +366,7 @@ public class DriverOnboardingService {
     driver.setReviewedBy(adminUser);
     DriverModel saved = driverRepository.save(driver);
 
-    driverNotificationService.notifyApproval(saved);
+    events.publishEvent(new DriverReviewEvent.Approved(saved.getToken()));
 
     return mapper.toResponse(saved);
   }
@@ -361,15 +375,21 @@ public class DriverOnboardingService {
   public DriverResponseDTO reject(
       String driverToken, DriverRejectionRequestDTO request, String adminUid) {
     UserModel adminUser = userService.requireByToken(adminUid);
+    if (request.reasonCode() == DriverRejectionReason.OTHER
+        && (request.reason() == null || request.reason().isBlank())) {
+      throw ApiProblemException.badRequest("driver.rejection.reason.required");
+    }
     DriverModel driver = requireDriverForDecision(driverToken);
 
     driver.setApprovalStatus(DriverApprovalStatus.REJECTED);
-    driver.setRejectionReason(request.reason());
+    driver.setRejectionReasonCode(request.reasonCode());
+    driver.setRejectionReason(
+        request.reason() == null || request.reason().isBlank() ? null : request.reason().strip());
     driver.setReviewedAt(Instant.now());
     driver.setReviewedBy(adminUser);
     DriverModel saved = driverRepository.save(driver);
 
-    driverNotificationService.notifyRejection(saved, request.reason());
+    events.publishEvent(new DriverReviewEvent.Rejected(saved.getToken()));
 
     return mapper.toResponse(saved);
   }

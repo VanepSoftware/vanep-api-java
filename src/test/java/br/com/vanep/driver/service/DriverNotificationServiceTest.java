@@ -8,10 +8,14 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import br.com.vanep.auth.mail.MailService;
+import br.com.vanep.driver.DriverRepository;
+import br.com.vanep.driver.enums.DriverRejectionReason;
+import br.com.vanep.driver.event.DriverReviewEvent;
 import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.user.model.UserModel;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -28,6 +32,7 @@ import org.thymeleaf.templateresolver.ClassLoaderTemplateResolver;
 @ExtendWith(MockitoExtension.class)
 class DriverNotificationServiceTest {
 
+  @Mock private DriverRepository drivers;
   @Mock private MailService mailService;
   @Mock private MessageSource messages;
 
@@ -39,7 +44,7 @@ class DriverNotificationServiceTest {
 
   @BeforeEach
   void setUp() {
-    service = new DriverNotificationService(mailService, messages);
+    service = new DriverNotificationService(drivers, mailService, messages);
 
     user = new UserModel();
     user.setId(10L);
@@ -109,8 +114,9 @@ class DriverNotificationServiceTest {
     when(messages.getMessage(eq("driver.rejection.email.subject"), any(), any()))
         .thenReturn("Atualização sobre seu cadastro — Vanep");
 
-    String reason = "Documento CRLV ilegível ou vencido.";
-    service.notifyRejection(driver, reason);
+    driver.setRejectionReasonCode(DriverRejectionReason.OTHER);
+    driver.setRejectionReason("Documento CRLV ilegível ou vencido.");
+    service.notifyRejection(driver);
 
     verify(mailService)
         .send(
@@ -131,7 +137,7 @@ class DriverNotificationServiceTest {
     when(messages.getMessage(eq("driver.rejection.email.subject"), any(), any()))
         .thenReturn("Atualização sobre seu cadastro — Vanep");
 
-    service.notifyRejection(driver, null);
+    service.notifyRejection(driver);
 
     verify(mailService)
         .send(
@@ -145,8 +151,44 @@ class DriverNotificationServiceTest {
   }
 
   @Test
+  void aCodedRejectionSendsTheReasonLabelAndTheMessageBelowIt() {
+    when(messages.getMessage(eq("driver.rejection.email.subject"), any(), any()))
+        .thenReturn("Atualização sobre seu cadastro — Vanep");
+    when(messages.getMessage(eq("driver.rejection_reason.DATA_MISMATCH"), any(), any()))
+        .thenReturn("Os dados do cadastro não conferem com os documentos.");
+    driver.setRejectionReasonCode(DriverRejectionReason.DATA_MISMATCH);
+    driver.setRejectionReason("O nome difere da CNH.");
+
+    service.notifyRejection(driver);
+
+    verify(mailService)
+        .send(
+            eq("carlos.driver@vanep.com"),
+            any(),
+            eq("email/driver-rejected"),
+            variablesCaptor.capture());
+    assertThat(variablesCaptor.getValue())
+        .containsEntry("reason", "Os dados do cadastro não conferem com os documentos.")
+        .containsEntry("details", "O nome difere da CNH.");
+  }
+
+  @Test
+  void theDecisionEventsAreMailedFromTheStoredDriver() {
+    driver.setRejectionReasonCode(DriverRejectionReason.OTHER);
+    when(drivers.findByToken("driver-token-123")).thenReturn(Optional.of(driver));
+
+    service.sendApproval(new DriverReviewEvent.Approved("driver-token-123"));
+    service.sendRejection(new DriverReviewEvent.Rejected("driver-token-123"));
+
+    verify(mailService)
+        .send(eq("carlos.driver@vanep.com"), any(), eq("email/driver-approved"), any());
+    verify(mailService)
+        .send(eq("carlos.driver@vanep.com"), any(), eq("email/driver-rejected"), any());
+  }
+
+  @Test
   void notifyRejectionThrowsWhenDriverIsNull() {
-    assertThatThrownBy(() -> service.notifyRejection(null, "some reason"))
+    assertThatThrownBy(() -> service.notifyRejection(null))
         .isInstanceOf(NullPointerException.class)
         .hasMessage("driver must not be null");
   }
@@ -154,7 +196,7 @@ class DriverNotificationServiceTest {
   @Test
   void notifyRejectionThrowsWhenDriverUserIsNull() {
     driver.setUser(null);
-    assertThatThrownBy(() -> service.notifyRejection(driver, "some reason"))
+    assertThatThrownBy(() -> service.notifyRejection(driver))
         .isInstanceOf(NullPointerException.class)
         .hasMessage("driver user must not be null");
   }

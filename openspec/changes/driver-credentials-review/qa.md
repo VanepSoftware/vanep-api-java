@@ -1,16 +1,16 @@
 # QA — driver-credentials-review (constitution rule 55)
 
-Latest run: API built from `VAN-86/7-compliance-policy` (PR 7), 2026-11-21, after the file-only submissions, on a fresh database with the seed and the JVM in `Pacific/Kiritimati`. Result: `qa.sh` **307/307 passed**, twice in a row on the same database. The regression of PRs 1 to 6 with the file-only submissions.
+Latest run: API built from `VAN-86/8-review-notifications` (PR 8, on top of PR 7), 2026-11-21, after the file-only submissions, on a fresh database with the seed and the JVM in `Pacific/Kiritimati`. Result: `qa.sh` **323/323 passed**, twice in a row on the same database. The regression of PRs 1 to 7 with the file-only submissions.
 
-Before the file-only submissions: API built from `VAN-86/7-compliance-policy` (PR 7), 2026-11-21, after the CNH category rule, on a fresh database with the seed and the JVM in `Pacific/Kiritimati`. Result: `qa.sh` **280/280 passed**, twice in a row on the same database, with the regression of PRs 1 to 6 under the date limits (D21) and the `file` in the responses (D22). N4 to N6b check that the API only takes the CNH categories D, E, AD and AE, and that a license saved before with category B is still read and reported as `cnh_category`.
+Before the file-only submissions: API built from `VAN-86/8-review-notifications` (PR 8, on top of PR 7), 2026-11-21, after the CNH category rule, on a fresh database with the seed and the JVM in `Pacific/Kiritimati`. Result: `qa.sh` **296/296 passed**, twice in a row on the same database; the rejection e-mail now uses an inspection that expires 180 days from today. N4 to N6b check that the API only takes the CNH categories D, E, AD and AE, and that a license saved before with category B is still read and reported as `cnh_category`.
 
-Before the CNH category rule: API built from `VAN-86/7-compliance-policy` (PR 7), 2026-11-20, after the mobile requests, on a fresh database with the seed and the JVM in `Pacific/Kiritimati`. Result: `qa.sh` **276/276 passed**, twice in a row on the same database, with the regression of PRs 1 to 6 under the date limits (D21) and the `file` in the responses (D22).
+Before the CNH category rule: API built from `VAN-86/8-review-notifications` (PR 8, on top of PR 7), 2026-11-20, after the mobile requests, on a fresh database with the seed and the JVM in `Pacific/Kiritimati`. Result: `qa.sh` **292/292 passed**, twice in a row on the same database; the rejection e-mail now uses an inspection that expires 180 days from today.
 
-Before the mobile requests: API built from `VAN-86/7-compliance-policy` (PR 7), 2026-11-20, after the code review fixes, on a fresh database with the seed and the JVM in `Pacific/Kiritimati`. Result: `qa.sh` **260/260 passed**, twice in a row on the same database. N8 now expects `cnh_file` while the new driver's CNH has no file, and N8b checks the step complete after the upload.
+Before the mobile requests: API built from `VAN-86/8-review-notifications` (PR 8, on top of PR 7), 2026-11-20, after the code review fixes, on a fresh database with the seed and the JVM in `Pacific/Kiritimati`. Result: `qa.sh` **276/276 passed**, twice in a row on the same database. N8 now expects `cnh_file` while the new driver's CNH has no file, and N8b checks the step complete after the upload.
 
-Before the code review fixes: API built from `VAN-86/7-compliance-policy` (PR 7), 2026-11-15, on a fresh database with the seed, with the JVM in `Pacific/Kiritimati` (already the next day, while São Paulo is still on the 15th). Result: `qa.sh` **259/259 passed**, twice in a row on the same database: the blockers of each refused approval of the new driver, an approval and a rejection at once, São Paulo's date against the JVM's, and the regression of PRs 1 to 6, including the CNH file as a PDF.
+Before the code review fixes: API built from `VAN-86/8-review-notifications` (PR 8), 2026-11-15, on a fresh database with the seed, the JVM in `Pacific/Kiritimati` and the e-mail sent to a throwaway Mailpit (SMTP on 1026, API on 8026). Result: `qa.sh` **275/275 passed**, twice in a row on the same database: the e-mail of each rejected submission (driver document, van document, CNH) with its `notified_at`, the code of the onboarding rejection, its e-mail after the commit and its text in the driver's onboarding, and the regression of PRs 1 to 7.
 
-Previous runs: API built from `VAN-86/6-cnh-review` (PR 6), 2026-11-15, on a fresh database with the seed. `qa.sh` **253/253 passed**, twice in a row on the same database: the CNH review, the renewal with the same number, the number of one driver (two drivers sending the same new number at once, 8 times in a row: a later run found that PostgreSQL can abort one of the two with a deadlock instead of the violation, and the service now answers that one with the same 409; this run logged 3 such deadlocks and no 500), the CNH file as a PDF (the digital CNH) on the `/file` route, read back as `application/pdf`, with the old `/photo` route gone and the column renamed by V77, the onboarding with a rejected CNH and the seed, and the regression of PRs 1 to 5. The new driver of part 4 now has their CNH approved by the admin before DRIVER_LICENSE counts. As a regression, `scripts/qa/service-request-proposal/qa.sh` on its own fresh database with `places-stub.py` and the JVM in `Etc/GMT+12`: **563/563 passed**. Before that: API built from `VAN-86/5-review-and-submissions` (PR 5), 2026-11-15, on a fresh database with the seed. `qa.sh` **224/224 passed**, twice in a row on the same database: V76 on legacy data, the decisions, the final submissions, the renewals and the file caching, and the regression of PRs 1 to 4, whose PR 2 and PR 3 flows now follow the PR 5 rules (the decision carries the version, a rejection carries a code, a renewal is a new submission). Before that: API built from `VAN-86/4-review-schema` (PR 4), 2026-11-15, rebased on the current `main`, on a fresh database with the seed. `qa.sh` **159/159 passed**, twice in a row on the same database: the 141 scenarios of PRs 1 to 3 as a regression, and the 18 of V75. Before that: API built from `VAN-86/3-credentials-and-onboarding` (PR 3), 2026-11-12: `qa.sh` **141/141 passed**, twice in a row, and `scripts/qa/service-request-proposal/qa.sh` as a regression on its own fresh database with `places-stub.py`: **563/563 passed**. API built from `VAN-86/2-review-and-http` (PR 2), 2026-11-11: `qa.sh` **104/104 passed**, twice in a row.
+Previous runs: API built from `VAN-86/7-compliance-policy` (PR 7), 2026-11-15, on a fresh database with the seed, with the JVM in `Pacific/Kiritimati` (already the next day, while São Paulo is still on the 15th). `qa.sh` **259/259 passed**, twice in a row on the same database: the blockers of each refused approval of the new driver, an approval and a rejection at once, São Paulo's date against the JVM's, and the regression of PRs 1 to 6, including the CNH file as a PDF. Before that: API built from `VAN-86/6-cnh-review` (PR 6), 2026-11-15, on a fresh database with the seed. `qa.sh` **253/253 passed**, twice in a row on the same database: the CNH review, the renewal with the same number, the number of one driver (two drivers sending the same new number at once, 8 times in a row: a later run found that PostgreSQL can abort one of the two with a deadlock instead of the violation, and the service now answers that one with the same 409; this run logged 3 such deadlocks and no 500), the CNH file as a PDF (the digital CNH) on the `/file` route, read back as `application/pdf`, with the old `/photo` route gone and the column renamed by V77, the onboarding with a rejected CNH and the seed, and the regression of PRs 1 to 5. The new driver of part 4 now has their CNH approved by the admin before DRIVER_LICENSE counts. As a regression, `scripts/qa/service-request-proposal/qa.sh` on its own fresh database with `places-stub.py` and the JVM in `Etc/GMT+12`: **563/563 passed**. Before that: API built from `VAN-86/5-review-and-submissions` (PR 5), 2026-11-15, on a fresh database with the seed. `qa.sh` **224/224 passed**, twice in a row on the same database: V76 on legacy data, the decisions, the final submissions, the renewals and the file caching, and the regression of PRs 1 to 4, whose PR 2 and PR 3 flows now follow the PR 5 rules (the decision carries the version, a rejection carries a code, a renewal is a new submission). Before that: API built from `VAN-86/4-review-schema` (PR 4), 2026-11-15, rebased on the current `main`, on a fresh database with the seed. `qa.sh` **159/159 passed**, twice in a row on the same database: the 141 scenarios of PRs 1 to 3 as a regression, and the 18 of V75. Before that: API built from `VAN-86/3-credentials-and-onboarding` (PR 3), 2026-11-12: `qa.sh` **141/141 passed**, twice in a row, and `scripts/qa/service-request-proposal/qa.sh` as a regression on its own fresh database with `places-stub.py`: **563/563 passed**. API built from `VAN-86/2-review-and-http` (PR 2), 2026-11-11: `qa.sh` **104/104 passed**, twice in a row.
 
 ## How to run
 
@@ -52,6 +52,8 @@ The first run of part 3 on PR 4 found that the `CHECK` "a rejected row has a rea
 **Part 6** (PR 6) reviews the CNH of the new driver of part 4: the owner cannot decide, edit or remove it once approved; a renewal with the same number lives next to it, takes a PDF as its file (the digital CNH) on the `/file` route, is refused without file and on an old version, and replaces it when approved (the old file leaves the disk); another driver cannot use the number, also when two drivers send the same new number at once; a driver whose only CNH was rejected sees `cnh_rejected`; and every seed CNH is approved.
 
 **Part 7** (PR 7) checks the `blockers` of the two refused approvals of part 4 (the driver's pending documents and the three of the closest van; then only the pending inspection), races an approval and a rejection of the seed driver (put under review by SQL: one decision and one 400 with `code`), and runs the expiry checks with the JVM in a zone whose date differs from São Paulo's (`QA_JVM_ZONE`, given to the API as `-Duser.timezone`): a document valid until yesterday in São Paulo fails and one valid until today passes, whatever day it is for the JVM. Z1x fails if the run's JVM zone gives the same date as São Paulo.
+
+**Part 8** (PR 8) needs the API sending e-mail to a throwaway Mailpit (`SPRING_MAIL_HOST=127.0.0.1 SPRING_MAIL_PORT=1026 VANEP_MAIL_ENABLED=true`, Mailpit started with `docker run -d --rm --name vanep-vd-qa-mail -p 127.0.0.1:1026:1025 -p 127.0.0.1:8026:8025 axllent/mailpit:v1.27`, and `QA_MAILPIT_URL=http://localhost:8026` for the script). It rejects a van inspection, a driver document and a CNH and reads each e-mail in Mailpit (name, plate, reason of the code, message, in pt-BR) and the `notified_at`; then it rejects the seed driver's onboarding without code, with `OTHER` and no reason, with an unknown code and with `DUPLICATE_ACCOUNT`, and checks the single rejection e-mail and the text the driver's onboarding shows.
 
 **Part 2** runs against the live API, which migrated the main database with Flyway. It uses real tokens from the mobile password grant, for the seed's admin, driver (Fábio) and client (Ana).
 
@@ -199,7 +201,7 @@ The first run of part 4 found a defect from PR 1: with one complete van and anot
 | id | scenario | expected | result |
 |---|---|---|---|
 | Q1 | the reviewer corrects a mistyped number and expiry | 200 | PASS |
-| Q2 | the correction records who corrected and keeps the file | 49fa445512174547b1a8cf4b5:yes | PASS |
+| Q2 | the correction records who corrected and keeps the file | affc0c654fc242268ddd57027:yes | PASS |
 | Q3 | a correction on the version before is stale | 409 | PASS |
 | Q4 | a correction without the required number | 400 | PASS |
 | Q5 | an expiry before today may be corrected: the document is then expired | 200 | PASS |
@@ -324,7 +326,7 @@ The first run of part 4 found a defect from PR 1: with one complete van and anot
 | T8 | an unknown van | 404 | PASS |
 | T9 | a removed van | 404 | PASS |
 
-TOTAL: 307 passed
+TOTAL: 323 passed
 
 ## PR 4 — schema of the new review
 
@@ -549,3 +551,29 @@ The live database: F3 and F4 in the PR 1 table above. The regression of PRs 1 to
 | Z1x | this run's JVM date differs from São Paulo's (QA_JVM_ZONE=Pacific/Kiritimati) | differ | PASS |
 | Z2x | valid until yesterday in São Paulo fails, though it is still that day for the JVM | false | PASS |
 | Z3x | valid until today in São Paulo passes | true | PASS |
+
+## PR 8 — e-mails after the commit and a code on the onboarding rejection
+
+== The driver hears about a rejected submission
+| id | scenario | expected | result |
+|---|---|---|---|
+| M1 | the admin rejects the van's inspection as ILLEGIBLE | 200 | PASS |
+| M2 | the e-mail names the inspection, the plate, the reason and the message, in pt-BR | yes | PASS |
+| M3 | the inspection records notified_at | t | PASS |
+| M4 | a driver document rejected for another reason: the name and the admin's message | yes | PASS |
+| M5 | the driver document records notified_at | t | PASS |
+| M6 | a rejected CNH is mailed with the reason of its code | yes | PASS |
+| M7 | the CNH records notified_at | t | PASS |
+
+== The rejection of the onboarding has a code
+| id | scenario | expected | result |
+|---|---|---|---|
+| O1 | a rejection without a code | 400 | PASS |
+| O2 | OTHER without a reason | 400 | PASS |
+| O3 | an unknown code | 400 | PASS |
+| O4 | the refused rejections changed nothing | UNDER_REVIEW | PASS |
+| O5 | a duplicate account needs no reason | 200 | PASS |
+| O6 | the code is stored | DUPLICATE_ACCOUNT: | PASS |
+| O7 | the rejection e-mail, sent after the commit, carries the reason of the code | yes | PASS |
+| O8 | a single rejection e-mail | 1 | PASS |
+| O9 | the driver's onboarding shows the code and its text, with no message written | 200 | PASS |

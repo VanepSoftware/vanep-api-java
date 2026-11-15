@@ -16,6 +16,7 @@ import br.com.vanep.country.model.CountryModel;
 import br.com.vanep.country.repository.CountryRepository;
 import br.com.vanep.driver.DriverApprovalStatus;
 import br.com.vanep.driver.DriverRepository;
+import br.com.vanep.driver.enums.DriverRejectionReason;
 import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.drivercnh.model.DriverCnhModel;
 import br.com.vanep.drivercnh.repository.DriverCnhRepository;
@@ -440,7 +441,7 @@ class DriverOnboardingControllerTest {
             post("/api/drivers/" + driver.getToken() + "/reject")
                 .with(driverJwt(driverUserUid))
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"reason\": \"Documentos pendentes\"}"))
+                .content("{\"reasonCode\": \"OTHER\", \"reason\": \"Documentos pendentes\"}"))
         .andExpect(status().isForbidden());
   }
 
@@ -454,8 +455,29 @@ class DriverOnboardingControllerTest {
             post("/api/drivers/" + driver.getToken() + "/reject")
                 .with(adminJwt(adminUserUid))
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"reason\": \"\"}"))
-        .andExpect(status().isBadRequest());
+                .content("{\"reason\": \"Sem código\"}"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.field").value("reasonCode"));
+
+    mockMvc
+        .perform(
+            post("/api/drivers/" + driver.getToken() + "/reject")
+                .with(adminJwt(adminUserUid))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"reasonCode\": \"OTHER\", \"reason\": \" \"}"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("driver.rejection.reason.required"));
+
+    mockMvc
+        .perform(
+            post("/api/drivers/" + driver.getToken() + "/reject")
+                .with(adminJwt(adminUserUid))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"reasonCode\": \"DUPLICATE_ACCOUNT\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.approvalStatus").value("REJECTED"));
+    assertThat(drivers.findByToken(driver.getToken()).orElseThrow().getRejectionReasonCode())
+        .isEqualTo(DriverRejectionReason.DUPLICATE_ACCOUNT);
   }
 
   @Test
@@ -468,7 +490,7 @@ class DriverOnboardingControllerTest {
             post("/api/drivers/" + driver.getToken() + "/reject")
                 .with(adminJwt(adminUserUid))
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"reason\": \"Foto da CNH ilegível\"}"))
+                .content("{\"reasonCode\": \"OTHER\", \"reason\": \"Foto da CNH ilegível\"}"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.approvalStatus").value("REJECTED"));
   }
@@ -483,7 +505,7 @@ class DriverOnboardingControllerTest {
             post("/api/drivers/" + driver.getToken() + "/reject")
                 .with(adminRoleOnlyJwt(adminUserUid))
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"reason\": \"Foto da CNH ilegível\"}"))
+                .content("{\"reasonCode\": \"OTHER\", \"reason\": \"Foto da CNH ilegível\"}"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.approvalStatus").value("REJECTED"));
   }
@@ -498,7 +520,7 @@ class DriverOnboardingControllerTest {
             post("/api/drivers/" + driver.getToken() + "/reject")
                 .with(adminJwt(adminUserUid))
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"reason\": \"Foto ilegível\"}"))
+                .content("{\"reasonCode\": \"OTHER\", \"reason\": \"Foto ilegível\"}"))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.code").value("driver.onboarding.not_under_review"));
   }

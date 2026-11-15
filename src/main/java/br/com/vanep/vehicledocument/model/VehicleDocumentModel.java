@@ -1,6 +1,7 @@
 package br.com.vanep.vehicledocument.model;
 
 import br.com.vanep.media.model.MediaFileModel;
+import br.com.vanep.shared.document.enums.DocumentKind;
 import br.com.vanep.shared.document.model.DocumentReview;
 import br.com.vanep.shared.document.model.DocumentSubmission;
 import br.com.vanep.vehicle.model.VehicleModel;
@@ -80,6 +81,11 @@ public class VehicleDocumentModel implements DocumentSubmission {
   @UpdateTimestamp
   @Column(name = "updated_at", nullable = false)
   private Instant updatedAt;
+
+  @Override
+  public DocumentKind kind() {
+    return DocumentKind.VEHICLE_DOCUMENT;
+  }
 
   @Override
   public String number() {

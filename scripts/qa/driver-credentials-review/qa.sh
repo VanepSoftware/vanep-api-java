@@ -800,7 +800,7 @@ expect A1x "approving with the documents still pending: the blockers name the dr
      "VEHICLE_REQUIREMENT:VEHICLE_REGISTRATION:PENDING:'"$NEW_PLATE"'", "VEHICLE_REQUIREMENT:VEHICLE_INSPECTION:PENDING:'"$NEW_PLATE"'",
      "VEHICLE_REQUIREMENT:SCHOOL_VEHICLE_AUTHORIZATION:PENDING:'"$NEW_PLATE"'"])'
 check A2x "the driver is still under review" "UNDER_REVIEW" "$(sql "select approval_status from driver where token = '$NEW_DRIVER'")"
-request POST "/api/drivers/$NEW_DRIVER/reject" "$ADMIN" '{"reason": "Vistoria ilegível"}'
+request POST "/api/drivers/$NEW_DRIVER/reject" "$ADMIN" '{"reasonCode": "OTHER", "reason": "Vistoria ilegível"}'
 expect A3x "the admin rejects the driver: the inspection is unreadable" 200 '.approvalStatus == "REJECTED"'
 upload_pdf "/api/vehicle-documents/$NINSP/file" "$NEW"
 request POST /api/drivers/me/submit-onboarding "$NEW"
@@ -1228,7 +1228,7 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST "$BASE_URL/api/drivers/$SEED_DR
   -H "Authorization: Bearer $ADMIN" >"$(mktemp "$race_dir/status.XXXXXX")" &
 curl -s -o /dev/null -w '%{http_code}\n' -X POST "$BASE_URL/api/drivers/$SEED_DRIVER_TOKEN/reject" \
   -H "Authorization: Bearer $ADMIN" -H "Content-Type: application/json" \
-  --data-binary '{"reason": "Corrida do QA"}' >"$(mktemp "$race_dir/status.XXXXXX")" &
+  --data-binary '{"reasonCode": "OTHER", "reason": "Corrida do QA"}' >"$(mktemp "$race_dir/status.XXXXXX")" &
 wait
 check K1x "an approval and a rejection of the same driver at once: one decision and one 400" "200 400" \
   "$(cat "$race_dir"/* | sort | paste -sd ' ' -)"
@@ -1250,6 +1250,84 @@ check Z2x "valid until yesterday in São Paulo fails, though it is still that da
 sql "update vehicle_document set expires_at = date '$SP_TODAY' where token = '$NINSP'" >/dev/null
 credentials "$NVAN" "$NEW"
 check Z3x "valid until today in São Paulo passes" "true" "$(satisfied_of VEHICLE_INSPECTION)"
+
+# ---------------------------------------------------------------------------------------------
+# Part 8 — PR 8: e-mails after the commit and a code on the onboarding rejection
+# ---------------------------------------------------------------------------------------------
+
+MAILPIT="${QA_MAILPIT_URL:-http://localhost:8026}"
+# The text of the newest e-mail to $1 whose subject contains $2, once it arrives.
+mail_text() {
+  local id="" attempt
+  for attempt in 1 2 3 4 5 6 7 8 9 10; do
+    id=$(curl -s "$MAILPIT/api/v1/search" --get --data-urlencode "query=to:\"$1\"" |
+      jq -r --arg s "$2" '[.messages[] | select(.Subject | contains($s))][0].ID // empty')
+    [[ -n $id ]] && break
+    sleep 0.5
+  done
+  [[ -n $id ]] && curl -s "$MAILPIT/api/v1/message/$id" | jq -r '(.Text // "") + (.HTML // "")'
+}
+mail_count() {
+  curl -s "$MAILPIT/api/v1/search" --get --data-urlencode "query=to:\"$1\"" |
+    jq --arg s "$2" '[.messages[] | select(.Subject | contains($s))] | length'
+}
+contains_all() {
+  local text=$1 part
+  shift
+  for part in "$@"; do [[ $text == *"$part"* ]] || { echo "missing: $part"; return; }; done
+  echo "yes"
+}
+
+table "The driver hears about a rejected submission"
+curl -s -X DELETE "$MAILPIT/api/v1/messages" >/dev/null
+send_doc "/api/vehicles/$NVAN/documents" "$NEW" '{"documentType": "VEHICLE_INSPECTION", "expiresAt": "'"$IN_180_DAYS"'"}'
+MAIL_INSP=$(jq -r .token <<<"$RESP_BODY")
+upload_pdf "/api/vehicle-documents/$MAIL_INSP/file" "$NEW"
+review vehicle-documents "$MAIL_INSP" '{"status": "REJECTED", "rejectionReasonCode": "ILLEGIBLE", "rejectionReason": "A foto saiu escura."}'
+expect M1 "the admin rejects the van's inspection as ILLEGIBLE" 200
+TEXT=$(mail_text "$NEW_EMAIL" "Documento recusado")
+check M2 "the e-mail names the inspection, the plate, the reason and the message, in pt-BR" "yes" \
+  "$(contains_all "$TEXT" "Vistoria da van" "$NEW_PLATE" "Não conseguimos ler o documento." "A foto saiu escura." "Abra o aplicativo Vanep")"
+check M3 "the inspection records notified_at" "t" \
+  "$(sql "select notified_at is not null from vehicle_document where token = '$MAIL_INSP'")"
+send_doc /api/driver-documents "$NEW" '{"documentType": "MUNICIPAL_AUTHORIZATION", "documentNumber": "AUT-MUN-2019"}'
+MAIL_MUNICIPAL=$(jq -r .token <<<"$RESP_BODY")
+review driver-documents "$MAIL_MUNICIPAL" '{"status": "REJECTED", "rejectionReasonCode": "OTHER", "rejectionReason": "Autorização de 2019."}'
+TEXT=$(mail_text "$NEW_EMAIL" "Documento recusado" | tr '\n' ' ')
+check M4 "a driver document rejected for another reason: the name and the admin's message" "yes" \
+  "$(contains_all "$TEXT" "Autorização municipal" "Autorização de 2019.")"
+check M5 "the driver document records notified_at" "t" \
+  "$(sql "select notified_at is not null from driver_document where token = '$MAIL_MUNICIPAL'")"
+MAIL_CNH=$(sql "select c.token from driver_cnh c join driver d on d.id = c.driver_id join users u on u.id = d.user_id
+                where u.email = '$REJECTED_EMAIL' and c.status = 'PENDING' and c.deleted_at is null and c.superseded_at is null")
+upload "/api/driver-cnhs/$MAIL_CNH/file" "$REJECTED_DRIVER"
+review driver-cnhs "$MAIL_CNH" '{"status": "REJECTED", "rejectionReasonCode": "EXPIRED"}'
+TEXT=$(mail_text "$REJECTED_EMAIL" "Documento recusado")
+check M6 "a rejected CNH is mailed with the reason of its code" "yes" "$(contains_all "$TEXT" "CNH" "O documento está vencido.")"
+check M7 "the CNH records notified_at" "t" "$(sql "select notified_at is not null from driver_cnh where token = '$MAIL_CNH'")"
+
+table "The rejection of the onboarding has a code"
+sql "update driver set approval_status = 'UNDER_REVIEW' where token = '$SEED_DRIVER_TOKEN'" >/dev/null
+request POST "/api/drivers/$SEED_DRIVER_TOKEN/reject" "$ADMIN" '{"reason": "Sem código"}'
+expect O1 "a rejection without a code" 400 '.field == "reasonCode"'
+request POST "/api/drivers/$SEED_DRIVER_TOKEN/reject" "$ADMIN" '{"reasonCode": "OTHER", "reason": "  "}'
+expect O2 "OTHER without a reason" 400 '.code == "driver.rejection.reason.required"'
+request POST "/api/drivers/$SEED_DRIVER_TOKEN/reject" "$ADMIN" '{"reasonCode": "BANNED"}'
+expect O3 "an unknown code" 400
+check O4 "the refused rejections changed nothing" "UNDER_REVIEW" "$(sql "select approval_status from driver where token = '$SEED_DRIVER_TOKEN'")"
+curl -s -X DELETE "$MAILPIT/api/v1/messages" >/dev/null
+request POST "/api/drivers/$SEED_DRIVER_TOKEN/reject" "$ADMIN" '{"reasonCode": "DUPLICATE_ACCOUNT"}'
+expect O5 "a duplicate account needs no reason" 200 '.approvalStatus == "REJECTED"'
+check O6 "the code is stored" "DUPLICATE_ACCOUNT:" \
+  "$(sql "select rejection_reason_code || ':' || coalesce(rejection_reason, '') from driver where token = '$SEED_DRIVER_TOKEN'")"
+TEXT=$(mail_text "$SEED_DRIVER_EMAIL" "Atualização sobre seu cadastro")
+check O7 "the rejection e-mail, sent after the commit, carries the reason of the code" "yes" \
+  "$(contains_all "$TEXT" "Já existe outra conta deste motorista.")"
+check O8 "a single rejection e-mail" "1" "$(mail_count "$SEED_DRIVER_EMAIL" "Atualização sobre seu cadastro")"
+request GET /api/drivers/me/onboarding "$DRIVER"
+expect O9 "the driver's onboarding shows the code and its text, with no message written" 200 \
+  '.rejectionReasonCode == "DUPLICATE_ACCOUNT" and .rejectionReason == "Já existe outra conta deste motorista."'
+sql "update driver set approval_status = 'APPROVED', rejection_reason_code = null where token = '$SEED_DRIVER_TOKEN'" >/dev/null
 
 echo
 echo "TOTAL: $PASSED passed"
