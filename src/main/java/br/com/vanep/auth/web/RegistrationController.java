@@ -100,10 +100,12 @@ public class RegistrationController {
     try {
       registration.run();
     } catch (SignupDuplicateException duplicate) {
-      bindingResult.rejectValue(
-          duplicate.getField(),
-          "duplicate",
-          messages.getMessage(duplicate.getMessageKey(), null, LocaleContextHolder.getLocale()));
+      for (SignupDuplicateException.DuplicateField field : duplicate.getDuplicates()) {
+        bindingResult.rejectValue(
+            field.field(),
+            "duplicate",
+            messages.getMessage(field.messageKey(), null, LocaleContextHolder.getLocale()));
+      }
       return formView;
     }
     return "redirect:/login?registered";
