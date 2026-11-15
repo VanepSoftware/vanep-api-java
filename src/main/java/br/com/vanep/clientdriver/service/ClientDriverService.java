@@ -81,9 +81,14 @@ public class ClientDriverService {
   // turns that violation into its own conflict.
   @Transactional
   public ClientDriverModel findOrCreateForRequest(ClientModel client, DriverModel driver) {
+    return findOrCreate(client, driver, LinkOrigin.CLIENT_SEARCH);
+  }
+
+  @Transactional
+  public ClientDriverModel findOrCreate(ClientModel client, DriverModel driver, LinkOrigin origin) {
     return links
         .lockByPair(client.getId(), driver.getId())
-        .orElseGet(() -> links.saveAndFlush(newLink(client, driver, LinkOrigin.CLIENT_SEARCH)));
+        .orElseGet(() -> links.saveAndFlush(newLink(client, driver, origin)));
   }
 
   ClientDriverModel newLink(ClientModel client, DriverModel driver, LinkOrigin origin) {

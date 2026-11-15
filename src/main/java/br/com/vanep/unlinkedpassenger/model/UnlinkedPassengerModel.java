@@ -65,6 +65,12 @@ public class UnlinkedPassengerModel {
   @Column(length = 500)
   private String notes;
 
+  @Column(name = "vehicle_id")
+  private Long vehicleId;
+
+  @Column(name = "dependent_id")
+  private Long dependentId;
+
   @OneToOne(fetch = FetchType.EAGER, optional = false, cascade = CascadeType.ALL)
   @JoinColumn(name = "schedule_id", nullable = false)
   private ScheduleModel schedule;

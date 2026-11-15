@@ -1,6 +1,7 @@
 package br.com.vanep.unlinkedpassenger.dto;
 
 import br.com.vanep.address.dto.AddressResponseDTO;
+import br.com.vanep.familymatch.dto.FamilyMatchResponseDTO;
 import br.com.vanep.schedule.dto.ScheduleSlotResponseDTO;
 import br.com.vanep.shared.enums.SchoolShift;
 import java.time.Instant;
@@ -15,5 +16,9 @@ public record UnlinkedPassengerResponseDTO(
     AddressResponseDTO address,
     String notes,
     List<ScheduleSlotResponseDTO> slots,
+    String vehicleToken,
+    String dependentToken,
+    Instant invitedAt,
+    FamilyMatchResponseDTO familyMatch,
     Instant createdAt,
     Instant updatedAt) {}

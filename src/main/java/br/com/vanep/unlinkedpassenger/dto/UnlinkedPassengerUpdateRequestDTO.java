@@ -11,7 +11,8 @@ public record UnlinkedPassengerUpdateRequestDTO(
     JsonNullable<String> schoolToken,
     JsonNullable<SchoolShift> schoolShift,
     JsonNullable<@Valid DependentAddressRequestDTO> address,
-    JsonNullable<@Size(max = 500, message = "{unlinked_passenger.notes.too_long}") String> notes) {
+    JsonNullable<@Size(max = 500, message = "{unlinked_passenger.notes.too_long}") String> notes,
+    JsonNullable<String> vehicleToken) {
 
   public UnlinkedPassengerUpdateRequestDTO {
     if (name == null) {
@@ -28,6 +29,9 @@ public record UnlinkedPassengerUpdateRequestDTO(
     }
     if (notes == null) {
       notes = JsonNullable.undefined();
+    }
+    if (vehicleToken == null) {
+      vehicleToken = JsonNullable.undefined();
     }
   }
 }

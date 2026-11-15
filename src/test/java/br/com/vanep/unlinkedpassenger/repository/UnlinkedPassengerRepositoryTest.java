@@ -32,6 +32,7 @@ import jakarta.persistence.EntityManagerFactory;
 import java.math.BigDecimal;
 import java.time.DayOfWeek;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -46,6 +47,8 @@ import org.springframework.test.context.jdbc.Sql;
 @ActiveProfiles("test")
 @Sql(scripts = "/db/clean.sql", executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
 class UnlinkedPassengerRepositoryTest {
+
+  private static final LocalDate TODAY = LocalDate.of(2026, 11, 15);
 
   @Autowired private UnlinkedPassengerRepository passengers;
   @Autowired private ScheduleRepository schedules;
@@ -129,7 +132,8 @@ class UnlinkedPassengerRepositoryTest {
     passengers.save(newPassenger(otherDriver, "Ana", "Rua B"));
 
     List<RoutePassengerDTO> found =
-        passengers.findRoutePassengers(driver.getId(), DayOfWeek.MONDAY, OperationShift.MORNING);
+        passengers.findRoutePassengers(
+            driver.getId(), TODAY, DayOfWeek.MONDAY, OperationShift.MORNING);
 
     assertThat(found)
         .singleElement()
@@ -151,11 +155,12 @@ class UnlinkedPassengerRepositoryTest {
     passengers.save(newPassenger(driver, "Lucas", "Rua A"));
 
     assertThat(
-            passengers.findRoutePassengers(driver.getId(), DayOfWeek.MONDAY, OperationShift.NIGHT))
+            passengers.findRoutePassengers(
+                driver.getId(), TODAY, DayOfWeek.MONDAY, OperationShift.NIGHT))
         .isEmpty();
     assertThat(
             passengers.findRoutePassengers(
-                driver.getId(), DayOfWeek.TUESDAY, OperationShift.MORNING))
+                driver.getId(), TODAY, DayOfWeek.TUESDAY, OperationShift.MORNING))
         .isEmpty();
   }
 
@@ -165,7 +170,7 @@ class UnlinkedPassengerRepositoryTest {
 
     assertThat(
             passengers.findRoutePassengers(
-                driver.getId(), DayOfWeek.MONDAY, OperationShift.MORNING))
+                driver.getId(), TODAY, DayOfWeek.MONDAY, OperationShift.MORNING))
         .isEmpty();
   }
 
@@ -191,28 +196,33 @@ class UnlinkedPassengerRepositoryTest {
     passengers.save(newPassenger(otherDriver, "Bia", "Rua C"));
     passengers.delete(passengers.save(newPassenger(driver, "Caio", "Rua D")));
 
-    assertThat(passengers.countPassengersByShift(driver.getId()))
+    assertThat(passengers.countPassengersByShift(driver.getId(), null, TODAY))
         .extracting(count -> count.shift(), count -> count.passengers())
         .containsExactlyInAnyOrder(
             tuple(OperationShift.MORNING, 2L), tuple(OperationShift.AFTERNOON, 2L));
-    assertThat(passengers.countByDriverId(driver.getId())).isEqualTo(2);
+    assertThat(passengers.countStudents(driver.getId(), null, TODAY)).isEqualTo(2);
   }
 
   @Test
   void countsThePassengersPerShiftInOneStatementWhateverTheirNumber() {
     SqlStatementCounter counter = new SqlStatementCounter(entityManagerFactory);
     passengers.save(newPassenger(driver, "Lucas", "Rua A"));
-    long withOne = counter.countStatements(() -> passengers.countPassengersByShift(driver.getId()));
+    long withOne =
+        counter.countStatements(
+            () -> passengers.countPassengersByShift(driver.getId(), null, TODAY));
 
     passengers.save(newPassenger(driver, "Ana", "Rua B"));
-    long withTwo = counter.countStatements(() -> passengers.countPassengersByShift(driver.getId()));
+    long withTwo =
+        counter.countStatements(
+            () -> passengers.countPassengersByShift(driver.getId(), null, TODAY));
 
     assertThat(withOne).isEqualTo(1);
     assertThat(withTwo).isEqualTo(1);
   }
 
   private List<RoutePassengerDTO> findMondayMorningPassengers() {
-    return passengers.findRoutePassengers(driver.getId(), DayOfWeek.MONDAY, OperationShift.MORNING);
+    return passengers.findRoutePassengers(
+        driver.getId(), TODAY, DayOfWeek.MONDAY, OperationShift.MORNING);
   }
 
   private UnlinkedPassengerModel newPassenger(DriverModel owner, String name, String street) {

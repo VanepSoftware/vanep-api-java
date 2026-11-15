@@ -36,7 +36,7 @@ public class RoutePassengerQueryService {
     List<RoutePassengerDTO> contracted =
         items.findRoutePassengers(driver.getId(), serviceDate, weekday, shift);
     List<RoutePassengerDTO> unlinked =
-        unlinkedPassengers.findRoutePassengers(driver.getId(), weekday, shift);
+        unlinkedPassengers.findRoutePassengers(driver.getId(), serviceDate, weekday, shift);
     return Stream.concat(contracted.stream(), unlinked.stream())
         .sorted(BY_PICKUP_TIME_THEN_NAME)
         .toList();

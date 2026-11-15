@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
+import br.com.vanep.unlinkedpassenger.repository.UnlinkedPassengerRepository;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
@@ -32,6 +33,7 @@ import org.springframework.web.server.ResponseStatusException;
 class VehicleServiceTest {
 
   @Mock private VehicleRepository vehicleRepository;
+  @Mock private UnlinkedPassengerRepository unlinkedPassengers;
   @Mock private DriverRepository driverRepository;
   @Mock private UserRepository userRepository;
   @Mock private VehicleMapper mapper;
@@ -132,5 +134,18 @@ class VehicleServiceTest {
     service.restore("veh-123");
 
     verify(vehicleRepository).restoreByToken("veh-123");
+  }
+
+  @Test
+  void deleteReleasesStudentsStillPointingAtTheVan() {
+    VehicleModel vehicle = new VehicleModel();
+    vehicle.setId(30L);
+    vehicle.setToken("veh-123");
+    when(vehicleRepository.findByToken("veh-123")).thenReturn(Optional.of(vehicle));
+
+    service.delete("veh-123");
+
+    verify(unlinkedPassengers).clearVehicleId(30L);
+    verify(vehicleRepository).delete(vehicle);
   }
 }
