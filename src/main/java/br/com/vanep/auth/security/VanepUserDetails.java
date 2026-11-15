@@ -15,7 +15,26 @@ public final class VanepUserDetails extends User {
       boolean enabled,
       boolean accountNonLocked,
       Collection<? extends GrantedAuthority> authorities) {
-    super(username, password, enabled, true, true, accountNonLocked, authorities);
+    this(username, password, userToken, enabled, true, true, accountNonLocked, authorities);
+  }
+
+  public VanepUserDetails(
+      String username,
+      String password,
+      String userToken,
+      boolean enabled,
+      boolean accountNonExpired,
+      boolean credentialsNonExpired,
+      boolean accountNonLocked,
+      Collection<? extends GrantedAuthority> authorities) {
+    super(
+        username,
+        password,
+        enabled,
+        accountNonExpired,
+        credentialsNonExpired,
+        accountNonLocked,
+        authorities);
     this.userToken = userToken;
   }
 
@@ -25,6 +44,13 @@ public final class VanepUserDetails extends User {
 
   public VanepUserDetails withPassword(String password) {
     return new VanepUserDetails(
-        getUsername(), password, userToken, isEnabled(), isAccountNonLocked(), getAuthorities());
+        getUsername(),
+        password,
+        userToken,
+        isEnabled(),
+        isAccountNonExpired(),
+        isCredentialsNonExpired(),
+        isAccountNonLocked(),
+        getAuthorities());
   }
 }

@@ -16,7 +16,6 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.oauth2.core.OAuth2ErrorCodes;
@@ -39,15 +38,13 @@ public final class MobilePasswordGrantAuthenticationProvider implements Authenti
 
   public MobilePasswordGrantAuthenticationProvider(
       UserDetailsService userDetailsService,
-      PasswordEncoder passwordEncoder,
       UserPasswordEncoder userPasswords,
       UserPasswordRehashService rehash,
       MobileGrantTokenIssuer tokenIssuer,
       LoginAttemptService loginAttempts,
       LoginActivityService loginActivity,
       MessageSource messages) {
-    this.credentials =
-        dedicatedCredentialsProvider(userDetailsService, passwordEncoder, userPasswords, rehash);
+    this.credentials = dedicatedCredentialsProvider(userDetailsService, userPasswords, rehash);
     this.tokenIssuer = tokenIssuer;
     this.loginAttempts = loginAttempts;
     this.loginActivity = loginActivity;
@@ -60,12 +57,10 @@ public final class MobilePasswordGrantAuthenticationProvider implements Authenti
    */
   private static UserBoundPasswordAuthenticationProvider dedicatedCredentialsProvider(
       UserDetailsService userDetailsService,
-      PasswordEncoder passwordEncoder,
       UserPasswordEncoder userPasswords,
       UserPasswordRehashService rehash) {
     UserBoundPasswordAuthenticationProvider provider =
-        UserBoundPasswordAuthenticationProvider.create(
-            userDetailsService, passwordEncoder, userPasswords, rehash);
+        UserBoundPasswordAuthenticationProvider.create(userDetailsService, userPasswords, rehash);
     provider.setPreAuthenticationChecks(
         user -> {
           if (!user.isAccountNonLocked()) {

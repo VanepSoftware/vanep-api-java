@@ -1,6 +1,5 @@
 package br.com.vanep.auth.security;
 
-import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
@@ -19,11 +18,15 @@ public class UserPasswordRehashService {
 
   @Transactional
   public UserDetails storeUpgradedHash(VanepUserDetails user, String upgradedHash) {
-    UserModel model = users.findByEmail(user.getUsername()).orElse(null);
-    if (model == null || !passwords.requiresUpgrade(model.getPassword())) {
+    String checked = user.getPassword();
+    if (!passwords.requiresUpgrade(checked)) {
       return user;
     }
-    model.setPassword(upgradedHash);
+    // One UPDATE so a reset that committed after the password check is not overwritten.
+    int updated = users.upgradePasswordIfCurrent(user.getUsername(), checked, upgradedHash);
+    if (updated != 1) {
+      return user;
+    }
     return user.withPassword(upgradedHash);
   }
 }

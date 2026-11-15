@@ -29,12 +29,16 @@ public final class UserBoundPasswordAuthenticationProvider extends DaoAuthentica
 
   public static UserBoundPasswordAuthenticationProvider create(
       UserDetailsService userDetailsService,
-      PasswordEncoder passwordEncoder,
       UserPasswordEncoder userPasswords,
       UserPasswordRehashService rehash) {
+    if (!(userPasswords instanceof UserBoundPasswordEncoder bound)) {
+      throw new IllegalArgumentException("User passwords require UserBoundPasswordEncoder");
+    }
     UserBoundPasswordAuthenticationProvider provider =
         new UserBoundPasswordAuthenticationProvider(userDetailsService, userPasswords, rehash);
-    provider.setPasswordEncoder(passwordEncoder);
+    // DaoAuthenticationProvider hashes a dummy password to keep unknown users on the same clock.
+    // The real check is additionalAuthenticationChecks, which has the account token.
+    provider.setPasswordEncoder(bound.argon2());
     provider.afterPropertiesSet();
     return provider;
   }
@@ -80,7 +84,13 @@ public final class UserBoundPasswordAuthenticationProvider extends DaoAuthentica
     }
     String upgraded =
         this.userPasswords.encode(authentication.getCredentials().toString(), userToken);
-    return this.rehash.storeUpgradedHash(details, upgraded);
+    try {
+      return this.rehash.storeUpgradedHash(details, upgraded);
+    } catch (RuntimeException ex) {
+      this.logger.warn(
+          "Password hash upgrade failed for " + details.getUsername() + "; login continues", ex);
+      return user;
+    }
   }
 
   private static String userTokenOf(UserDetails userDetails) {

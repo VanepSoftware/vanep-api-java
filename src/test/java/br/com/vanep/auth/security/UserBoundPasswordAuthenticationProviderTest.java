@@ -2,6 +2,9 @@ package br.com.vanep.auth.security;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -10,7 +13,6 @@ import static org.mockito.Mockito.when;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
 import java.util.List;
-import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -28,6 +30,7 @@ class UserBoundPasswordAuthenticationProviderTest {
   private static final String EMAIL = "person@vanep.com";
   private static final PepperedArgon2PasswordEncoder ENCODER =
       new PepperedArgon2PasswordEncoder("unit-test-pepper");
+  private static final UserPasswordEncoder PASSWORDS = new UserBoundPasswordEncoder(ENCODER);
   private static final String LEGACY = ENCODER.encode(PASSWORD);
   private static final String BOUND_A = ENCODER.encode(PASSWORD, TOKEN_A);
 
@@ -138,7 +141,7 @@ class UserBoundPasswordAuthenticationProviderTest {
   void doesNotReplaceAHashAlreadyUpgradedInTheDatabase() {
     UserModel model = account(BOUND_A, TOKEN_A);
     UserRepository users = repositoryReturning(model);
-    UserPasswordRehashService rehash = new UserPasswordRehashService(users, ENCODER);
+    UserPasswordRehashService rehash = new UserPasswordRehashService(users, PASSWORDS);
 
     UserDetails result = rehash.storeUpgradedHash(vanep(LEGACY, TOKEN_A), "replacement");
 
@@ -149,17 +152,32 @@ class UserBoundPasswordAuthenticationProviderTest {
   @Test
   void leavesTheHashUntouchedWhenTheAccountDisappearsBeforeUpgrade() {
     UserRepository users = mock(UserRepository.class);
-    when(users.findByEmail(EMAIL)).thenReturn(Optional.empty());
-    UserPasswordRehashService rehash = new UserPasswordRehashService(users, ENCODER);
+    when(users.upgradePasswordIfCurrent(eq(EMAIL), eq(LEGACY), anyString())).thenReturn(0);
+    UserPasswordRehashService rehash = new UserPasswordRehashService(users, PASSWORDS);
     VanepUserDetails user = vanep(LEGACY, TOKEN_A);
 
     assertThat(rehash.storeUpgradedHash(user, "replacement")).isSameAs(user);
   }
 
+  @Test
+  void keepsTheLoginWhenTheUpgradeFails() {
+    UserPasswordRehashService rehash = mock(UserPasswordRehashService.class);
+    when(rehash.storeUpgradedHash(any(VanepUserDetails.class), anyString()))
+        .thenThrow(new IllegalStateException("database timeout"));
+
+    Authentication result =
+        UserBoundPasswordAuthenticationProvider.create(
+                details(vanep(LEGACY, TOKEN_A)), PASSWORDS, rehash)
+            .authenticate(UsernamePasswordAuthenticationToken.unauthenticated(EMAIL, PASSWORD));
+
+    assertThat(result.isAuthenticated()).isTrue();
+    assertThat(((VanepUserDetails) result.getPrincipal()).getPassword()).isEqualTo(LEGACY);
+  }
+
   private static UserBoundPasswordAuthenticationProvider provider(
       UserRepository users, UserDetailsService details) {
     return UserBoundPasswordAuthenticationProvider.create(
-        details, ENCODER, ENCODER, new UserPasswordRehashService(users, ENCODER));
+        details, PASSWORDS, new UserPasswordRehashService(users, PASSWORDS));
   }
 
   private static UserDetailsService details(UserDetails user) {
@@ -170,7 +188,16 @@ class UserBoundPasswordAuthenticationProviderTest {
 
   private static UserRepository repositoryReturning(UserModel model) {
     UserRepository users = mock(UserRepository.class);
-    when(users.findByEmail(EMAIL)).thenReturn(Optional.of(model));
+    when(users.upgradePasswordIfCurrent(eq(EMAIL), anyString(), anyString()))
+        .thenAnswer(
+            invocation -> {
+              String current = invocation.getArgument(1);
+              if (!current.equals(model.getPassword())) {
+                return 0;
+              }
+              model.setPassword(invocation.getArgument(2));
+              return 1;
+            });
     return users;
   }
 

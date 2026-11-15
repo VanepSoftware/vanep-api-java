@@ -7,7 +7,7 @@ import javax.crypto.spec.SecretKeySpec;
 import org.springframework.security.crypto.argon2.Argon2PasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
-public class PepperedArgon2PasswordEncoder implements PasswordEncoder, UserPasswordEncoder {
+public class PepperedArgon2PasswordEncoder implements PasswordEncoder {
 
   private static final String HMAC_ALGORITHM = "HmacSHA256";
 
@@ -35,7 +35,6 @@ public class PepperedArgon2PasswordEncoder implements PasswordEncoder, UserPassw
     return this.delegate.encode(applyPepper(rawPassword));
   }
 
-  @Override
   public String encode(CharSequence rawPassword, String userToken) {
     if (rawPassword == null) {
       throw new IllegalArgumentException("rawPassword is required");
@@ -57,7 +56,6 @@ public class PepperedArgon2PasswordEncoder implements PasswordEncoder, UserPassw
     return this.delegate.matches(applyPepper(rawPassword), encodedPassword);
   }
 
-  @Override
   public boolean matches(CharSequence rawPassword, String encodedPassword, String userToken) {
     if (rawPassword == null || encodedPassword == null || encodedPassword.isBlank()) {
       return false;
@@ -74,7 +72,6 @@ public class PepperedArgon2PasswordEncoder implements PasswordEncoder, UserPassw
     return matches(rawPassword, encodedPassword);
   }
 
-  @Override
   public boolean requiresUpgrade(String encodedPassword) {
     return encodedPassword != null && !encodedPassword.isBlank() && !isBound(encodedPassword);
   }
