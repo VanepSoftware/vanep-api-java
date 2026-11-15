@@ -379,8 +379,11 @@ public class DependentService {
 
   private Map<Long, String> clientTokensById(List<DependentModel> models) {
     List<Long> clientIds = models.stream().map(model -> model.getClientId()).distinct().toList();
-    return clients.findAllById(clientIds).stream()
-        .collect(Collectors.toMap(client -> client.getId(), client -> client.getToken()));
+    if (clientIds.isEmpty()) {
+      return Map.of();
+    }
+    return clients.findTokensByIdIn(clientIds).stream()
+        .collect(Collectors.toMap(row -> row.getId(), row -> row.getToken()));
   }
 
   private String resolveClientToken(Long clientId) {

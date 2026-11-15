@@ -5,6 +5,7 @@ import jakarta.persistence.LockModeType;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
@@ -15,6 +16,8 @@ public interface VehicleRepository extends JpaRepository<VehicleModel, Long> {
 
   Optional<VehicleModel> findByToken(String token);
 
+  // Each vehicle has its own three photos, so they are fetched with the list (rule 17).
+  @EntityGraph(attributePaths = {"driver.user", "photoFront", "photoSide", "photoDocument"})
   List<VehicleModel> findByDriverId(Long driverId);
 
   @Lock(LockModeType.PESSIMISTIC_WRITE)
