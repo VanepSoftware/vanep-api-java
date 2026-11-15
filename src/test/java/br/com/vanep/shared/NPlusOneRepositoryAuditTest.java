@@ -40,6 +40,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestReporter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.jdbc.Sql;
@@ -139,9 +140,7 @@ class NPlusOneRepositoryAuditTest {
         hotspots,
         "DriverDocumentRepository.findByDriverId(Pageable) (touch driver.user + file + reviewer)",
         () -> {},
-        () ->
-            touchDocuments(
-                documents.findByDriverId(driver.getId(), PageRequest.of(0, 20)).getContent()),
+        () -> touchDocumentPage(documents.findByDriverId(driver.getId(), PageRequest.of(0, 2))),
         () -> {
           createDocument(4);
           createDocument(5);
@@ -154,11 +153,46 @@ class NPlusOneRepositoryAuditTest {
         hotspots,
         "DriverDocumentRepository.findAll(Pageable) — admin, one driver per row",
         () -> createDocumentForNewDriver(0),
-        () -> touchDocuments(documents.findAll(PageRequest.of(0, 50)).getContent()),
+        () -> touchDocumentPage(documents.findAll(PageRequest.of(0, 2))),
         () -> {
           createDocumentForNewDriver(1);
           createDocumentForNewDriver(2);
           createDocumentForNewDriver(3);
+        },
+        reporter);
+
+    recordHotspot(
+        counter,
+        hotspots,
+        "DriverDocumentRepository.findByDriverIdAndDocumentType (page smaller than the total)",
+        () -> {
+          createDocumentOfType(10, DocumentTypeEnum.CRLV);
+          createDocumentOfType(11, DocumentTypeEnum.CRLV);
+        },
+        () ->
+            touchDocumentPage(
+                documents.findByDriverIdAndDocumentType(
+                    driver.getId(), DocumentTypeEnum.CRLV, PageRequest.of(0, 2))),
+        () -> {
+          createDocumentOfType(12, DocumentTypeEnum.CRLV);
+          createDocumentOfType(13, DocumentTypeEnum.CRLV);
+          createDocumentOfType(14, DocumentTypeEnum.CRLV);
+        },
+        reporter);
+
+    recordHotspot(
+        counter,
+        hotspots,
+        "DriverDocumentRepository.findByDriverIdAndStatus (page smaller than the total)",
+        () -> {},
+        () ->
+            touchDocumentPage(
+                documents.findByDriverIdAndStatus(
+                    driver.getId(), DocumentStatusEnum.PENDING, PageRequest.of(0, 2))),
+        () -> {
+          createDocument(15);
+          createDocument(16);
+          createDocument(17);
         },
         reporter);
 
@@ -268,9 +302,14 @@ class NPlusOneRepositoryAuditTest {
   }
 
   private void createDocument(int index) {
+    createDocumentOfType(
+        index, DocumentTypeEnum.values()[index % DocumentTypeEnum.values().length]);
+  }
+
+  private void createDocumentOfType(int index, DocumentTypeEnum type) {
     DriverDocumentModel document = new DriverDocumentModel();
     document.setDriver(driver);
-    document.setDocumentType(DocumentTypeEnum.values()[index % DocumentTypeEnum.values().length]);
+    document.setDocumentType(type);
     document.setStatus(DocumentStatusEnum.PENDING);
     document.setFile(saveMedia());
     document.setReviewedBy(
@@ -321,10 +360,6 @@ class NPlusOneRepositoryAuditTest {
     createContractWithStatus(ContractStatus.AWAITING_SIGNATURES, index);
   }
 
-  private void createContractWithStatus(ContractStatus status) {
-    createContractWithStatus(status, 0);
-  }
-
   private void createContractWithStatus(ContractStatus status, int dayOffset) {
     LocalDate startsOn = LocalDate.now().plusDays(dayOffset);
     ContractModel contract = new ContractModel();
@@ -352,6 +387,13 @@ class NPlusOneRepositoryAuditTest {
             vehicle.getPhotoDocument().getToken();
           }
         });
+  }
+
+  private static void touchDocumentPage(Page<DriverDocumentModel> page) {
+    assertThat(page.getContent()).hasSize(2);
+    assertThat(page.getTotalElements()).isGreaterThan(page.getContent().size());
+    assertThat(page.getContent()).extracting(DriverDocumentModel::getToken).doesNotHaveDuplicates();
+    touchDocuments(page.getContent());
   }
 
   private static void touchDocuments(List<DriverDocumentModel> rows) {

@@ -120,7 +120,7 @@ audit-n-plus-one-suite:
 	$(MVNW) test \
 		-Dspring.jpa.properties.hibernate.session_factory.statement_inspector=br.com.vanep.shared.nplusone.NPlusOneDetector \
 		-Dspring.jpa.properties.hibernate.session.events.auto=br.com.vanep.shared.nplusone.NPlusOneSessionListener
-	@test -f target/n-plus-one-report.txt && sort -t$$'\t' -k2,2 -u target/n-plus-one-report.txt | sort -rn || echo "=> nenhum select repetido numa sessão"
+	@test -f target/n-plus-one-report.txt && sort -t"$$(printf '\t')" -k2,2 -u target/n-plus-one-report.txt | sort -rn || echo "=> nenhum select repetido numa sessão"
 
 test-coverage:
 	$(MVNW) verify
