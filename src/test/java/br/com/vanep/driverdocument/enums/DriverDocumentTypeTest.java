@@ -2,6 +2,7 @@ package br.com.vanep.driverdocument.enums;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.time.LocalDate;
 import java.util.Arrays;
 import org.junit.jupiter.api.Test;
 
@@ -26,5 +27,21 @@ class DriverDocumentTypeTest {
             "VEHICLE_PHOTO",
             "RESIDENCE_PROOF",
             "OTHER");
+  }
+
+  @Test
+  void theAuthorizationAndTheCourseExpireWithinFiveYears() {
+    LocalDate today = LocalDate.of(2026, 11, 20);
+
+    assertThat(DriverDocumentType.MUNICIPAL_AUTHORIZATION.latestExpiryOn(today))
+        .isEqualTo(LocalDate.of(2031, 11, 20));
+    assertThat(DriverDocumentType.SCHOOL_DRIVER_COURSE.latestExpiryOn(today))
+        .isEqualTo(LocalDate.of(2031, 11, 20));
+  }
+
+  @Test
+  void theCriminalRecordHasNoUpperLimit() {
+    assertThat(DriverDocumentType.CRIMINAL_RECORD.latestExpiryOn(LocalDate.of(2026, 11, 20)))
+        .isEqualTo(LocalDate.MAX);
   }
 }

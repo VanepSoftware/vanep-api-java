@@ -26,11 +26,14 @@ public class DriverDocumentMapper {
         review.getStatus(),
         review.getReviewMethod(),
         review.getExternalCheckId(),
+        review.getRejectionReasonCode(),
         review.getRejectionReason(),
         reviewedByUserToken,
         review.getReviewedAt(),
+        review.getDataCorrectedAt(),
         document.getNotifiedAt(),
         document.isActive(),
+        document.getVersion(),
         document.getCreatedAt(),
         document.getUpdatedAt());
   }

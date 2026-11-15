@@ -122,41 +122,41 @@
 > Depends on: PR 4 | Parallel with: —
 > Order: test → erro → policy → request DTO → service → media → controller → response DTO → mensagens
 
-- [ ] 5.1 Criar branch `VAN-86/5-review-and-submissions` de dentro da branch do PR 4
-- [ ] 5.1a Testes da `ApiProblemException` (D20) num controller de teste: a resposta tem o status, o `code` igual à chave, o `detail` com o texto pt-BR da chave, e as propriedades extras; um `ResponseStatusException` antigo continua com a resposta de hoje
-- [ ] 5.1b `shared.error.ApiProblemException` estendendo a `ErrorResponseException`, e o ajuste do `ApiErrorAdvice` se o teste pedir. Teste 5.1a verde
-- [ ] 5.1c Migration `V76__one_pending_submission_and_rejection_code.sql` com os passos da `V76` no Migration Plan
-- [ ] 5.2 Testes da `DocumentReviewPolicy` (spec `document-review`): recusar sem código → `reason_code_required`; `OTHER` sem mensagem → `reason_required`; outro código sem mensagem → aceito; aprovar limpa código e mensagem
-- [ ] 5.3 Testes de slice da decisão nos dois documentos:
+- [x] 5.1 Criar branch `VAN-86/5-review-and-submissions` de dentro da branch do PR 4
+- [x] 5.1a Testes da `ApiProblemException` (D20) num controller de teste: a resposta tem o status, o `code` igual à chave, o `detail` com o texto pt-BR da chave, e as propriedades extras; um `ResponseStatusException` antigo continua com a resposta de hoje
+- [x] 5.1b `shared.error.ApiProblemException` estendendo a `ErrorResponseException`, e o ajuste do `ApiErrorAdvice` se o teste pedir. Teste 5.1a verde
+- [x] 5.1c Migration `V76__one_pending_submission_and_rejection_code.sql` com os passos da `V76` no Migration Plan
+- [x] 5.2 Testes da `DocumentReviewPolicy` (spec `document-review`): recusar sem código → `reason_code_required`; `OTHER` sem mensagem → `reason_required`; outro código sem mensagem → aceito; aprovar limpa código e mensagem
+- [x] 5.3 Testes de slice da decisão nos dois documentos:
   - `PUT /status` com `update_*_document` e sem `review_documents` → 403, e com `review_documents` → 200;
   - versão diferente → 409 `document.review.stale`, sem mudar nada;
   - `ObjectOptimisticLockingFailureException` → 409 com a mesma chave;
   - a resposta traz `version` e `rejectionReasonCode`;
   - cada erro da tabela do D20 deste PR traz o `code`
-- [ ] 5.4 Testes do D10, nos dois documentos:
+- [x] 5.4 Testes do D10, nos dois documentos:
   - `/file` e `DELETE` do dono em envio aprovado ou recusado → 409 `document.submission.reviewed`, e em pendente → aceito e continua `PENDING`;
   - o admin com `delete_*` remove um envio revisado;
   - segundo `PENDING` do mesmo tipo → 409 `document.submission.pending_exists`, inclusive no restore;
   - um envio novo substitui o recusado; aprovar substitui o aprovado anterior;
   - o substituído fica sem arquivo, com a decisão, fora da listagem e fora das credenciais;
   - renovar a vistoria antes de vencer mantém `VEHICLE_INSPECTION` satisfeito
-- [ ] 5.5 Testes dos arquivos:
+- [x] 5.5 Testes dos arquivos:
   - o objeto só é apagado depois do commit, e num rollback continua no storage (`StorageService` em mock);
   - `Cache-Control`: `v` igual ao token da mídia → `private, max-age=86400, immutable`; sem `v` ou diferente → `private, no-cache`
-- [ ] 5.6 `DocumentReviewPolicy` com o código; `DocumentStatusUpdateRequestDTO` com `rejectionReasonCode` e `version` (`@NotNull`); `DocumentReviewService` conferindo a versão; os erros da policy e do serviço pela `ApiProblemException`. Teste 5.2 verde
-- [ ] 5.7 `MediaDiscardedEvent` e `MediaFileService.discard` apagando o objeto em `@TransactionalEventListener(AFTER_COMMIT)`; `MediaResponder` recebendo o `v` e mandando o `Cache-Control` em todas as rotas de arquivo. Teste 5.5 verde, e os testes de foto existentes continuam verdes
-- [ ] 5.8 Um `DocumentSubmissionRules` em `shared.document` com a regra do D10 (o que muda em cada status), usado pelos dois serviços; `DriverDocumentService`, `DriverDocumentFileService`, `VehicleDocumentService` e `VehicleDocumentFileService` com o 409, o pendente único (com a violação do índice traduzida) e a substituição; `DocumentReviewService` substituindo na aprovação. Teste 5.4 verde
-- [ ] 5.9 `ApiErrorAdvice` com o 409 do `ObjectOptimisticLockingFailureException`; `PUT /status` dos dois controllers com `hasAuthority('review_documents')`; `version` e código nos response DTOs e nos mappers. Teste 5.3 verde
-- [ ] 5.10 Mensagens `document.review.reason_code_required`, `document.review.stale`, `document.submission.reviewed`, `document.submission.pending_exists` e os rótulos `document.rejection_reason.*` nos dois `messages*.properties`
-- [ ] 5.10a Testes das datas (D21):
+- [x] 5.6 `DocumentReviewPolicy` com o código; `DocumentStatusUpdateRequestDTO` com `rejectionReasonCode` e `version` (`@NotNull`); `DocumentReviewService` conferindo a versão; os erros da policy e do serviço pela `ApiProblemException`. Teste 5.2 verde
+- [x] 5.7 `MediaDiscardedEvent` e `MediaFileService.discard` apagando o objeto em `@TransactionalEventListener(AFTER_COMMIT)`; `MediaResponder` recebendo o `v` e mandando o `Cache-Control` em todas as rotas de arquivo. Teste 5.5 verde, e os testes de foto existentes continuam verdes
+- [x] 5.8 Um `DocumentSubmissionRules` em `shared.document` com a regra do D10 (o que muda em cada status), usado pelos dois serviços; `DriverDocumentService`, `DriverDocumentFileService`, `VehicleDocumentService` e `VehicleDocumentFileService` com o 409, o pendente único (com a violação do índice traduzida) e a substituição; `DocumentReviewService` substituindo na aprovação. Teste 5.4 verde
+- [x] 5.9 `ApiErrorAdvice` com o 409 do `ObjectOptimisticLockingFailureException`; `PUT /status` dos dois controllers com `hasAuthority('review_documents')`; `version` e código nos response DTOs e nos mappers. Teste 5.3 verde
+- [x] 5.10 Mensagens `document.review.reason_code_required`, `document.review.stale`, `document.submission.reviewed`, `document.submission.pending_exists` e os rótulos `document.rejection_reason.*` nos dois `messages*.properties`
+- [x] 5.10a Testes das datas (D21):
   - `DocumentDatesPolicy`: véspera de hoje → `document.expires_at.past`; hoje → aceito; o último dia do limite → aceito, e o dia seguinte → `document.expires_at.too_far`; sem limite → aceito; sem validade → aceito;
   - `latestExpiryOn` de cada tipo, com o CRLV em 31/12 do ano que vem;
   - slice da aprovação nos dois documentos: 400 com o `code` e o `field` `expiresAt`, e o envio continua `PENDING`, sem os dados
-- [ ] 5.10b `latestExpiryOn(today)` no `DriverDocumentType` e no `VehicleDocumentType`; `shared.document.service.DocumentDatesPolicy`; a aprovação dos dois documentos conferindo a validade que o revisor preenche, com `SchoolTransportCredentialService.today()`; mensagens `document.expires_at.past` e `document.expires_at.too_far`. Testes 5.10a verdes
-- [ ] 5.10c Testes da correção (D25), nos dois documentos: `PUT …/{token}/data` num aprovado → 200 com os dados novos, a decisão, o revisor e o arquivo iguais, e quem corrigiu gravado; num `PENDING`, num recusado ou num substituído → 409 `document.data.not_approved`; versão velha → 409 `document.review.stale`; sem um obrigatório → 400 `document.review.field_required`; validade passada → aceita, e acima do limite → `too_far`; o dono → 403; nenhum e-mail
-- [ ] 5.10d `DocumentDataCorrectionRequestDTO`; a correção no `DocumentReviewService` e nos dois serviços, com as regras da aprovação e a validade passada aceita; as rotas `/data` nos dois controllers com `review_documents`; mensagem `document.data.not_approved`. Testes 5.10c verdes
-- [ ] 5.11 `make lint` + `./mvnw verify -B`
-- [ ] 5.12 QA da regra 55:
+- [x] 5.10b `latestExpiryOn(today)` no `DriverDocumentType` e no `VehicleDocumentType`; `shared.document.service.DocumentDatesPolicy`; a aprovação dos dois documentos conferindo a validade que o revisor preenche, com `SchoolTransportCredentialService.today()`; mensagens `document.expires_at.past` e `document.expires_at.too_far`. Testes 5.10a verdes
+- [x] 5.10c Testes da correção (D25), nos dois documentos: `PUT …/{token}/data` num aprovado → 200 com os dados novos, a decisão, o revisor e o arquivo iguais, e quem corrigiu gravado; num `PENDING`, num recusado ou num substituído → 409 `document.data.not_approved`; versão velha → 409 `document.review.stale`; sem um obrigatório → 400 `document.review.field_required`; validade passada → aceita, e acima do limite → `too_far`; o dono → 403; nenhum e-mail
+- [x] 5.10d `DocumentDataCorrectionRequestDTO`; a correção no `DocumentReviewService` e nos dois serviços, com as regras da aprovação e a validade passada aceita; as rotas `/data` nos dois controllers com `review_documents`; mensagem `document.data.not_approved`. Testes 5.10c verdes
+- [x] 5.11 `make lint` + `./mvnw verify -B`
+- [x] 5.12 QA da regra 55:
   - a correção de uma validade digitada errada num documento aprovado, conferida no endpoint de credenciais; a correção num pendente → 409; o dono → 403;
   - recusa com cada código, e `OTHER` com e sem mensagem;
   - dois `curl` com a mesma versão, o segundo → 409;

@@ -3,6 +3,7 @@ package br.com.vanep.driverdocument.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -18,12 +19,14 @@ import br.com.vanep.driverdocument.repository.DriverDocumentRepository;
 import br.com.vanep.media.enums.MediaSlot;
 import br.com.vanep.media.model.MediaFileModel;
 import br.com.vanep.media.service.MediaFileService;
+import br.com.vanep.schooltransportcredential.service.SchoolTransportCredentialService;
 import br.com.vanep.shared.document.dto.DocumentStatusUpdateRequestDTO;
 import br.com.vanep.shared.document.enums.DocumentDecisionStatus;
 import br.com.vanep.shared.document.enums.DocumentStatus;
 import br.com.vanep.shared.document.enums.ReviewMethod;
 import br.com.vanep.shared.document.model.DocumentReview;
 import br.com.vanep.shared.document.service.DocumentReviewService;
+import br.com.vanep.shared.document.service.DocumentSubmissionRules;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.service.UserService;
@@ -47,6 +50,7 @@ class DriverDocumentServiceTest {
   @Mock private DriverRepository driverRepository;
   @Mock private UserService userService;
   @Mock private DocumentReviewService reviewService;
+  @Mock private DocumentSubmissionRules submissionRules;
   @Mock private DriverDocumentMapper mapper;
   @Mock private MediaFileService media;
   @Mock private MessageSource messages;
@@ -107,12 +111,14 @@ class DriverDocumentServiceTest {
     saved.setToken("doc-123");
     saved.setDriver(driver);
     saved.setDocumentType(DriverDocumentType.CRIMINAL_RECORD);
-    when(driverDocumentRepository.save(any(DriverDocumentModel.class))).thenReturn(saved);
+    when(driverDocumentRepository.saveAndFlush(any(DriverDocumentModel.class))).thenReturn(saved);
     MediaFileModel stored = new MediaFileModel();
     when(media.store(MediaSlot.DRIVER_DOCUMENT_FILE, "doc-123", request.file())).thenReturn(stored);
 
     service.create(request, "user-token-123");
 
+    verify(submissionRules).requireNoOtherPending(any(), any());
+    verify(submissionRules).supersedeRejected(any());
     assertThat(saved.getFile()).isSameAs(stored);
     assertThat(saved.getDocumentNumber()).isNull();
     assertThat(saved.getExpiresAt()).isNull();
@@ -123,56 +129,41 @@ class DriverDocumentServiceTest {
     DriverDocumentModel existing = new DriverDocumentModel();
     existing.setToken("doc-123");
     existing.setDriver(driver);
+    existing.setDocumentType(DriverDocumentType.CRIMINAL_RECORD);
 
     when(driverDocumentRepository.findByToken("doc-123")).thenReturn(Optional.of(existing));
-    when(driverDocumentRepository.save(any(DriverDocumentModel.class))).thenReturn(existing);
+    when(driverDocumentRepository.saveAndFlush(any(DriverDocumentModel.class)))
+        .thenReturn(existing);
 
-    existing.setDocumentType(DriverDocumentType.CRIMINAL_RECORD);
+    LocalDate expiry = SchoolTransportCredentialService.today().plusMonths(2);
     DocumentStatusUpdateRequestDTO statusRequest =
         new DocumentStatusUpdateRequestDTO(
             DocumentDecisionStatus.APPROVED,
             ReviewMethod.MANUAL,
             null,
             null,
+            null,
             " CERT-1 ",
-            LocalDate.of(2027, 1, 1));
+            expiry,
+            0L);
     DocumentReview approved = new DocumentReview();
     approved.setStatus(DocumentStatus.APPROVED);
     approved.setReviewMethod(ReviewMethod.MANUAL);
-    when(reviewService.review(statusRequest, null, DriverDocumentType.CRIMINAL_RECORD, "admin-uid"))
+    when(reviewService.review(
+            eq(existing),
+            eq(statusRequest),
+            eq(DriverDocumentType.CRIMINAL_RECORD),
+            any(LocalDate.class),
+            eq("admin-uid")))
         .thenReturn(approved);
 
     service.updateStatus("doc-123", statusRequest, "admin-uid");
 
-    verify(driverDocumentRepository).save(existing);
+    verify(submissionRules).supersedeAllBut(any(), any());
+    verify(driverDocumentRepository).saveAndFlush(existing);
     assertThat(existing.getReview()).isSameAs(approved);
     assertThat(existing.getDocumentNumber()).isEqualTo("CERT-1");
-    assertThat(existing.getExpiresAt()).isEqualTo(LocalDate.of(2027, 1, 1));
-  }
-
-  @Test
-  void aRejectionDoesNotStoreTheDataOfItsBody() {
-    DriverDocumentModel existing = new DriverDocumentModel();
-    existing.setToken("doc-123");
-    existing.setDriver(driver);
-    existing.setDocumentType(DriverDocumentType.CRIMINAL_RECORD);
-    when(driverDocumentRepository.findByToken("doc-123")).thenReturn(Optional.of(existing));
-    when(driverDocumentRepository.save(any(DriverDocumentModel.class))).thenReturn(existing);
-    DocumentStatusUpdateRequestDTO rejection =
-        new DocumentStatusUpdateRequestDTO(
-            DocumentDecisionStatus.REJECTED,
-            ReviewMethod.MANUAL,
-            null,
-            "Ilegível",
-            "CERT-1",
-            LocalDate.of(2027, 1, 1));
-    when(reviewService.review(rejection, null, DriverDocumentType.CRIMINAL_RECORD, "admin-uid"))
-        .thenReturn(new DocumentReview());
-
-    service.updateStatus("doc-123", rejection, "admin-uid");
-
-    assertThat(existing.getDocumentNumber()).isNull();
-    assertThat(existing.getExpiresAt()).isNull();
+    assertThat(existing.getExpiresAt()).isEqualTo(expiry);
   }
 
   @Test
@@ -207,5 +198,6 @@ class DriverDocumentServiceTest {
     service.restore("doc-123");
 
     verify(driverDocumentRepository).restoreByToken("doc-123");
+    verify(submissionRules).acceptRestored(any(), any());
   }
 }

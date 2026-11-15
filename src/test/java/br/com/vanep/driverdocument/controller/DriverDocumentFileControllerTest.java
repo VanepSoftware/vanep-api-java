@@ -93,8 +93,8 @@ class DriverDocumentFileControllerTest {
     mockMvc
         .perform(
             multipart("/api/driver-documents")
-                .file(new MockMultipartFile("file", "record.pdf", "application/pdf", pdf()))
-                .param("documentType", "CRIMINAL_RECORD")
+                .file(new MockMultipartFile("file", "course.pdf", "application/pdf", pdf()))
+                .param("documentType", "SCHOOL_DRIVER_COURSE")
                 .with(ownerJwt()))
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.token").exists())
@@ -146,7 +146,7 @@ class DriverDocumentFileControllerTest {
   }
 
   @Test
-  void swappingTheFileOfAnApprovedDocumentReturnsItToPending() throws Exception {
+  void anApprovedDocumentKeepsItsFile() throws Exception {
     upload(pdf(), "crlv.pdf", "application/pdf", ownerJwt());
     DriverDocumentModel approved = documents.findByToken(documentToken).orElseThrow();
     approved.getReview().setStatus(DocumentStatus.APPROVED);
@@ -154,13 +154,19 @@ class DriverDocumentFileControllerTest {
     approved.getReview().setReviewedAt(Instant.now());
     documents.save(approved);
 
-    upload(pdf(), "crlv-novo.pdf", "application/pdf", ownerJwt());
+    String file = approved.getFile().getToken();
+
+    mockMvc
+        .perform(
+            multipart(path())
+                .file(new MockMultipartFile("file", "crlv-novo.pdf", "application/pdf", pdf()))
+                .with(ownerJwt()))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("document.submission.reviewed"));
 
     DriverDocumentModel stored = documents.findByToken(documentToken).orElseThrow();
-    assertThat(stored.getReview().getStatus()).isEqualTo(DocumentStatus.PENDING);
-    assertThat(stored.getReview().getReviewMethod()).isNull();
-    assertThat(stored.getReview().getReviewedAt()).isNull();
-    assertThat(stored.getReview().getReviewedBy()).isNull();
+    assertThat(stored.getReview().getStatus()).isEqualTo(DocumentStatus.APPROVED);
+    assertThat(stored.getFile().getToken()).isEqualTo(file);
   }
 
   @Test

@@ -19,6 +19,12 @@ public final class SecurityHelper {
     return Optional.empty();
   }
 
+  public static boolean hasAuthority(Authentication authentication, String authority) {
+    return authentication != null
+        && authentication.getAuthorities().stream()
+            .anyMatch(granted -> authority.equals(granted.getAuthority()));
+  }
+
   public static String requireCallerUid(Authentication authentication) {
     return getCallerUid(authentication)
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Unauthorized"));

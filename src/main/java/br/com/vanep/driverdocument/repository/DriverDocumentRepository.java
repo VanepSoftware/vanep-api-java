@@ -42,6 +42,10 @@ public interface DriverDocumentRepository
       @Param("status") DocumentStatus status,
       Pageable pageable);
 
+  @EntityGraph(attributePaths = {"file"})
+  List<DriverDocumentModel> findByDriverIdAndDocumentTypeAndSupersededAtIsNull(
+      Long driverId, DriverDocumentType documentType);
+
   @Modifying
   @Query(
       value = "UPDATE driver_document SET deleted_at = NULL WHERE token = :token",

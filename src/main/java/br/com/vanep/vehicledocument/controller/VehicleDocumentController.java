@@ -2,6 +2,7 @@ package br.com.vanep.vehicledocument.controller;
 
 import br.com.vanep.auth.security.SecurityHelper;
 import br.com.vanep.media.web.MediaResponder;
+import br.com.vanep.shared.document.dto.DocumentDataCorrectionRequestDTO;
 import br.com.vanep.shared.document.dto.DocumentStatusUpdateRequestDTO;
 import br.com.vanep.shared.document.enums.DocumentStatus;
 import br.com.vanep.vehicledocument.dto.VehicleDocumentRequestDTO;
@@ -80,7 +81,7 @@ public class VehicleDocumentController {
   }
 
   @PutMapping("/vehicle-documents/{token}/status")
-  @PreAuthorize("hasAuthority('update_vehicle_document')")
+  @PreAuthorize("hasAuthority('review_documents')")
   public VehicleDocumentResponseDTO updateStatus(
       @PathVariable String token,
       @Valid @RequestBody DocumentStatusUpdateRequestDTO request,
@@ -88,13 +89,22 @@ public class VehicleDocumentController {
     return service.updateStatus(token, request, SecurityHelper.requireCallerUid(authentication));
   }
 
+  @PutMapping("/vehicle-documents/{token}/data")
+  @PreAuthorize("hasAuthority('review_documents')")
+  public VehicleDocumentResponseDTO correctData(
+      @PathVariable String token,
+      @Valid @RequestBody DocumentDataCorrectionRequestDTO request,
+      Authentication authentication) {
+    return service.correctData(token, request, SecurityHelper.requireCallerUid(authentication));
+  }
+
   @DeleteMapping("/vehicle-documents/{token}")
   @PreAuthorize(
       "hasAuthority('delete_vehicle_document')"
           + " or @sec.isVehicleDocumentOwner(#token, authentication)")
   @ResponseStatus(HttpStatus.NO_CONTENT)
-  public void delete(@PathVariable String token) {
-    service.delete(token);
+  public void delete(@PathVariable String token, Authentication authentication) {
+    service.delete(token, SecurityHelper.hasAuthority(authentication, "delete_vehicle_document"));
   }
 
   @PostMapping("/vehicle-documents/{token}/restore")
@@ -117,7 +127,8 @@ public class VehicleDocumentController {
   @GetMapping("/vehicle-documents/{token}/file")
   @PreAuthorize(
       "hasAuthority('show_vehicle_document') or @sec.isVehicleDocumentOwner(#token, authentication)")
-  public ResponseEntity<InputStreamResource> downloadFile(@PathVariable String token) {
-    return mediaResponder.respond(fileService.requireFile(token));
+  public ResponseEntity<InputStreamResource> downloadFile(
+      @PathVariable String token, @RequestParam(name = "v", required = false) String version) {
+    return mediaResponder.respond(fileService.requireFile(token), version);
   }
 }

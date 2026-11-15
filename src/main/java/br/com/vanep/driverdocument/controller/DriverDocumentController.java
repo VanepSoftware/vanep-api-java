@@ -7,6 +7,7 @@ import br.com.vanep.driverdocument.enums.DriverDocumentType;
 import br.com.vanep.driverdocument.service.DriverDocumentFileService;
 import br.com.vanep.driverdocument.service.DriverDocumentService;
 import br.com.vanep.media.web.MediaResponder;
+import br.com.vanep.shared.document.dto.DocumentDataCorrectionRequestDTO;
 import br.com.vanep.shared.document.dto.DocumentStatusUpdateRequestDTO;
 import br.com.vanep.shared.document.enums.DocumentStatus;
 import jakarta.validation.Valid;
@@ -82,7 +83,7 @@ public class DriverDocumentController {
   }
 
   @PutMapping("/{token}/status")
-  @PreAuthorize("hasAuthority('update_driver_document')")
+  @PreAuthorize("hasAuthority('review_documents')")
   public DriverDocumentResponseDTO updateStatus(
       @PathVariable String token,
       @Valid @RequestBody DocumentStatusUpdateRequestDTO request,
@@ -90,12 +91,21 @@ public class DriverDocumentController {
     return service.updateStatus(token, request, SecurityHelper.requireCallerUid(authentication));
   }
 
+  @PutMapping("/{token}/data")
+  @PreAuthorize("hasAuthority('review_documents')")
+  public DriverDocumentResponseDTO correctData(
+      @PathVariable String token,
+      @Valid @RequestBody DocumentDataCorrectionRequestDTO request,
+      Authentication authentication) {
+    return service.correctData(token, request, SecurityHelper.requireCallerUid(authentication));
+  }
+
   @DeleteMapping("/{token}")
   @PreAuthorize(
       "hasAuthority('delete_driver_document') or @sec.isDriverDocumentOwner(#token, authentication)")
   @ResponseStatus(HttpStatus.NO_CONTENT)
-  public void delete(@PathVariable String token) {
-    service.delete(token);
+  public void delete(@PathVariable String token, Authentication authentication) {
+    service.delete(token, SecurityHelper.hasAuthority(authentication, "delete_driver_document"));
   }
 
   @PostMapping("/{token}/restore")
@@ -115,7 +125,8 @@ public class DriverDocumentController {
   @GetMapping("/{token}/file")
   @PreAuthorize(
       "hasAuthority('show_driver_document') or @sec.isDriverDocumentOwner(#token, authentication)")
-  public ResponseEntity<InputStreamResource> downloadFile(@PathVariable String token) {
-    return mediaResponder.respond(fileService.requireFile(token));
+  public ResponseEntity<InputStreamResource> downloadFile(
+      @PathVariable String token, @RequestParam(name = "v", required = false) String version) {
+    return mediaResponder.respond(fileService.requireFile(token), version);
   }
 }

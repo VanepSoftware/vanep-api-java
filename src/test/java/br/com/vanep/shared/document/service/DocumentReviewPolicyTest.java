@@ -4,9 +4,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import br.com.vanep.driverdocument.enums.DriverDocumentType;
 import br.com.vanep.shared.document.enums.DocumentDecisionStatus;
+import br.com.vanep.shared.document.enums.DocumentRejectionReason;
 import br.com.vanep.shared.document.enums.DocumentReviewViolation;
 import br.com.vanep.shared.document.enums.DocumentStatus;
 import br.com.vanep.shared.document.enums.ReviewMethod;
+import br.com.vanep.shared.document.model.DocumentDecision;
 import br.com.vanep.shared.document.model.DocumentReview;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.vehicledocument.enums.VehicleDocumentType;
@@ -14,6 +16,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
@@ -21,28 +24,37 @@ class DocumentReviewPolicyTest {
 
   private final DocumentReviewPolicy policy = new DocumentReviewPolicy();
 
+  @Test
+  void rejectingWithoutACodeIsRefused() {
+    assertThat(policy.validate(rejection(null, "Ilegível"), true))
+        .contains(DocumentReviewViolation.REASON_CODE_REQUIRED);
+  }
+
   @ParameterizedTest
   @NullSource
   @ValueSource(strings = {"", "   "})
-  void rejectingWithoutReasonIsRefused(String reason) {
-    assertThat(policy.validate(DocumentDecisionStatus.REJECTED, reason, true))
+  void rejectingForAnotherReasonWithoutAMessageIsRefused(String reason) {
+    assertThat(policy.validate(rejection(DocumentRejectionReason.OTHER, reason), true))
         .contains(DocumentReviewViolation.REASON_REQUIRED);
   }
 
-  @Test
-  void rejectingWithReasonIsAllowedEvenWithoutFile() {
-    assertThat(policy.validate(DocumentDecisionStatus.REJECTED, "Ilegível", false)).isEmpty();
+  @ParameterizedTest
+  @EnumSource(
+      value = DocumentRejectionReason.class,
+      names = "OTHER",
+      mode = EnumSource.Mode.EXCLUDE)
+  void rejectingWithAnyOtherCodeNeedsNoMessage(DocumentRejectionReason code) {
+    assertThat(policy.validate(rejection(code, null), false)).isEmpty();
   }
 
   @Test
   void approvingWithoutFileIsRefused() {
-    assertThat(policy.validate(DocumentDecisionStatus.APPROVED, null, false))
-        .contains(DocumentReviewViolation.FILE_REQUIRED);
+    assertThat(policy.validate(approval(), false)).contains(DocumentReviewViolation.FILE_REQUIRED);
   }
 
   @Test
   void approvingWithFileIsAllowed() {
-    assertThat(policy.validate(DocumentDecisionStatus.APPROVED, null, true)).isEmpty();
+    assertThat(policy.validate(approval(), true)).isEmpty();
   }
 
   @Test
@@ -52,7 +64,10 @@ class DocumentReviewPolicyTest {
 
     DocumentReview review =
         policy.decide(
-            DocumentDecisionStatus.APPROVED, ReviewMethod.MANUAL, "ext-1", null, admin, now);
+            new DocumentDecision(
+                DocumentDecisionStatus.APPROVED, ReviewMethod.MANUAL, "ext-1", null, null),
+            admin,
+            now);
 
     assertThat(review.getStatus()).isEqualTo(DocumentStatus.APPROVED);
     assertThat(review.getReviewMethod()).isEqualTo(ReviewMethod.MANUAL);
@@ -62,43 +77,65 @@ class DocumentReviewPolicyTest {
   }
 
   @Test
-  void aRejectionKeepsTheTrimmedReason() {
+  void aRejectionKeepsTheCodeAndTheTrimmedMessage() {
     DocumentReview review =
         policy.decide(
-            DocumentDecisionStatus.REJECTED,
-            null,
-            null,
-            "  Ilegível  ",
+            rejection(DocumentRejectionReason.OTHER, "  Foto de outro documento  "),
             new UserModel(),
             Instant.now());
 
-    assertThat(review.getRejectionReason()).isEqualTo("Ilegível");
+    assertThat(review.getRejectionReasonCode()).isEqualTo(DocumentRejectionReason.OTHER);
+    assertThat(review.getRejectionReason()).isEqualTo("Foto de outro documento");
   }
 
   @Test
-  void anApprovalDropsAReasonSentByMistake() {
+  void aRejectionWithABlankMessageStoresNoMessage() {
     DocumentReview review =
         policy.decide(
-            DocumentDecisionStatus.APPROVED,
-            null,
-            null,
-            "Ilegível",
-            new UserModel(),
-            Instant.now());
+            rejection(DocumentRejectionReason.ILLEGIBLE, "  "), new UserModel(), Instant.now());
 
+    assertThat(review.getRejectionReasonCode()).isEqualTo(DocumentRejectionReason.ILLEGIBLE);
     assertThat(review.getRejectionReason()).isNull();
   }
 
   @Test
-  void theCleanReviewClearsStatusReviewerTimeMethodAndReason() {
+  void anApprovalClearsTheCodeAndTheMessageSentByMistake() {
+    DocumentReview review =
+        policy.decide(
+            new DocumentDecision(
+                DocumentDecisionStatus.APPROVED,
+                null,
+                null,
+                DocumentRejectionReason.EXPIRED,
+                "Vencido"),
+            new UserModel(),
+            Instant.now());
+
+    assertThat(review.getRejectionReasonCode()).isNull();
+    assertThat(review.getRejectionReason()).isNull();
+  }
+
+  @Test
+  void theCleanReviewClearsEverything() {
     DocumentReview review = policy.clear();
 
     assertThat(review.getStatus()).isEqualTo(DocumentStatus.PENDING);
     assertThat(review.getReviewedBy()).isNull();
     assertThat(review.getReviewedAt()).isNull();
     assertThat(review.getReviewMethod()).isNull();
+    assertThat(review.getRejectionReasonCode()).isNull();
     assertThat(review.getRejectionReason()).isNull();
     assertThat(review.getExternalCheckId()).isNull();
+  }
+
+  private static DocumentDecision rejection(DocumentRejectionReason code, String reason) {
+    return new DocumentDecision(
+        DocumentDecisionStatus.REJECTED, ReviewMethod.MANUAL, null, code, reason);
+  }
+
+  private static DocumentDecision approval() {
+    return new DocumentDecision(
+        DocumentDecisionStatus.APPROVED, ReviewMethod.MANUAL, null, null, null);
   }
 
   @Test

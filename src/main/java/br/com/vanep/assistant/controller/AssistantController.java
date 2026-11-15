@@ -27,6 +27,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
@@ -144,7 +145,8 @@ public class AssistantController {
 
   @GetMapping("/{token}/photo")
   @PreAuthorize("@sec.isAssistantParty(#token, authentication)")
-  public ResponseEntity<InputStreamResource> downloadPhoto(@PathVariable String token) {
-    return mediaResponder.respond(photoService.requirePhoto(token));
+  public ResponseEntity<InputStreamResource> downloadPhoto(
+      @PathVariable String token, @RequestParam(name = "v", required = false) String version) {
+    return mediaResponder.respond(photoService.requirePhoto(token), version);
   }
 }

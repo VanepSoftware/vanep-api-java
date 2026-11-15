@@ -2,6 +2,7 @@ package br.com.vanep.vehicledocument.model;
 
 import br.com.vanep.media.model.MediaFileModel;
 import br.com.vanep.shared.document.model.DocumentReview;
+import br.com.vanep.shared.document.model.DocumentSubmission;
 import br.com.vanep.vehicle.model.VehicleModel;
 import br.com.vanep.vehicledocument.enums.VehicleDocumentType;
 import jakarta.persistence.Column;
@@ -33,7 +34,7 @@ import org.hibernate.annotations.UpdateTimestamp;
 @SoftDelete(columnName = "deleted_at", strategy = SoftDeleteType.TIMESTAMP)
 @Getter
 @Setter
-public class VehicleDocumentModel {
+public class VehicleDocumentModel implements DocumentSubmission {
 
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -79,6 +80,16 @@ public class VehicleDocumentModel {
   @UpdateTimestamp
   @Column(name = "updated_at", nullable = false)
   private Instant updatedAt;
+
+  @Override
+  public MediaFileModel getReviewedFile() {
+    return file;
+  }
+
+  @Override
+  public void setReviewedFile(MediaFileModel file) {
+    this.file = file;
+  }
 
   @PrePersist
   void onCreate() {

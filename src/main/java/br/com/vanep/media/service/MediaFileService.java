@@ -1,6 +1,7 @@
 package br.com.vanep.media.service;
 
 import br.com.vanep.media.enums.MediaSlot;
+import br.com.vanep.media.event.MediaDiscardedEvent;
 import br.com.vanep.media.model.MediaFileModel;
 import br.com.vanep.media.repository.MediaFileRepository;
 import br.com.vanep.media.storage.StorageService;
@@ -9,6 +10,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.HttpStatus;
@@ -26,6 +28,7 @@ public class MediaFileService {
   private final StorageService storage;
   private final MimeTypeDetector mimeTypeDetector;
   private final MessageSource messages;
+  private final ApplicationEventPublisher events;
   private final long maxPhotoBytes;
   private final long maxDocumentBytes;
 
@@ -34,12 +37,14 @@ public class MediaFileService {
       StorageService storage,
       MimeTypeDetector mimeTypeDetector,
       MessageSource messages,
+      ApplicationEventPublisher events,
       @Value("${vanep.media.max-photo-size-mb}") long maxPhotoSizeMb,
       @Value("${vanep.media.max-document-size-mb}") long maxDocumentSizeMb) {
     this.repository = repository;
     this.storage = storage;
     this.mimeTypeDetector = mimeTypeDetector;
     this.messages = messages;
+    this.events = events;
     this.maxPhotoBytes = maxPhotoSizeMb * BYTES_IN_MB;
     this.maxDocumentBytes = maxDocumentSizeMb * BYTES_IN_MB;
   }
@@ -52,8 +57,19 @@ public class MediaFileService {
     if (file.getSize() > maxSizeFor(slot)) {
       throw payloadTooLarge("media.file.too_large");
     }
+    return store(slot, ownerToken, readAll(file), file.getOriginalFilename());
+  }
 
-    byte[] content = readAll(file);
+  // For content that does not come from a request, such as the seed's files.
+  @Transactional
+  public MediaFileModel store(
+      MediaSlot slot, String ownerToken, byte[] content, String originalName) {
+    if (content.length == 0) {
+      throw badRequest("media.file.required");
+    }
+    if (content.length > maxSizeFor(slot)) {
+      throw payloadTooLarge("media.file.too_large");
+    }
     String mimeType =
         mimeTypeDetector.detect(content).orElseThrow(() -> badRequest("media.mime.not_allowed"));
     if (!slot.allows(mimeType)) {
@@ -66,7 +82,7 @@ public class MediaFileService {
     media.setObjectKey(objectKey(slot, ownerToken, media.getToken(), mimeType));
     media.setMimeType(mimeType);
     media.setSizeBytes((long) content.length);
-    media.setOriginalName(file.getOriginalFilename());
+    media.setOriginalName(originalName);
     media.setVisibility(slot.visibility());
 
     storage.upload(
@@ -81,7 +97,7 @@ public class MediaFileService {
       return;
     }
     repository.delete(media);
-    storage.delete(media.getObjectKey());
+    events.publishEvent(new MediaDiscardedEvent(media.getObjectKey()));
   }
 
   @Transactional(readOnly = true)

@@ -2,7 +2,7 @@
 # Manual QA for the driver-credentials-review change (constitution rule 55). Two parts:
 #  - V72 and V75 against legacy data: a separate database in the throwaway container gets V1..V71
 #    through psql, then the rows V72 must remove or keep, then V72, then the rows V75 must fill,
-#    then V75, and each outcome is checked.
+#    then V75, then the rows V76 must clean, then V76, and each outcome is checked.
 #  - the live API from the branch, on the throwaway database it migrated with Flyway and seeded.
 # Never point it at a shared database: it creates and drops a database and writes rows directly.
 set -euo pipefail
@@ -14,6 +14,11 @@ source "$SCRIPT_DIR/../lib.sh"
 MIGRATION_DB="${QA_MIGRATION_DB:-v72check}"
 SEED_DRIVER_EMAIL="fabio.teixeira@seed.vanep.com.br"
 SEED_CLIENT_EMAIL="ana.souza@seed.vanep.com.br"
+# Dates relative to today in São Paulo, the API's date, so the run never goes stale.
+in_days() { TZ=America/Sao_Paulo date -v"$1"d +%F 2>/dev/null || TZ=America/Sao_Paulo date -d "$1 days" +%F; }
+TODAY=$(in_days +0)
+YESTERDAY=$(in_days -1)
+for n in 60 90 120 150 180 200 300 365; do printf -v "IN_${n}_DAYS" '%s' "$(in_days +$n)"; done
 
 mig_sql() {
   docker exec "$QA_DB_CONTAINER" psql -U "$QA_DB_USER" -d "$MIGRATION_DB" -Atqc "$1"
@@ -286,6 +291,47 @@ check P3 "the ADMIN bundle gets review_documents" "1" \
 check P4 "no other bundle gets it" "0" \
   "$(mig_sql "select count(*) from role_permissions where name <> 'ADMIN' and permissions @> '[\"review_documents\"]'::jsonb")"
 
+# ---------------------------------------------------------------------------------------------
+# Part 1c — PR 5: V76 on the data V75 left
+# ---------------------------------------------------------------------------------------------
+
+mig_sql "
+insert into driver_document (token, driver_id, document_type, status, created_at)
+  select x.token, d.id, 'SCHOOL_DRIVER_COURSE', 'PENDING', x.at
+  from (values ('dd-course-old', now() - interval '2 days'), ('dd-course-new', now() - interval '1 day'))
+       as x(token, at)
+  cross join driver d where d.token = 'd-driver';
+insert into vehicle_document (token, vehicle_id, document_type, expires_at, status, rejection_reason)
+  select 'vd-rejected', id, 'VEHICLE_INSPECTION', date '2027-01-31', 'REJECTED', 'Ilegível'
+  from vehicle where token = 'v-van';
+" >/dev/null
+
+mig_apply "$(ls "$MIGRATIONS"/V76__*.sql)"
+
+table "V76 on legacy data"
+check Q1 "of two pending submissions of the same owner and type, the newest stays pending" "dd-course-new" \
+  "$(mig_sql "select token from driver_document where document_type = 'SCHOOL_DRIVER_COURSE' and superseded_at is null and status = 'PENDING'")"
+check Q2 "the older one is superseded" "1" \
+  "$(mig_sql "select count(*) from driver_document where token = 'dd-course-old' and superseded_at is not null")"
+check Q3 "a rejection without code made before V76 gets OTHER" "OTHER" \
+  "$(mig_sql "select rejection_reason_code from vehicle_document where token = 'vd-rejected'")"
+
+table "V76 constraints"
+mig_check_rejected U1 "a second pending submission of the same owner and type" driver_document_one_pending_key \
+  "insert into driver_document (token, driver_id, document_type) select 'x', id, 'SCHOOL_DRIVER_COURSE' from driver where token = 'd-driver'"
+mig_check_rejected U2 "a second pending van document of the same type" vehicle_document_one_pending_key \
+  "insert into vehicle_document (token, vehicle_id, document_type, expires_at) select 'x' || n, id, 'CRLV', date '2027-01-31' from vehicle, generate_series(1, 2) n where token = 'v-van'"
+mig_check_rejected U3 "a second pending CNH of the same driver" driver_cnh_one_pending_key \
+  "insert into driver_cnh (token, driver_id, registration_number, category, issue_date, valid_until) select 'x', id, '01234567890', 'D', date '2026-01-10', date '2036-01-10' from driver where token = 'd-driver'"
+mig_check_accepted U4 "a new pending submission next to a superseded and a removed one" \
+  "update driver_document set deleted_at = now() where token = 'dd-course-new'; insert into driver_document (token, driver_id, document_type) select 'x', id, 'SCHOOL_DRIVER_COURSE' from driver where token = 'd-driver'"
+mig_check_rejected U5 "a rejected document without reason code" driver_document_rejected_reason_check \
+  "update driver_document set status = 'REJECTED' where token = 'dd-course-new'"
+mig_check_rejected U6 "a rejected van document without reason code" vehicle_document_rejected_reason_check \
+  "update vehicle_document set rejection_reason_code = null where token = 'vd-rejected'"
+mig_check_rejected U7 "a rejected CNH without reason code" driver_cnh_rejected_reason_check \
+  "update driver_cnh set status = 'REJECTED' where token = 'cnh-driver'"
+
 sql "drop database $MIGRATION_DB" >/dev/null
 
 # ---------------------------------------------------------------------------------------------
@@ -303,6 +349,8 @@ check F1 "V72 is applied by Flyway" "1" \
   "$(sql "select count(*) from flyway_schema_history where version = '72' and success")"
 check F3 "V75 is applied by Flyway" "1" \
   "$(sql "select count(*) from flyway_schema_history where version = '75' and success")"
+check F5 "V76 is applied by Flyway" "1" \
+  "$(sql "select count(*) from flyway_schema_history where version = '76' and success")"
 check F4 "review_documents is in the live ADMIN bundle only" "ADMIN" \
   "$(sql "select string_agg(name, ',') from role_permissions where permissions @> '[\"review_documents\"]'::jsonb")"
 check F2 "the seed's documents have only the person's types" "0" \
@@ -322,7 +370,7 @@ request GET "/api/vehicles/$VAN" "$ADMIN"
 expect V5 "the admin reads the van with the front photo URL" 200 '.photoFrontUrl | startswith("/api/vehicles/")'
 
 table "Driver documents with the person's types only"
-send_doc /api/driver-documents "$DRIVER" '{"documentType": "CRLV", "expiresAt": "2027-01-31"}'
+send_doc /api/driver-documents "$DRIVER" '{"documentType": "CRLV", "expiresAt": "'"$IN_60_DAYS"'"}'
 expect D1 "a CRLV as a driver document is refused" 400
 send_doc /api/driver-documents "$DRIVER" '{"documentType": "PROFILE_PHOTO"}'
 expect D2 "a profile photo as a driver document is refused" 400
@@ -330,7 +378,9 @@ before=$(count driver_document)
 send_doc /api/driver-documents "$DRIVER" '{"documentType": "SCHOOL_DRIVER_COURSE"}'
 expect D3 "the specialized course is accepted with its file and no data" 201 \
   '.documentType == "SCHOOL_DRIVER_COURSE" and .status == "PENDING" and .file != null and .documentNumber == null'
+ACCEPTED_COURSE=$(jq -r .token <<<"$RESP_BODY")
 check D4 "only the accepted one was written" "$((before + 1))" "$(count driver_document)"
+request DELETE "/api/driver-documents/$ACCEPTED_COURSE" "$DRIVER"
 
 table "Onboarding reading the van's documents"
 request GET /api/drivers/me/onboarding "$DRIVER"
@@ -353,9 +403,16 @@ OTHER_EMAIL=$(sql "select u.email from users u join driver d on d.user_id = u.id
 OTHER=$(login "$OTHER_EMAIL")
 ADMIN_UID=$(claims "$ADMIN" | jq -r .uid)
 docs() { sql "select count(*) from vehicle_document"; }
+# Reads the submission as the reviewer opens it and sends the decision with the version it saw.
+review() {
+  local kind=$1 token=$2 decision=$3 who=${4:-$ADMIN} version
+  request GET "/api/$kind/$token" "$ADMIN"
+  version=$(jq -r .version <<<"$RESP_BODY")
+  decide "/api/$kind/$token/status" "$who" "$(jq -c --argjson v "$version" '. + {version: $v}' <<<"$decision")"
+}
 
 table "The life of a van document"
-send_doc "/api/vehicles/$VAN/documents" "$DRIVER" '{"documentType": "CRLV", "documentNumber": " RENAVAM-00912 ", "expiresAt": "2027-03-31"}'
+send_doc "/api/vehicles/$VAN/documents" "$DRIVER" '{"documentType": "CRLV", "documentNumber": " RENAVAM-00912 ", "expiresAt": "'"$IN_120_DAYS"'"}'
 expect L1 "the owner sends the CRLV of the van with its file, without typing its data" 201 \
   '.status == "PENDING" and .vehicleToken == "'"$VAN"'" and .documentNumber == null and .expiresAt == null and .file.mimeType == "application/pdf"'
 DOC=$(jq -r .token <<<"$RESP_BODY")
@@ -366,33 +423,32 @@ expect L2b "the document describes its file" 200 \
   '.file.mimeType == "application/pdf" and .file.sizeBytes == '"$(pdf | wc -c | tr -d ' ')"' and (.file.originalName | endswith(".pdf"))'
 download "/api/vehicle-documents/$DOC/file" "$DRIVER"
 check L3 "the owner reads the file back as PDF" "200 application/pdf" "$RESP_STATUS $(cut -d';' -f1 <<<"$RESP_TYPE")"
-decide "/api/vehicle-documents/$DOC/status" "$DRIVER" '{"status": "APPROVED"}'
+review vehicle-documents "$DOC" '{"status": "APPROVED"}' "$DRIVER"
 expect L4 "the owner tries to approve their own document" 403
 check L5 "the status did not change" "PENDING" "$(sql "select status from vehicle_document where token = '$DOC'")"
-decide "/api/vehicle-documents/$DOC/status" "$ADMIN" '{"status": "APPROVED", "reviewMethod": "MANUAL"}'
+review vehicle-documents "$DOC" '{"status": "APPROVED", "reviewMethod": "MANUAL"}'
 expect L6 "the admin approves it with the number and the expiry read from the file" 200 \
-  '.status == "APPROVED" and .reviewMethod == "MANUAL" and .reviewedByUserToken == "'"$ADMIN_UID"'" and .reviewedAt != null and .documentNumber == "RENAVAM-00912" and .expiresAt != null'
+  '.status == "APPROVED" and .reviewMethod == "MANUAL" and .reviewedByUserToken == "'"$ADMIN_UID"'" and .reviewedAt != null and .documentNumber == "RENAVAM-00912" and .expiresAt == "'"$IN_120_DAYS"'"'
 upload_pdf "/api/vehicle-documents/$DOC/file" "$DRIVER"
-expect L7 "the owner swaps the file" 201
+expect L7 "the owner cannot swap the file of the approved document" 409 '.code == "document.submission.reviewed"'
 request GET "/api/vehicle-documents/$DOC" "$DRIVER"
-expect L8 "the swapped document is pending with no reviewer and without the approved data" 200 \
-  '.status == "PENDING" and .reviewedByUserToken == null and .reviewedAt == null and .reviewMethod == null and .documentNumber == null and .expiresAt == null'
-decide "/api/vehicle-documents/$DOC/status" "$ADMIN" '{"status": "APPROVED", "reviewMethod": "MANUAL"}'
-expect L9 "the admin approves it again" 200 '.status == "APPROVED"'
-request PUT "/api/vehicle-documents/$DOC" "$DRIVER" '{"documentType": "CRLV", "expiresAt": "2028-03-31"}'
-expect L10 "the owner cannot edit the data: there is no PUT of a document" 405
-decide "/api/vehicle-documents/$DOC/status" "$ADMIN" '{"status": "REJECTED", "rejectionReason": "  Ilegível  "}'
-expect L11 "the admin rejects with a reason, stored trimmed" 200 '.status == "REJECTED" and .rejectionReason == "Ilegível"'
-send_doc "/api/vehicles/$VAN/documents" "$DRIVER" '{"documentType": "VEHICLE_INSPECTION", "expiresAt": "2026-12-31"}'
-OLD_INSPECTION=$(jq -r .token <<<"$RESP_BODY")
-send_doc "/api/vehicles/$VAN/documents" "$DRIVER" '{"documentType": "VEHICLE_INSPECTION", "expiresAt": "2027-06-30"}'
+expect L8 "the approved document keeps its decision" 200 '.status == "APPROVED" and .reviewedByUserToken != null'
+request PUT "/api/vehicle-documents/$DOC" "$DRIVER" '{"documentType": "CRLV", "documentNumber": "RENAVAM-00912", "expiresAt": "'"$IN_365_DAYS"'"}'
+expect L9 "the owner cannot edit the data: there is no PUT of a document" 405
+send_doc "/api/vehicles/$VAN/documents" "$DRIVER" '{"documentType": "CRLV", "documentNumber": "RENAVAM-00912", "expiresAt": "'"$IN_365_DAYS"'"}'
+expect L10 "a renewed CRLV is a new submission" 201 '.status == "PENDING"'
+RENEWAL=$(jq -r .token <<<"$RESP_BODY")
+review vehicle-documents "$RENEWAL" '{"status": "REJECTED", "rejectionReasonCode": "OTHER", "rejectionReason": "  Ilegível  "}'
+expect L11 "the admin rejects it with a code and a message, stored trimmed" 200 \
+  '.status == "REJECTED" and .rejectionReasonCode == "OTHER" and .rejectionReason == "Ilegível"'
+send_doc "/api/vehicles/$VAN/documents" "$DRIVER" '{"documentType": "VEHICLE_INSPECTION", "expiresAt": "'"$IN_180_DAYS"'"}'
 NEW_INSPECTION=$(jq -r .token <<<"$RESP_BODY")
-request GET "/api/vehicles/$VAN/documents?documentType=VEHICLE_INSPECTION" "$DRIVER"
-expect L12 "the van keeps both inspections, the newer first" 200 \
-  '[.content[].token] | index("'"$NEW_INSPECTION"'") < index("'"$OLD_INSPECTION"'")'
+send_doc "/api/vehicles/$VAN/documents" "$DRIVER" '{"documentType": "VEHICLE_INSPECTION", "expiresAt": "'"$IN_200_DAYS"'"}'
+expect L12 "a second pending inspection of the van is refused" 409 '.code == "document.submission.pending_exists"'
+request DELETE "/api/vehicle-documents/$NEW_INSPECTION" "$DRIVER"
 request GET "/api/vehicles/$VAN/documents?status=REJECTED" "$ADMIN"
 expect L13 "the admin filters the van's documents by status" 200 \
-  '([.content[].token] | index("'"$DOC"'") != null) and all(.content[]; .status == "REJECTED")'
+  '([.content[].token] | index("'"$RENEWAL"'") != null) and all(.content[]; .status == "REJECTED")'
 request GET /api/drivers/me/onboarding "$DRIVER"
 expect L14 "the onboarding shows the van document with its file URL" 200 \
   '[.documentsStep.vehicles[] | select(.vehicleToken == "'"$VAN"'") | .uploadedDocuments[] | select(.token == "'"$DOC"'") | .fileUrl] | .[0] | startswith("/api/vehicle-documents/")'
@@ -401,7 +457,7 @@ table "Who may touch a van's documents"
 before=$(docs)
 request GET "/api/vehicles/$VAN/documents" "$OTHER"
 expect A1 "another driver lists the van's documents" 403
-send_doc "/api/vehicles/$VAN/documents" "$OTHER" '{"documentType": "CRLV", "expiresAt": "2027-03-31"}'
+send_doc "/api/vehicles/$VAN/documents" "$OTHER" '{"documentType": "CRLV", "expiresAt": "'"$IN_120_DAYS"'"}'
 expect A2 "another driver adds a document to the van" 403
 request GET "/api/vehicle-documents/$DOC" "$OTHER"
 expect A3 "another driver reads the document" 403
@@ -409,7 +465,7 @@ download "/api/vehicle-documents/$DOC/file" "$OTHER"
 check A4 "another driver reads the file and gets no content" "403 0" "$RESP_STATUS $(wc -c <"$BODY_FILE" | tr -d ' ')"
 upload_pdf "/api/vehicle-documents/$DOC/file" "$OTHER"
 expect A5 "another driver replaces the file" 403
-request PUT "/api/vehicle-documents/$DOC" "$OTHER" '{"documentType": "CRLV", "expiresAt": "2030-01-01"}'
+request PUT "/api/vehicle-documents/$DOC" "$OTHER" '{"documentType": "CRLV", "expiresAt": "'"$IN_120_DAYS"'"}'
 expect A6 "another driver tries to edit the document: there is no PUT" 405
 request DELETE "/api/vehicle-documents/$DOC" "$OTHER"
 expect A7 "another driver removes the document" 403
@@ -428,8 +484,10 @@ expect A13 "an unknown document" 404
 check A14 "nothing refused was written" "$before" "$(docs)"
 request GET "/api/vehicles/$VAN/documents" "$ADMIN"
 expect A15 "the admin lists the van's documents" 200 '.totalElements >= 3'
-send_doc "/api/vehicles/$VAN/documents" "$ADMIN" '{"documentType": "SCHOOL_VEHICLE_AUTHORIZATION", "documentNumber": "AUT-118/2026", "expiresAt": "2027-01-31"}'
+send_doc "/api/vehicles/$VAN/documents" "$ADMIN" '{"documentType": "SCHOOL_VEHICLE_AUTHORIZATION", "documentNumber": "AUT-118/2026", "expiresAt": "'"$IN_60_DAYS"'"}'
 expect A16 "the admin sends a document for the van" 201 '.status == "PENDING" and .documentNumber == null'
+request DELETE "/api/vehicle-documents/$(jq -r .token <<<"$RESP_BODY")" "$DRIVER"
+expect A17 "the owner removes the pending one, so the run can be repeated" 204
 
 
 table "What a van document must have"
@@ -447,42 +505,77 @@ expect B7 "a type that is not one of the van's" 400
 check B9 "nothing refused was written" "$before" "$(docs)"
 UNREAD=$(curl -s -X POST "$BASE_URL/api/vehicles/$VAN/documents" -H "Authorization: Bearer $DRIVER" \
   -F "file=@$(f=$(mktemp).pdf; pdf >"$f"; echo "$f");type=application/pdf" -F documentType=CRLV \
-  -F documentNumber=RENAVAM-1 -F expiresAt=2027-03-31)
+  -F documentNumber=RENAVAM-1 -F expiresAt="$IN_120_DAYS")
 check B10 "the number and the expiry sent with the file are not read" "PENDING null null" \
   "$(jq -r '"\(.status) \(.documentNumber) \(.expiresAt)"' <<<"$UNREAD")"
 request DELETE "/api/vehicle-documents/$(jq -r .token <<<"$UNREAD")" "$DRIVER"
+expect B11 "the owner removes the pending one" 204
 
 table "What the approval must carry"
 send_doc "/api/vehicles/$VAN/documents" "$DRIVER" '{"documentType": "SCHOOL_VEHICLE_AUTHORIZATION"}'
 AUTH=$(jq -r .token <<<"$RESP_BODY")
-request PUT "/api/vehicle-documents/$AUTH/status" "$ADMIN" '{"status": "APPROVED", "documentNumber": "  ", "expiresAt": "2027-03-31"}'
-expect P1 "approving an authorization without number" 400 '.field == "documentNumber" and .detail == "Preencha os dados obrigatórios do documento para aprovar."'
-request PUT "/api/vehicle-documents/$AUTH/status" "$ADMIN" '{"status": "APPROVED", "documentNumber": "AUT-118/2026"}'
-expect P2 "approving without the expiry" 400 '.field == "expiresAt"'
-request PUT "/api/vehicle-documents/$AUTH/status" "$ADMIN" "{\"status\": \"APPROVED\", \"documentNumber\": \"$(printf 'A%.0s' {1..65})\", \"expiresAt\": \"2027-03-31\"}"
+review vehicle-documents "$AUTH" '{"status": "APPROVED", "documentNumber": "  ", "expiresAt": "'"$IN_120_DAYS"'"}'
+expect P1 "approving an authorization without number" 400 \
+  '.code == "document.review.field_required" and .field == "documentNumber" and .detail == "Preencha os dados obrigatórios do documento para aprovar."'
+review vehicle-documents "$AUTH" '{"status": "APPROVED", "documentNumber": "AUT-118/2026"}'
+expect P2 "approving without the expiry" 400 '.code == "document.review.field_required" and .field == "expiresAt"'
+review vehicle-documents "$AUTH" "{\"status\": \"APPROVED\", \"documentNumber\": \"$(printf 'A%.0s' {1..65})\", \"expiresAt\": \"$IN_120_DAYS\"}"
 expect P3 "a number of 65 characters" 400 '.field == "documentNumber"'
-request PUT "/api/vehicle-documents/$AUTH/status" "$ADMIN" '{"status": "APPROVED", "documentNumber": "AUT-1", "expiresAt": "31/03/2027"}'
+review vehicle-documents "$AUTH" '{"status": "APPROVED", "documentNumber": "AUT-1", "expiresAt": "31/03/2027"}'
 expect P4 "an expiry in the wrong format" 400
 check P5 "the refused approvals changed nothing" "PENDING::" \
   "$(sql "select status || ':' || coalesce(document_number, '') || ':' || coalesce(expires_at::text, '') from vehicle_document where token = '$AUTH'")"
-request PUT "/api/vehicle-documents/$AUTH/status" "$ADMIN" "{\"status\": \"APPROVED\", \"documentNumber\": \"  $(printf 'A%.0s' {1..64}) \", \"expiresAt\": \"2027-03-31\"}"
-expect P6 "a number of exactly 64 characters, stored without the outer spaces" 200 '.status == "APPROVED" and (.documentNumber | length == 64) and .expiresAt == "2027-03-31"'
+review vehicle-documents "$AUTH" "{\"status\": \"APPROVED\", \"documentNumber\": \"  $(printf 'A%.0s' {1..64}) \", \"expiresAt\": \"$IN_365_DAYS\"}"
+expect P6 "a number of exactly 64 characters, stored without the outer spaces" 200 \
+  '.status == "APPROVED" and (.documentNumber | length == 64) and .expiresAt == "'"$IN_365_DAYS"'"'
 send_doc "/api/vehicles/$VAN/documents" "$DRIVER" '{"documentType": "CRLV"}'
 REJECTED_CRLV=$(jq -r .token <<<"$RESP_BODY")
-request PUT "/api/vehicle-documents/$REJECTED_CRLV/status" "$ADMIN" '{"status": "REJECTED", "rejectionReason": "Ilegível", "documentNumber": "X", "expiresAt": "2027-03-31"}'
-expect P7 "a rejection does not store the data of its body" 200 '.status == "REJECTED" and .documentNumber == null and .expiresAt == null'
+review vehicle-documents "$REJECTED_CRLV" '{"status": "REJECTED", "rejectionReasonCode": "NOT_ELIGIBLE", "documentNumber": "X", "expiresAt": "'"$IN_120_DAYS"'"}'
+expect P7 "a rejection as NOT_ELIGIBLE does not store the data of its body" 200 \
+  '.status == "REJECTED" and .rejectionReasonCode == "NOT_ELIGIBLE" and .documentNumber == null and .expiresAt == null'
+
+table "Correcting the data of an approved document"
+review vehicle-documents "$AUTH" '{"status": "APPROVED"}' >/dev/null
+request GET "/api/vehicle-documents/$AUTH" "$ADMIN"
+SEEN=$(jq -r .version <<<"$RESP_BODY")
+request PUT "/api/vehicle-documents/$AUTH/data" "$ADMIN" "{\"documentNumber\": \" AUT-118/2026 \", \"expiresAt\": \"$IN_300_DAYS\", \"version\": $SEEN}"
+expect Q1 "the reviewer corrects a mistyped number and expiry" 200 \
+  '.status == "APPROVED" and .documentNumber == "AUT-118/2026" and .expiresAt == "'"$IN_300_DAYS"'" and .reviewedByUserToken == "'"$ADMIN_UID"'" and .dataCorrectedAt != null and .version == '"$((SEEN + 1))"''
+check Q2 "the correction records who corrected and keeps the file" "$ADMIN_UID:yes" \
+  "$(sql "select u.token || ':' || case when d.file_media_id is not null then 'yes' else 'no' end from vehicle_document d join users u on u.id = d.data_corrected_by where d.token = '$AUTH'")"
+request PUT "/api/vehicle-documents/$AUTH/data" "$ADMIN" "{\"documentNumber\": \"AUT-118/2026\", \"expiresAt\": \"$IN_300_DAYS\", \"version\": $SEEN}"
+expect Q3 "a correction on the version before is stale" 409 '.code == "document.review.stale"'
+request PUT "/api/vehicle-documents/$AUTH/data" "$ADMIN" "{\"expiresAt\": \"$IN_300_DAYS\", \"version\": $((SEEN + 1))}"
+expect Q4 "a correction without the required number" 400 '.code == "document.review.field_required" and .field == "documentNumber"'
+request PUT "/api/vehicle-documents/$AUTH/data" "$ADMIN" "{\"documentNumber\": \"AUT-118/2026\", \"expiresAt\": \"$YESTERDAY\", \"version\": $((SEEN + 1))}"
+expect Q5 "an expiry before today may be corrected: the document is then expired" 200 '.expiresAt == "'"$YESTERDAY"'"'
+request PUT "/api/vehicle-documents/$AUTH/data" "$ADMIN" "{\"documentNumber\": \"AUT-118/2026\", \"expiresAt\": \"$IN_365_DAYS\", \"version\": $((SEEN + 2))}"
+expect Q6 "the reviewer puts the right expiry back" 200 '.expiresAt == "'"$IN_365_DAYS"'"'
+request PUT "/api/vehicle-documents/$AUTH/data" "$DRIVER" "{\"documentNumber\": \"X\", \"expiresAt\": \"$IN_365_DAYS\", \"version\": $((SEEN + 3))}"
+expect Q7 "the owner cannot correct" 403
+request GET "/api/vehicle-documents/$REJECTED_CRLV" "$ADMIN"
+request PUT "/api/vehicle-documents/$REJECTED_CRLV/data" "$ADMIN" "{\"expiresAt\": \"$IN_120_DAYS\", \"version\": $(jq -r .version <<<"$RESP_BODY")}"
+expect Q8 "a rejected document is not corrected" 409 '.code == "document.data.not_approved"'
+request PUT "/api/vehicle-documents/$AUTH/data" "$ADMIN" '{"documentNumber": "AUT-1"}'
+expect Q9 "a correction without version" 400 '.field == "version"'
 
 table "The review of a van document"
 NOFILE="qa-nofile-$(date +%s)"
 sql "insert into vehicle_document (token, vehicle_id, document_type) select '$NOFILE', id, 'CRLV' from vehicle where token = '$VAN'" >/dev/null
-decide "/api/vehicle-documents/$NOFILE/status" "$ADMIN" '{"status": "APPROVED"}'
-expect R1 "approving a document left without file before this change" 422 '.detail == "O documento só pode ser aprovado depois do envio do arquivo."'
-decide "/api/vehicle-documents/$NOFILE/status" "$ADMIN" '{"status": "REJECTED", "rejectionReason": " "}'
-expect R2 "rejecting without reason" 400 '.detail == "Informe o motivo da recusa."'
-decide "/api/vehicle-documents/$NOFILE/status" "$ADMIN" '{"reviewMethod": "MANUAL"}'
+review vehicle-documents "$NOFILE" '{"status": "APPROVED"}'
+expect R1 "approving a document left without file before this change" 422 \
+  '.code == "document.review.file_required" and .detail == "O documento só pode ser aprovado depois do envio do arquivo."'
+review vehicle-documents "$NOFILE" '{"status": "REJECTED", "rejectionReason": "Ilegível"}'
+expect R2 "rejecting without a reason code" 400 '.code == "document.review.reason_code_required"'
+review vehicle-documents "$NOFILE" '{"status": "REJECTED", "rejectionReasonCode": "OTHER", "rejectionReason": " "}'
+expect R2b "rejecting for another reason without a message" 400 \
+  '.code == "document.review.reason_required" and .detail == "Informe o motivo da recusa."'
+review vehicle-documents "$NOFILE" '{"reviewMethod": "MANUAL"}'
 expect R3 "a review without status" 400 '.field == "status"'
-decide "/api/vehicle-documents/$NOFILE/status" "$ADMIN" '{"status": "DONE"}'
+review vehicle-documents "$NOFILE" '{"status": "DONE"}'
 expect R4 "an unknown status" 400
+decide "/api/vehicle-documents/$NOFILE/status" "$ADMIN" '{"status": "APPROVED"}'
+expect R4b "a review without the version it saw" 400 '.field == "version"'
 check R5 "the refused reviews changed nothing" "PENDING:" \
   "$(sql "select status || ':' || coalesce(reviewed_by::text, '') from vehicle_document where token = '$NOFILE'")"
 
@@ -499,10 +592,18 @@ request POST "/api/vehicle-documents/$NOFILE/restore" "$ADMIN"
 expect X5 "restoring a live document" 409
 request POST /api/vehicle-documents/unknown-document/restore "$ADMIN"
 expect X6 "restoring an unknown document" 404
+request DELETE "/api/vehicle-documents/$NOFILE" "$DRIVER"
+send_doc "/api/vehicles/$VAN/documents" "$DRIVER" '{"documentType": "CRLV", "expiresAt": "'"$IN_120_DAYS"'"}'
+ANOTHER=$(jq -r .token <<<"$RESP_BODY")
+request POST "/api/vehicle-documents/$NOFILE/restore" "$ADMIN"
+expect X6b "restoring a pending document next to another pending one" 409 '.code == "document.submission.pending_exists"'
+check X6c "the refused restore left it removed" "1" \
+  "$(sql "select count(*) from vehicle_document where token = '$NOFILE' and deleted_at is not null")"
+request DELETE "/api/vehicle-documents/$ANOTHER" "$DRIVER"
 request POST /api/vehicles/me "$DRIVER" '{"plate": "QAD9F01", "brand": "Renault", "model": "Master", "manufactureYear": 2021, "color": "Prata", "capacity": 16}'
 expect X7 "the owner adds a second van" 201
 VAN2=$(jq -r .token <<<"$RESP_BODY")
-send_doc "/api/vehicles/$VAN2/documents" "$DRIVER" '{"documentType": "VEHICLE_INSPECTION", "expiresAt": "2027-05-31"}'
+send_doc "/api/vehicles/$VAN2/documents" "$DRIVER" '{"documentType": "VEHICLE_INSPECTION", "expiresAt": "'"$IN_150_DAYS"'"}'
 VAN2_DOC=$(jq -r .token <<<"$RESP_BODY")
 request DELETE "/api/vehicles/$VAN2" "$DRIVER"
 expect X8 "the owner removes the second van" 204
@@ -528,24 +629,30 @@ expect DD2b "a driver document without file" 400 '.field == "file"'
 check DD3 "nothing refused was written" "$before" "$(count driver_document)"
 send_doc /api/driver-documents "$DRIVER" '{"documentType": "MUNICIPAL_AUTHORIZATION"}'
 MUNI=$(jq -r .token <<<"$RESP_BODY")
-request PUT "/api/driver-documents/$MUNI/status" "$ADMIN" '{"status": "APPROVED"}'
-expect DD1 "approving a municipal authorization without number" 400 '.field == "documentNumber"'
+review driver-documents "$MUNI" '{"status": "APPROVED"}'
+expect DD1 "approving a municipal authorization without number" 400 '.code == "document.review.field_required" and .field == "documentNumber"'
 request DELETE "/api/driver-documents/$MUNI" "$DRIVER"
 send_doc /api/driver-documents "$DRIVER" '{"documentType": "SCHOOL_DRIVER_COURSE", "documentNumber": " CERT-2024-118 "}'
 expect DD4 "the specialized course is sent with its file and no number" 201 '.status == "PENDING" and .documentNumber == null and .file != null'
 COURSE=$(jq -r .token <<<"$RESP_BODY")
 upload_pdf "/api/driver-documents/$COURSE/file" "$DRIVER"
 expect DD5 "the owner replaces the course's file while it is pending" 201
-decide "/api/driver-documents/$COURSE/status" "$ADMIN" '{"status": "APPROVED", "reviewMethod": "MANUAL"}'
+review driver-documents "$COURSE" '{"status": "APPROVED", "reviewMethod": "MANUAL"}'
 expect DD6 "the admin approves it with the number read from the file, resolved by uid" 200 \
   '.status == "APPROVED" and .reviewedByUserToken == "'"$ADMIN_UID"'" and .documentNumber == "CERT-2024-118"'
 upload_pdf "/api/driver-documents/$COURSE/file" "$DRIVER"
-request GET "/api/driver-documents/$COURSE" "$DRIVER"
-expect DD7 "swapping the file returns it to pending without the number" 200 '.status == "PENDING" and .reviewedByUserToken == null and .documentNumber == null'
-decide "/api/driver-documents/$COURSE/status" "$ADMIN" '{"status": "REJECTED"}'
-expect DD8 "rejecting without reason" 400
-decide "/api/driver-documents/$COURSE/status" "$DRIVER" '{"status": "APPROVED"}'
+expect DD7 "the owner cannot swap the file of the approved course" 409 '.code == "document.submission.reviewed"'
+send_doc /api/driver-documents "$DRIVER" '{"documentType": "SCHOOL_DRIVER_COURSE", "documentNumber": "CERT-2025-007"}'
+RECOURSE=$(jq -r .token <<<"$RESP_BODY")
+review driver-documents "$RECOURSE" '{"status": "REJECTED"}'
+expect DD8 "rejecting without a reason code" 400 '.code == "document.review.reason_code_required"'
+review driver-documents "$RECOURSE" '{"status": "APPROVED"}' "$DRIVER"
 expect DD9 "the owner cannot review" 403
+review driver-documents "$RECOURSE" '{"status": "REJECTED", "rejectionReasonCode": "INCOMPLETE"}'
+expect DD9b "the admin rejects the new course as incomplete" 200 '.rejectionReasonCode == "INCOMPLETE" and .rejectionReason == null'
+request GET "/api/driver-documents/$COURSE" "$ADMIN"
+request PUT "/api/driver-documents/$COURSE/data" "$ADMIN" "{\"documentNumber\": \"CERT-2024-119\", \"version\": $(jq -r .version <<<"$RESP_BODY")}"
+expect DD9c "the reviewer corrects the course's number" 200 '.status == "APPROVED" and .documentNumber == "CERT-2024-119" and .dataCorrectedAt != null'
 DRIVER_USER=$(sql "select token from users where email = '$SEED_DRIVER_EMAIL'")
 sql "update users set email = 'renamed.qa@seed.vanep.com.br' where token = '$DRIVER_USER'" >/dev/null
 request GET "/api/driver-documents?size=500" "$DRIVER"
@@ -558,8 +665,8 @@ expect DD11 "another driver reads the document" 403
 table "Regression"
 upload "/api/vehicles/$VAN/photo-side" "$DRIVER"
 expect G1 "the side photo still uploads" 201
-request GET "/api/driver-documents?status=PENDING" "$ADMIN"
-expect G2 "the admin lists pending driver documents" 200 '.totalElements >= 1'
+request GET "/api/driver-documents?status=REJECTED" "$ADMIN"
+expect G2 "the admin lists rejected driver documents" 200 '.totalElements >= 1'
 
 # ---------------------------------------------------------------------------------------------
 # Part 4 — PR 3: credentials, the legal onboarding and the approval
@@ -630,7 +737,7 @@ credentials "$NVAN" "$NEW"
 check N9 "category AD satisfies DRIVER_LICENSE" "true" "$(satisfied_of DRIVER_LICENSE)"
 
 table "Documents one at a time"
-send_doc "/api/vehicles/$NVAN/documents" "$NEW" '{"documentType": "CRLV", "documentNumber": "RENAVAM-QA", "expiresAt": "2027-09-30"}'
+send_doc "/api/vehicles/$NVAN/documents" "$NEW" '{"documentType": "CRLV", "documentNumber": "RENAVAM-QA", "expiresAt": "'"$IN_300_DAYS"'"}'
 NCRLV=$(jq -r .token <<<"$RESP_BODY")
 upload_pdf "/api/vehicle-documents/$NCRLV/file" "$NEW"
 expect E1 "today the driver only sends the CRLV" 201
@@ -651,12 +758,12 @@ for doc in 'SCHOOL_DRIVER_COURSE CURSO-QA' 'CRIMINAL_RECORD CERT-QA'; do
   upload_pdf "/api/driver-documents/$token/file" "$NEW"
 done
 expect E5 "a week later the driver sends the course and the criminal record" 201
-send_doc "/api/vehicles/$NVAN/documents" "$NEW" '{"documentType": "VEHICLE_INSPECTION", "expiresAt": "2027-05-31"}'
+send_doc "/api/vehicles/$NVAN/documents" "$NEW" '{"documentType": "VEHICLE_INSPECTION", "expiresAt": "'"$IN_150_DAYS"'"}'
 NINSP=$(jq -r .token <<<"$RESP_BODY")
 upload_pdf "/api/vehicle-documents/$NINSP/file" "$NEW"
 request POST /api/drivers/me/submit-onboarding "$NEW"
 expect E6 "still missing the school authorization of any van" 422 '.detail | contains("'"$NEW_PLATE"': SCHOOL_VEHICLE_AUTHORIZATION")'
-send_doc "/api/vehicles/$NVAN/documents" "$NEW" '{"documentType": "SCHOOL_VEHICLE_AUTHORIZATION", "documentNumber": "AUT-QA-77", "expiresAt": "2027-02-28"}'
+send_doc "/api/vehicles/$NVAN/documents" "$NEW" '{"documentType": "SCHOOL_VEHICLE_AUTHORIZATION", "documentNumber": "AUT-QA-77", "expiresAt": "'"$IN_90_DAYS"'"}'
 NAUT=$(jq -r .token <<<"$RESP_BODY")
 upload_pdf "/api/vehicle-documents/$NAUT/file" "$NEW"
 request POST /api/vehicles/me "$NEW" "{\"plate\": \"$SECOND_PLATE\", \"brand\": \"Renault\", \"model\": \"Master\", \"manufactureYear\": 2021, \"color\": \"Prata\", \"capacity\": 16}"
@@ -668,10 +775,10 @@ expect E8 "one complete van is enough; the second shows its three types missing"
    and ([.documentsStep.vehicles[] | select(.vehicleToken == "'"$NVAN2"'") | .missingTypes] == [["CRLV", "VEHICLE_INSPECTION", "SCHOOL_VEHICLE_AUTHORIZATION"]])'
 request POST /api/drivers/me/submit-onboarding "$NEW"
 expect E9 "the driver submits" 200 '.approvalStatus == "UNDER_REVIEW"'
-send_doc "/api/vehicles/$NVAN/documents" "$NEW" '{"documentType": "VEHICLE_INSPECTION", "expiresAt": "2027-11-30"}'
+send_doc /api/driver-documents "$NEW" '{"documentType": "MUNICIPAL_AUTHORIZATION", "documentNumber": "AUT-MUN-QA"}'
 expect E10 "a driver under review can still add a document" 201
 EXTRA=$(jq -r .token <<<"$RESP_BODY")
-request DELETE "/api/vehicle-documents/$EXTRA" "$NEW"
+request DELETE "/api/driver-documents/$EXTRA" "$NEW"
 
 table "Approving the driver"
 request POST "/api/drivers/$NEW_DRIVER/approve" "$ADMIN"
@@ -684,20 +791,20 @@ upload_pdf "/api/vehicle-documents/$NINSP/file" "$NEW"
 request POST /api/drivers/me/submit-onboarding "$NEW"
 expect A4x "the driver uploads a new file and submits again" 200 '.approvalStatus == "UNDER_REVIEW"'
 for token in $(sql "select dd.token from driver_document dd join driver d on d.id = dd.driver_id where d.token = '$NEW_DRIVER' and dd.deleted_at is null"); do
-  decide "/api/driver-documents/$token/status" "$ADMIN" '{"status": "APPROVED", "reviewMethod": "MANUAL"}'
+  review driver-documents "$token" '{"status": "APPROVED", "reviewMethod": "MANUAL"}'
 done
 for token in "$NCRLV" "$NAUT"; do
-  decide "/api/vehicle-documents/$token/status" "$ADMIN" '{"status": "APPROVED", "reviewMethod": "MANUAL"}'
+  review vehicle-documents "$token" '{"status": "APPROVED", "reviewMethod": "MANUAL"}'
 done
 credentials "$NVAN" "$NEW"
 expect A5x "with the inspection still pending only VEHICLE_INSPECTION fails" 200 \
   '.satisfied == false and ([.requirements[] | select((.satisfied | not) and (.optional | not)) | .requirement] == ["VEHICLE_INSPECTION"])'
 request POST "/api/drivers/$NEW_DRIVER/approve" "$ADMIN"
 expect A6x "approving with the inspection of the only complete van pending" 422
-decide "/api/vehicle-documents/$NINSP/status" "$ADMIN" '{"status": "APPROVED", "reviewMethod": "MANUAL"}'
+review vehicle-documents "$NINSP" '{"status": "APPROVED", "reviewMethod": "MANUAL"}'
 credentials "$NVAN" "$NEW"
 expect A7x "everything approved: the van passes, with each number and expiry" 200 \
-  '.satisfied == true and ([.requirements[] | select(.requirement == "SCHOOL_VEHICLE_AUTHORIZATION")][0] | .number == "AUT-QA-77" and .validUntil == "2027-02-28")
+  '.satisfied == true and ([.requirements[] | select(.requirement == "SCHOOL_VEHICLE_AUTHORIZATION")][0] | .number == "AUT-QA-77" and .validUntil == "'"$IN_90_DAYS"'")
    and ([.requirements[] | select(.requirement == "DRIVER_LICENSE")][0].number == "'"$CNH_NUMBER"'")'
 credentials "$NVAN2" "$NEW"
 expect A8x "the second van shows the three vehicle requirements missing" 200 \
@@ -730,6 +837,212 @@ expect T8 "an unknown van" 404
 request DELETE "/api/vehicles/$NVAN2" "$NEW"
 credentials "$NVAN2" "$NEW"
 expect T9 "a removed van" 404
+
+# ---------------------------------------------------------------------------------------------
+# Part 5 — PR 5: decisions with version and reason, final submissions and file caching
+# ---------------------------------------------------------------------------------------------
+
+MEDIA_ROOT="${QA_MEDIA_ROOT:-/tmp/vanep-vd-media}"
+cache_control() {
+  curl -s -o /dev/null -D - "$BASE_URL$1" -H "Authorization: Bearer $2" |
+    awk 'tolower($1) == "cache-control:" {sub(/^[^:]*: */, ""); sub(/\r$/, ""); print}'
+}
+file_key_of() { sql "select m.object_key from $1 s join media_file m on m.id = s.file_media_id where s.token = '$2'"; }
+
+table "A rejection has a structured reason"
+FIRST_COURSE=""
+for code in ILLEGIBLE EXPIRED DATA_MISMATCH WRONG_TYPE INCOMPLETE NOT_ELIGIBLE; do
+  send_doc /api/driver-documents "$DRIVER" '{"documentType": "SCHOOL_DRIVER_COURSE"}'
+  course=$(jq -r .token <<<"$RESP_BODY")
+  if [[ -z $FIRST_COURSE ]]; then
+    FIRST_COURSE=$course
+    upload_pdf "/api/driver-documents/$course/file" "$DRIVER"
+  fi
+  review driver-documents "$course" "{\"status\": \"REJECTED\", \"rejectionReasonCode\": \"$code\"}"
+  expect "S-$code" "rejecting with $code needs no message" 200 \
+    '.status == "REJECTED" and .rejectionReasonCode == "'"$code"'" and .rejectionReason == null'
+done
+check S1 "each resend superseded the previous rejection; one rejection stays live" "1" \
+  "$(sql "select count(*) from driver_document dd join driver d on d.id = dd.driver_id join users u on u.id = d.user_id
+          where u.email = '$SEED_DRIVER_EMAIL' and dd.document_type = 'SCHOOL_DRIVER_COURSE' and dd.status = 'REJECTED'
+            and dd.deleted_at is null and dd.superseded_at is null")"
+check S2 "the superseded rejection keeps its decision and loses its file" "REJECTED:ILLEGIBLE:true:" \
+  "$(sql "select status || ':' || rejection_reason_code || ':' || (reviewed_by is not null) || ':' || coalesce(file_media_id::text, '')
+          from driver_document where token = '$FIRST_COURSE' and superseded_at is not null")"
+request GET "/api/driver-documents?documentType=SCHOOL_DRIVER_COURSE&status=REJECTED&size=100" "$DRIVER"
+expect S3 "the superseded rejections are not listed" 200 '.totalElements == 1'
+send_doc /api/driver-documents "$DRIVER" '{"documentType": "SCHOOL_DRIVER_COURSE"}'
+OTHER_COURSE=$(jq -r .token <<<"$RESP_BODY")
+review driver-documents "$OTHER_COURSE" '{"status": "REJECTED", "rejectionReasonCode": "OTHER"}'
+expect S4 "OTHER without a message" 400 '.code == "document.review.reason_required"'
+review driver-documents "$OTHER_COURSE" '{"status": "REJECTED", "rejectionReasonCode": "OTHER", "rejectionReason": "Certificado em nome de outra pessoa"}'
+expect S5 "OTHER with a message" 200 '.rejectionReasonCode == "OTHER" and .rejectionReason == "Certificado em nome de outra pessoa"'
+review driver-documents "$OTHER_COURSE" '{"status": "REJECTED", "rejectionReasonCode": "BLURRY"}'
+expect S6 "an unknown reason code" 400
+
+table "The decision names the version it saw"
+send_doc /api/driver-documents "$DRIVER" '{"documentType": "SCHOOL_DRIVER_COURSE"}'
+COURSE=$(jq -r .token <<<"$RESP_BODY")
+upload_pdf "/api/driver-documents/$COURSE/file" "$DRIVER"
+request GET "/api/driver-documents/$COURSE" "$ADMIN"
+SEEN=$(jq -r .version <<<"$RESP_BODY")
+decide "/api/driver-documents/$COURSE/status" "$ADMIN" "{\"status\": \"APPROVED\", \"version\": $SEEN}"
+expect V1 "the first admin approves with the version they saw" 200 '.status == "APPROVED" and .version > '"$SEEN"
+decide "/api/driver-documents/$COURSE/status" "$ADMIN" "{\"status\": \"REJECTED\", \"rejectionReasonCode\": \"EXPIRED\", \"version\": $SEEN}"
+expect V2 "the second admin, with the same version, is stale" 409 \
+  '.code == "document.review.stale" and .detail == "Este envio mudou desde que você abriu."'
+check V3 "the first decision stands" "APPROVED" "$(sql "select status from driver_document where token = '$COURSE'")"
+send_doc /api/driver-documents "$DRIVER" '{"documentType": "SCHOOL_DRIVER_COURSE"}'
+SWAPPED=$(jq -r .token <<<"$RESP_BODY")
+upload_pdf "/api/driver-documents/$SWAPPED/file" "$DRIVER"
+request GET "/api/driver-documents/$SWAPPED" "$ADMIN"
+OPENED=$(jq -r .version <<<"$RESP_BODY")
+upload_pdf "/api/driver-documents/$SWAPPED/file" "$DRIVER"
+decide "/api/driver-documents/$SWAPPED/status" "$ADMIN" "{\"status\": \"APPROVED\", \"version\": $OPENED}"
+expect V4 "the owner swapped the file while the admin looked: approving what they saw is stale" 409 '.code == "document.review.stale"'
+check V5 "the document is still pending" "PENDING" "$(sql "select status from driver_document where token = '$SWAPPED'")"
+review driver-documents "$SWAPPED" '{"status": "REJECTED", "rejectionReasonCode": "WRONG_TYPE"}'
+expect V6 "deciding it with the current version" 200
+sql "update role_permissions set permissions = permissions - 'review_documents' where name = 'ADMIN'" >/dev/null
+EDITOR=$(login "$ADMIN_EMAIL")
+sql "update role_permissions set permissions = permissions || '[\"review_documents\"]'::jsonb where name = 'ADMIN'" >/dev/null
+check V7 "a real token with update_driver_document and without review_documents" "true false" \
+  "$(claims "$EDITOR" | jq -r '[(.permissions | index("update_driver_document") != null), (.permissions | index("review_documents") != null)] | join(" ")')"
+send_doc /api/driver-documents "$DRIVER" '{"documentType": "SCHOOL_DRIVER_COURSE"}'
+EDITED=$(jq -r .token <<<"$RESP_BODY")
+upload_pdf "/api/driver-documents/$EDITED/file" "$DRIVER"
+review driver-documents "$EDITED" '{"status": "APPROVED"}' "$EDITOR"
+expect V8 "that token cannot decide" 403
+review vehicle-documents "$DOC" '{"status": "APPROVED"}' "$EDITOR"
+expect V9 "nor decide a van document" 403
+review driver-documents "$EDITED" '{"status": "REJECTED", "rejectionReasonCode": "DATA_MISMATCH"}'
+expect V10 "the reviewer decides it" 200
+
+table "Renewing is a new submission"
+send_doc "/api/vehicles/$VAN/documents" "$DRIVER" '{"documentType": "VEHICLE_INSPECTION", "expiresAt": "'"$IN_180_DAYS"'"}'
+FIRST_INSP=$(jq -r .token <<<"$RESP_BODY")
+upload_pdf "/api/vehicle-documents/$FIRST_INSP/file" "$DRIVER"
+review vehicle-documents "$FIRST_INSP" '{"status": "APPROVED", "reviewMethod": "MANUAL"}'
+expect W1 "the inspection is approved" 200
+FIRST_KEY=$(file_key_of vehicle_document "$FIRST_INSP")
+send_doc "/api/vehicles/$VAN/documents" "$DRIVER" '{"documentType": "VEHICLE_INSPECTION", "expiresAt": "'"$IN_200_DAYS"'"}'
+expect W2 "the owner sends the renewal before it expires" 201 '.status == "PENDING"'
+RENEWED=$(jq -r .token <<<"$RESP_BODY")
+upload_pdf "/api/vehicle-documents/$RENEWED/file" "$DRIVER"
+credentials "$VAN" "$DRIVER"
+check W3 "the van keeps VEHICLE_INSPECTION while the renewal waits" "true" "$(satisfied_of VEHICLE_INSPECTION)"
+check W4 "the approved file is on disk before the renewal is approved" "yes" "$([[ -f $MEDIA_ROOT/$FIRST_KEY ]] && echo yes || echo no)"
+review vehicle-documents "$RENEWED" '{"status": "APPROVED", "reviewMethod": "MANUAL"}'
+expect W5 "the admin approves the renewal" 200
+check W6 "the previous approval is superseded, keeps its decision and has no file" "APPROVED:true:" \
+  "$(sql "select status || ':' || (superseded_at is not null) || ':' || coalesce(file_media_id::text, '') from vehicle_document where token = '$FIRST_INSP'")"
+check W7 "its media row is removed" "0" \
+  "$(sql "select count(*) from media_file where object_key = '$FIRST_KEY' and deleted_at is null")"
+check W8 "and its object is deleted from the disk after the commit" "no" "$([[ -f $MEDIA_ROOT/$FIRST_KEY ]] && echo yes || echo no)"
+credentials "$VAN" "$DRIVER"
+expect W9 "the van passes with the renewal" 200 \
+  '[.requirements[] | select(.requirement == "VEHICLE_INSPECTION")][0] | .satisfied and .validUntil == "'"$IN_200_DAYS"'"'
+request GET "/api/vehicles/$VAN/documents?documentType=VEHICLE_INSPECTION" "$DRIVER"
+expect W10 "the listing shows the renewal, not the superseded one" 200 \
+  '([.content[].token] | index("'"$RENEWED"'") != null) and ([.content[].token] | index("'"$FIRST_INSP"'") == null)'
+request GET "/api/vehicle-documents/$FIRST_INSP/file" "$DRIVER"
+expect W11 "the superseded one has nothing to download" 404
+
+table "A reviewed submission is final"
+request PUT "/api/vehicle-documents/$RENEWED" "$DRIVER" '{"documentType": "VEHICLE_INSPECTION", "expiresAt": "'"$IN_150_DAYS"'"}'
+expect Z1 "editing the approved inspection: there is no PUT of a document" 405
+upload_pdf "/api/vehicle-documents/$RENEWED/file" "$DRIVER"
+expect Z2 "uploading a file to it" 409 '.code == "document.submission.reviewed"'
+request DELETE "/api/vehicle-documents/$RENEWED" "$DRIVER"
+expect Z3 "the owner removing it" 409 '.code == "document.submission.reviewed"'
+review vehicle-documents "$RENEWED" '{"status": "REJECTED", "rejectionReasonCode": "EXPIRED"}'
+expect Z4 "deciding it again" 409 '.code == "document.submission.reviewed"'
+check Z5 "nothing changed" "APPROVED:$IN_200_DAYS" \
+  "$(sql "select status || ':' || expires_at from vehicle_document where token = '$RENEWED' and deleted_at is null")"
+send_doc /api/driver-documents "$DRIVER" '{"documentType": "SCHOOL_DRIVER_COURSE"}'
+DOOMED=$(jq -r .token <<<"$RESP_BODY")
+upload_pdf "/api/driver-documents/$DOOMED/file" "$DRIVER"
+review driver-documents "$DOOMED" '{"status": "APPROVED"}'
+request DELETE "/api/driver-documents/$DOOMED" "$DRIVER"
+expect Z6 "the owner cannot remove an approved driver document" 409 '.code == "document.submission.reviewed"'
+request DELETE "/api/driver-documents/$DOOMED" "$ADMIN"
+expect Z7 "the admin with delete_driver_document removes it" 204
+# Z6 superseded the seed's approved course and Z7 removed its replacement: the seed driver gets an
+# approved course back, so the later parts still see a complete driver.
+send_doc /api/driver-documents "$DRIVER" '{"documentType": "SCHOOL_DRIVER_COURSE", "documentNumber": "CURSO-ESC-QA"}'
+COURSE_BACK=$(jq -r .token <<<"$RESP_BODY")
+upload_pdf "/api/driver-documents/$COURSE_BACK/file" "$DRIVER"
+review driver-documents "$COURSE_BACK" '{"status": "APPROVED", "reviewMethod": "MANUAL"}'
+
+table "One pending submission per owner and type"
+send_in_parallel() {
+  local token=$1 type=$2 dir file path
+  shift 2
+  dir="$(mktemp -d)"
+  file="$(mktemp).pdf"
+  pdf >"$file"
+  for path in "$@"; do
+    curl -s -o /dev/null -w '%{http_code}\n' -X POST "$BASE_URL$path" -H "Authorization: Bearer $token" \
+      -F "file=@$file;type=application/pdf" -F "documentType=$type" >"$(mktemp "$dir/status.XXXXXX")" &
+  done
+  wait
+  cat "$dir"/* | sort | paste -sd ' ' -
+  rm -rf "$dir" "$file"
+}
+statuses=$(send_in_parallel "$DRIVER" SCHOOL_DRIVER_COURSE /api/driver-documents /api/driver-documents)
+check Y1 "two simultaneous submissions of the same type: one is created, the other refused" "201 409" "$statuses"
+check Y2 "a single pending one was stored" "1" \
+  "$(sql "select count(*) from driver_document dd join driver d on d.id = dd.driver_id join users u on u.id = d.user_id
+          where u.email = '$SEED_DRIVER_EMAIL' and dd.document_type = 'SCHOOL_DRIVER_COURSE' and dd.status = 'PENDING'
+            and dd.deleted_at is null and dd.superseded_at is null")"
+LAST_COURSE=$(sql "select dd.token from driver_document dd join driver d on d.id = dd.driver_id join users u on u.id = d.user_id
+                  where u.email = '$SEED_DRIVER_EMAIL' and dd.document_type = 'SCHOOL_DRIVER_COURSE' and dd.status = 'PENDING'
+                    and dd.deleted_at is null and dd.superseded_at is null")
+request DELETE "/api/driver-documents/$LAST_COURSE" "$DRIVER"
+expect Y3 "the owner removes their pending submission, so the run can be repeated" 204
+
+table "Dates within the type's limits"
+NEXT_YEAR_END="$(($(TZ=America/Sao_Paulo date +%Y) + 1))-12-31"
+AFTER_NEXT_YEAR="$(($(TZ=America/Sao_Paulo date +%Y) + 2))-01-01"
+# A van of its own, so approving these documents supersedes nothing the later parts read.
+request POST /api/vehicles/me "$DRIVER" "{\"plate\": \"$(random_plate K)\", \"brand\": \"Fiat\", \"model\": \"Ducato\", \"manufactureYear\": 2022, \"color\": \"Branca\", \"capacity\": 15}"
+KVAN=$(jq -r .token <<<"$RESP_BODY")
+send_doc "/api/vehicles/$KVAN/documents" "$DRIVER" '{"documentType": "VEHICLE_INSPECTION"}'
+KINSP=$(jq -r .token <<<"$RESP_BODY")
+review vehicle-documents "$KINSP" '{"status": "APPROVED", "expiresAt": "'"$YESTERDAY"'"}'
+expect K1 "approving an inspection that expired yesterday" 400 '.code == "document.expires_at.past" and .field == "expiresAt"'
+send_doc "/api/vehicles/$KVAN/documents" "$DRIVER" '{"documentType": "CRLV"}'
+KCRLV=$(jq -r .token <<<"$RESP_BODY")
+review vehicle-documents "$KCRLV" '{"status": "APPROVED", "expiresAt": "'"$AFTER_NEXT_YEAR"'"}'
+expect K2 "approving a CRLV after December 31 of next year" 400 '.code == "document.expires_at.too_far" and .field == "expiresAt"'
+check K3 "both are still pending, without data" "PENDING: PENDING:" \
+  "$(sql "select string_agg(status || ':' || coalesce(expires_at::text, ''), ' ' order by document_type) from vehicle_document where token in ('$KINSP', '$KCRLV')")"
+review vehicle-documents "$KCRLV" '{"status": "APPROVED", "expiresAt": "'"$NEXT_YEAR_END"'"}'
+expect K4 "approving a CRLV on December 31 of next year, the last day" 200 '.expiresAt == "'"$NEXT_YEAR_END"'"'
+request PUT "/api/vehicle-documents/$KCRLV/data" "$ADMIN" "{\"expiresAt\": \"$AFTER_NEXT_YEAR\", \"version\": $(jq -r .version <<<"$RESP_BODY")}"
+expect K5 "correcting it past the limit" 400 '.code == "document.expires_at.too_far"'
+check K6 "the CRLV kept its date" "$NEXT_YEAR_END" "$(sql "select expires_at from vehicle_document where token = '$KCRLV'")"
+request DELETE "/api/vehicles/$KVAN" "$DRIVER"
+expect K7 "the owner removes the van of these checks, so the run can be repeated" 204
+send_doc /api/driver-documents "$DRIVER" '{"documentType": "SCHOOL_DRIVER_COURSE"}'
+KCOURSE=$(jq -r .token <<<"$RESP_BODY")
+review driver-documents "$KCOURSE" '{"status": "APPROVED", "expiresAt": "'"$YESTERDAY"'"}'
+expect K8 "approving a driver course that expired yesterday" 400 '.code == "document.expires_at.past" and .field == "expiresAt"'
+request DELETE "/api/driver-documents/$KCOURSE" "$DRIVER"
+send_doc /api/driver-documents "$DRIVER" '{"documentType": "CRIMINAL_RECORD"}'
+review driver-documents "$(jq -r .token <<<"$RESP_BODY")" '{"status": "APPROVED", "expiresAt": "'"$(in_days +3650)"'"}'
+expect K9 "approving a criminal record ten years ahead, which has no upper limit" 200 '.status == "APPROVED"'
+
+table "Files are cached while the URL does not change"
+request GET "/api/vehicle-documents/$RENEWED" "$DRIVER"
+FILE_URL=$(jq -r .fileUrl <<<"$RESP_BODY")
+check H1 "a document file with the v of its URL" "max-age=86400, private, immutable" "$(cache_control "$FILE_URL" "$DRIVER")"
+check H2 "a document file without v" "no-cache, private" "$(cache_control "/api/vehicle-documents/$RENEWED/file" "$DRIVER")"
+check H3 "a document file with an old v" "no-cache, private" "$(cache_control "/api/vehicle-documents/$RENEWED/file?v=old" "$DRIVER")"
+request GET "/api/vehicles/$VAN" "$DRIVER"
+PHOTO_URL=$(jq -r .photoSideUrl <<<"$RESP_BODY")
+check H4 "a van photo with the v of its URL" "max-age=86400, private, immutable" "$(cache_control "$PHOTO_URL" "$DRIVER")"
+check H5 "a van photo without v" "no-cache, private" "$(cache_control "${PHOTO_URL%%\?*}" "$DRIVER")"
 
 echo
 echo "TOTAL: $PASSED passed"

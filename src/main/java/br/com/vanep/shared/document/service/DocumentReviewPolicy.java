@@ -2,8 +2,9 @@ package br.com.vanep.shared.document.service;
 
 import br.com.vanep.shared.document.enums.DocumentDataRequirements;
 import br.com.vanep.shared.document.enums.DocumentDecisionStatus;
+import br.com.vanep.shared.document.enums.DocumentRejectionReason;
 import br.com.vanep.shared.document.enums.DocumentReviewViolation;
-import br.com.vanep.shared.document.enums.ReviewMethod;
+import br.com.vanep.shared.document.model.DocumentDecision;
 import br.com.vanep.shared.document.model.DocumentReview;
 import br.com.vanep.user.model.UserModel;
 import java.time.Instant;
@@ -14,12 +15,17 @@ import org.springframework.stereotype.Component;
 @Component
 public class DocumentReviewPolicy {
 
-  public Optional<DocumentReviewViolation> validate(
-      DocumentDecisionStatus status, String rejectionReason, boolean hasFile) {
-    if (status == DocumentDecisionStatus.REJECTED && isBlank(rejectionReason)) {
-      return Optional.of(DocumentReviewViolation.REASON_REQUIRED);
+  public Optional<DocumentReviewViolation> validate(DocumentDecision decision, boolean hasFile) {
+    if (decision.status() == DocumentDecisionStatus.REJECTED) {
+      if (decision.rejectionReasonCode() == null) {
+        return Optional.of(DocumentReviewViolation.REASON_CODE_REQUIRED);
+      }
+      if (decision.rejectionReasonCode() == DocumentRejectionReason.OTHER
+          && isBlank(decision.rejectionReason())) {
+        return Optional.of(DocumentReviewViolation.REASON_REQUIRED);
+      }
     }
-    if (status == DocumentDecisionStatus.APPROVED && !hasFile) {
+    if (decision.status() == DocumentDecisionStatus.APPROVED && !hasFile) {
       return Optional.of(DocumentReviewViolation.FILE_REQUIRED);
     }
     return Optional.empty();
@@ -36,19 +42,14 @@ public class DocumentReviewPolicy {
     return Optional.empty();
   }
 
-  public DocumentReview decide(
-      DocumentDecisionStatus status,
-      ReviewMethod reviewMethod,
-      String externalCheckId,
-      String rejectionReason,
-      UserModel reviewer,
-      Instant reviewedAt) {
+  public DocumentReview decide(DocumentDecision decision, UserModel reviewer, Instant reviewedAt) {
+    boolean rejected = decision.status() == DocumentDecisionStatus.REJECTED;
     DocumentReview review = new DocumentReview();
-    review.setStatus(status.toStatus());
-    review.setReviewMethod(reviewMethod);
-    review.setExternalCheckId(externalCheckId);
-    review.setRejectionReason(
-        status == DocumentDecisionStatus.REJECTED ? rejectionReason.strip() : null);
+    review.setStatus(decision.status().toStatus());
+    review.setReviewMethod(decision.reviewMethod());
+    review.setExternalCheckId(decision.externalCheckId());
+    review.setRejectionReasonCode(rejected ? decision.rejectionReasonCode() : null);
+    review.setRejectionReason(rejected ? stripToNull(decision.rejectionReason()) : null);
     review.setReviewedBy(reviewer);
     review.setReviewedAt(reviewedAt);
     return review;
@@ -60,5 +61,9 @@ public class DocumentReviewPolicy {
 
   static boolean isBlank(String value) {
     return value == null || value.isBlank();
+  }
+
+  static String stripToNull(String value) {
+    return isBlank(value) ? null : value.strip();
   }
 }

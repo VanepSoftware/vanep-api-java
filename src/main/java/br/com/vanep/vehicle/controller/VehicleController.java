@@ -24,6 +24,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
@@ -111,8 +112,10 @@ public class VehicleController {
   @PreAuthorize(
       "hasAuthority('show_vehicle') or @sec.isVehicleOwner(#token, authentication)"
           + " or @sec.isVehicleOfSearchableDriver(#token)")
-  public ResponseEntity<InputStreamResource> downloadPhotoFront(@PathVariable String token) {
-    return mediaResponder.respond(photoService.require(token, MediaSlot.VEHICLE_PHOTO_FRONT));
+  public ResponseEntity<InputStreamResource> downloadPhotoFront(
+      @PathVariable String token, @RequestParam(name = "v", required = false) String version) {
+    return mediaResponder.respond(
+        photoService.require(token, MediaSlot.VEHICLE_PHOTO_FRONT), version);
   }
 
   @PostMapping(value = "/{token}/photo-side", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -126,7 +129,9 @@ public class VehicleController {
   @PreAuthorize(
       "hasAuthority('show_vehicle') or @sec.isVehicleOwner(#token, authentication)"
           + " or @sec.isVehicleOfSearchableDriver(#token)")
-  public ResponseEntity<InputStreamResource> downloadPhotoSide(@PathVariable String token) {
-    return mediaResponder.respond(photoService.require(token, MediaSlot.VEHICLE_PHOTO_SIDE));
+  public ResponseEntity<InputStreamResource> downloadPhotoSide(
+      @PathVariable String token, @RequestParam(name = "v", required = false) String version) {
+    return mediaResponder.respond(
+        photoService.require(token, MediaSlot.VEHICLE_PHOTO_SIDE), version);
   }
 }

@@ -4,6 +4,7 @@ import br.com.vanep.media.enums.MediaSlot;
 import br.com.vanep.media.model.MediaFileModel;
 import br.com.vanep.media.service.MediaFileService;
 import br.com.vanep.shared.document.service.DocumentReviewService;
+import br.com.vanep.shared.document.service.DocumentSubmissionRules;
 import br.com.vanep.vehicledocument.model.VehicleDocumentModel;
 import br.com.vanep.vehicledocument.repository.VehicleDocumentRepository;
 import org.springframework.context.MessageSource;
@@ -20,6 +21,7 @@ public class VehicleDocumentFileService {
   private final VehicleDocumentService documentService;
   private final VehicleDocumentRepository documents;
   private final DocumentReviewService reviewService;
+  private final DocumentSubmissionRules submissionRules;
   private final MediaFileService media;
   private final MessageSource messages;
 
@@ -27,11 +29,13 @@ public class VehicleDocumentFileService {
       VehicleDocumentService documentService,
       VehicleDocumentRepository documents,
       DocumentReviewService reviewService,
+      DocumentSubmissionRules submissionRules,
       MediaFileService media,
       MessageSource messages) {
     this.documentService = documentService;
     this.documents = documents;
     this.reviewService = reviewService;
+    this.submissionRules = submissionRules;
     this.media = media;
     this.messages = messages;
   }
@@ -39,6 +43,7 @@ public class VehicleDocumentFileService {
   @Transactional
   public MediaFileModel replace(String token, MultipartFile file) {
     VehicleDocumentModel document = documentService.requireByToken(token);
+    submissionRules.requirePending(document);
     MediaFileModel previous = document.getFile();
 
     MediaFileModel stored = media.store(MediaSlot.VEHICLE_DOCUMENT_FILE, document.getToken(), file);

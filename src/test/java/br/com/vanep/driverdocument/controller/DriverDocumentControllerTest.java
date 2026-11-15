@@ -17,8 +17,9 @@ import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.driverdocument.enums.DriverDocumentType;
 import br.com.vanep.driverdocument.model.DriverDocumentModel;
 import br.com.vanep.driverdocument.repository.DriverDocumentRepository;
+import br.com.vanep.schooltransportcredential.service.SchoolTransportCredentialService;
+import br.com.vanep.shared.document.enums.DocumentRejectionReason;
 import br.com.vanep.shared.document.enums.DocumentStatus;
-import br.com.vanep.shared.document.enums.ReviewMethod;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
@@ -43,7 +44,8 @@ import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequ
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import org.springframework.test.web.servlet.RequestBuilder;
+import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockMultipartHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
@@ -52,6 +54,9 @@ import org.springframework.web.context.WebApplicationContext;
 @ActiveProfiles("test")
 @Sql(scripts = "/db/clean.sql", executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
 class DriverDocumentControllerTest {
+
+  private static final LocalDate TODAY = SchoolTransportCredentialService.today();
+  private static final LocalDate IN_A_YEAR = TODAY.plusYears(1);
 
   @Autowired private WebApplicationContext context;
   @Autowired private UserRepository users;
@@ -139,7 +144,8 @@ class DriverDocumentControllerTest {
             new SimpleGrantedAuthority("create_driver_document"),
             new SimpleGrantedAuthority("update_driver_document"),
             new SimpleGrantedAuthority("delete_driver_document"),
-            new SimpleGrantedAuthority("restore_driver_document"));
+            new SimpleGrantedAuthority("restore_driver_document"),
+            new SimpleGrantedAuthority("review_documents"));
   }
 
   private JwtRequestPostProcessor driverJwt() {
@@ -201,7 +207,6 @@ class DriverDocumentControllerTest {
         .andExpect(jsonPath("$.token").exists())
         .andExpect(jsonPath("$.documentType").value("SCHOOL_DRIVER_COURSE"))
         .andExpect(jsonPath("$.fileUrl").exists())
-        .andExpect(jsonPath("$.file.originalName").value("doc.pdf"))
         .andExpect(jsonPath("$.documentNumber").doesNotExist())
         .andExpect(jsonPath("$.expiresAt").doesNotExist())
         .andExpect(jsonPath("$.status").value("PENDING"));
@@ -212,26 +217,12 @@ class DriverDocumentControllerTest {
     mockMvc
         .perform(
             multipart("/api/driver-documents")
-                .param("documentType", "CRIMINAL_RECORD")
+                .param("documentType", "SCHOOL_DRIVER_COURSE")
                 .with(driverJwt()))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.field").value("file"));
 
     assertThat(documents.count()).isEqualTo(1);
-  }
-
-  @Test
-  void theOwnerCannotEditTheData() throws Exception {
-    mockMvc
-        .perform(
-            put("/api/driver-documents/" + docToken)
-                .with(driverJwt())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    """
-                    {"documentType": "CRIMINAL_RECORD", "expiresAt": "2028-01-01"}
-                    """))
-        .andExpect(status().isMethodNotAllowed());
   }
 
   @Test
@@ -256,9 +247,11 @@ class DriverDocumentControllerTest {
         """
         {
           "status": "APPROVED",
-          "reviewMethod": "MANUAL"
+          "reviewMethod": "MANUAL",
+          "version": %d
         }
-        """;
+        """
+            .formatted(reloadVersion());
 
     mockMvc
         .perform(
@@ -269,7 +262,8 @@ class DriverDocumentControllerTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.status").value("APPROVED"))
         .andExpect(jsonPath("$.reviewMethod").value("MANUAL"))
-        .andExpect(jsonPath("$.reviewedByUserToken").value("admin-uid"));
+        .andExpect(jsonPath("$.reviewedByUserToken").value("admin-uid"))
+        .andExpect(jsonPath("$.version").exists());
   }
 
   @Test
@@ -279,11 +273,9 @@ class DriverDocumentControllerTest {
             put("/api/driver-documents/" + docToken + "/status")
                 .with(adminJwt())
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    """
-                    {"status": "APPROVED"}
-                    """))
+                .content(approval()))
         .andExpect(status().isUnprocessableContent())
+        .andExpect(jsonPath("$.code").value("document.review.file_required"))
         .andExpect(jsonPath("$.detail").value(message("document.review.file_required")));
 
     assertThat(documents.findByToken(docToken).orElseThrow().getReview().getStatus())
@@ -301,7 +293,7 @@ class DriverDocumentControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     """
-                    {"status": "PENDING"}
+                    {"status": "PENDING", "version": 0}
                     """))
         .andExpect(status().isBadRequest());
   }
@@ -315,10 +307,7 @@ class DriverDocumentControllerTest {
             put("/api/driver-documents/" + docToken + "/status")
                 .with(driverJwt())
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    """
-                    {"status": "APPROVED"}
-                    """))
+                .content(approval()))
         .andExpect(status().isForbidden());
   }
 
@@ -338,28 +327,56 @@ class DriverDocumentControllerTest {
   }
 
   @Test
-  void approvingAMunicipalAuthorizationWithoutNumberIsRefused() throws Exception {
-    String authorization = sendAndReadToken("MUNICIPAL_AUTHORIZATION");
+  void approvingACourseThatExpiredYesterdayIsRefused() throws Exception {
+    String course = sendAndReadToken("SCHOOL_DRIVER_COURSE");
 
     mockMvc
-        .perform(approve(authorization, "{\"status\": \"APPROVED\"}"))
+        .perform(approveCourse(course, TODAY.minusDays(1)))
         .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.field").value("documentNumber"))
-        .andExpect(jsonPath("$.detail").value(message("document.review.field_required")));
+        .andExpect(jsonPath("$.code").value("document.expires_at.past"))
+        .andExpect(jsonPath("$.field").value("expiresAt"));
 
-    assertThat(documents.findByToken(authorization).orElseThrow().getReview().getStatus())
+    assertThat(documents.findByToken(course).orElseThrow().getReview().getStatus())
         .isEqualTo(DocumentStatus.PENDING);
   }
 
   @Test
-  void theSpecializedCourseIsApprovedWithoutNumberNorExpiry() throws Exception {
+  void aCourseIsApprovedUntilTheLastDayOfItsLimit() throws Exception {
+    LocalDate latest = DriverDocumentType.SCHOOL_DRIVER_COURSE.latestExpiryOn(TODAY);
     String course = sendAndReadToken("SCHOOL_DRIVER_COURSE");
 
     mockMvc
-        .perform(approve(course, "{\"status\": \"APPROVED\"}"))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.status").value("APPROVED"))
-        .andExpect(jsonPath("$.documentNumber").doesNotExist());
+        .perform(approveCourse(course, latest.plusDays(1)))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("document.expires_at.too_far"))
+        .andExpect(jsonPath("$.field").value("expiresAt"));
+    mockMvc.perform(approveCourse(course, latest)).andExpect(status().isOk());
+  }
+
+  @Test
+  void theOwnerCannotEditTheData() throws Exception {
+    mockMvc
+        .perform(
+            put("/api/driver-documents/" + docToken)
+                .with(driverJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {"documentType": "CRIMINAL_RECORD", "expiresAt": "%s"}
+                    """
+                        .formatted(IN_A_YEAR)))
+        .andExpect(status().isMethodNotAllowed());
+  }
+
+  @Test
+  void approvingAMunicipalAuthorizationWithoutNumberIsRefused() throws Exception {
+    String authorization = sendAndReadToken("MUNICIPAL_AUTHORIZATION");
+
+    mockMvc
+        .perform(decideOn(authorization, "{\"status\": \"APPROVED\"}"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("document.review.field_required"))
+        .andExpect(jsonPath("$.field").value("documentNumber"));
   }
 
   @Test
@@ -368,14 +385,10 @@ class DriverDocumentControllerTest {
 
     mockMvc
         .perform(
-            approve(
-                course,
-                """
-                {"status": "APPROVED", "documentNumber": " CERT-2024-118 ", "expiresAt": "2029-01-31"}
-                """))
+            decideOn(course, "{\"status\": \"APPROVED\", \"documentNumber\": \" CERT-2024-118 \"}"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.documentNumber").value("CERT-2024-118"))
-        .andExpect(jsonPath("$.expiresAt").value("2029-01-31"));
+        .andExpect(jsonPath("$.status").value("APPROVED"))
+        .andExpect(jsonPath("$.documentNumber").value("CERT-2024-118"));
   }
 
   @Test
@@ -384,14 +397,47 @@ class DriverDocumentControllerTest {
 
     mockMvc
         .perform(
-            approve(
+            decideOn(
                 authorization,
-                """
-                {"status": "APPROVED", "documentNumber": "%s"}
-                """
-                    .formatted("A".repeat(65))))
+                "{\"status\": \"APPROVED\", \"documentNumber\": \"%s\"}".formatted("A".repeat(65))))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.field").value("documentNumber"));
+  }
+
+  @Test
+  void theReviewerCorrectsTheNumberOfAnApprovedDocument() throws Exception {
+    approve();
+
+    mockMvc
+        .perform(
+            put("/api/driver-documents/" + docToken + "/data")
+                .with(adminJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"documentNumber\": \"CERT-9\", \"version\": %d}".formatted(reloadVersion())))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("APPROVED"))
+        .andExpect(jsonPath("$.documentNumber").value("CERT-9"))
+        .andExpect(jsonPath("$.dataCorrectedAt").exists());
+    mockMvc
+        .perform(
+            put("/api/driver-documents/" + docToken + "/data")
+                .with(driverJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"version\": %d}".formatted(reloadVersion())))
+        .andExpect(status().isForbidden());
+  }
+
+  @Test
+  void aPendingDocumentIsNotCorrected() throws Exception {
+    mockMvc
+        .perform(
+            put("/api/driver-documents/" + docToken + "/data")
+                .with(adminJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"version\": %d}".formatted(reloadVersion())))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("document.data.not_approved"));
   }
 
   @Test
@@ -455,26 +501,132 @@ class DriverDocumentControllerTest {
   }
 
   @Test
-  void replacingTheFileOfAnApprovedDocumentReturnsItToPendingWithoutData() throws Exception {
-    uploadPdf();
-    DriverDocumentModel doc = documents.findByToken(docToken).orElseThrow();
-    doc.getReview().setStatus(DocumentStatus.APPROVED);
-    doc.getReview().setReviewMethod(ReviewMethod.MANUAL);
-    doc.getReview().setReviewedBy(users.findByToken("admin-uid").orElseThrow());
-    doc.getReview().setReviewedAt(Instant.now());
-    doc.setDocumentNumber("CERT-1");
-    documents.save(doc);
+  void anApprovedDocumentCannotGetAnotherFile() throws Exception {
+    approve();
 
+    mockMvc
+        .perform(
+            multipart("/api/driver-documents/" + docToken + "/file")
+                .file(pdfPart())
+                .with(driverJwt()))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("document.submission.reviewed"));
+
+    assertThat(documents.findByToken(docToken).orElseThrow().getReview().getStatus())
+        .isEqualTo(DocumentStatus.APPROVED);
+  }
+
+  @Test
+  void theOwnerCannotRemoveAnApprovedDocumentButTheAdminCan() throws Exception {
+    approve();
+
+    mockMvc
+        .perform(delete("/api/driver-documents/" + docToken).with(driverJwt()))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("document.submission.reviewed"));
+    mockMvc
+        .perform(delete("/api/driver-documents/" + docToken).with(adminJwt()))
+        .andExpect(status().isNoContent());
+  }
+
+  @Test
+  void aCallerThatCanEditButNotReviewIsRefused() throws Exception {
     uploadPdf();
 
     mockMvc
-        .perform(get("/api/driver-documents/" + docToken).with(driverJwt()))
+        .perform(
+            put("/api/driver-documents/" + docToken + "/status")
+                .with(
+                    jwt()
+                        .jwt(token -> token.claim("uid", "admin-uid"))
+                        .authorities(new SimpleGrantedAuthority("update_driver_document")))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(approval()))
+        .andExpect(status().isForbidden());
+  }
+
+  @Test
+  void aDecisionOnAnOldVersionIsStale() throws Exception {
+    String opened = approval();
+    uploadPdf();
+
+    mockMvc
+        .perform(
+            put("/api/driver-documents/" + docToken + "/status")
+                .with(adminJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(opened))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("document.review.stale"));
+    assertThat(documents.findByToken(docToken).orElseThrow().getReview().getStatus())
+        .isEqualTo(DocumentStatus.PENDING);
+  }
+
+  @Test
+  void aSecondPendingDocumentOfTheSameTypeIsRefused() throws Exception {
+    createCriminalRecord()
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("document.submission.pending_exists"));
+  }
+
+  @Test
+  void resendingAfterARejectionSupersedesTheRejectedOne() throws Exception {
+    uploadPdf();
+    mockMvc
+        .perform(
+            put("/api/driver-documents/" + docToken + "/status")
+                .with(adminJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"status\": \"REJECTED\", \"rejectionReasonCode\": \"ILLEGIBLE\", \"version\": %d}"
+                        .formatted(reloadVersion())))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.status").value("PENDING"))
-        .andExpect(jsonPath("$.documentNumber").doesNotExist())
-        .andExpect(jsonPath("$.reviewMethod").doesNotExist())
-        .andExpect(jsonPath("$.reviewedByUserToken").doesNotExist())
-        .andExpect(jsonPath("$.reviewedAt").doesNotExist());
+        .andExpect(jsonPath("$.rejectionReasonCode").value("ILLEGIBLE"));
+
+    createCriminalRecord().andExpect(status().isCreated());
+
+    DriverDocumentModel rejected = documents.findByToken(docToken).orElseThrow();
+    assertThat(rejected.getSupersededAt()).isNotNull();
+    assertThat(rejected.getFile()).isNull();
+    assertThat(rejected.getReview().getRejectionReasonCode())
+        .isEqualTo(DocumentRejectionReason.ILLEGIBLE);
+    mockMvc
+        .perform(get("/api/driver-documents").with(driverJwt()))
+        .andExpect(jsonPath("$.content.length()").value(1));
+  }
+
+  @Test
+  void approvingTheRenewalSupersedesThePreviousApproval() throws Exception {
+    approve();
+    String renewal =
+        JsonPath.read(
+            createCriminalRecord()
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString(),
+            "$.token");
+    mockMvc
+        .perform(
+            multipart("/api/driver-documents/" + renewal + "/file")
+                .file(new MockMultipartFile("file", "doc.pdf", "application/pdf", pdf()))
+                .with(driverJwt()))
+        .andExpect(status().isCreated());
+
+    mockMvc
+        .perform(
+            put("/api/driver-documents/" + renewal + "/status")
+                .with(adminJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"status\": \"APPROVED\", \"version\": %d}"
+                        .formatted(documents.findByToken(renewal).orElseThrow().getVersion())))
+        .andExpect(status().isOk());
+
+    DriverDocumentModel previous = documents.findByToken(docToken).orElseThrow();
+    assertThat(previous.getSupersededAt()).isNotNull();
+    assertThat(previous.getFile()).isNull();
+    assertThat(previous.getReview().getStatus()).isEqualTo(DocumentStatus.APPROVED);
   }
 
   @Test
@@ -501,25 +653,23 @@ class DriverDocumentControllerTest {
         .andExpect(jsonPath("$.active").value(true));
   }
 
-  private void uploadPdf() throws Exception {
-    byte[] pdf =
-        "%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\ntrailer\n%%EOF\n"
-            .getBytes(StandardCharsets.UTF_8);
+  private void approve() throws Exception {
+    uploadPdf();
     mockMvc
         .perform(
-            multipart("/api/driver-documents/" + docToken + "/file")
-                .file(new MockMultipartFile("file", "doc.pdf", "application/pdf", pdf))
-                .with(driverJwt()))
-        .andExpect(status().isCreated());
+            put("/api/driver-documents/" + docToken + "/status")
+                .with(adminJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(approval()))
+        .andExpect(status().isOk());
+  }
+
+  private ResultActions createCriminalRecord() throws Exception {
+    return mockMvc.perform(send("CRIMINAL_RECORD", driverJwt()));
   }
 
   private static MockMultipartFile pdfPart() {
-    return new MockMultipartFile(
-        "file",
-        "doc.pdf",
-        "application/pdf",
-        "%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\ntrailer\n%%EOF\n"
-            .getBytes(StandardCharsets.UTF_8));
+    return new MockMultipartFile("file", "doc.pdf", "application/pdf", pdf());
   }
 
   private MockMultipartHttpServletRequestBuilder send(String type, JwtRequestPostProcessor who) {
@@ -527,21 +677,50 @@ class DriverDocumentControllerTest {
   }
 
   private String sendAndReadToken(String type) throws Exception {
-    String body =
+    return JsonPath.read(
         mockMvc
             .perform(send(type, driverJwt()))
             .andExpect(status().isCreated())
             .andReturn()
             .getResponse()
-            .getContentAsString();
-    return JsonPath.read(body, "$.token");
+            .getContentAsString(),
+        "$.token");
   }
 
-  private MockHttpServletRequestBuilder approve(String token, String body) {
+  private RequestBuilder decideOn(String token, String body) {
+    long version = documents.findByToken(token).orElseThrow().getVersion();
     return put("/api/driver-documents/" + token + "/status")
         .with(adminJwt())
         .contentType(MediaType.APPLICATION_JSON)
-        .content(body);
+        .content(body.substring(0, body.lastIndexOf('}')) + ", \"version\": " + version + "}");
+  }
+
+  private RequestBuilder approveCourse(String token, LocalDate expiresAt) {
+    return decideOn(
+        token, "{\"status\": \"APPROVED\", \"expiresAt\": \"%s\"}".formatted(expiresAt));
+  }
+
+  private String approval() {
+    return "{\"status\": \"APPROVED\", \"version\": %d}".formatted(reloadVersion());
+  }
+
+  private long reloadVersion() {
+    return documents.findByToken(docToken).orElseThrow().getVersion();
+  }
+
+  private static byte[] pdf() {
+    return "%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\ntrailer\n%%EOF\n"
+        .getBytes(StandardCharsets.UTF_8);
+  }
+
+  private void uploadPdf() throws Exception {
+    byte[] pdf = pdf();
+    mockMvc
+        .perform(
+            multipart("/api/driver-documents/" + docToken + "/file")
+                .file(new MockMultipartFile("file", "doc.pdf", "application/pdf", pdf))
+                .with(driverJwt()))
+        .andExpect(status().isCreated());
   }
 
   private String message(String key) {

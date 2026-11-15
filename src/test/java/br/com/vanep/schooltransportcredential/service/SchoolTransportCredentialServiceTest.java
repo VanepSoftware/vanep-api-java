@@ -11,7 +11,9 @@ import br.com.vanep.shared.document.enums.DocumentStatus;
 import br.com.vanep.vehicle.model.VehicleModel;
 import br.com.vanep.vehicle.repository.VehicleRepository;
 import br.com.vanep.vehicledocument.enums.VehicleDocumentType;
+import br.com.vanep.vehicledocument.repository.VehicleDocumentRepository;
 import jakarta.persistence.EntityManagerFactory;
+import java.time.Instant;
 import java.time.LocalDate;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -32,6 +34,7 @@ class SchoolTransportCredentialServiceTest {
   @Autowired private EntityManagerFactory entityManagerFactory;
   @Autowired private SchoolTransportCredentialService service;
   @Autowired private VehicleRepository vehicles;
+  @Autowired private VehicleDocumentRepository vehicleDocuments;
 
   private SchoolTransportCredentialFixtures fixtures;
   private DriverModel driver;
@@ -141,5 +144,28 @@ class SchoolTransportCredentialServiceTest {
         DocumentStatus.APPROVED);
 
     assertThat(service.hasAnyQualifiedVehicle(driver.getId(), TODAY)).isFalse();
+  }
+
+  @Test
+  void aPendingRenewalOfTheInspectionKeepsTheApprovedOneCounting() {
+    fixtures.createVehicleDocument(
+        van, VehicleDocumentType.VEHICLE_INSPECTION, null, DocumentStatus.PENDING);
+
+    assertThat(service.findCredentials(driver.getId(), van.getId(), TODAY).failed()).isEmpty();
+  }
+
+  @Test
+  void aSupersededApprovalNoLongerCounts() {
+    vehicleDocuments
+        .findByVehicleIdAndDocumentTypeAndSupersededAtIsNull(
+            van.getId(), VehicleDocumentType.VEHICLE_INSPECTION)
+        .forEach(
+            inspection -> {
+              inspection.setSupersededAt(Instant.now());
+              vehicleDocuments.save(inspection);
+            });
+
+    assertThat(service.findCredentials(driver.getId(), van.getId(), TODAY).failed())
+        .contains(CredentialRequirement.VEHICLE_INSPECTION);
   }
 }

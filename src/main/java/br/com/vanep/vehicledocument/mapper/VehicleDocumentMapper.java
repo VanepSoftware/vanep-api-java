@@ -25,9 +25,12 @@ public class VehicleDocumentMapper {
         review.getStatus(),
         review.getReviewMethod(),
         review.getExternalCheckId(),
+        review.getRejectionReasonCode(),
         review.getRejectionReason(),
         review.getReviewedBy() != null ? review.getReviewedBy().getToken() : null,
         review.getReviewedAt(),
+        review.getDataCorrectedAt(),
+        document.getVersion(),
         document.getCreatedAt(),
         document.getUpdatedAt());
   }

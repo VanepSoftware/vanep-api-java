@@ -2,6 +2,7 @@ package br.com.vanep.vehicle.seed;
 
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
+import br.com.vanep.seed.DriverUnderReviewSeeder;
 import br.com.vanep.user.repository.UserRepository;
 import br.com.vanep.vehicle.model.VehicleModel;
 import br.com.vanep.vehicle.repository.VehicleRepository;
@@ -50,7 +51,15 @@ public class VehicleSeeder {
               "Ducato Minibus",
               2022,
               "Branca",
-              14));
+              14),
+          new VehicleSeed(
+              DriverUnderReviewSeeder.EMAIL,
+              DriverUnderReviewSeeder.PLATE,
+              "Volkswagen",
+              "Volare W9",
+              2019,
+              "Amarela",
+              20));
 
   private final VehicleRepository vehicles;
   private final DriverRepository drivers;

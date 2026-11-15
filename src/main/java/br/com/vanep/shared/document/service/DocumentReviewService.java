@@ -1,87 +1,137 @@
 package br.com.vanep.shared.document.service;
 
-import br.com.vanep.media.model.MediaFileModel;
+import br.com.vanep.shared.document.dto.DocumentDataCorrectionRequestDTO;
 import br.com.vanep.shared.document.dto.DocumentStatusUpdateRequestDTO;
 import br.com.vanep.shared.document.enums.DocumentDataRequirements;
 import br.com.vanep.shared.document.enums.DocumentReviewViolation;
+import br.com.vanep.shared.document.enums.DocumentStatus;
+import br.com.vanep.shared.document.model.DocumentDecision;
 import br.com.vanep.shared.document.model.DocumentReview;
+import br.com.vanep.shared.document.model.DocumentSubmission;
+import br.com.vanep.shared.error.ApiProblemException;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.service.UserService;
 import java.time.Instant;
-import java.util.Optional;
-import org.springframework.context.MessageSource;
-import org.springframework.context.i18n.LocaleContextHolder;
-import org.springframework.http.HttpStatus;
+import java.time.LocalDate;
+import java.util.Objects;
 import org.springframework.stereotype.Service;
-import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class DocumentReviewService {
 
   private final DocumentReviewPolicy policy;
+  private final DocumentSubmissionRules submissionRules;
   private final UserService userService;
-  private final MessageSource messages;
 
   public DocumentReviewService(
-      DocumentReviewPolicy policy, UserService userService, MessageSource messages) {
+      DocumentReviewPolicy policy,
+      DocumentSubmissionRules submissionRules,
+      UserService userService) {
     this.policy = policy;
+    this.submissionRules = submissionRules;
     this.userService = userService;
-    this.messages = messages;
   }
 
   public DocumentReview review(
+      DocumentSubmission submission,
       DocumentStatusUpdateRequestDTO request,
-      MediaFileModel file,
       DocumentDataRequirements requirements,
+      LocalDate today,
       String reviewerUid) {
+    requireSeenVersion(submission, request.version());
+    submissionRules.requirePending(submission);
+    DocumentDecision decision = toDecision(request);
     policy
-        .validate(request.status(), request.rejectionReason(), file != null)
-        .or(
-            () ->
-                request.approves()
-                    ? policy.validateApprovalData(
-                        requirements, request.documentNumber(), request.expiresAt())
-                    : Optional.empty())
+        .validate(decision, submission.getReviewedFile() != null)
         .ifPresent(
             violation -> {
               throw toException(violation);
             });
+    if (request.approves()) {
+      requireApprovalData(requirements, request.documentNumber(), request.expiresAt(), today);
+    }
     UserModel reviewer = userService.requireByToken(reviewerUid);
-    return policy.decide(
-        request.status(),
-        request.reviewMethod(),
-        request.externalCheckId(),
-        request.rejectionReason(),
-        reviewer,
-        Instant.now());
+    return policy.decide(decision, reviewer, Instant.now());
   }
 
   public DocumentReview clear() {
     return policy.clear();
   }
 
-  ResponseStatusException toException(DocumentReviewViolation violation) {
+  public void correctData(
+      DocumentSubmission submission,
+      DocumentDataCorrectionRequestDTO request,
+      DocumentDataRequirements requirements,
+      LocalDate today,
+      String correctorUid) {
+    requireCorrectable(submission, request.version());
+    policy
+        .validateApprovalData(requirements, request.documentNumber(), request.expiresAt())
+        .ifPresent(
+            violation -> {
+              throw toException(violation);
+            });
+    DocumentDatesPolicy.requireExpiryWithin(
+        "expiresAt", request.expiresAt(), requirements.latestExpiryOn(today), LocalDate.MIN);
+    markCorrected(submission, correctorUid);
+  }
+
+  public void requireCorrectable(DocumentSubmission submission, Long seenVersion) {
+    requireSeenVersion(submission, seenVersion);
+    if (submission.getReview().getStatus() != DocumentStatus.APPROVED
+        || submission.getSupersededAt() != null) {
+      throw ApiProblemException.conflict("document.data.not_approved");
+    }
+  }
+
+  public void markCorrected(DocumentSubmission submission, String correctorUid) {
+    submission.getReview().setDataCorrectedById(userService.requireByToken(correctorUid).getId());
+    submission.getReview().setDataCorrectedAt(Instant.now());
+  }
+
+  void requireApprovalData(
+      DocumentDataRequirements requirements,
+      String documentNumber,
+      LocalDate expiresAt,
+      LocalDate today) {
+    policy
+        .validateApprovalData(requirements, documentNumber, expiresAt)
+        .ifPresent(
+            violation -> {
+              throw toException(violation);
+            });
+    DocumentDatesPolicy.requireExpiryWithin(
+        "expiresAt", expiresAt, requirements.latestExpiryOn(today), today);
+  }
+
+  void requireSeenVersion(DocumentSubmission submission, Long seenVersion) {
+    if (!Objects.equals(submission.getVersion(), seenVersion)) {
+      throw ApiProblemException.conflict("document.review.stale");
+    }
+  }
+
+  static DocumentDecision toDecision(DocumentStatusUpdateRequestDTO request) {
+    return new DocumentDecision(
+        request.status(),
+        request.reviewMethod(),
+        request.externalCheckId(),
+        request.rejectionReasonCode(),
+        request.rejectionReason());
+  }
+
+  static ApiProblemException toException(DocumentReviewViolation violation) {
     return switch (violation) {
-      case REASON_REQUIRED ->
-          new ResponseStatusException(
-              HttpStatus.BAD_REQUEST, message("document.review.reason_required"));
-      case FILE_REQUIRED ->
-          new ResponseStatusException(
-              HttpStatus.UNPROCESSABLE_CONTENT, message("document.review.file_required"));
+      case REASON_CODE_REQUIRED ->
+          ApiProblemException.badRequest("document.review.reason_code_required");
+      case REASON_REQUIRED -> ApiProblemException.badRequest("document.review.reason_required");
+      case FILE_REQUIRED -> ApiProblemException.unprocessable("document.review.file_required");
       case NUMBER_REQUIRED -> fieldRequired("documentNumber");
       case EXPIRY_REQUIRED -> fieldRequired("expiresAt");
     };
   }
 
-  public ResponseStatusException fieldRequired(String field) {
-    ResponseStatusException exception =
-        new ResponseStatusException(
-            HttpStatus.BAD_REQUEST, message("document.review.field_required"));
-    exception.getBody().setProperty("field", field);
-    return exception;
-  }
-
-  private String message(String key) {
-    return messages.getMessage(key, null, LocaleContextHolder.getLocale());
+  public static ApiProblemException fieldRequired(String field) {
+    return ApiProblemException.badRequest("document.review.field_required")
+        .withProperty("field", field);
   }
 }

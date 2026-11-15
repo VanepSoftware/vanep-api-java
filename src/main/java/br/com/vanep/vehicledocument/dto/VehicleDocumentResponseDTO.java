@@ -1,6 +1,7 @@
 package br.com.vanep.vehicledocument.dto;
 
 import br.com.vanep.shared.document.dto.DocumentFileResponseDTO;
+import br.com.vanep.shared.document.enums.DocumentRejectionReason;
 import br.com.vanep.shared.document.enums.DocumentStatus;
 import br.com.vanep.shared.document.enums.ReviewMethod;
 import br.com.vanep.vehicledocument.enums.VehicleDocumentType;
@@ -18,8 +19,11 @@ public record VehicleDocumentResponseDTO(
     DocumentStatus status,
     ReviewMethod reviewMethod,
     String externalCheckId,
+    DocumentRejectionReason rejectionReasonCode,
     String rejectionReason,
     String reviewedByUserToken,
     Instant reviewedAt,
+    Instant dataCorrectedAt,
+    Long version,
     Instant createdAt,
     Instant updatedAt) {}

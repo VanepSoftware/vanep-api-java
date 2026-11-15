@@ -17,6 +17,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import br.com.vanep.driver.DriverApprovalStatus;
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
+import br.com.vanep.schooltransportcredential.service.SchoolTransportCredentialService;
+import br.com.vanep.shared.document.enums.DocumentRejectionReason;
 import br.com.vanep.shared.document.enums.DocumentStatus;
 import br.com.vanep.shared.document.enums.ReviewMethod;
 import br.com.vanep.user.enums.UserType;
@@ -47,6 +49,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.RequestBuilder;
+import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockMultipartHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
@@ -55,6 +58,10 @@ import org.springframework.web.context.WebApplicationContext;
 @ActiveProfiles("test")
 @Sql(scripts = "/db/clean.sql", executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
 class VehicleDocumentControllerTest {
+
+  private static final LocalDate TODAY = SchoolTransportCredentialService.today();
+  private static final LocalDate IN_FOUR_MONTHS = TODAY.plusMonths(4);
+  private static final LocalDate IN_FIVE_MONTHS = TODAY.plusMonths(5);
 
   @Autowired private WebApplicationContext context;
   @Autowired private UserRepository users;
@@ -129,7 +136,7 @@ class VehicleDocumentControllerTest {
         .perform(
             send("SCHOOL_VEHICLE_AUTHORIZATION", ownerJwt())
                 .param("documentNumber", "AUT-1")
-                .param("expiresAt", "2027-05-31"))
+                .param("expiresAt", IN_FIVE_MONTHS.toString()))
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.documentNumber").doesNotExist())
         .andExpect(jsonPath("$.expiresAt").doesNotExist());
@@ -137,7 +144,7 @@ class VehicleDocumentControllerTest {
 
   @Test
   void theAdminSendsADocumentForAnyVan() throws Exception {
-    mockMvc.perform(send("CRLV", adminJwt())).andExpect(status().isCreated());
+    mockMvc.perform(send("VEHICLE_INSPECTION", adminJwt())).andExpect(status().isCreated());
   }
 
   @Test
@@ -145,7 +152,7 @@ class VehicleDocumentControllerTest {
     mockMvc
         .perform(
             multipart("/api/vehicles/" + vehicleToken + "/documents")
-                .param("documentType", "CRLV")
+                .param("documentType", "VEHICLE_INSPECTION")
                 .with(ownerJwt()))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.field").value("file"));
@@ -167,41 +174,44 @@ class VehicleDocumentControllerTest {
             putJson(
                 "/api/vehicle-documents/" + documentToken,
                 """
-                {"documentType": "CRLV", "expiresAt": "2027-04-30"}
-                """,
+                {"documentType": "CRLV", "expiresAt": "%s"}
+                """
+                    .formatted(IN_FOUR_MONTHS),
                 ownerJwt()))
         .andExpect(status().isMethodNotAllowed());
   }
 
   @Test
   void theAdminApprovesWithTheNumberAndTheExpiry() throws Exception {
-    uploadPdf(ownerJwt());
+    String inspection = sendAndReadToken("VEHICLE_INSPECTION");
 
     mockMvc
         .perform(
-            putJson(
-                statusPath(documentToken),
+            decideOn(
+                inspection,
                 """
-                {"status": "APPROVED", "documentNumber": " RENAVAM-1 ", "expiresAt": "2027-05-31"}
-                """,
+                {"status": "APPROVED", "documentNumber": " VIST-1 ", "expiresAt": "%s"}
+                """
+                    .formatted(IN_FIVE_MONTHS),
                 adminJwt()))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.status").value("APPROVED"))
-        .andExpect(jsonPath("$.documentNumber").value("RENAVAM-1"))
-        .andExpect(jsonPath("$.expiresAt").value("2027-05-31"));
+        .andExpect(jsonPath("$.documentNumber").value("VIST-1"))
+        .andExpect(jsonPath("$.expiresAt").value(IN_FIVE_MONTHS.toString()));
   }
 
   @Test
   void approvingWithoutTheExpiryIsRefused() throws Exception {
-    uploadPdf(ownerJwt());
+    String inspection = sendAndReadToken("VEHICLE_INSPECTION");
 
     mockMvc
-        .perform(putJson(statusPath(documentToken), "{\"status\": \"APPROVED\"}", adminJwt()))
+        .perform(decideOn(inspection, "{\"status\": \"APPROVED\"}", adminJwt()))
         .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.field").value("expiresAt"))
-        .andExpect(jsonPath("$.detail").value(message("document.review.field_required")));
+        .andExpect(jsonPath("$.code").value("document.review.field_required"))
+        .andExpect(jsonPath("$.field").value("expiresAt"));
 
-    assertThat(reloadStatus()).isEqualTo(DocumentStatus.PENDING);
+    assertThat(documents.findByToken(inspection).orElseThrow().getReview().getStatus())
+        .isEqualTo(DocumentStatus.PENDING);
   }
 
   @Test
@@ -209,10 +219,10 @@ class VehicleDocumentControllerTest {
     String authorization = sendAndReadToken("SCHOOL_VEHICLE_AUTHORIZATION");
 
     mockMvc
-        .perform(putJson(statusPath(authorization), approvalWithNumber("  "), adminJwt()))
+        .perform(decideOn(authorization, approvalWithNumber("  "), adminJwt()))
         .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.field").value("documentNumber"))
-        .andExpect(jsonPath("$.detail").value(message("document.review.field_required")));
+        .andExpect(jsonPath("$.code").value("document.review.field_required"))
+        .andExpect(jsonPath("$.field").value("documentNumber"));
 
     assertThat(documents.findByToken(authorization).orElseThrow().getExpiresAt()).isNull();
   }
@@ -222,8 +232,7 @@ class VehicleDocumentControllerTest {
     String authorization = sendAndReadToken("SCHOOL_VEHICLE_AUTHORIZATION");
 
     mockMvc
-        .perform(
-            putJson(statusPath(authorization), approvalWithNumber("  AUT-118/2026 "), adminJwt()))
+        .perform(decideOn(authorization, approvalWithNumber("  AUT-118/2026 "), adminJwt()))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.documentNumber").value("AUT-118/2026"));
   }
@@ -233,7 +242,7 @@ class VehicleDocumentControllerTest {
     String authorization = sendAndReadToken("SCHOOL_VEHICLE_AUTHORIZATION");
 
     mockMvc
-        .perform(putJson(statusPath(authorization), approvalWithNumber("A".repeat(64)), adminJwt()))
+        .perform(decideOn(authorization, approvalWithNumber("A".repeat(64)), adminJwt()))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.documentNumber").value("A".repeat(64)));
   }
@@ -243,31 +252,43 @@ class VehicleDocumentControllerTest {
     String authorization = sendAndReadToken("SCHOOL_VEHICLE_AUTHORIZATION");
 
     mockMvc
-        .perform(putJson(statusPath(authorization), approvalWithNumber("A".repeat(65)), adminJwt()))
+        .perform(decideOn(authorization, approvalWithNumber("A".repeat(65)), adminJwt()))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.field").value("documentNumber"))
         .andExpect(
             jsonPath("$.detail").value(message("document.number.too_long").replace("{max}", "64")));
-
-    assertThat(documents.findByToken(authorization).orElseThrow().getReview().getStatus())
-        .isEqualTo(DocumentStatus.PENDING);
   }
 
   @Test
   void aRejectionDoesNotStoreTheDataOfItsBody() throws Exception {
-    uploadPdf(ownerJwt());
+    String inspection = sendAndReadToken("VEHICLE_INSPECTION");
 
     mockMvc
         .perform(
-            putJson(
-                statusPath(documentToken),
+            decideOn(
+                inspection,
                 """
-                {"status": "REJECTED", "rejectionReason": "Ilegível", "expiresAt": "2027-05-31"}
-                """,
+                {"status": "REJECTED", "rejectionReasonCode": "ILLEGIBLE", "expiresAt": "%s"}
+                """
+                    .formatted(IN_FIVE_MONTHS),
                 adminJwt()))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.status").value("REJECTED"))
         .andExpect(jsonPath("$.expiresAt").doesNotExist());
+  }
+
+  @Test
+  void aDocumentThatDoesNotAllowSchoolTransportIsRejectedAsNotEligible() throws Exception {
+    String inspection = sendAndReadToken("VEHICLE_INSPECTION");
+
+    mockMvc
+        .perform(
+            decideOn(
+                inspection,
+                "{\"status\": \"REJECTED\", \"rejectionReasonCode\": \"NOT_ELIGIBLE\"}",
+                adminJwt()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.rejectionReasonCode").value("NOT_ELIGIBLE"));
   }
 
   @Test
@@ -376,10 +397,14 @@ class VehicleDocumentControllerTest {
   }
 
   @Test
-  void onlyTheAdminRestoresAndTheReviewComesBack() throws Exception {
+  void onlyTheAdminRemovesAReviewedDocumentAndRestoresIt() throws Exception {
     approveWithFile();
     mockMvc
         .perform(delete("/api/vehicle-documents/" + documentToken).with(ownerJwt()))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("document.submission.reviewed"));
+    mockMvc
+        .perform(delete("/api/vehicle-documents/" + documentToken).with(adminJwt()))
         .andExpect(status().isNoContent());
 
     mockMvc
@@ -398,17 +423,72 @@ class VehicleDocumentControllerTest {
   }
 
   @Test
+  void anApprovedDocumentRemovedByMistakeComesBackNextToAPendingRenewal() throws Exception {
+    approveWithFile();
+    mockMvc
+        .perform(delete("/api/vehicle-documents/" + documentToken).with(adminJwt()))
+        .andExpect(status().isNoContent());
+    String renewal = token(createCrlv(ownerJwt()).andExpect(status().isCreated()));
+
+    mockMvc
+        .perform(post("/api/vehicle-documents/" + documentToken + "/restore").with(adminJwt()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("APPROVED"));
+    assertThat(documents.findByToken(renewal).orElseThrow().getReview().getStatus())
+        .isEqualTo(DocumentStatus.PENDING);
+  }
+
+  @Test
+  void restoringAnApprovedDocumentNextToAnotherApprovedOneIsRefused() throws Exception {
+    approveWithFile();
+    mockMvc
+        .perform(delete("/api/vehicle-documents/" + documentToken).with(adminJwt()))
+        .andExpect(status().isNoContent());
+    VehicleDocumentModel renewal =
+        documents
+            .findByToken(token(createCrlv(ownerJwt()).andExpect(status().isCreated())))
+            .orElseThrow();
+    renewal.getReview().setStatus(DocumentStatus.APPROVED);
+    documents.save(renewal);
+
+    mockMvc
+        .perform(post("/api/vehicle-documents/" + documentToken + "/restore").with(adminJwt()))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("document.submission.restore_conflict"));
+    assertThat(documents.findByToken(documentToken)).isEmpty();
+  }
+
+  @Test
+  void restoringAPendingDocumentNextToAnotherPendingOneIsRefused() throws Exception {
+    mockMvc
+        .perform(delete("/api/vehicle-documents/" + documentToken).with(ownerJwt()))
+        .andExpect(status().isNoContent());
+    createCrlv(ownerJwt()).andExpect(status().isCreated());
+
+    mockMvc
+        .perform(post("/api/vehicle-documents/" + documentToken + "/restore").with(adminJwt()))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("document.submission.pending_exists"));
+    assertThat(documents.findByToken(documentToken)).isEmpty();
+  }
+
+  @Test
   void theOwnerCannotApproveTheirOwnDocument() throws Exception {
     uploadPdf(ownerJwt());
 
     mockMvc
-        .perform(
-            putJson(
-                "/api/vehicle-documents/" + documentToken + "/status",
-                """
-                {"status": "APPROVED"}
-                """,
-                ownerJwt()))
+        .perform(decide("{\"status\": \"APPROVED\"}", ownerJwt()))
+        .andExpect(status().isForbidden());
+
+    assertThat(reloadStatus()).isEqualTo(DocumentStatus.PENDING);
+  }
+
+  @Test
+  void aCallerThatCanEditButNotReviewIsRefused() throws Exception {
+    uploadPdf(ownerJwt());
+
+    mockMvc
+        .perform(decide("{\"status\": \"APPROVED\"}", editorJwt()))
         .andExpect(status().isForbidden());
 
     assertThat(reloadStatus()).isEqualTo(DocumentStatus.PENDING);
@@ -417,65 +497,350 @@ class VehicleDocumentControllerTest {
   @Test
   void theAdminApprovesADocumentWithFile() throws Exception {
     uploadPdf(ownerJwt());
+    long seen = reloadVersion();
 
     mockMvc
         .perform(
-            putJson(
-                "/api/vehicle-documents/" + documentToken + "/status",
-                """
-                {"status": "APPROVED", "reviewMethod": "MANUAL", "expiresAt": "2027-03-31"}
-                """,
+            decide(
+                "{\"status\": \"APPROVED\", \"reviewMethod\": \"MANUAL\", \"expiresAt\": \"%s\"}"
+                    .formatted(IN_FIVE_MONTHS),
                 adminJwt()))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.status").value("APPROVED"))
         .andExpect(jsonPath("$.reviewMethod").value("MANUAL"))
         .andExpect(jsonPath("$.reviewedByUserToken").value("admin-uid"))
-        .andExpect(jsonPath("$.reviewedAt").exists());
+        .andExpect(jsonPath("$.reviewedAt").exists())
+        .andExpect(jsonPath("$.rejectionReasonCode").doesNotExist())
+        .andExpect(jsonPath("$.version").value(seen + 1));
   }
 
   @Test
   void approvingWithoutFileIsUnprocessable() throws Exception {
     mockMvc
-        .perform(
-            putJson(
-                "/api/vehicle-documents/" + documentToken + "/status",
-                """
-                {"status": "APPROVED"}
-                """,
-                adminJwt()))
+        .perform(decide("{\"status\": \"APPROVED\"}", adminJwt()))
         .andExpect(status().isUnprocessableContent())
+        .andExpect(jsonPath("$.code").value("document.review.file_required"))
         .andExpect(jsonPath("$.detail").value(message("document.review.file_required")));
 
     assertThat(reloadStatus()).isEqualTo(DocumentStatus.PENDING);
   }
 
   @Test
-  void rejectingWithoutReasonIsRefused() throws Exception {
+  void rejectingWithoutACodeIsRefused() throws Exception {
     mockMvc
         .perform(
-            putJson(
-                "/api/vehicle-documents/" + documentToken + "/status",
-                """
-                {"status": "REJECTED", "rejectionReason": " "}
-                """,
+            decide("{\"status\": \"REJECTED\", \"rejectionReason\": \"Ilegível\"}", adminJwt()))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("document.review.reason_code_required"));
+
+    assertThat(reloadStatus()).isEqualTo(DocumentStatus.PENDING);
+  }
+
+  @Test
+  void rejectingForAnotherReasonWithoutAMessageIsRefused() throws Exception {
+    mockMvc
+        .perform(
+            decide(
+                "{\"status\": \"REJECTED\", \"rejectionReasonCode\": \"OTHER\", \"rejectionReason\": \" \"}",
                 adminJwt()))
         .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("document.review.reason_required"))
         .andExpect(jsonPath("$.detail").value(message("document.review.reason_required")));
   }
 
   @Test
-  void swappingTheFileOfAnApprovedDocumentReturnsItToPending() throws Exception {
+  void rejectingAnUnreadableFileNeedsNoMessage() throws Exception {
+    mockMvc
+        .perform(
+            decide(
+                "{\"status\": \"REJECTED\", \"rejectionReasonCode\": \"ILLEGIBLE\"}", adminJwt()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("REJECTED"))
+        .andExpect(jsonPath("$.rejectionReasonCode").value("ILLEGIBLE"))
+        .andExpect(jsonPath("$.rejectionReason").doesNotExist());
+  }
+
+  @Test
+  void aDecisionOnAnOldVersionIsStaleAndChangesNothing() throws Exception {
+    long opened = reloadVersion();
+    uploadPdf(ownerJwt());
+
+    mockMvc
+        .perform(
+            putJson(
+                "/api/vehicle-documents/" + documentToken + "/status",
+                "{\"status\": \"APPROVED\", \"version\": %d}".formatted(opened),
+                adminJwt()))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("document.review.stale"))
+        .andExpect(jsonPath("$.detail").value(message("document.review.stale")));
+
+    assertThat(reloadStatus()).isEqualTo(DocumentStatus.PENDING);
+  }
+
+  @Test
+  void aDecisionWithoutVersionIsRefused() throws Exception {
+    mockMvc
+        .perform(
+            putJson(
+                "/api/vehicle-documents/" + documentToken + "/status",
+                "{\"status\": \"APPROVED\"}",
+                adminJwt()))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.field").value("version"));
+  }
+
+  @Test
+  void aDecidedDocumentCannotBeDecidedAgain() throws Exception {
     approveWithFile();
+
+    mockMvc
+        .perform(
+            decide("{\"status\": \"REJECTED\", \"rejectionReasonCode\": \"EXPIRED\"}", adminJwt()))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("document.submission.reviewed"));
+  }
+
+  @Test
+  void approvingAnInspectionThatExpiredYesterdayIsRefused() throws Exception {
+    String inspection = sendAndReadToken("VEHICLE_INSPECTION");
+
+    mockMvc
+        .perform(decideOn(inspection, approvalExpiringOn(TODAY.minusDays(1)), adminJwt()))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("document.expires_at.past"))
+        .andExpect(jsonPath("$.field").value("expiresAt"));
+
+    VehicleDocumentModel stored = documents.findByToken(inspection).orElseThrow();
+    assertThat(stored.getReview().getStatus()).isEqualTo(DocumentStatus.PENDING);
+    assertThat(stored.getExpiresAt()).isNull();
+  }
+
+  @Test
+  void anInspectionIsApprovedUntilTheLastDayOfItsLimit() throws Exception {
+    LocalDate latest = VehicleDocumentType.VEHICLE_INSPECTION.latestExpiryOn(TODAY);
+    String inspection = sendAndReadToken("VEHICLE_INSPECTION");
+
+    mockMvc
+        .perform(decideOn(inspection, approvalExpiringOn(latest.plusDays(1)), adminJwt()))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("document.expires_at.too_far"))
+        .andExpect(jsonPath("$.field").value("expiresAt"));
+    mockMvc
+        .perform(decideOn(inspection, approvalExpiringOn(latest), adminJwt()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.expiresAt").value(latest.toString()));
+  }
+
+  @Test
+  void anApprovedDocumentCannotGetAnotherFile() throws Exception {
+    approveWithFile();
+    long version = reloadVersion();
+
+    mockMvc
+        .perform(
+            multipart(filePath())
+                .file(new MockMultipartFile("file", "crlv.pdf", "application/pdf", pdf()))
+                .with(ownerJwt()))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("document.submission.reviewed"));
+
+    VehicleDocumentModel stored = documents.findByToken(documentToken).orElseThrow();
+    assertThat(stored.getReview().getStatus()).isEqualTo(DocumentStatus.APPROVED);
+    assertThat(stored.getExpiresAt()).isEqualTo(IN_FIVE_MONTHS);
+    assertThat(stored.getVersion()).isEqualTo(version);
+  }
+
+  @Test
+  void aPendingDocumentIsFixedInPlaceAndStaysPending() throws Exception {
+    uploadPdf(ownerJwt());
+    String firstFile = documents.findByToken(documentToken).orElseThrow().getFile().getToken();
 
     uploadPdf(ownerJwt());
 
     VehicleDocumentModel stored = documents.findByToken(documentToken).orElseThrow();
     assertThat(stored.getReview().getStatus()).isEqualTo(DocumentStatus.PENDING);
     assertThat(stored.getReview().getReviewedBy()).isNull();
-    assertThat(stored.getReview().getReviewedAt()).isNull();
-    assertThat(stored.getReview().getReviewMethod()).isNull();
-    assertThat(stored.getExpiresAt()).isNull();
-    assertThat(stored.getDocumentNumber()).isNull();
+    assertThat(stored.getFile().getToken()).isNotEqualTo(firstFile);
+  }
+
+  @Test
+  void aSecondPendingDocumentOfTheSameTypeIsRefused() throws Exception {
+    createCrlv(ownerJwt())
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("document.submission.pending_exists"));
+  }
+
+  @Test
+  void resendingAfterARejectionSupersedesTheRejectedOne() throws Exception {
+    uploadPdf(ownerJwt());
+    mockMvc
+        .perform(
+            decide(
+                "{\"status\": \"REJECTED\", \"rejectionReasonCode\": \"ILLEGIBLE\"}", adminJwt()))
+        .andExpect(status().isOk());
+
+    String resent = token(createCrlv(ownerJwt()).andExpect(status().isCreated()));
+
+    VehicleDocumentModel rejected = documents.findByToken(documentToken).orElseThrow();
+    assertThat(rejected.getSupersededAt()).isNotNull();
+    assertThat(rejected.getFile()).isNull();
+    assertThat(rejected.getReview().getStatus()).isEqualTo(DocumentStatus.REJECTED);
+    assertThat(rejected.getReview().getRejectionReasonCode())
+        .isEqualTo(DocumentRejectionReason.ILLEGIBLE);
+    assertThat(rejected.getReview().getReviewedBy()).isNotNull();
+    mockMvc
+        .perform(get("/api/vehicles/" + vehicleToken + "/documents").with(ownerJwt()))
+        .andExpect(jsonPath("$.content.length()").value(1))
+        .andExpect(jsonPath("$.content[0].token").value(resent));
+  }
+
+  @Test
+  void approvingTheRenewalSupersedesThePreviousApproval() throws Exception {
+    approveWithFile();
+    String renewal = token(createCrlv(ownerJwt()).andExpect(status().isCreated()));
+    String previousFile = filePath();
+    mockMvc
+        .perform(
+            multipart("/api/vehicle-documents/" + renewal + "/file")
+                .file(new MockMultipartFile("file", "crlv.pdf", "application/pdf", pdf()))
+                .with(ownerJwt()))
+        .andExpect(status().isCreated());
+    long seen = documents.findByToken(renewal).orElseThrow().getVersion();
+
+    mockMvc
+        .perform(
+            putJson(
+                "/api/vehicle-documents/" + renewal + "/status",
+                "{\"status\": \"APPROVED\", \"expiresAt\": \"%s\", \"version\": %d}"
+                    .formatted(IN_FIVE_MONTHS, seen),
+                adminJwt()))
+        .andExpect(status().isOk());
+
+    VehicleDocumentModel previous = documents.findByToken(documentToken).orElseThrow();
+    assertThat(previous.getSupersededAt()).isNotNull();
+    assertThat(previous.getFile()).isNull();
+    assertThat(previous.getReview().getStatus()).isEqualTo(DocumentStatus.APPROVED);
+    mockMvc.perform(get(previousFile).with(ownerJwt())).andExpect(status().isNotFound());
+    mockMvc
+        .perform(get("/api/vehicles/" + vehicleToken + "/documents").with(ownerJwt()))
+        .andExpect(jsonPath("$.content.length()").value(1))
+        .andExpect(jsonPath("$.content[0].token").value(renewal));
+  }
+
+  @Test
+  void theReviewerCorrectsTheDataOfAnApprovedDocument() throws Exception {
+    approveWithFile();
+    long seen = reloadVersion();
+
+    mockMvc
+        .perform(
+            putJson(
+                dataPath(documentToken),
+                """
+                {"documentNumber": " RENAVAM-9 ", "expiresAt": "%s", "version": %d}
+                """
+                    .formatted(IN_FOUR_MONTHS, seen),
+                adminJwt()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("APPROVED"))
+        .andExpect(jsonPath("$.documentNumber").value("RENAVAM-9"))
+        .andExpect(jsonPath("$.expiresAt").value(IN_FOUR_MONTHS.toString()))
+        .andExpect(jsonPath("$.reviewedByUserToken").value("admin-uid"))
+        .andExpect(jsonPath("$.dataCorrectedAt").exists())
+        .andExpect(jsonPath("$.version").value(seen + 1));
+
+    VehicleDocumentModel stored = documents.findByToken(documentToken).orElseThrow();
+    assertThat(stored.getReview().getDataCorrectedById())
+        .isEqualTo(users.findByToken("admin-uid").orElseThrow().getId());
+    assertThat(stored.getFile()).isNotNull();
+  }
+
+  @Test
+  void anExpiryBeforeTodayCanBeCorrectedButNotBeyondTheLimit() throws Exception {
+    approveWithFile();
+
+    mockMvc
+        .perform(putJson(dataPath(documentToken), correction(TODAY.minusDays(3)), adminJwt()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.expiresAt").value(TODAY.minusDays(3).toString()));
+    mockMvc
+        .perform(
+            putJson(
+                dataPath(documentToken),
+                correction(VehicleDocumentType.CRLV.latestExpiryOn(TODAY).plusDays(1)),
+                adminJwt()))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("document.expires_at.too_far"));
+  }
+
+  @Test
+  void correctingWithoutTheRequiredExpiryIsRefused() throws Exception {
+    approveWithFile();
+
+    mockMvc
+        .perform(
+            putJson(
+                dataPath(documentToken),
+                "{\"version\": %d}".formatted(reloadVersion()),
+                adminJwt()))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("document.review.field_required"))
+        .andExpect(jsonPath("$.field").value("expiresAt"));
+  }
+
+  @Test
+  void onlyAnApprovedDocumentIsCorrected() throws Exception {
+    mockMvc
+        .perform(putJson(dataPath(documentToken), correction(IN_FOUR_MONTHS), adminJwt()))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("document.data.not_approved"));
+  }
+
+  @Test
+  void aCorrectionOnAnOldVersionIsStale() throws Exception {
+    approveWithFile();
+    long old = reloadVersion() - 1;
+
+    mockMvc
+        .perform(
+            putJson(
+                dataPath(documentToken),
+                """
+                {"expiresAt": "%s", "version": %d}
+                """
+                    .formatted(IN_FOUR_MONTHS, old),
+                adminJwt()))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("document.review.stale"));
+  }
+
+  @Test
+  void theOwnerAndAnEditorCannotCorrect() throws Exception {
+    approveWithFile();
+
+    mockMvc
+        .perform(putJson(dataPath(documentToken), correction(IN_FOUR_MONTHS), ownerJwt()))
+        .andExpect(status().isForbidden());
+    mockMvc
+        .perform(putJson(dataPath(documentToken), correction(IN_FOUR_MONTHS), editorJwt()))
+        .andExpect(status().isForbidden());
+  }
+
+  @Test
+  void theFileIsCachedOnlyForTheVersionInItsUrl() throws Exception {
+    uploadPdf(ownerJwt());
+    String fileUrl = documents.findByToken(documentToken).orElseThrow().getFile().getToken();
+
+    mockMvc
+        .perform(get(filePath()).param("v", fileUrl).with(ownerJwt()))
+        .andExpect(header().string("Cache-Control", "max-age=86400, private, immutable"));
+    mockMvc
+        .perform(get(filePath()).with(ownerJwt()))
+        .andExpect(header().string("Cache-Control", "no-cache, private"));
+    mockMvc
+        .perform(get(filePath()).param("v", "old").with(ownerJwt()))
+        .andExpect(header().string("Cache-Control", "no-cache, private"));
   }
 
   @Test
@@ -524,7 +889,7 @@ class VehicleDocumentControllerTest {
     stored.getReview().setReviewMethod(ReviewMethod.MANUAL);
     stored.getReview().setReviewedBy(users.findByToken("admin-uid").orElseThrow());
     stored.getReview().setReviewedAt(Instant.now());
-    stored.setExpiresAt(LocalDate.of(2027, 3, 31));
+    stored.setExpiresAt(IN_FIVE_MONTHS);
     documents.save(stored);
   }
 
@@ -535,6 +900,67 @@ class VehicleDocumentControllerTest {
                 .file(new MockMultipartFile("file", "crlv.pdf", "application/pdf", pdf()))
                 .with(who))
         .andExpect(status().isCreated());
+  }
+
+  private RequestBuilder decide(String body, JwtRequestPostProcessor who) {
+    String withVersion =
+        body.substring(0, body.lastIndexOf('}')) + ", \"version\": " + reloadVersion() + "}";
+    return putJson("/api/vehicle-documents/" + documentToken + "/status", withVersion, who);
+  }
+
+  private ResultActions createCrlv(JwtRequestPostProcessor who) throws Exception {
+    return mockMvc.perform(send("CRLV", who));
+  }
+
+  private MockMultipartHttpServletRequestBuilder send(String type, JwtRequestPostProcessor who) {
+    return multipart("/api/vehicles/" + vehicleToken + "/documents")
+        .file(new MockMultipartFile("file", "crlv.pdf", "application/pdf", pdf()))
+        .param("documentType", type)
+        .with(who);
+  }
+
+  private String sendAndReadToken(String type) throws Exception {
+    return token(mockMvc.perform(send(type, ownerJwt())).andExpect(status().isCreated()));
+  }
+
+  private RequestBuilder decideOn(String token, String body, JwtRequestPostProcessor who) {
+    long version = documents.findByToken(token).orElseThrow().getVersion();
+    String withVersion =
+        body.substring(0, body.lastIndexOf('}')) + ", \"version\": " + version + "}";
+    return putJson("/api/vehicle-documents/" + token + "/status", withVersion, who);
+  }
+
+  private static String approvalWithNumber(String number) {
+    return """
+        {"status": "APPROVED", "documentNumber": "%s", "expiresAt": "%s"}
+        """
+        .formatted(number, IN_FIVE_MONTHS);
+  }
+
+  private static String approvalExpiringOn(LocalDate expiresAt) {
+    return """
+        {"status": "APPROVED", "expiresAt": "%s"}
+        """
+        .formatted(expiresAt);
+  }
+
+  private String correction(LocalDate expiresAt) {
+    return """
+        {"expiresAt": "%s", "version": %d}
+        """
+        .formatted(expiresAt, reloadVersion());
+  }
+
+  private static String dataPath(String token) {
+    return "/api/vehicle-documents/" + token + "/data";
+  }
+
+  private static String token(ResultActions result) throws Exception {
+    return JsonPath.read(result.andReturn().getResponse().getContentAsString(), "$.token");
+  }
+
+  private long reloadVersion() {
+    return documents.findByToken(documentToken).orElseThrow().getVersion();
   }
 
   private DocumentStatus reloadStatus() {
@@ -548,35 +974,6 @@ class VehicleDocumentControllerTest {
   private static byte[] pdf() {
     return "%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\ntrailer\n%%EOF\n"
         .getBytes(StandardCharsets.UTF_8);
-  }
-
-  private static String approvalWithNumber(String number) {
-    return """
-        {"status": "APPROVED", "documentNumber": "%s", "expiresAt": "2027-05-31"}
-        """
-        .formatted(number);
-  }
-
-  private MockMultipartHttpServletRequestBuilder send(String type, JwtRequestPostProcessor who) {
-    return multipart("/api/vehicles/" + vehicleToken + "/documents")
-        .file(new MockMultipartFile("file", "crlv.pdf", "application/pdf", pdf()))
-        .param("documentType", type)
-        .with(who);
-  }
-
-  private String sendAndReadToken(String type) throws Exception {
-    String body =
-        mockMvc
-            .perform(send(type, ownerJwt()))
-            .andExpect(status().isCreated())
-            .andReturn()
-            .getResponse()
-            .getContentAsString();
-    return JsonPath.read(body, "$.token");
-  }
-
-  private static String statusPath(String token) {
-    return "/api/vehicle-documents/" + token + "/status";
   }
 
   private static VehicleDocumentModel inspection(VehicleModel vehicle, LocalDate expiresAt) {
@@ -632,7 +1029,16 @@ class VehicleDocumentControllerTest {
             new SimpleGrantedAuthority("show_vehicle_document"),
             new SimpleGrantedAuthority("update_vehicle_document"),
             new SimpleGrantedAuthority("delete_vehicle_document"),
-            new SimpleGrantedAuthority("restore_vehicle_document"));
+            new SimpleGrantedAuthority("restore_vehicle_document"),
+            new SimpleGrantedAuthority("review_documents"));
+  }
+
+  private JwtRequestPostProcessor editorJwt() {
+    return jwt()
+        .jwt(token -> token.claim("uid", "admin-uid"))
+        .authorities(
+            new SimpleGrantedAuthority("show_vehicle_document"),
+            new SimpleGrantedAuthority("update_vehicle_document"));
   }
 
   private JwtRequestPostProcessor ownerJwt() {
