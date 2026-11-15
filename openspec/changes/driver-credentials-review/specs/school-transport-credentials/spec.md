@@ -6,11 +6,11 @@ One answer to "can this driver, with this van, provide school transport on this 
 
 ### Requirement: The credentials of a driver and a van on a date
 
-For a driver, one of their vehicles and a date, the system MUST evaluate these requirements, each satisfied only by a document that is not removed, is `APPROVED`, and does not expire before that date. A driver document without expiry counts as not expiring:
+For a driver, one of their vehicles and a date, the system MUST evaluate these requirements, each satisfied only by a submission that is not removed, not superseded, `APPROVED`, and does not expire before that date. A driver document without expiry counts as not expiring:
 
 | Requirement | Satisfied by |
 |---|---|
-| `DRIVER_LICENSE` | an active CNH of the driver with category containing `D` or `E` and `validUntil` not before the date |
+| `DRIVER_LICENSE` | an approved, active CNH of the driver with category containing `D` or `E` and `validUntil` not before the date |
 | `SCHOOL_DRIVER_COURSE` | a driver document `SCHOOL_DRIVER_COURSE` |
 | `CRIMINAL_RECORD` | a driver document `CRIMINAL_RECORD` |
 | `VEHICLE_REGISTRATION` | a vehicle document `CRLV` of that vehicle |
@@ -34,6 +34,11 @@ The result MUST list, for each satisfied requirement, the document number and ex
 - **WHEN** the van's inspection expires the day before the date
 - **THEN** `VEHICLE_INSPECTION` is unsatisfied
 
+#### Scenario: A CNH under review does not count yet
+
+- **WHEN** the driver's only CNH is `PENDING`, sent with its file and without data yet
+- **THEN** `DRIVER_LICENSE` is unsatisfied
+
 #### Scenario: Category B is not enough
 
 - **WHEN** the driver's only active CNH has category `B`
@@ -41,7 +46,7 @@ The result MUST list, for each satisfied requirement, the document number and ex
 
 ### Requirement: The driver sees what each van is missing
 
-`GET /api/vehicles/{token}/school-transport-credentials` MUST return, for the van's owner and for callers with `show_vehicle`, the evaluation for that van on the current date: each requirement with `satisfied`, and the number and expiry of the document that satisfies it. Anyone else MUST get HTTP 403, without authentication HTTP 401, and an unknown or removed van HTTP 404.
+`GET /api/vehicles/{token}/school-transport-credentials` MUST return, for the van's owner and for callers with `show_vehicle`, the evaluation for that van on the current date in `America/Sao_Paulo`: each requirement with `satisfied`, and the number and expiry of the document that satisfies it. Anyone else MUST get HTTP 403, without authentication HTTP 401, an unknown or removed van HTTP 404, and an inactive van HTTP 422 (`vehicle.inactive`).
 
 #### Scenario: A new van without documents
 
