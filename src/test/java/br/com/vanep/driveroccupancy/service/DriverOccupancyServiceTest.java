@@ -57,7 +57,7 @@ class DriverOccupancyServiceTest {
     DriverOccupancyResponseDTO occupancy = service.findOccupancy(driver, null, TODAY);
 
     assertThat(occupancy.shifts())
-        .extracting(ShiftOccupancyDTO::shift, ShiftOccupancyDTO::passengers)
+        .extracting(count -> count.shift(), count -> count.passengers())
         .containsExactly(
             tuple(OperationShift.MORNING, 16L),
             tuple(OperationShift.AFTERNOON, 12L),
@@ -74,7 +74,7 @@ class DriverOccupancyServiceTest {
     DriverOccupancyResponseDTO occupancy = service.findOccupancy(driver, null, TODAY);
 
     assertThat(occupancy.shifts())
-        .extracting(ShiftOccupancyDTO::shift, ShiftOccupancyDTO::passengers)
+        .extracting(count -> count.shift(), count -> count.passengers())
         .containsExactly(
             tuple(OperationShift.MORNING, 0L),
             tuple(OperationShift.AFTERNOON, 0L),
