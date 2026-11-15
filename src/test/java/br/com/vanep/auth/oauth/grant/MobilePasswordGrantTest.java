@@ -6,6 +6,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import br.com.vanep.auth.security.LoginAttemptService;
+import br.com.vanep.auth.security.UserPasswordEncoder;
+import br.com.vanep.auth.security.UserPasswordService;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
@@ -41,6 +43,8 @@ class MobilePasswordGrantTest {
   @Autowired private WebApplicationContext context;
   @Autowired private UserRepository users;
   @Autowired private PasswordEncoder passwordEncoder;
+  @Autowired private UserPasswordEncoder userPasswords;
+  @Autowired private UserPasswordService userPasswordService;
   @Autowired private LoginAttemptService loginAttempts;
 
   private final ObjectMapper objectMapper = new ObjectMapper();
@@ -73,7 +77,9 @@ class MobilePasswordGrantTest {
     user.setName("Grant User");
     user.setEmail(EMAIL);
     user.setDocument("39053344705");
-    user.setPassword(withLocalPassword ? passwordEncoder.encode(PASSWORD) : null);
+    if (withLocalPassword) {
+      userPasswordService.assignEncodedPassword(user, PASSWORD);
+    }
     user.setVerified(verified);
     return users.save(user);
   }
@@ -177,6 +183,55 @@ class MobilePasswordGrantTest {
                 .header("Accept", "application/json"))
         .andExpect(status().isUnauthorized())
         .andExpect(jsonPath("$.error").value("invalid_client"));
+  }
+
+  @Test
+  void aHashBoundAtCreationLogsInAndACopyDoesNot() throws Exception {
+    UserModel owner = new UserModel();
+    owner.setType(UserType.CLIENT);
+    owner.setName("Bound User");
+    owner.setEmail(EMAIL);
+    owner.setDocument("39053344705");
+    owner.setVerified(true);
+    userPasswordService.assignEncodedPassword(owner, PASSWORD);
+    users.save(owner);
+
+    JsonNode tokens = grant(MOBILE_CLIENT_ID, EMAIL, PASSWORD, status().isOk());
+    assertThat(tokens.hasNonNull("access_token")).isTrue();
+
+    UserModel other = new UserModel();
+    other.setType(UserType.CLIENT);
+    other.setName("Other");
+    other.setEmail("other-grant@vanep.com");
+    other.setDocument("11144477735");
+    other.setPassword(users.findByEmail(EMAIL).orElseThrow().getPassword());
+    other.setVerified(true);
+    users.save(other);
+    loginAttempts.loginSucceeded(other.getEmail());
+
+    JsonNode rejected =
+        grant(MOBILE_CLIENT_ID, other.getEmail(), PASSWORD, status().isBadRequest());
+    assertThat(rejected.get("error").asText()).isEqualTo("invalid_grant");
+    grant(MOBILE_CLIENT_ID, EMAIL, PASSWORD, status().isOk());
+  }
+
+  @Test
+  void aLegacyHashLogsInOnceAndIsReboundToThatAccount() throws Exception {
+    UserModel user = persistUser(true, false);
+    String legacy = passwordEncoder.encode(PASSWORD);
+    user.setPassword(legacy);
+    users.save(user);
+
+    grant(MOBILE_CLIENT_ID, EMAIL, PASSWORD, status().isOk());
+
+    UserModel reloaded = users.findByEmail(EMAIL).orElseThrow();
+    assertThat(reloaded.getPassword()).isNotEqualTo(legacy);
+    assertThat(userPasswords.requiresUpgrade(reloaded.getPassword())).isFalse();
+    assertThat(reloaded.getPassword()).doesNotContain(reloaded.getToken());
+    assertThat(userPasswords.matches(PASSWORD, reloaded.getPassword(), reloaded.getToken()))
+        .isTrue();
+    assertThat(userPasswords.matches(PASSWORD, reloaded.getPassword(), "user-token-beta"))
+        .isFalse();
   }
 
   @Test

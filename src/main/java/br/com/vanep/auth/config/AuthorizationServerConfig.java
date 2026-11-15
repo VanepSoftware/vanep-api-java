@@ -3,6 +3,7 @@ package br.com.vanep.auth.config;
 import br.com.vanep.auth.oauth.JwtTokenCustomizer;
 import br.com.vanep.auth.oauth.grant.MobileAuthorizationGrantTypes;
 import br.com.vanep.auth.oauth.grant.MobileRefreshTokenGenerator;
+import br.com.vanep.auth.security.OAuth2AuthorizationJackson;
 import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jose.jwk.source.ImmutableJWKSet;
@@ -167,7 +168,10 @@ public class AuthorizationServerConfig {
   @Profile("docker | prod | local")
   public OAuth2AuthorizationService authorizationService(
       JdbcTemplate jdbcTemplate, RegisteredClientRepository registeredClientRepository) {
-    return new JdbcOAuth2AuthorizationService(jdbcTemplate, registeredClientRepository);
+    JdbcOAuth2AuthorizationService service =
+        new JdbcOAuth2AuthorizationService(jdbcTemplate, registeredClientRepository);
+    OAuth2AuthorizationJackson.install(service, registeredClientRepository);
+    return service;
   }
 
   /**

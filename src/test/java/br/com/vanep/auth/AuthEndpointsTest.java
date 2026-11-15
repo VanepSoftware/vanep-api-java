@@ -1,5 +1,6 @@
 package br.com.vanep.auth;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestBuilders.formLogin;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.response.SecurityMockMvcResultMatchers.authenticated;
@@ -11,6 +12,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import br.com.vanep.auth.security.LoginAttemptService;
+import br.com.vanep.auth.security.UserPasswordEncoder;
+import br.com.vanep.auth.security.UserPasswordService;
 import br.com.vanep.user.enums.Gender;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
@@ -38,6 +41,8 @@ class AuthEndpointsTest {
   @Autowired private WebApplicationContext context;
   @Autowired private UserRepository users;
   @Autowired private PasswordEncoder passwordEncoder;
+  @Autowired private UserPasswordEncoder userPasswords;
+  @Autowired private UserPasswordService userPasswordService;
   @Autowired private LoginAttemptService loginAttempts;
 
   private MockMvc mockMvc;
@@ -60,7 +65,7 @@ class AuthEndpointsTest {
     user.setDocument("12345678901");
     user.setBirthDate(LocalDate.of(1990, 5, 15));
     user.setGender(Gender.FEMALE);
-    user.setPassword(passwordEncoder.encode(PASSWORD));
+    userPasswordService.assignEncodedPassword(user, PASSWORD);
     user.setVerified(true);
     users.save(user);
   }
@@ -147,6 +152,45 @@ class AuthEndpointsTest {
         .andExpect(status().is3xxRedirection())
         .andExpect(redirectedUrl("/login?error"))
         .andExpect(unauthenticated());
+  }
+
+  @Test
+  void formLoginUpgradesALegacyHashAndRejectsThatHashOnAnotherAccount() throws Exception {
+    UserModel seeded = users.findByEmail(EMAIL).orElseThrow();
+    seeded.setPassword(passwordEncoder.encode(PASSWORD));
+    users.save(seeded);
+
+    mockMvc
+        .perform(formLogin("/login").user("email", EMAIL).password(PASSWORD))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(authenticated().withUsername(EMAIL));
+
+    UserModel owner = users.findByEmail(EMAIL).orElseThrow();
+    assertThat(userPasswords.requiresUpgrade(owner.getPassword())).isFalse();
+    assertThat(owner.getPassword()).doesNotContain(owner.getToken());
+    assertThat(userPasswords.matches(PASSWORD, owner.getPassword(), owner.getToken())).isTrue();
+    assertThat(userPasswords.matches(PASSWORD, owner.getPassword(), "user-token-beta")).isFalse();
+
+    UserModel other = new UserModel();
+    other.setType(UserType.CLIENT);
+    other.setName("Other");
+    other.setEmail("other@vanep.com.br");
+    other.setDocument("98765432100");
+    other.setPassword(owner.getPassword());
+    other.setVerified(true);
+    users.save(other);
+    loginAttempts.loginSucceeded(other.getEmail());
+
+    mockMvc
+        .perform(formLogin("/login").user("email", other.getEmail()).password(PASSWORD))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrl("/login?error"))
+        .andExpect(unauthenticated());
+
+    mockMvc
+        .perform(formLogin("/login").user("email", EMAIL).password(PASSWORD))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(authenticated().withUsername(EMAIL));
   }
 
   @Test
