@@ -55,7 +55,10 @@ public class DriverOccupancyService {
       List<ShiftOccupancyDTO> contracted, List<ShiftOccupancyDTO> unlinked) {
     Map<OperationShift, Long> passengers = new EnumMap<>(OperationShift.class);
     Stream.concat(contracted.stream(), unlinked.stream())
-        .forEach(count -> passengers.merge(count.shift(), count.passengers(), Long::sum));
+        .forEach(
+            count ->
+                passengers.merge(
+                    count.shift(), count.passengers(), (current, added) -> current + added));
     return Arrays.stream(OperationShift.values())
         .map(shift -> new ShiftOccupancyDTO(shift, passengers.getOrDefault(shift, 0L)))
         .toList();
