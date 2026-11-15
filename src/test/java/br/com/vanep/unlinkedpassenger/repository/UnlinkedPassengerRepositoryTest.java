@@ -11,7 +11,6 @@ import br.com.vanep.country.model.CountryModel;
 import br.com.vanep.country.repository.CountryRepository;
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
-import br.com.vanep.driveroccupancy.dto.ShiftOccupancyDTO;
 import br.com.vanep.routepassenger.dto.RoutePassengerDTO;
 import br.com.vanep.routepassenger.enums.PassengerSource;
 import br.com.vanep.schedule.model.ScheduleModel;
@@ -193,7 +192,7 @@ class UnlinkedPassengerRepositoryTest {
     passengers.delete(passengers.save(newPassenger(driver, "Caio", "Rua D")));
 
     assertThat(passengers.countPassengersByShift(driver.getId()))
-        .extracting(ShiftOccupancyDTO::shift, ShiftOccupancyDTO::passengers)
+        .extracting(count -> count.shift(), count -> count.passengers())
         .containsExactlyInAnyOrder(
             tuple(OperationShift.MORNING, 2L), tuple(OperationShift.AFTERNOON, 2L));
     assertThat(passengers.countByDriverId(driver.getId())).isEqualTo(2);
