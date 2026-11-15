@@ -1329,5 +1329,124 @@ expect O9 "the driver's onboarding shows the code and its text, with no message 
   '.rejectionReasonCode == "DUPLICATE_ACCOUNT" and .rejectionReason == "Já existe outra conta deste motorista."'
 sql "update driver set approval_status = 'APPROVED', rejection_reason_code = null where token = '$SEED_DRIVER_TOKEN'" >/dev/null
 
+# Part 9 — PR 9: the admin's queue and counts, computed on every read
+# ---------------------------------------------------------------------------------------------
+
+queue() { request GET "/api/drivers/compliance?$1" "${2:-$ADMIN}"; }
+
+table "The four tabs and the counts"
+request GET /api/drivers/compliance/counts "$ADMIN"
+expect Q1x "the counts" 200 '.all > 0 and .asOf != null'
+COUNTS="$RESP_BODY"
+for tab in AWAITING_DECISION:awaitingDecision PENDING_DOCUMENTS:pendingDocuments EXPIRING:expiring ALL:all; do
+  queue "view=${tab%%:*}&size=1"
+  check "Q2x-${tab%%:*}" "the ${tab%%:*} tab totals what /counts says" "$(jq -r ".${tab##*:}" <<<"$COUNTS")" \
+    "$(jq -r .totalElements <<<"$RESP_BODY")"
+done
+queue "view=ALL&size=500"
+expect Q3x "a row has the situation, no CPF and no phone" 200 \
+  '([.content[] | select(.token == "'"$NEW_DRIVER"'")][0] | .nextAction != null and .createdAt != null and .vehicleCount >= 1)
+   and all(.content[]; has("document") | not) and all(.content[]; has("phone") | not)'
+check Q4x "the badge counts the drivers waiting for the admin" "$(jq -r .badge <<<"$COUNTS")" \
+  "$(jq '[.content[] | select(.nextAction == "READY_TO_APPROVE" or .nextAction == "ADMIN")] | length' <<<"$RESP_BODY")"
+queue "view=AWAITING_DECISION&size=500"
+expect Q5x "awaiting decision: only drivers under review, the driver's turn last" 200 \
+  'all(.content[]; .approvalStatus == "UNDER_REVIEW")
+   and ([.content[].nextAction | . == "DRIVER"] | . == (. | sort))'
+check Q6x "awaitingDriver counts the driver's turn" "$(jq -r .awaitingDriver <<<"$COUNTS")" \
+  "$(jq '[.content[] | select(.nextAction == "DRIVER")] | length' <<<"$RESP_BODY")"
+
+table "The search"
+HYPHENATED="${NEW_PLATE:0:3}-${NEW_PLATE:3}"
+queue "q=$HYPHENATED"
+expect S1x "by the plate with a hyphen" 200 '[.content[].token] == ["'"$NEW_DRIVER"'"]'
+queue "q=$(tr '[:upper:]' '[:lower:]' <<<"$NEW_PLATE")"
+expect S2x "by the plate in lower case without hyphen" 200 '[.content[].token] == ["'"$NEW_DRIVER"'"]'
+queue "q=QA.MOTORISTA.$RUN"
+expect S3x "by the e-mail, any case" 200 '[.content[].token] == ["'"$NEW_DRIVER"'"]'
+queue "q=nobody-$RUN"
+expect S4x "a search that matches nobody" 200 '.totalElements == 0 and .content == []'
+queue "view=ALL&size=2&page=0"
+FIRST_PAGE="$RESP_BODY"
+queue "view=ALL&size=2&page=0"
+check S5x "the same page twice is the same" "$FIRST_PAGE" "$RESP_BODY"
+queue "view=NOPE"
+expect S6x "an unknown tab" 400
+
+table "The queue is current at every read"
+RECORD=$(sql "select dd.token from driver_document dd join driver d on d.id = dd.driver_id where d.token = '$SEED_DRIVER_TOKEN'
+              and dd.document_type = 'CRIMINAL_RECORD' and dd.status = 'APPROVED' and dd.deleted_at is null and dd.superseded_at is null limit 1")
+OLD_EXPIRY=$(sql "select coalesce(expires_at::text, 'null') from driver_document where token = '$RECORD'")
+queue "view=EXPIRING&size=500"
+BEFORE=$(jq '[.content[].token] | index("'"$SEED_DRIVER_TOKEN"'") != null' <<<"$RESP_BODY")
+sql "update driver_document set expires_at = (now() at time zone 'America/Sao_Paulo')::date - 1 where token = '$RECORD'" >/dev/null
+queue "view=EXPIRING&size=500"
+expect E1x "a document expired yesterday puts the driver in EXPIRING on the next read, with nothing run" 200 \
+  '[.content[] | select(.token == "'"$SEED_DRIVER_TOKEN"'")][0].expiredCount >= 1'
+sql "update driver_document set expires_at = $( [[ $OLD_EXPIRY == null ]] && echo null || echo "'$OLD_EXPIRY'" ) where token = '$RECORD'" >/dev/null
+queue "view=EXPIRING&size=500"
+check E2x "putting the date back takes it out again" "$BEFORE" \
+  "$(jq '[.content[].token] | index("'"$SEED_DRIVER_TOKEN"'") != null' <<<"$RESP_BODY")"
+
+table "Who reads the queue"
+queue "" "$DRIVER"
+expect W1x "a driver" 403
+request GET /api/drivers/compliance/counts "$CLIENT"
+expect W2x "a client" 403
+request GET /api/drivers/compliance ""
+expect W3x "no token" 401
+
+table "R10: the queue with 1,000 more drivers"
+BULK="r$((RUN % 1000000))"
+sql "
+insert into users (token, type, name, email, document, verified, terms_accepted_at)
+  select '$BULK-u' || n, 'DRIVER', 'Carga ' || n, '$BULK.' || n || '@carga.test', lpad((80000000000 + n)::text, 11, '0'), true, now()
+  from generate_series(1, 1000) n;
+insert into driver (token, user_id, base_price, approval_status, submitted_at)
+  select '$BULK-d' || n, u.id, 100, case when n % 3 = 0 then 'UNDER_REVIEW' else 'APPROVED' end, now() - n * interval '1 minute'
+  from generate_series(1, 1000) n join users u on u.token = '$BULK-u' || n;
+insert into vehicle (token, driver_id, plate, brand, model, manufacture_year, color, capacity)
+  select '$BULK-v' || n, d.id, 'C' || lpad(n::text, 6, '0'), 'Fiat', 'Ducato', 2022, 'Branca', 15
+  from generate_series(1, 1000) n join driver d on d.token = '$BULK-d' || n;
+insert into driver_cnh (token, driver_id, registration_number, category, issue_date, valid_until, status)
+  select '$BULK-c' || n, d.id, '6' || lpad(($RUN % 100000 * 1000 + n)::text, 10, '0'), 'D', date '2020-01-01', current_date + n, 'APPROVED'
+  from generate_series(1, 1000) n join driver d on d.token = '$BULK-d' || n;
+insert into driver_document (token, driver_id, document_type, document_number, expires_at, status)
+  select '$BULK-' || t.code || n, d.id, t.type, 'N-' || n, current_date + n, 'APPROVED'
+  from generate_series(1, 1000) n join driver d on d.token = '$BULK-d' || n
+  cross join (values ('SCHOOL_DRIVER_COURSE', 'sc'), ('CRIMINAL_RECORD', 'cr')) t(type, code);
+insert into vehicle_document (token, vehicle_id, document_type, document_number, expires_at, status)
+  select '$BULK-' || t.code || n, v.id, t.type, 'N-' || n, current_date + n, case when n % 5 = 0 then 'PENDING' else 'APPROVED' end
+  from generate_series(1, 1000) n join vehicle v on v.token = '$BULK-v' || n
+  cross join (values ('CRLV', 'rl'), ('VEHICLE_INSPECTION', 'vi'), ('SCHOOL_VEHICLE_AUTHORIZATION', 'va')) t(type, code);
+" >/dev/null
+check L1x "1,000 drivers were added, each with a van and its documents" "1000" \
+  "$(sql "select count(*) from driver where token like '$BULK-d%'")"
+TIMINGS=""
+STATUSES=""
+measure() {
+  local result
+  result=$(curl -s -o "$BODY_FILE" -w '%{http_code} %{time_total}' "$BASE_URL$2" -H "Authorization: Bearer $ADMIN")
+  STATUSES="$STATUSES${result%% *} "
+  TIMINGS="$TIMINGS $1=${result##* }s"
+}
+for tab in AWAITING_DECISION PENDING_DOCUMENTS EXPIRING ALL; do
+  measure "$tab" "/api/drivers/compliance?view=$tab&size=20"
+done
+measure counts /api/drivers/compliance/counts
+check L2x "the counts see the 1,000 new drivers" "true" "$(jq '.all >= 1000' "$BODY_FILE")"
+measure search "/api/drivers/compliance?q=C000500"
+check L3x "the search finds a plate among them" "1" "$(jq '.totalElements' "$BODY_FILE")"
+check L4x "every tab, the counts and the search answer" "200 200 200 200 200 200 " "$STATUSES"
+echo "R10 timings with $(sql "select count(*) from driver where deleted_at is null") drivers:$TIMINGS"
+sql "
+delete from vehicle_document where token like '$BULK-%';
+delete from driver_document where token like '$BULK-%';
+delete from driver_cnh where token like '$BULK-c%';
+delete from vehicle where token like '$BULK-v%';
+delete from driver where token like '$BULK-d%';
+delete from users where token like '$BULK-u%';
+" >/dev/null
+
 echo
 echo "TOTAL: $PASSED passed"

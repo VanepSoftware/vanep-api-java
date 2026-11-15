@@ -70,6 +70,20 @@ public interface VehicleRepository extends JpaRepository<VehicleModel, Long> {
   @Query(value = "SELECT id, token FROM vehicle WHERE id IN (:ids)", nativeQuery = true)
   List<IdAndToken> findTokensByIdIn(@Param("ids") Collection<Long> ids);
 
+  @Query(
+      """
+      select vehicle.driver.id as driverId, count(vehicle) as total from VehicleModel vehicle
+      where vehicle.driver.id in :driverIds and vehicle.active = true
+      group by vehicle.driver.id
+      """)
+  List<DriverVehicleCount> countActiveByDriverIdIn(@Param("driverIds") Collection<Long> driverIds);
+
+  interface DriverVehicleCount {
+    Long getDriverId();
+
+    Long getTotal();
+  }
+
   interface IdAndToken {
     Long getId();
 

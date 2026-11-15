@@ -2,6 +2,7 @@ package br.com.vanep.vehicle.service;
 
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
+import br.com.vanep.shared.error.ApiProblemException;
 import br.com.vanep.unlinkedpassenger.repository.UnlinkedPassengerRepository;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
@@ -13,6 +14,7 @@ import br.com.vanep.vehicle.mapper.VehicleMapper;
 import br.com.vanep.vehicle.model.VehicleModel;
 import br.com.vanep.vehicle.repository.VehicleRepository;
 import java.util.List;
+import java.util.Locale;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.HttpStatus;
@@ -99,13 +101,14 @@ public class VehicleService {
   }
 
   VehicleResponseDTO createFor(DriverModel driver, VehicleRequestDTO request) {
-    if (vehicleRepository.existsByPlate(request.plate())) {
-      throw new ResponseStatusException(HttpStatus.CONFLICT, message("vehicle.plate.duplicate"));
+    String plate = normalizePlate(request.plate());
+    if (vehicleRepository.existsByPlate(plate)) {
+      throw ApiProblemException.conflict("vehicle.plate.duplicate");
     }
 
     VehicleModel vehicle = new VehicleModel();
     vehicle.setDriver(driver);
-    vehicle.setPlate(request.plate());
+    vehicle.setPlate(plate);
     vehicle.setBrand(request.brand());
     vehicle.setModel(request.model());
     vehicle.setManufactureYear(request.manufactureYear());
@@ -158,12 +161,12 @@ public class VehicleService {
   public VehicleResponseDTO update(String token, VehicleRequestDTO request) {
     VehicleModel vehicle = requireByToken(token);
 
-    if (!vehicle.getPlate().equalsIgnoreCase(request.plate())
-        && vehicleRepository.existsByPlate(request.plate())) {
-      throw new ResponseStatusException(HttpStatus.CONFLICT, message("vehicle.plate.duplicate"));
+    String plate = normalizePlate(request.plate());
+    if (!vehicle.getPlate().equals(plate) && vehicleRepository.existsByPlate(plate)) {
+      throw ApiProblemException.conflict("vehicle.plate.duplicate");
     }
 
-    vehicle.setPlate(request.plate());
+    vehicle.setPlate(plate);
     vehicle.setBrand(request.brand());
     vehicle.setModel(request.model());
     vehicle.setManufactureYear(request.manufactureYear());
@@ -201,5 +204,10 @@ public class VehicleService {
         .findByToken(token)
         .orElseThrow(
             () -> new ResponseStatusException(HttpStatus.NOT_FOUND, message("vehicle.not_found")));
+  }
+
+  // A plate is stored in one spelling so "ABC-1D23" and "abc1d23" are the same van.
+  public static String normalizePlate(String plate) {
+    return plate == null ? null : plate.replaceAll("[\\s-]", "").toUpperCase(Locale.ROOT);
   }
 }

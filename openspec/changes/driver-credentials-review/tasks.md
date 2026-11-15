@@ -267,9 +267,9 @@
 > Depends on: PR 7 | Parallel with: PR 8
 > Order: test → repository → service → controller → response DTO
 
-- [ ] 9.1 Criar branch `VAN-86/9-admin-queue` de dentro da branch do PR 7
-- [ ] 9.2 Testes do `DriverComplianceView` (puro): cada aba com o filtro e a ordem do D17; `DRIVER` no fim de `AWAITING_DECISION`; em `EXPIRING`, um vencido, um que vence em 30 dias e um que vence em 31 (fora); empate desfeito pelo motorista
-- [ ] 9.3 Testes da fila (spec `admin-driver-review`):
+- [x] 9.1 Criar branch `VAN-86/9-admin-queue` de dentro da branch do PR 7
+- [x] 9.2 Testes do `DriverComplianceView` (puro): cada aba com o filtro e a ordem do D17; `DRIVER` no fim de `AWAITING_DECISION`; em `EXPIRING`, um vencido, um que vence em 30 dias e um que vence em 31 (fora); empate desfeito pelo motorista
+- [x] 9.3 Testes da fila (spec `admin-driver-review`):
   - a busca por nome, por e-mail e por placa com e sem hífen;
   - página e total certos com mais motoristas que o tamanho da página, e a mesma página em dois pedidos iguais;
   - a linha com `createdAt` e sem CPF e telefone;
@@ -277,12 +277,12 @@
   - `/counts` com o total de cada aba, `awaitingDriver`, `badge` e `asOf`;
   - um documento vencido ontem aparece em `EXPIRING` hoje, sem nenhuma escrita;
   - com `review_documents` ou `approve_driver` → 200, o motorista → 403, sem token → 401
-- [ ] 9.4 Testes da placa normalizada no `VehicleService`: `ABC-1D23` grava `ABC1D23`, e `ABC1D23` depois de `ABC-1D23` → 409 `vehicle.plate.duplicate`, com o `code`
-- [ ] 9.5 Placa normalizada no `VehicleService`. Teste 9.4 verde
-- [ ] 9.6 `DriverComplianceView`. Teste 9.2 verde
-- [ ] 9.7 Consulta dos candidatos no `DriverRepository` (busca e status do cadastro) e as consultas em lote de cidade e de vans; `DriverComplianceQueueService` com o Javadoc da decisão (D16); `DriverComplianceController` com `GET /api/drivers/compliance` e `/counts`; `DriverComplianceRowResponseDTO` e `DriverComplianceCountsResponseDTO`. Teste 9.3 verde
-- [ ] 9.8 `make lint` + `./mvnw verify -B`
-- [ ] 9.9 QA da regra 55:
+- [x] 9.4 Testes da placa normalizada no `VehicleService`: `ABC-1D23` grava `ABC1D23`, e `ABC1D23` depois de `ABC-1D23` → 409 `vehicle.plate.duplicate`, com o `code`
+- [x] 9.5 Placa normalizada no `VehicleService`. Teste 9.4 verde
+- [x] 9.6 `DriverComplianceView`. Teste 9.2 verde
+- [x] 9.7 Consulta dos candidatos no `DriverRepository` (busca e status do cadastro) e as consultas em lote de cidade e de vans; `DriverComplianceQueueService` com o Javadoc da decisão (D16); `DriverComplianceController` com `GET /api/drivers/compliance` e `/counts`; `DriverComplianceRowResponseDTO` e `DriverComplianceCountsResponseDTO`. Teste 9.3 verde
+- [x] 9.8 `make lint` + `./mvnw verify -B`
+- [x] 9.9 QA da regra 55:
   - as quatro abas e as contagens com os motoristas do seed e o motorista novo;
   - a busca por placa com hífen;
   - vencer a vistoria por SQL e conferir que `EXPIRING` a mostra na leitura seguinte, sem rodar nada;

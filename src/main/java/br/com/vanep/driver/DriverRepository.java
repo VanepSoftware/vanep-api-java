@@ -3,6 +3,7 @@ package br.com.vanep.driver;
 import br.com.vanep.driver.model.DriverModel;
 import jakarta.persistence.LockModeType;
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -16,6 +17,37 @@ public interface DriverRepository extends JpaRepository<DriverModel, Long> {
   Optional<DriverModel> findByUserId(Long userId);
 
   Optional<DriverModel> findByToken(String token);
+
+  @Query(
+      """
+      select driver from DriverModel driver
+      join fetch driver.user user
+      where (:status is null or driver.approvalStatus = :status)
+        and (:text is null
+             or lower(user.name) like :text escape '\\'
+             or lower(user.email) like :text escape '\\'
+             or exists (select vehicle.id from VehicleModel vehicle
+                        where vehicle.driver = driver and vehicle.active = true
+                          and vehicle.plate like :plate escape '\\'))
+      """)
+  List<DriverModel> findQueueCandidates(
+      @Param("status") DriverApprovalStatus status,
+      @Param("text") String text,
+      @Param("plate") String plate);
+
+  @Query(
+      """
+      select driver.id as driverId, city.name as cityName
+      from DriverModel driver join driver.user user, AddressModel address join address.city city
+      where address.id = user.addressId and driver.id in :driverIds
+      """)
+  List<DriverCity> findCitiesByDriverIdIn(@Param("driverIds") Collection<Long> driverIds);
+
+  interface DriverCity {
+    Long getDriverId();
+
+    String getCityName();
+  }
 
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   @Query("select driver from DriverModel driver where driver.token = :token")
