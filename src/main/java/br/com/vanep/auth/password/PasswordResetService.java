@@ -3,6 +3,7 @@ package br.com.vanep.auth.password;
 import br.com.vanep.auth.enums.AuthCodePurpose;
 import br.com.vanep.auth.mail.MailService;
 import br.com.vanep.auth.password.model.PasswordResetTokenModel;
+import br.com.vanep.auth.security.UserPasswordService;
 import br.com.vanep.auth.token.AuthCodeIssueDecision;
 import br.com.vanep.auth.token.AuthCodeIssuePolicy;
 import br.com.vanep.auth.token.SecureCodes;
@@ -16,7 +17,6 @@ import java.util.Optional;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,7 +31,7 @@ public class PasswordResetService {
   private final UserRepository users;
   private final MailService mail;
   private final MessageSource messages;
-  private final PasswordEncoder passwordEncoder;
+  private final UserPasswordService userPasswords;
   private final SecureCodes codes;
   private final AuthCodeIssuePolicy issuePolicy;
   private final int maxAttempts;
@@ -43,7 +43,7 @@ public class PasswordResetService {
       UserRepository users,
       MailService mail,
       MessageSource messages,
-      PasswordEncoder passwordEncoder,
+      UserPasswordService userPasswords,
       SecureCodes codes,
       AuthCodeIssuePolicy issuePolicy,
       @Value("${vanep.auth.code.max-attempts:5}") int maxAttempts,
@@ -53,7 +53,7 @@ public class PasswordResetService {
     this.users = users;
     this.mail = mail;
     this.messages = messages;
-    this.passwordEncoder = passwordEncoder;
+    this.userPasswords = userPasswords;
     this.codes = codes;
     this.issuePolicy = issuePolicy;
     this.maxAttempts = maxAttempts;
@@ -117,7 +117,7 @@ public class PasswordResetService {
     if (user.isEmpty()) {
       return false;
     }
-    user.get().setPassword(passwordEncoder.encode(newPassword));
+    userPasswords.assignEncodedPassword(user.get(), newPassword);
     token.setConsumedAt(Instant.now());
     return true;
   }
@@ -139,7 +139,7 @@ public class PasswordResetService {
       registerFailedAttempt(token, now);
       return false;
     }
-    user.setPassword(passwordEncoder.encode(newPassword));
+    userPasswords.assignEncodedPassword(user, newPassword);
     token.setConsumedAt(now);
     return true;
   }

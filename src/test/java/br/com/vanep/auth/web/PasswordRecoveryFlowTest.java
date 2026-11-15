@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import br.com.vanep.auth.password.PasswordResetTokenRepository;
 import br.com.vanep.auth.password.model.PasswordResetTokenModel;
+import br.com.vanep.auth.security.UserPasswordEncoder;
 import br.com.vanep.auth.token.SecureTokens;
 import br.com.vanep.auth.verification.EmailVerificationTokenRepository;
 import br.com.vanep.auth.verification.model.EmailVerificationTokenModel;
@@ -39,6 +40,7 @@ class PasswordRecoveryFlowTest {
   @Autowired private PasswordResetTokenRepository resetTokens;
   @Autowired private EmailVerificationTokenRepository verificationTokens;
   @Autowired private PasswordEncoder passwordEncoder;
+  @Autowired private UserPasswordEncoder userPasswords;
 
   private MockMvc mockMvc;
 
@@ -105,7 +107,10 @@ class PasswordRecoveryFlowTest {
         .andExpect(redirectedUrl("/login?reset"));
 
     UserModel reloaded = users.findById(user.getId()).orElseThrow();
-    assertThat(passwordEncoder.matches("Newpass-12", reloaded.getPassword())).isTrue();
+    assertThat(userPasswords.matches("Newpass-12", reloaded.getPassword(), reloaded.getToken()))
+        .isTrue();
+    assertThat(userPasswords.matches("Newpass-12", reloaded.getPassword(), "user-token-beta"))
+        .isFalse();
   }
 
   @Test

@@ -12,6 +12,8 @@ import static org.mockito.Mockito.when;
 import br.com.vanep.auth.enums.AuthCodePurpose;
 import br.com.vanep.auth.mail.MailService;
 import br.com.vanep.auth.password.model.PasswordResetTokenModel;
+import br.com.vanep.auth.security.UserPasswordEncoder;
+import br.com.vanep.auth.security.UserPasswordService;
 import br.com.vanep.auth.token.AuthCodeIssuePolicy;
 import br.com.vanep.auth.token.SecureCodes;
 import br.com.vanep.user.model.UserModel;
@@ -27,7 +29,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.MessageSource;
-import org.springframework.security.crypto.password.PasswordEncoder;
 
 @ExtendWith(MockitoExtension.class)
 class PasswordResetServiceTest {
@@ -40,7 +41,7 @@ class PasswordResetServiceTest {
   @Mock private UserRepository users;
   @Mock private MailService mail;
   @Mock private MessageSource messages;
-  @Mock private PasswordEncoder passwordEncoder;
+  @Mock private UserPasswordEncoder passwordEncoder;
 
   private final SecureCodes codes = new SecureCodes("pepper-for-tests");
   private PasswordResetService service;
@@ -53,7 +54,7 @@ class PasswordResetServiceTest {
             users,
             mail,
             messages,
-            passwordEncoder,
+            new UserPasswordService(passwordEncoder),
             codes,
             new AuthCodeIssuePolicy(60, 10),
             5,
@@ -66,6 +67,7 @@ class PasswordResetServiceTest {
     user.setId(USER_ID);
     user.setName("Person");
     user.setEmail(EMAIL);
+    user.setToken("user-token-alpha");
     user.setPassword("stored-hash");
     return user;
   }
@@ -142,11 +144,12 @@ class PasswordResetServiceTest {
     PasswordResetTokenModel token = activeTokenFor("654321");
     when(users.findByEmail(EMAIL)).thenReturn(Optional.of(user));
     when(tokens.lockLatestActive(eq(USER_ID), any(Instant.class))).thenReturn(Optional.of(token));
-    when(passwordEncoder.encode("new-password")).thenReturn("new-hash");
+    when(passwordEncoder.encode("new-password", "user-token-alpha")).thenReturn("new-hash");
 
     assertThat(service.resetByCode(EMAIL, "654321", "new-password")).isTrue();
 
     assertThat(user.getPassword()).isEqualTo("new-hash");
+    assertThat(user.getToken()).isEqualTo("user-token-alpha");
     assertThat(token.getConsumedAt()).isNotNull();
   }
 
@@ -161,7 +164,7 @@ class PasswordResetServiceTest {
 
     assertThat(user.getPassword()).isEqualTo("stored-hash");
     assertThat(token.getFailedAttempts()).isEqualTo(1);
-    verify(passwordEncoder, never()).encode(anyString());
+    verify(passwordEncoder, never()).encode(anyString(), anyString());
   }
 
   @Test

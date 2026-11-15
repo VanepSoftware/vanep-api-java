@@ -2,6 +2,7 @@ package br.com.vanep.auth.security;
 
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
+import java.util.List;
 import org.springframework.security.authentication.LockedException;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -36,11 +37,12 @@ public class VanepUserDetailsService implements UserDetailsService {
       throw new UsernameNotFoundException("Account without a local password: " + email);
     }
 
-    return org.springframework.security.core.userdetails.User.withUsername(user.getEmail())
-        .password(user.getPassword())
-        .authorities(new SimpleGrantedAuthority("ROLE_" + user.getType().name()))
-        .disabled(!user.isVerified())
-        .accountLocked(loginAttempts.isBlocked(user.getEmail()))
-        .build();
+    return new VanepUserDetails(
+        user.getEmail(),
+        user.getPassword(),
+        user.getToken(),
+        user.isVerified(),
+        !loginAttempts.isBlocked(user.getEmail()),
+        List.of(new SimpleGrantedAuthority("ROLE_" + user.getType().name())));
   }
 }
