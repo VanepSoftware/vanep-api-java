@@ -36,6 +36,9 @@ public interface DriverRatingRepository extends JpaRepository<DriverRatingModel,
 
   boolean existsByLinkId(Long linkId);
 
+  @Query("SELECT COUNT(dr) FROM DriverRatingModel dr WHERE dr.link.driver.id = :driverId")
+  long countByDriverId(@Param("driverId") Long driverId);
+
   @Query("SELECT AVG(dr.rating) FROM DriverRatingModel dr WHERE dr.link.driver.id = :driverId")
   Optional<BigDecimal> calculateAverageRatingForDriver(@Param("driverId") Long driverId);
 

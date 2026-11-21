@@ -8,8 +8,10 @@ public record DriverMeSummaryResponseDTO(
     String token,
     String photo,
     BigDecimal rating,
+    long ratingCount,
     DriverApprovalStatus approvalStatus,
     boolean available,
     boolean active,
     BigDecimal basePrice,
+    Integer experienceYears,
     UserMeResponseDTO user) {}

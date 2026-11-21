@@ -64,6 +64,7 @@ class DriverControllerTest {
     driver.setUser(user);
     driver.setCnpj("11222333000181");
     driver.setBasePrice(BigDecimal.valueOf(50));
+    driver.setExperienceYears(8);
     driver.setApprovalStatus(DriverApprovalStatus.APPROVED);
     driver = drivers.save(driver);
 
@@ -331,7 +332,9 @@ class DriverControllerTest {
         .andExpect(jsonPath("$.user.document").value("66666666666"))
         .andExpect(jsonPath("$.user.type").value("DRIVER"))
         .andExpect(jsonPath("$.bio").doesNotExist())
-        .andExpect(jsonPath("$.basePrice").value(50));
+        .andExpect(jsonPath("$.basePrice").value(50))
+        .andExpect(jsonPath("$.ratingCount").value(0))
+        .andExpect(jsonPath("$.experienceYears").value(8));
   }
 
   @Test

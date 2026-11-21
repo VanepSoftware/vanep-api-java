@@ -67,7 +67,7 @@ public enum DriverComplianceView {
     }
   };
 
-  static final int EXPIRY_WINDOW_DAYS = 30;
+  public static final int EXPIRY_WINDOW_DAYS = 30;
 
   public abstract boolean includes(EvaluatedDriver candidate, LocalDate today);
 

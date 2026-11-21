@@ -2,13 +2,13 @@
 
 PR 8 was QA'd apart, on top of PR 7: the runs below were made before PR 9 was moved on top of PR 8, so they do not include it, and the PR 8 results come from its own run.
 
-Latest run: API built from `VAN-86/10-admin-driver-page` (PR 10, on top of PR 9), 2026-11-21, after the file-only submissions, on a fresh database with the seed and the JVM in `Pacific/Kiritimati`. Result: `qa.sh` **345/345 passed**, twice in a row on the same database. The CNH on the page has its whole number and who corrected it (P3y, P3z).
+Latest run: API built from `VAN-86/11-driver-own-compliance` (PR 11, on top of PR 10), 2026-11-21, after the file-only submissions, on a fresh database with the seed and the JVM in `Pacific/Kiritimati`. Result: `qa.sh` **361/361 passed**, twice in a row on the same database. The driver sees a CNH just sent with its file and without data (U2).
 
-Before the file-only submissions: API built from `VAN-86/10-admin-driver-page` (PR 10, on top of PR 9), 2026-11-21, after the CNH category rule, on a fresh database with the seed and the JVM in `Pacific/Kiritimati`. Result: `qa.sh` **317/317 passed**, twice in a row on the same database; the page's file metadata is the shared `DocumentFileResponseDTO` (D22). N4 to N6b check that the API only takes the CNH categories D, E, AD and AE, and that a license saved before with category B is still read and reported as `cnh_category`.
+Before the file-only submissions: API built from `VAN-86/11-driver-own-compliance` (PR 11, on top of PR 10), 2026-11-21, after the CNH category rule, on a fresh database with the seed and the JVM in `Pacific/Kiritimati`. Result: `qa.sh` **333/333 passed**, twice in a row on the same database: the driver's own compliance at each step of a new driver (nothing sent, the CNH without and with its file, a rejected course, an inspection expiring in 20 days), the seed driver approved, the response without reviewer, CPF, e-mail or history, who reads it, the rating count and the experience in `GET /api/drivers/me`, a 10.1 MB PDF refused with `media.file.too_large` and a 9.9 MB PDF stored through the real HTTP stack (D24), and the regression of PRs 1 to 7, 9 and 10. N4 to N6b check that the API only takes the CNH categories D, E, AD and AE, and that a license saved before with category B is still read and reported as `cnh_category`.
 
-Before the CNH category rule: API built from `VAN-86/10-admin-driver-page` (PR 10, on top of PR 9), 2026-11-20, after the mobile requests, on a fresh database with the seed and the JVM in `Pacific/Kiritimati`. Result: `qa.sh` **313/313 passed**, twice in a row on the same database; the page's file metadata is the shared `DocumentFileResponseDTO` (D22).
+Before the CNH category rule: API built from `VAN-86/11-driver-own-compliance` (PR 11, on top of PR 10), 2026-11-20, on a fresh database with the seed and the JVM in `Pacific/Kiritimati`. Result: `qa.sh` **329/329 passed**, twice in a row on the same database: the driver's own compliance at each step of a new driver (nothing sent, the CNH without and with its file, a rejected course, an inspection expiring in 20 days), the seed driver approved, the response without reviewer, CPF, e-mail or history, who reads it, the rating count and the experience in `GET /api/drivers/me`, a 10.1 MB PDF refused with `media.file.too_large` and a 9.9 MB PDF stored through the real HTTP stack (D24), and the regression of PRs 1 to 7, 9 and 10.
 
-Before the mobile requests: API built from `VAN-86/10-admin-driver-page` (PR 10, on top of PR 9), 2026-11-20, after the code review fixes, on a fresh database with the seed and the JVM in `Pacific/Kiritimati`. Result: `qa.sh` **297/297 passed**, twice in a row on the same database. N8 now expects `cnh_file` while the new driver's CNH has no file, and N8b checks the step complete after the upload.
+PR 10: API built from `VAN-86/10-admin-driver-page` (PR 10, on top of PR 9), 2026-11-21, after the CNH category rule, on a fresh database with the seed and the JVM in `Pacific/Kiritimati`. Result: `qa.sh` **317/317 passed**, twice in a row on the same database; the page's file metadata is the shared `DocumentFileResponseDTO` (D22). N4 to N6b check that the API only takes the CNH categories D, E, AD and AE, and that a license saved before with category B is still read and reported as `cnh_category`.
 
 Before the code review fixes: API built from `VAN-86/10-admin-driver-page` (PR 10, on top of PR 9), 2026-11-15, on a fresh database with the seed and the JVM in `Pacific/Kiritimati`. Result: `qa.sh` **296/296 passed**, twice in a row on the same database: the page of the approved new driver (personal data, active vans only, masked CNH, history), the last decision, the review queue and the history after a rejection and a resend, who reads the page, and the regression of PRs 1 to 7 and 9.
 
@@ -216,7 +216,7 @@ The first run of part 4 found a defect from PR 1: with one complete van and anot
 | id | scenario | expected | result |
 |---|---|---|---|
 | Q1 | the reviewer corrects a mistyped number and expiry | 200 | PASS |
-| Q2 | the correction records who corrected and keeps the file | 70bdc73a6a244406a5e20a884:yes | PASS |
+| Q2 | the correction records who corrected and keeps the file | 6610ef18945141d59a204f995:yes | PASS |
 | Q3 | a correction on the version before is stale | 409 | PASS |
 | Q4 | a correction without the required number | 400 | PASS |
 | Q5 | an expiry before today may be corrected: the document is then expired | 200 | PASS |
@@ -341,7 +341,7 @@ The first run of part 4 found a defect from PR 1: with one complete van and anot
 | T8 | an unknown van | 404 | PASS |
 | T9 | a removed van | 404 | PASS |
 
-TOTAL: 345 passed
+TOTAL: 361 passed
 
 ## PR 4 — schema of the new review
 
@@ -615,7 +615,7 @@ The live database: F3 and F4 in the PR 1 table above. The regression of PRs 1 to
 | S2x | by the plate in lower case without hyphen | 200 | PASS |
 | S3x | by the e-mail, any case | 200 | PASS |
 | S4x | a search that matches nobody | 200 | PASS |
-| S5x | the same page twice is the same | {"content":[{"token":"9ea1302041694c9e835d0909d","name":"Motorista Recusado","email":"qa.recusado.1795316152@vanep.test","city":null,"vehicleCount":0,"approvalStatus":"PENDING","submittedAt":null,"createdAt":"2026-11-22T02:56:02.747131Z","nextAction":"ADMIN","canApprove":false,"pendingReviewCount":1,"oldestPendingAt":"2026-11-22T02:56:03.044067Z","rejectedCount":0,"missingCount":2,"expiredCount":0,"nextExpiryOn":null},{"token":"b2aa63aa1fc44251a7f1b5089","name":"Motorista QA","email":"qa.corrida.b.1795316152@vanep.test","city":null,"vehicleCount":0,"approvalStatus":"PENDING","submittedAt":null,"createdAt":"2026-11-22T02:55:58.269192Z","nextAction":"DRIVER","canApprove":false,"pendingReviewCount":0,"oldestPendingAt":null,"rejectedCount":0,"missingCount":3,"expiredCount":0,"nextExpiryOn":null}],"empty":false,"first":true,"last":false,"number":0,"numberOfElements":2,"pageable":{"offset":0,"pageNumber":0,"pageSize":2,"paged":true,"sort":{"empty":true,"sorted":false,"unsorted":true},"unpaged":false},"size":2,"sort":{"empty":true,"sorted":false,"unsorted":true},"totalElements":7,"totalPages":4} | PASS |
+| S5x | the same page twice is the same | {"content":[{"token":"5f8113ae2727435d844c4acf6","name":"Motorista Recusado","email":"qa.recusado.1795316332@vanep.test","city":null,"vehicleCount":0,"approvalStatus":"PENDING","submittedAt":null,"createdAt":"2026-11-22T02:59:00.732382Z","nextAction":"ADMIN","canApprove":false,"pendingReviewCount":1,"oldestPendingAt":"2026-11-22T02:59:01.022165Z","rejectedCount":0,"missingCount":2,"expiredCount":0,"nextExpiryOn":null},{"token":"f7ea72808a98477892c52c7e0","name":"Motorista QA","email":"qa.corrida.b.1795316332@vanep.test","city":null,"vehicleCount":0,"approvalStatus":"PENDING","submittedAt":null,"createdAt":"2026-11-22T02:58:58.447553Z","nextAction":"DRIVER","canApprove":false,"pendingReviewCount":0,"oldestPendingAt":null,"rejectedCount":0,"missingCount":3,"expiredCount":0,"nextExpiryOn":null}],"empty":false,"first":true,"last":false,"number":0,"numberOfElements":2,"pageable":{"offset":0,"pageNumber":0,"pageSize":2,"paged":true,"sort":{"empty":true,"sorted":false,"unsorted":true},"unpaged":false},"size":2,"sort":{"empty":true,"sorted":false,"unsorted":true},"totalElements":7,"totalPages":4} | PASS |
 | S6x | an unknown tab | 400 | PASS |
 
 == The queue is current at every read
@@ -645,11 +645,11 @@ The live database: F3 and F4 in the PR 1 table above. The regression of PRs 1 to
 | id | scenario | expected | result |
 |---|---|---|---|
 | P1y | the approved new driver: personal data only on this route, the decision and the history | 200 | PASS |
-| P2y | only the active vans, the second van was removed | ["b1a3c62b5cfb4a9a88a35ad89"] | PASS |
+| P2y | only the active vans, the second van was removed | ["a178aa801b774659bc51341fb"] | PASS |
 | P3y | the CNH has its whole number for the correction, its file URL, its expiry and who corrected it | true | PASS |
 | P3z | the history names who corrected the CNH's data | true | PASS |
 | P4y | after a rejection and a resend: the approval counts, the resend waits, the rejection is the last decision | 200 | PASS |
-| P5y | the review queue holds the resend | ["ed861d9a13e841269f1cc0ad5"] | PASS |
+| P5y | the review queue holds the resend | ["bf0c0bb0262c49afbed28182e"] | PASS |
 | P6y | the decision counts it | 1 ADMIN | PASS |
 | P7y | the history has the first sending, its rejection with the code and the second sending | true | PASS |
 | P8y | the van's requirements carry the file metadata | true | PASS |
@@ -662,3 +662,33 @@ The live database: F3 and F4 in the PR 1 table above. The regression of PRs 1 to
 | P11y | no token | 401 | PASS |
 | P12y | an unknown driver | 404 | PASS |
 | P13y | an admin token without review_documents still has approve_driver | 200 | PASS |
+
+## PR 11 — the driver's own compliance
+
+== The driver's own compliance
+| id | scenario | expected | result |
+|---|---|---|---|
+| U1 | a new driver with nothing sent: every requirement missing, no van | 200 | PASS |
+| U2 | the CNH just sent waits with its file and without data, and the van is listed | 200 | PASS |
+| U3 | after replacing its file the CNH still carries a PDF | application/pdf | PASS |
+| U4 | the rejected course shows its code and no reviewer | 200 | PASS |
+| U5 | the response has no CPF, e-mail or history | true | PASS |
+| U6 | the inspection approved for 20 more days is expiring soon | APPROVED true true | PASS |
+| U7 | the CNH waiting for review is not expiring soon | PENDING false | PASS |
+| U8 | the seed driver: approved, with every required credential and a qualified van | 200 | PASS |
+| U9 | a client | 403 | PASS |
+| U10 | an admin | 403 | PASS |
+| U11 | no token | 401 | PASS |
+
+== A file within the limit always reaches the size rule
+| id | scenario | expected | result |
+|---|---|---|---|
+| U14 | a 10.1 MB PDF reaches the media rule and is refused with its code | 413 | PASS |
+| U15 | a 9.9 MB PDF is stored | 201 | PASS |
+| U16 | the document describes the 9.9 MB file | 200 | PASS |
+
+== The driver's summary
+| id | scenario | expected | result |
+|---|---|---|---|
+| U12 | the seed driver's summary counts the ratings and shows the experience | 200 | PASS |
+| U13 | a driver without ratings counts zero | 200 | PASS |

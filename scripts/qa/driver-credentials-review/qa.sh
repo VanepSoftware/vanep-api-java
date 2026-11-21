@@ -1510,5 +1510,94 @@ expect P12y "an unknown driver" 404 '.code == "driver.not_found"'
 page "$SEED_DRIVER_TOKEN" "$EDITOR"
 expect P13y "an admin token without review_documents still has approve_driver" 200
 
+table "The driver's own compliance"
+mine() { request GET /api/drivers/me/compliance "$1"; MINE="$RESP_BODY"; }
+requirement_of() { jq -c --arg r "$1" '[.driverRequirements[], .vehicles[].requirements[]] | map(select(.requirement == $r)) | .[0]' <<<"$MINE"; }
+ME_EMAIL="qa.me.$RUN@vanep.test"
+request POST /api/auth/signup/driver "" "{\"name\": \"Motorista Me QA\", \"email\": \"$ME_EMAIL\", \"password\": \"$NEW_PASSWORD\", \"document\": \"$(valid_cpf)\", \"acceptTerms\": true, \"basePrice\": 150.00}"
+sql "insert into address (token, city_id, street) select 'qame$RUN', city_id, 'Rua do QA' from address order by id limit 1" >/dev/null
+sql "update users set verified = true, address_id = (select id from address where token = 'qame$RUN') where email = '$ME_EMAIL'" >/dev/null
+ME=$(SEED_PASSWORD=$NEW_PASSWORD login "$ME_EMAIL")
+mine "$ME"
+expect U1 "a new driver with nothing sent: every requirement missing, no van" 200 \
+  '.asOf == "'"$TODAY"'" and .approvalStatus == "PENDING" and .vehicles == []
+   and ([.driverRequirements[].state] | all(. == "MISSING"))
+   and ([.driverRequirements[] | select(.optional) | .requirement] == ["MUNICIPAL_AUTHORIZATION"])
+   and ([.driverRequirements[] | .current, .pending] | all(. == null))'
+ME_PLATE=$(random_plate F)
+request POST /api/vehicles/me "$ME" "{\"plate\": \"$ME_PLATE\", \"brand\": \"Fiat\", \"model\": \"Ducato\", \"manufactureYear\": 2023, \"color\": \"Branca\", \"capacity\": 15}"
+ME_VAN=$(jq -r .token <<<"$RESP_BODY")
+ME_CNH_NUMBER="8$(printf '%010d' $(( (RUN + 7) % 10000000000 )))"
+send_doc /api/driver-cnhs "$ME" "$(cnh_body "$ME_CNH_NUMBER" "$CNH_ISSUED" "$LATER")"
+ME_CNH=$(jq -r .token <<<"$RESP_BODY")
+mine "$ME"
+expect U2 "the CNH just sent waits with its file and without data, and the van is listed" 200 \
+  '(.driverRequirements[] | select(.requirement == "DRIVER_LICENSE")) as $c
+   | $c.state == "PENDING" and $c.current.token == "'"$ME_CNH"'" and $c.current.file != null
+     and $c.current.registrationNumber == null and $c.current.category == null and $c.current.expiresAt == null
+     and .vehicles[0].token == "'"$ME_VAN"'" and .vehicles[0].plate == "'"$ME_PLATE"'"
+     and .vehicles[0].brand == "Fiat" and .vehicles[0].model == "Ducato" and .vehicles[0].qualified == false
+     and ([.vehicles[0].requirements[].state] | all(. == "MISSING"))'
+upload_pdf "/api/driver-cnhs/$ME_CNH/file" "$ME"
+mine "$ME"
+check U3 "after replacing its file the CNH still carries a PDF" "application/pdf" "$(requirement_of DRIVER_LICENSE | jq -r .current.file.mimeType)"
+send_doc /api/driver-documents "$ME" '{"documentType": "SCHOOL_DRIVER_COURSE", "documentNumber": "CURSO-ME"}'
+ME_COURSE=$(jq -r .token <<<"$RESP_BODY")
+upload_pdf "/api/driver-documents/$ME_COURSE/file" "$ME"
+review driver-documents "$ME_COURSE" '{"status": "REJECTED", "rejectionReasonCode": "ILLEGIBLE"}'
+mine "$ME"
+expect U4 "the rejected course shows its code and no reviewer" 200 \
+  '(.driverRequirements[] | select(.requirement == "SCHOOL_DRIVER_COURSE")) as $r
+   | $r.state == "REJECTED" and $r.current.rejectionReasonCode == "ILLEGIBLE" and $r.current.reviewedAt != null
+     and ($r.current | has("reviewedBy") | not)'
+check U5 "the response has no CPF, e-mail or history" "true" \
+  "$(jq --arg e "$ME_EMAIL" '(has("driver") or has("history") or (tostring | contains($e))) | not' <<<"$MINE")"
+send_doc "/api/vehicles/$ME_VAN/documents" "$ME" '{"documentType": "VEHICLE_INSPECTION", "expiresAt": "'"$(in_days +20)"'"}'
+ME_INSPECTION=$(jq -r .token <<<"$RESP_BODY")
+upload_pdf "/api/vehicle-documents/$ME_INSPECTION/file" "$ME"
+review vehicle-documents "$ME_INSPECTION" '{"status": "APPROVED", "reviewMethod": "MANUAL"}'
+mine "$ME"
+check U6 "the inspection approved for 20 more days is expiring soon" "APPROVED true true" \
+  "$(requirement_of VEHICLE_INSPECTION | jq -r '"\(.state) \(.satisfied) \(.expiringSoon)"')"
+check U7 "the CNH waiting for review is not expiring soon" "PENDING false" \
+  "$(requirement_of DRIVER_LICENSE | jq -r '"\(.state) \(.expiringSoon)"')"
+mine "$DRIVER"
+expect U8 "the seed driver: approved, with every required credential and a qualified van" 200 \
+  '.approvalStatus == "APPROVED" and ([.driverRequirements[] | select(.optional | not) | .satisfied] | all)
+   and ([.vehicles[].qualified] | any)'
+mine "$CLIENT"
+expect U9 "a client" 403
+mine "$ADMIN"
+expect U10 "an admin" 403
+mine ""
+expect U11 "no token" 401
+
+table "A file within the limit always reaches the size rule"
+upload_pdf_of() {
+  local path=$1 token=$2 bytes=$3 file
+  file="$(mktemp).pdf"
+  { printf '%%PDF-1.4\n'; head -c $((bytes - 9)) /dev/zero | tr '\0' ' '; } >"$file"
+  RESP_STATUS=$(curl -s -o "$BODY_FILE" -w '%{http_code}' -X POST "$BASE_URL$path" \
+    -H "Authorization: Bearer $token" -F "file=@$file;type=application/pdf")
+  RESP_BODY=$(cat "$BODY_FILE")
+  rm -f "$file"
+}
+send_doc "/api/vehicles/$ME_VAN/documents" "$ME" '{"documentType": "CRLV", "expiresAt": "'"$IN_120_DAYS"'"}'
+ME_CRLV=$(jq -r .token <<<"$RESP_BODY")
+upload_pdf_of "/api/vehicle-documents/$ME_CRLV/file" "$ME" $((1024 * 1024 * 101 / 10))
+expect U14 "a 10.1 MB PDF reaches the media rule and is refused with its code" 413 '.code == "media.file.too_large"'
+upload_pdf_of "/api/vehicle-documents/$ME_CRLV/file" "$ME" $((1024 * 1024 * 99 / 10))
+expect U15 "a 9.9 MB PDF is stored" 201
+request GET "/api/vehicle-documents/$ME_CRLV" "$ME"
+expect U16 "the document describes the 9.9 MB file" 200 '.file.sizeBytes == '"$((1024 * 1024 * 99 / 10))"
+
+table "The driver's summary"
+request GET /api/drivers/me "$DRIVER"
+expect U12 "the seed driver's summary counts the ratings and shows the experience" 200 \
+  '.ratingCount == '"$(sql "select count(*) from driver_rating r join client_driver l on l.id = r.client_driver_id and l.deleted_at is null join driver d on d.id = l.driver_id join users u on u.id = d.user_id where u.email = '$SEED_DRIVER_EMAIL'")"'
+   and .experienceYears == '"$(sql "select coalesce(d.experience_years::text, 'null') from driver d join users u on u.id = d.user_id where u.email = '$SEED_DRIVER_EMAIL'")"
+request GET /api/drivers/me "$ME"
+expect U13 "a driver without ratings counts zero" 200 '.ratingCount == 0'
+
 echo
 echo "TOTAL: $PASSED passed"

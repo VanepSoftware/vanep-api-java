@@ -1,5 +1,6 @@
 package br.com.vanep.config;
 
+import br.com.vanep.media.service.MediaFileService;
 import br.com.vanep.shared.document.model.DocumentSubmission;
 import br.com.vanep.shared.error.ApiProblemException;
 import org.springframework.http.HttpHeaders;
@@ -12,6 +13,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
 @RestControllerAdvice
@@ -39,6 +41,16 @@ public class ApiErrorAdvice extends ResponseEntityExceptionHandler {
     return entityName != null
         && ClassUtils.isPresent(entityName, null)
         && DocumentSubmission.class.isAssignableFrom(ClassUtils.resolveClassName(entityName, null));
+  }
+
+  @Override
+  protected ResponseEntity<Object> handleMaxUploadSizeExceededException(
+      MaxUploadSizeExceededException exception,
+      HttpHeaders headers,
+      HttpStatusCode status,
+      WebRequest request) {
+    ApiProblemException tooLarge = MediaFileService.tooLarge();
+    return handleErrorResponseException(tooLarge, headers, tooLarge.getStatusCode(), request);
   }
 
   @Override

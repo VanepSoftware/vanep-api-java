@@ -7,6 +7,7 @@ import br.com.vanep.driver.dto.DriverResponseDTO;
 import br.com.vanep.driver.dto.DriverUpdateRequestDTO;
 import br.com.vanep.driver.mapper.DriverMapper;
 import br.com.vanep.driver.model.DriverModel;
+import br.com.vanep.driverrating.repository.DriverRatingRepository;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.service.UserService;
@@ -24,16 +25,19 @@ public class DriverService {
   private final DriverRepository driverRepository;
   private final DriverMapper mapper;
   private final UserService userService;
+  private final DriverRatingRepository ratings;
   private final MessageSource messages;
 
   public DriverService(
       DriverRepository driverRepository,
       DriverMapper mapper,
       UserService userService,
+      DriverRatingRepository ratings,
       MessageSource messages) {
     this.driverRepository = driverRepository;
     this.mapper = mapper;
     this.userService = userService;
+    this.ratings = ratings;
     this.messages = messages;
   }
 
@@ -55,7 +59,7 @@ public class DriverService {
   public DriverMeSummaryResponseDTO getMyProfile(String uid) {
     UserModel user = userService.requireByTokenAndType(uid, UserType.DRIVER);
     DriverModel driver = requireByUserId(user.getId());
-    return mapper.toMeSummary(driver, userService.toMeResponse(user));
+    return toMeSummary(driver, user);
   }
 
   @Transactional
@@ -64,7 +68,12 @@ public class DriverService {
     UserModel user = userService.requireByTokenAndType(uid, UserType.DRIVER);
     DriverModel driver = requireByUserId(user.getId());
     driver.setAvailable(request.available());
-    return mapper.toMeSummary(driverRepository.save(driver), userService.toMeResponse(user));
+    return toMeSummary(driverRepository.save(driver), user);
+  }
+
+  DriverMeSummaryResponseDTO toMeSummary(DriverModel driver, UserModel user) {
+    return mapper.toMeSummary(
+        driver, ratings.countByDriverId(driver.getId()), userService.toMeResponse(user));
   }
 
   public DriverModel requireCallerDriver(String uid) {

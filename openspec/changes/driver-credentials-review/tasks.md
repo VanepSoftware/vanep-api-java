@@ -321,21 +321,21 @@
 > Depends on: PR 10 | Parallel with: PR 8
 > Order: test → repository → service → controller → response DTO
 
-- [ ] 11.1 Criar branch `VAN-86/11-driver-own-compliance` de dentro da branch do PR 10
-- [ ] 11.2 Testes (spec `driver-own-compliance`):
+- [x] 11.1 Criar branch `VAN-86/11-driver-own-compliance` de dentro da branch do PR 10
+- [x] 11.2 Testes (spec `driver-own-compliance`):
   - motorista sem nada: requisitos `MISSING`, `current` e `pending` nulos, `MUNICIPAL_AUTHORIZATION` opcional e `vehicles` vazio;
   - `asOf` e `approvalStatus`; cada van ativa com `token`, `plate`, `brand`, `model`, `qualified` e os requisitos, e a van inativa fora;
   - `expiringSoon` com a validade em 30 dias (`true`) e em 31 (`false`), e `false` fora de `APPROVED`;
   - a recusa com o código e sem revisor; a renovação em `pending`; a CNH aprovada com `category`, `issueDate` e o número inteiro; um envio `PENDING` com o `file` e os dados nulos;
   - cliente → 403; sem token → 401
-- [ ] 11.3 Teste de contagem: o mesmo número de consultas com uma van e com três, cada uma com os seus documentos e arquivos (`SqlStatementCounter`)
-- [ ] 11.4 Testes do resumo: `ratingCount` com zero e com três avaliações, e `experienceYears` do motorista, no `GET /api/drivers/me` e no `PUT /api/drivers/me/availability`
-- [ ] 11.5 `DriverRatingRepository.countByDriverId`; `ratingCount` e `experienceYears` no `DriverMeSummaryResponseDTO` e no `DriverMapper.toMeSummary`. Teste 11.4 verde
-- [ ] 11.6 `DriverMeComplianceService` sobre o `DriverService.requireCallerDriver` e o `DriverComplianceService.evaluate`; `DriverMeComplianceMapper`; `DriverMeComplianceResponseDTO` com records aninhados; `GET /api/drivers/me/compliance` no `DriverComplianceController` com `isAuthenticated()`. Testes 11.2 e 11.3 verdes
-- [ ] 11.6a Testes do limite de upload (D24): com a API num servidor de verdade, um PDF de 9,9 MB → 201, um de 10,1 MB → 413 `media.file.too_large`, e uma requisição acima do limite de transporte → 413 com o mesmo `code`; o `MediaFileService` recusa subir com o limite de transporte igual ao maior limite de mídia
-- [ ] 11.6b `MEDIA_MAX_UPLOAD_SIZE_MB` (padrão 11) no `spring.servlet.multipart.*` e no `.env.example`; a conferência na subida no `MediaFileService`; o 413 com `code` no `MediaFileService` e no `ApiErrorAdvice`. Testes 11.6a verdes
-- [ ] 11.7 `make lint` + `./mvnw verify -B`
-- [ ] 11.8 QA da regra 55:
+- [x] 11.3 Teste de contagem: o mesmo número de consultas com uma van e com três, cada uma com os seus documentos e arquivos (`SqlStatementCounter`)
+- [x] 11.4 Testes do resumo: `ratingCount` com zero e com três avaliações, e `experienceYears` do motorista, no `GET /api/drivers/me` e no `PUT /api/drivers/me/availability`
+- [x] 11.5 `DriverRatingRepository.countByDriverId`; `ratingCount` e `experienceYears` no `DriverMeSummaryResponseDTO` e no `DriverMapper.toMeSummary`. Teste 11.4 verde
+- [x] 11.6 `DriverMeComplianceService` sobre o `DriverService.requireCallerDriver` e o `DriverComplianceService.evaluate`; `DriverMeComplianceMapper`; `DriverMeComplianceResponseDTO` com records aninhados; `GET /api/drivers/me/compliance` no `DriverComplianceController` com `isAuthenticated()`. Testes 11.2 e 11.3 verdes
+- [x] 11.6a Testes do limite de upload (D24): com a API num servidor de verdade, um PDF de 9,9 MB → 201, um de 10,1 MB → 413 `media.file.too_large`, e uma requisição acima do limite de transporte → 413 com o mesmo `code`; o `MediaFileService` recusa subir com o limite de transporte igual ao maior limite de mídia
+- [x] 11.6b `MEDIA_MAX_UPLOAD_SIZE_MB` (padrão 11) no `spring.servlet.multipart.*` e no `.env.example`; a conferência na subida no `MediaFileService`; o 413 com `code` no `MediaFileService` e no `ApiErrorAdvice`. Testes 11.6a verdes
+- [x] 11.7 `make lint` + `./mvnw verify -B`
+- [x] 11.8 QA da regra 55:
   - a rota em cada etapa do motorista novo: sem nada, com a CNH pendente, com documentos recusados e aprovados, e com o cadastro aprovado;
   - `expiringSoon` numa vistoria que vence em 20 dias;
   - a resposta sem revisor, CPF e e-mail;

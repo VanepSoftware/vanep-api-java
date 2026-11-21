@@ -20,6 +20,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.server.ResponseStatusException;
 
 class ApiProblemExceptionTest {
@@ -99,6 +100,15 @@ class ApiProblemExceptionTest {
         .andExpect(jsonPath("$.detail").value("Este envio mudou desde que você abriu."));
   }
 
+  @Test
+  void aRequestOverTheUploadLimitIsTooLargeWithTheMediaCode() throws Exception {
+    mockMvc
+        .perform(get("/__test/problem/upload-too-large").locale(PT_BR))
+        .andExpect(status().isContentTooLarge())
+        .andExpect(jsonPath("$.code").value("media.file.too_large"))
+        .andExpect(jsonPath("$.detail").value("O arquivo é maior que o permitido."));
+  }
+
   @RestController
   @RequestMapping("/__test/problem")
   static class ProblemFixtureController {
@@ -127,6 +137,11 @@ class ApiProblemExceptionTest {
     @GetMapping("/other-stale")
     void otherStale() {
       throw new ObjectOptimisticLockingFailureException(MediaFileModel.class.getName(), 1L);
+    }
+
+    @GetMapping("/upload-too-large")
+    void uploadTooLarge() {
+      throw new MaxUploadSizeExceededException(11L * 1024 * 1024);
     }
 
     @GetMapping("/legacy")
