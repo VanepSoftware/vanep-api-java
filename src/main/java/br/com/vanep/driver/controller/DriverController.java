@@ -136,7 +136,8 @@ public class DriverController {
   @PreAuthorize(
       "hasAuthority('show_driver') or @sec.isDriverOwner(#token, authentication)"
           + " or @sec.isSearchableDriver(#token)")
-  public ResponseEntity<InputStreamResource> downloadPhoto(@PathVariable String token) {
-    return mediaResponder.respond(photoService.require(token, true));
+  public ResponseEntity<InputStreamResource> downloadPhoto(
+      @PathVariable String token, @RequestParam(name = "v", required = false) String version) {
+    return mediaResponder.respond(photoService.require(token, true), version);
   }
 }

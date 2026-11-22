@@ -1,12 +1,13 @@
 package br.com.vanep.driverdocument.model;
 
 import br.com.vanep.driver.model.DriverModel;
-import br.com.vanep.driverdocument.enums.DocumentStatusEnum;
-import br.com.vanep.driverdocument.enums.DocumentTypeEnum;
-import br.com.vanep.driverdocument.enums.ReviewMethodEnum;
+import br.com.vanep.driverdocument.enums.DriverDocumentType;
 import br.com.vanep.media.model.MediaFileModel;
-import br.com.vanep.user.model.UserModel;
+import br.com.vanep.shared.document.enums.DocumentKind;
+import br.com.vanep.shared.document.model.DocumentReview;
+import br.com.vanep.shared.document.model.DocumentSubmission;
 import jakarta.persistence.Column;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -18,6 +19,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
@@ -33,7 +35,7 @@ import org.hibernate.annotations.UpdateTimestamp;
 @SoftDelete(columnName = "deleted_at", strategy = SoftDeleteType.TIMESTAMP)
 @Getter
 @Setter
-public class DriverDocumentModel {
+public class DriverDocumentModel implements DocumentSubmission {
 
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -48,7 +50,10 @@ public class DriverDocumentModel {
 
   @Enumerated(EnumType.STRING)
   @Column(name = "document_type", nullable = false, length = 50)
-  private DocumentTypeEnum documentType;
+  private DriverDocumentType documentType;
+
+  @Column(name = "document_number", length = 64)
+  private String documentNumber;
 
   @ManyToOne(fetch = FetchType.EAGER)
   @JoinColumn(name = "file_media_id")
@@ -57,29 +62,17 @@ public class DriverDocumentModel {
   @Column(name = "expires_at")
   private LocalDate expiresAt;
 
-  @Enumerated(EnumType.STRING)
-  @Column(nullable = false, length = 20)
-  private DocumentStatusEnum status = DocumentStatusEnum.PENDING;
-
-  @Enumerated(EnumType.STRING)
-  @Column(name = "review_method", length = 30)
-  private ReviewMethodEnum reviewMethod;
-
-  @Column(name = "external_check_id", length = 64)
-  private String externalCheckId;
-
-  @Column(name = "rejection_reason", length = 255)
-  private String rejectionReason;
-
-  @ManyToOne(fetch = FetchType.EAGER)
-  @JoinColumn(name = "reviewed_by")
-  private UserModel reviewedBy;
-
-  @Column(name = "reviewed_at")
-  private Instant reviewedAt;
+  @Embedded private DocumentReview review = DocumentReview.pending();
 
   @Column(name = "notified_at")
   private Instant notifiedAt;
+
+  @Version
+  @Column(nullable = false)
+  private Long version;
+
+  @Column(name = "superseded_at")
+  private Instant supersededAt;
 
   @Column(name = "is_active", nullable = false)
   private boolean active = true;
@@ -91,6 +84,31 @@ public class DriverDocumentModel {
   @UpdateTimestamp
   @Column(name = "updated_at", nullable = false)
   private Instant updatedAt;
+
+  @Override
+  public DocumentKind kind() {
+    return DocumentKind.DRIVER_DOCUMENT;
+  }
+
+  @Override
+  public String number() {
+    return documentNumber;
+  }
+
+  @Override
+  public LocalDate expiresOn() {
+    return expiresAt;
+  }
+
+  @Override
+  public MediaFileModel getReviewedFile() {
+    return file;
+  }
+
+  @Override
+  public void setReviewedFile(MediaFileModel file) {
+    this.file = file;
+  }
 
   @PrePersist
   void onCreate() {

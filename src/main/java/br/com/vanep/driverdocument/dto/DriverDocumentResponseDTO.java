@@ -1,24 +1,31 @@
 package br.com.vanep.driverdocument.dto;
 
-import br.com.vanep.driverdocument.enums.DocumentStatusEnum;
-import br.com.vanep.driverdocument.enums.DocumentTypeEnum;
-import br.com.vanep.driverdocument.enums.ReviewMethodEnum;
+import br.com.vanep.driverdocument.enums.DriverDocumentType;
+import br.com.vanep.shared.document.dto.DocumentFileResponseDTO;
+import br.com.vanep.shared.document.enums.DocumentRejectionReason;
+import br.com.vanep.shared.document.enums.DocumentStatus;
+import br.com.vanep.shared.document.enums.ReviewMethod;
 import java.time.Instant;
 import java.time.LocalDate;
 
 public record DriverDocumentResponseDTO(
     String token,
     String driverToken,
-    DocumentTypeEnum documentType,
+    DriverDocumentType documentType,
+    String documentNumber,
     String fileUrl,
+    DocumentFileResponseDTO file,
     LocalDate expiresAt,
-    DocumentStatusEnum status,
-    ReviewMethodEnum reviewMethod,
+    DocumentStatus status,
+    ReviewMethod reviewMethod,
     String externalCheckId,
+    DocumentRejectionReason rejectionReasonCode,
     String rejectionReason,
     String reviewedByUserToken,
     Instant reviewedAt,
+    Instant dataCorrectedAt,
     Instant notifiedAt,
     boolean active,
+    Long version,
     Instant createdAt,
     Instant updatedAt) {}

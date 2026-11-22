@@ -21,7 +21,6 @@ public class VehicleMapper {
         vehicle.getCapacity(),
         url(vehicle, "photo-front", vehicle.getPhotoFront()),
         url(vehicle, "photo-side", vehicle.getPhotoSide()),
-        url(vehicle, "photo-document", vehicle.getPhotoDocument()),
         vehicle.isActive(),
         vehicle.getCreatedAt());
   }

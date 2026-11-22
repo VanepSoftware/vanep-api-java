@@ -5,6 +5,7 @@ import static org.mockito.Mockito.when;
 
 import br.com.vanep.clientdriver.repository.ClientDriverRepository;
 import br.com.vanep.contract.repository.ContractRepository;
+import br.com.vanep.vehicledocument.repository.VehicleDocumentRepository;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -24,6 +25,7 @@ class SecurityEvaluatorTest {
 
   @Mock private ClientDriverRepository clientDriverRepository;
   @Mock private ContractRepository contractRepository;
+  @Mock private VehicleDocumentRepository vehicleDocumentRepository;
 
   @InjectMocks private SecurityEvaluator evaluator;
 
@@ -57,6 +59,23 @@ class SecurityEvaluatorTest {
     when(contractRepository.findClientDriverTokenByToken("missing")).thenReturn(Optional.empty());
 
     assertThat(evaluator.isContractParty("missing", callerWithUid("maria-uid"))).isFalse();
+  }
+
+  @Test
+  void theDriverOfTheVanOwnsItsDocument() {
+    when(vehicleDocumentRepository.findDriverUserTokenByDocumentToken("doc"))
+        .thenReturn(Optional.of("carlos-uid"));
+
+    assertThat(evaluator.isVehicleDocumentOwner("doc", callerWithUid("carlos-uid"))).isTrue();
+    assertThat(evaluator.isVehicleDocumentOwner("doc", callerWithUid("ana-uid"))).isFalse();
+  }
+
+  @Test
+  void aDocumentOfARemovedOrUnknownVanHasNoOwner() {
+    when(vehicleDocumentRepository.findDriverUserTokenByDocumentToken("gone"))
+        .thenReturn(Optional.empty());
+
+    assertThat(evaluator.isVehicleDocumentOwner("gone", callerWithUid("carlos-uid"))).isFalse();
   }
 
   private Authentication callerWithUid(String uid) {

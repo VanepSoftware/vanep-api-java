@@ -31,6 +31,7 @@ delete from client_driver;
 delete from dependent_school_day;
 delete from dependent;
 delete from client;
+delete from vehicle_document;
 delete from vehicle;
 delete from driver_cnh;
 delete from driver_document;

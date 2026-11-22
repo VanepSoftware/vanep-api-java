@@ -29,6 +29,7 @@ import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
 import br.com.vanep.vehicle.seed.VehicleSeeder;
+import br.com.vanep.vehicledocument.seed.VehicleDocumentSeeder;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
@@ -64,6 +65,8 @@ public class DataSeeder implements ApplicationRunner {
   private final TripSeeder tripSeeder;
   private final ClientDriverSeeder clientDriverSeeder;
   private final VehicleSeeder vehicleSeeder;
+  private final VehicleDocumentSeeder vehicleDocumentSeeder;
+  private final DriverUnderReviewSeeder driverUnderReviewSeeder;
   private final ContractSeeder contractSeeder;
   private final ServiceRequestSeeder serviceRequestSeeder;
   private final ProposalSeeder proposalSeeder;
@@ -100,6 +103,8 @@ public class DataSeeder implements ApplicationRunner {
       TripSeeder tripSeeder,
       ClientDriverSeeder clientDriverSeeder,
       VehicleSeeder vehicleSeeder,
+      VehicleDocumentSeeder vehicleDocumentSeeder,
+      DriverUnderReviewSeeder driverUnderReviewSeeder,
       ContractSeeder contractSeeder,
       ServiceRequestSeeder serviceRequestSeeder,
       ProposalSeeder proposalSeeder,
@@ -119,6 +124,8 @@ public class DataSeeder implements ApplicationRunner {
     this.tripSeeder = tripSeeder;
     this.clientDriverSeeder = clientDriverSeeder;
     this.vehicleSeeder = vehicleSeeder;
+    this.vehicleDocumentSeeder = vehicleDocumentSeeder;
+    this.driverUnderReviewSeeder = driverUnderReviewSeeder;
     this.contractSeeder = contractSeeder;
     this.serviceRequestSeeder = serviceRequestSeeder;
     this.proposalSeeder = proposalSeeder;
@@ -144,6 +151,8 @@ public class DataSeeder implements ApplicationRunner {
     driverCnhSeeder.seed();
     driverDocumentSeeder.seed();
     vehicleSeeder.seed();
+    vehicleDocumentSeeder.seed();
+    driverUnderReviewSeeder.seed();
     clientDriverSeeder.seed();
     contractSeeder.seed();
     serviceRequestSeeder.seed();
@@ -341,21 +350,36 @@ public class DataSeeder implements ApplicationRunner {
   }
 
   private void seedDrivers() {
-    record DriverSeed(String name, String email, String document, String cnpj) {}
+    record DriverSeed(
+        String name, String email, String document, String cnpj, DriverApprovalStatus status) {}
     List<DriverSeed> seeds =
         List.of(
             new DriverSeed(
                 "Fabio Teixeira",
                 "fabio.teixeira@seed.vanep.com.br",
                 "23456789092",
-                "11222333000181"),
+                "11222333000181",
+                DriverApprovalStatus.APPROVED),
             new DriverSeed(
                 "Gustavo Santos",
                 "gustavo.santos@seed.vanep.com.br",
                 "34567890175",
-                "22333444000192"),
+                "22333444000192",
+                DriverApprovalStatus.APPROVED),
             new DriverSeed(
-                "Helena Costa", "helena.costa@seed.vanep.com.br", "45678901249", "33444555000103"));
+                "Helena Costa",
+                "helena.costa@seed.vanep.com.br",
+                "45678901249",
+                "33444555000103",
+                DriverApprovalStatus.APPROVED),
+            // Sent the onboarding and waits for the admin: pending files, a rejection and an
+            // approval close to expiry, so the review queue has something to show.
+            new DriverSeed(
+                "Igor Prado",
+                DriverUnderReviewSeeder.EMAIL,
+                "67890123469",
+                "44455566000183",
+                DriverApprovalStatus.UNDER_REVIEW));
 
     RoleModel driverRole = roles.findByRoleName(RoleName.DRIVER).orElseThrow();
     for (DriverSeed seed : seeds) {
@@ -374,7 +398,10 @@ public class DataSeeder implements ApplicationRunner {
       driver.setUser(user);
       driver.setCnpj(seed.cnpj());
       driver.setBasePrice(BigDecimal.valueOf(50));
-      driver.setApprovalStatus(DriverApprovalStatus.APPROVED);
+      driver.setApprovalStatus(seed.status());
+      if (seed.status() == DriverApprovalStatus.UNDER_REVIEW) {
+        driver.setSubmittedAt(Instant.now());
+      }
       driver.setAvailable(true);
       drivers.save(driver);
       log.info("Seed: driver created ({}).", seed.email());

@@ -35,7 +35,7 @@ public class MailService {
     this.from = from;
   }
 
-  public void send(String to, String subject, String template, Map<String, Object> variables) {
+  public boolean send(String to, String subject, String template, Map<String, Object> variables) {
     Context context = new Context(PT_BR);
     context.setVariables(variables);
     String html = templateEngine.process(template, context);
@@ -43,7 +43,7 @@ public class MailService {
     JavaMailSender sender = mailSender.getIfAvailable();
     if (!enabled || sender == null) {
       log.info("[mail desabilitado] para={} assunto=\"{}\"\n{}", to, subject, html);
-      return;
+      return false;
     }
     try {
       MimeMessage message = sender.createMimeMessage();
@@ -53,8 +53,10 @@ public class MailService {
       helper.setSubject(subject);
       helper.setText(html, true);
       sender.send(message);
+      return true;
     } catch (Exception ex) {
       log.error("Falha ao enviar e-mail para {}.", to, ex);
+      return false;
     }
   }
 }

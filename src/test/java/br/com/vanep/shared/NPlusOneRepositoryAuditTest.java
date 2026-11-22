@@ -16,14 +16,14 @@ import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.drivercnh.model.DriverCnhModel;
 import br.com.vanep.drivercnh.repository.DriverCnhRepository;
-import br.com.vanep.driverdocument.enums.DocumentStatusEnum;
-import br.com.vanep.driverdocument.enums.DocumentTypeEnum;
+import br.com.vanep.driverdocument.enums.DriverDocumentType;
 import br.com.vanep.driverdocument.model.DriverDocumentModel;
 import br.com.vanep.driverdocument.repository.DriverDocumentRepository;
 import br.com.vanep.media.enums.MediaVisibility;
 import br.com.vanep.media.enums.StorageProvider;
 import br.com.vanep.media.model.MediaFileModel;
 import br.com.vanep.media.repository.MediaFileRepository;
+import br.com.vanep.shared.document.enums.DocumentStatus;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
@@ -112,9 +112,9 @@ class NPlusOneRepositoryAuditTest {
     recordHotspot(
         counter,
         hotspots,
-        "DriverDocumentRepository.findByDriverId (touch driver.user + file + reviewer)",
+        "DriverDocumentRepository.findByDriverIdAndSupersededAtIsNull (touch driver.user + file + reviewer)",
         () -> createDocument(0),
-        () -> touchDocuments(documents.findByDriverId(driver.getId())),
+        () -> touchDocuments(documents.findByDriverIdAndSupersededAtIsNull(driver.getId())),
         () -> {
           createDocument(1);
           createDocument(2);
@@ -125,9 +125,9 @@ class NPlusOneRepositoryAuditTest {
     recordHotspot(
         counter,
         hotspots,
-        "DriverCnhRepository.findByDriverId (touch driver.user)",
+        "DriverCnhRepository.findByDriverIdAndSupersededAtIsNull (touch driver.user)",
         () -> createCnh(0),
-        () -> touchCnhs(cnhs.findByDriverId(driver.getId())),
+        () -> touchCnhs(cnhs.findByDriverIdAndSupersededAtIsNull(driver.getId())),
         () -> {
           createCnh(1);
           createCnh(2);
@@ -138,9 +138,55 @@ class NPlusOneRepositoryAuditTest {
     recordHotspot(
         counter,
         hotspots,
-        "DriverDocumentRepository.findByDriverId(Pageable) (touch driver.user + file + reviewer)",
+        "VehicleRepository.findByDriverIdInAndActiveTrueOrderByCreatedAtAscIdAsc (touch driver.user + photos)",
         () -> {},
-        () -> touchDocumentPage(documents.findByDriverId(driver.getId(), PageRequest.of(0, 2))),
+        () ->
+            touchVehicles(
+                vehicles.findByDriverIdInAndActiveTrueOrderByCreatedAtAscIdAsc(
+                    List.of(driver.getId()))),
+        () -> {
+          createVehicle(4);
+          createVehicle(5);
+          createVehicle(6);
+        },
+        reporter);
+
+    recordHotspot(
+        counter,
+        hotspots,
+        "DriverDocumentRepository.findByDriverIdInAndSupersededAtIsNull (touch driver.user + file + reviewer)",
+        () -> {},
+        () ->
+            touchDocuments(
+                documents.findByDriverIdInAndSupersededAtIsNull(List.of(driver.getId()))),
+        () -> {
+          createDocument(20);
+          createDocument(21);
+          createDocument(22);
+        },
+        reporter);
+
+    recordHotspot(
+        counter,
+        hotspots,
+        "DriverCnhRepository.findByDriverIdInAndSupersededAtIsNull (touch driver.user)",
+        () -> {},
+        () -> touchCnhs(cnhs.findByDriverIdInAndSupersededAtIsNull(List.of(driver.getId()))),
+        () -> {
+          createCnh(4);
+          createCnh(5);
+          createCnh(6);
+        },
+        reporter);
+
+    recordHotspot(
+        counter,
+        hotspots,
+        "DriverDocumentRepository.findFiltered by driver (touch driver.user + file + reviewer)",
+        () -> {},
+        () ->
+            touchDocumentPage(
+                documents.findFiltered(driver.getId(), null, null, PageRequest.of(0, 2))),
         () -> {
           createDocument(4);
           createDocument(5);
@@ -151,9 +197,9 @@ class NPlusOneRepositoryAuditTest {
     recordHotspot(
         counter,
         hotspots,
-        "DriverDocumentRepository.findAll(Pageable) — admin, one driver per row",
+        "DriverDocumentRepository.findFiltered — admin, one driver per row",
         () -> createDocumentForNewDriver(0),
-        () -> touchDocumentPage(documents.findAll(PageRequest.of(0, 2))),
+        () -> touchDocumentPage(documents.findFiltered(null, null, null, PageRequest.of(0, 2))),
         () -> {
           createDocumentForNewDriver(1);
           createDocumentForNewDriver(2);
@@ -164,31 +210,34 @@ class NPlusOneRepositoryAuditTest {
     recordHotspot(
         counter,
         hotspots,
-        "DriverDocumentRepository.findByDriverIdAndDocumentType (page smaller than the total)",
+        "DriverDocumentRepository.findFiltered by type (page smaller than the total)",
         () -> {
-          createDocumentOfType(10, DocumentTypeEnum.CRLV);
-          createDocumentOfType(11, DocumentTypeEnum.CRLV);
+          createDocumentOfType(10, DriverDocumentType.CRIMINAL_RECORD);
+          createDocumentOfType(11, DriverDocumentType.CRIMINAL_RECORD);
         },
         () ->
             touchDocumentPage(
-                documents.findByDriverIdAndDocumentType(
-                    driver.getId(), DocumentTypeEnum.CRLV, PageRequest.of(0, 2))),
+                documents.findFiltered(
+                    driver.getId(),
+                    DriverDocumentType.CRIMINAL_RECORD,
+                    null,
+                    PageRequest.of(0, 2))),
         () -> {
-          createDocumentOfType(12, DocumentTypeEnum.CRLV);
-          createDocumentOfType(13, DocumentTypeEnum.CRLV);
-          createDocumentOfType(14, DocumentTypeEnum.CRLV);
+          createDocumentOfType(12, DriverDocumentType.CRIMINAL_RECORD);
+          createDocumentOfType(13, DriverDocumentType.CRIMINAL_RECORD);
+          createDocumentOfType(14, DriverDocumentType.CRIMINAL_RECORD);
         },
         reporter);
 
     recordHotspot(
         counter,
         hotspots,
-        "DriverDocumentRepository.findByDriverIdAndStatus (page smaller than the total)",
+        "DriverDocumentRepository.findFiltered by status (page smaller than the total)",
         () -> {},
         () ->
             touchDocumentPage(
-                documents.findByDriverIdAndStatus(
-                    driver.getId(), DocumentStatusEnum.PENDING, PageRequest.of(0, 2))),
+                documents.findFiltered(
+                    driver.getId(), null, DocumentStatus.PENDING, PageRequest.of(0, 2))),
         () -> {
           createDocument(15);
           createDocument(16);
@@ -297,23 +346,23 @@ class NPlusOneRepositoryAuditTest {
     vehicle.setCapacity(12);
     vehicle.setPhotoFront(saveMedia());
     vehicle.setPhotoSide(saveMedia());
-    vehicle.setPhotoDocument(saveMedia());
     vehicles.save(vehicle);
   }
 
   private void createDocument(int index) {
     createDocumentOfType(
-        index, DocumentTypeEnum.values()[index % DocumentTypeEnum.values().length]);
+        index, DriverDocumentType.values()[index % DriverDocumentType.values().length]);
   }
 
-  private void createDocumentOfType(int index, DocumentTypeEnum type) {
+  private void createDocumentOfType(int index, DriverDocumentType type) {
     DriverDocumentModel document = new DriverDocumentModel();
     document.setDriver(driver);
     document.setDocumentType(type);
-    document.setStatus(DocumentStatusEnum.PENDING);
     document.setFile(saveMedia());
-    document.setReviewedBy(
-        saveUser("reviewer" + index + "@vanep.com", UserType.ADMIN, "reviewer-" + index));
+    document
+        .getReview()
+        .setReviewedBy(
+            saveUser("reviewer" + index + "@vanep.com", UserType.ADMIN, "reviewer-" + index));
     documents.save(document);
   }
 
@@ -330,8 +379,7 @@ class NPlusOneRepositoryAuditTest {
     owner = drivers.save(owner);
     DriverDocumentModel document = new DriverDocumentModel();
     document.setDriver(owner);
-    document.setDocumentType(DocumentTypeEnum.values()[0]);
-    document.setStatus(DocumentStatusEnum.PENDING);
+    document.setDocumentType(DriverDocumentType.values()[0]);
     document.setFile(saveMedia());
     documents.save(document);
   }
@@ -383,9 +431,6 @@ class NPlusOneRepositoryAuditTest {
           if (vehicle.getPhotoSide() != null) {
             vehicle.getPhotoSide().getToken();
           }
-          if (vehicle.getPhotoDocument() != null) {
-            vehicle.getPhotoDocument().getToken();
-          }
         });
   }
 
@@ -403,8 +448,8 @@ class NPlusOneRepositoryAuditTest {
           if (document.getFile() != null) {
             document.getFile().getToken();
           }
-          if (document.getReviewedBy() != null) {
-            document.getReviewedBy().getEmail();
+          if (document.getReview().getReviewedBy() != null) {
+            document.getReview().getReviewedBy().getEmail();
           }
         });
   }

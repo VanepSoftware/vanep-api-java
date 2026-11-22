@@ -65,10 +65,6 @@ public class VehicleModel {
   @JoinColumn(name = "photo_side_media_id")
   private MediaFileModel photoSide;
 
-  @ManyToOne(fetch = FetchType.EAGER)
-  @JoinColumn(name = "photo_document_media_id")
-  private MediaFileModel photoDocument;
-
   @Column(name = "is_active", nullable = false)
   private boolean active = true;
 

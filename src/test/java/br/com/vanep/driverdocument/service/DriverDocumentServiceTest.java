@@ -3,6 +3,7 @@ package br.com.vanep.driverdocument.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -11,16 +12,24 @@ import static org.mockito.Mockito.when;
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.driverdocument.dto.DriverDocumentRequestDTO;
-import br.com.vanep.driverdocument.dto.DriverDocumentStatusUpdateRequestDTO;
-import br.com.vanep.driverdocument.enums.DocumentStatusEnum;
-import br.com.vanep.driverdocument.enums.DocumentTypeEnum;
-import br.com.vanep.driverdocument.enums.ReviewMethodEnum;
+import br.com.vanep.driverdocument.enums.DriverDocumentType;
 import br.com.vanep.driverdocument.mapper.DriverDocumentMapper;
 import br.com.vanep.driverdocument.model.DriverDocumentModel;
 import br.com.vanep.driverdocument.repository.DriverDocumentRepository;
+import br.com.vanep.media.enums.MediaSlot;
+import br.com.vanep.media.model.MediaFileModel;
+import br.com.vanep.media.service.MediaFileService;
+import br.com.vanep.schooltransportcredential.service.SchoolTransportCredentialService;
+import br.com.vanep.shared.document.dto.DocumentStatusUpdateRequestDTO;
+import br.com.vanep.shared.document.enums.DocumentDecisionStatus;
+import br.com.vanep.shared.document.enums.DocumentStatus;
+import br.com.vanep.shared.document.enums.ReviewMethod;
+import br.com.vanep.shared.document.model.DocumentReview;
+import br.com.vanep.shared.document.service.DocumentReviewService;
+import br.com.vanep.shared.document.service.DocumentSubmissionRules;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
-import br.com.vanep.user.repository.UserRepository;
+import br.com.vanep.user.service.UserService;
 import java.time.LocalDate;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -31,6 +40,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.MessageSource;
 import org.springframework.http.HttpStatus;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 @ExtendWith(MockitoExtension.class)
@@ -38,8 +48,11 @@ class DriverDocumentServiceTest {
 
   @Mock private DriverDocumentRepository driverDocumentRepository;
   @Mock private DriverRepository driverRepository;
-  @Mock private UserRepository userRepository;
+  @Mock private UserService userService;
+  @Mock private DocumentReviewService reviewService;
+  @Mock private DocumentSubmissionRules submissionRules;
   @Mock private DriverDocumentMapper mapper;
+  @Mock private MediaFileService media;
   @Mock private MessageSource messages;
 
   @InjectMocks private DriverDocumentService service;
@@ -67,14 +80,17 @@ class DriverDocumentServiceTest {
 
     request =
         new DriverDocumentRequestDTO(
-            "driver-token-123", DocumentTypeEnum.CRLV, LocalDate.of(2027, 1, 1));
+            "driver-token-123",
+            DriverDocumentType.CRIMINAL_RECORD,
+            new MockMultipartFile("file", "record.pdf", "application/pdf", new byte[] {1}));
   }
 
   @Test
   void createThrowsNotFoundWhenUserNotFound() {
-    when(userRepository.findByEmail("unknown@vanep.com")).thenReturn(Optional.empty());
+    when(userService.requireByToken("unknown-uid"))
+        .thenThrow(new ResponseStatusException(HttpStatus.NOT_FOUND, "user.account.not_found"));
 
-    assertThatThrownBy(() -> service.create(request, "unknown@vanep.com"))
+    assertThatThrownBy(() -> service.create(request, "unknown-uid"))
         .isInstanceOf(ResponseStatusException.class)
         .satisfies(
             e -> {
@@ -88,17 +104,24 @@ class DriverDocumentServiceTest {
 
   @Test
   void createSavesDocumentSuccessfully() {
-    when(userRepository.findByEmail("driver@vanep.com")).thenReturn(Optional.of(user));
+    when(userService.requireByToken("user-token-123")).thenReturn(user);
     when(driverRepository.findByUserId(1L)).thenReturn(Optional.of(driver));
 
     DriverDocumentModel saved = new DriverDocumentModel();
+    saved.setToken("doc-123");
     saved.setDriver(driver);
-    saved.setDocumentType(DocumentTypeEnum.CRLV);
-    when(driverDocumentRepository.save(any(DriverDocumentModel.class))).thenReturn(saved);
+    saved.setDocumentType(DriverDocumentType.CRIMINAL_RECORD);
+    when(driverDocumentRepository.saveAndFlush(any(DriverDocumentModel.class))).thenReturn(saved);
+    MediaFileModel stored = new MediaFileModel();
+    when(media.store(MediaSlot.DRIVER_DOCUMENT_FILE, "doc-123", request.file())).thenReturn(stored);
 
-    service.create(request, "driver@vanep.com");
+    service.create(request, "user-token-123");
 
-    verify(driverDocumentRepository).save(any(DriverDocumentModel.class));
+    verify(submissionRules).requireNoOtherPending(any(), any());
+    verify(submissionRules).supersedeRejected(any());
+    assertThat(saved.getFile()).isSameAs(stored);
+    assertThat(saved.getDocumentNumber()).isNull();
+    assertThat(saved.getExpiresAt()).isNull();
   }
 
   @Test
@@ -106,20 +129,41 @@ class DriverDocumentServiceTest {
     DriverDocumentModel existing = new DriverDocumentModel();
     existing.setToken("doc-123");
     existing.setDriver(driver);
+    existing.setDocumentType(DriverDocumentType.CRIMINAL_RECORD);
 
     when(driverDocumentRepository.findByToken("doc-123")).thenReturn(Optional.of(existing));
-    when(userRepository.findByEmail("driver@vanep.com")).thenReturn(Optional.of(user));
-    when(driverDocumentRepository.save(any(DriverDocumentModel.class))).thenReturn(existing);
+    when(driverDocumentRepository.saveAndFlush(any(DriverDocumentModel.class)))
+        .thenReturn(existing);
 
-    DriverDocumentStatusUpdateRequestDTO statusRequest =
-        new DriverDocumentStatusUpdateRequestDTO(
-            DocumentStatusEnum.APPROVED, ReviewMethodEnum.MANUAL, null, null);
+    LocalDate expiry = SchoolTransportCredentialService.today().plusMonths(2);
+    DocumentStatusUpdateRequestDTO statusRequest =
+        new DocumentStatusUpdateRequestDTO(
+            DocumentDecisionStatus.APPROVED,
+            ReviewMethod.MANUAL,
+            null,
+            null,
+            null,
+            " CERT-1 ",
+            expiry,
+            0L);
+    DocumentReview approved = new DocumentReview();
+    approved.setStatus(DocumentStatus.APPROVED);
+    approved.setReviewMethod(ReviewMethod.MANUAL);
+    when(reviewService.review(
+            eq(existing),
+            eq(statusRequest),
+            eq(DriverDocumentType.CRIMINAL_RECORD),
+            any(LocalDate.class),
+            eq("admin-uid")))
+        .thenReturn(approved);
 
-    service.updateStatus("doc-123", statusRequest, "driver@vanep.com");
+    service.updateStatus("doc-123", statusRequest, "admin-uid");
 
-    verify(driverDocumentRepository).save(existing);
-    assertThat(existing.getStatus()).isEqualTo(DocumentStatusEnum.APPROVED);
-    assertThat(existing.getReviewMethod()).isEqualTo(ReviewMethodEnum.MANUAL);
+    verify(submissionRules).supersedeAllBut(any(), any());
+    verify(driverDocumentRepository).saveAndFlush(existing);
+    assertThat(existing.getReview()).isSameAs(approved);
+    assertThat(existing.getDocumentNumber()).isEqualTo("CERT-1");
+    assertThat(existing.getExpiresAt()).isEqualTo(expiry);
   }
 
   @Test
@@ -154,5 +198,6 @@ class DriverDocumentServiceTest {
     service.restore("doc-123");
 
     verify(driverDocumentRepository).restoreByToken("doc-123");
+    verify(submissionRules).acceptRestored(any(), any());
   }
 }

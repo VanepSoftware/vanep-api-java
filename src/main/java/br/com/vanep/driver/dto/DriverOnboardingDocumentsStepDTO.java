@@ -1,9 +1,10 @@
 package br.com.vanep.driver.dto;
 
-import br.com.vanep.driverdocument.enums.DocumentTypeEnum;
+import br.com.vanep.driverdocument.enums.DriverDocumentType;
 import java.util.List;
 
 public record DriverOnboardingDocumentsStepDTO(
     boolean completed,
-    List<DocumentTypeEnum> missingTypes,
-    List<DriverDocumentSummaryDTO> uploadedDocuments) {}
+    List<DriverDocumentType> missingDriverTypes,
+    List<DriverDocumentSummaryDTO> uploadedDocuments,
+    List<VehicleDocumentsStepDTO> vehicles) {}
