@@ -104,16 +104,27 @@ class VehiclePhotoControllerTest {
   }
 
   @Test
-  void theOwnerUploadsEachOfTheThreeSlots() throws Exception {
+  void theOwnerUploadsEachOfTheTwoSlots() throws Exception {
     upload("photo-front", "frente.png", ownerJwt());
     upload("photo-side", "lateral.png", ownerJwt());
-    upload("photo-document", "documento.png", ownerJwt());
 
     VehicleModel stored = vehicles.findByToken(vehicleToken).orElseThrow();
     assertThat(stored.getPhotoFront()).isNotNull();
     assertThat(stored.getPhotoSide()).isNotNull();
-    assertThat(stored.getPhotoDocument()).isNotNull();
-    assertThat(mediaFiles.findAll()).hasSize(3);
+    assertThat(mediaFiles.findAll()).hasSize(2);
+  }
+
+  @Test
+  void theVehicleHasNoDocumentPhotoRouteAnymore() throws Exception {
+    mockMvc
+        .perform(
+            multipart(path("photo-document"))
+                .file(new MockMultipartFile("file", "documento.png", "image/png", png()))
+                .with(ownerJwt()))
+        .andExpect(status().isNotFound());
+    mockMvc.perform(get(path("photo-document")).with(ownerJwt())).andExpect(status().isNotFound());
+
+    assertThat(mediaFiles.findAll()).isEmpty();
   }
 
   @Test
@@ -145,18 +156,16 @@ class VehiclePhotoControllerTest {
   }
 
   @Test
-  void readingTheVehicleCarriesTheThreeUrlsWithoutAnotherCall() throws Exception {
+  void readingTheVehicleCarriesTheTwoUrlsWithoutAnotherCall() throws Exception {
     upload("photo-front", "frente.png", ownerJwt());
     upload("photo-side", "lateral.png", ownerJwt());
-    upload("photo-document", "documento.png", ownerJwt());
 
     mockMvc
         .perform(get("/api/vehicles/" + vehicleToken).with(adminJwt()))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.photoFrontUrl").value(startsWith(path("photo-front") + "?v=")))
         .andExpect(jsonPath("$.photoSideUrl").value(startsWith(path("photo-side") + "?v=")))
-        .andExpect(
-            jsonPath("$.photoDocumentUrl").value(startsWith(path("photo-document") + "?v=")));
+        .andExpect(jsonPath("$.photoDocumentUrl").doesNotExist());
   }
 
   @Test
@@ -167,8 +176,7 @@ class VehiclePhotoControllerTest {
         .perform(get("/api/vehicles/" + vehicleToken).with(adminJwt()))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.photoFrontUrl").value(startsWith(path("photo-front") + "?v=")))
-        .andExpect(jsonPath("$.photoSideUrl").doesNotExist())
-        .andExpect(jsonPath("$.photoDocumentUrl").doesNotExist());
+        .andExpect(jsonPath("$.photoSideUrl").doesNotExist());
   }
 
   @Test
@@ -199,11 +207,11 @@ class VehiclePhotoControllerTest {
 
   @Test
   void theOwnerDownloadsEachSlot() throws Exception {
-    upload("photo-document", "documento.png", ownerJwt());
+    upload("photo-side", "lateral.png", ownerJwt());
 
     MvcResult result =
         mockMvc
-            .perform(get(path("photo-document")).with(ownerJwt()))
+            .perform(get(path("photo-side")).with(ownerJwt()))
             .andExpect(status().isOk())
             .andReturn();
 
@@ -212,11 +220,11 @@ class VehiclePhotoControllerTest {
 
   @Test
   void anUnrelatedDriverIsRefusedWithoutReceivingAnyContent() throws Exception {
-    upload("photo-document", "documento.png", ownerJwt());
+    upload("photo-front", "frente.png", ownerJwt());
 
     MvcResult result =
         mockMvc
-            .perform(get(path("photo-document")).with(strangerJwt()))
+            .perform(get(path("photo-front")).with(strangerJwt()))
             .andExpect(status().isForbidden())
             .andReturn();
 

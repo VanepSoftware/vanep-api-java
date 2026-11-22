@@ -38,15 +38,18 @@ public class DriverMapper {
         driver.getUpdatedAt());
   }
 
-  public DriverMeSummaryResponseDTO toMeSummary(DriverModel driver, UserMeResponseDTO user) {
+  public DriverMeSummaryResponseDTO toMeSummary(
+      DriverModel driver, long ratingCount, UserMeResponseDTO user) {
     return new DriverMeSummaryResponseDTO(
         driver.getToken(),
         photoUrl(driver),
         driver.getRating(),
+        ratingCount,
         driver.getApprovalStatus(),
         driver.isAvailable(),
         driver.isActive(),
         driver.getBasePrice(),
+        driver.getExperienceYears(),
         user);
   }
 

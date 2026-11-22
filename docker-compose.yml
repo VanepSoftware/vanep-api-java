@@ -58,11 +58,22 @@ services:
       # Mantém a JWK de dev entre recriações do container. Em produção a chave vem de
       # VANEP_OAUTH_JWK_PRIVATE_KEY e este volume fica sem uso.
       - vanep-oauth-dev-key:/app/.dev
+      # Logs da aplicação no host: todo deploy recria o container, e sem este mount o
+      # arquivo de log seria apagado junto. Em dev cai em ./logs; no servidor o .env
+      # aponta VANEP_LOG_DIR para /var/lib/vanep/logs (dono 1500:1500, igual à mídia).
+      - ${VANEP_LOG_DIR:-./logs}:/app/logs
       # Os binários moram no host. Sem este mount, todo deploy recria o container e
       # apaga CNH e documento de todos os motoristas — que não se regeram.
       # O `:?` derruba o compose com mensagem clara se a variável faltar, do mesmo
       # jeito que a aplicação se recusa a subir sem raiz de storage configurada.
       - ${MEDIA_STORAGE_ROOT:?defina MEDIA_STORAGE_ROOT no .env}:/var/lib/vanep/media
+    # Rotação do log do Docker (stdout/stderr). Sem limite, o json-file cresce até
+    # encher o disco da VPS.
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
     depends_on:
       postgres:
         condition: service_healthy

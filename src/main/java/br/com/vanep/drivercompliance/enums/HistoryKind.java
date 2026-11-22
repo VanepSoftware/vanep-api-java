@@ -1,0 +1,11 @@
+package br.com.vanep.drivercompliance.enums;
+
+public enum HistoryKind {
+  SUBMISSION_SENT,
+  SUBMISSION_APPROVED,
+  SUBMISSION_REJECTED,
+  SUBMISSION_DATA_CORRECTED,
+  ONBOARDING_SUBMITTED,
+  DRIVER_APPROVED,
+  DRIVER_REJECTED
+}

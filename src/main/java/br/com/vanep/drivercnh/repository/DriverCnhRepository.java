@@ -1,8 +1,10 @@
 package br.com.vanep.drivercnh.repository;
 
 import br.com.vanep.drivercnh.model.DriverCnhModel;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -10,13 +12,24 @@ import org.springframework.data.repository.query.Param;
 
 public interface DriverCnhRepository extends JpaRepository<DriverCnhModel, Long> {
 
+  @EntityGraph(attributePaths = {"driver.user", "file", "review.reviewedBy"})
   Optional<DriverCnhModel> findByToken(String token);
 
-  List<DriverCnhModel> findByDriverId(Long driverId);
+  @EntityGraph(attributePaths = {"driver.user", "file", "review.reviewedBy"})
+  List<DriverCnhModel> findByDriverIdAndSupersededAtIsNull(Long driverId);
+
+  @EntityGraph(attributePaths = {"driver.user", "file", "review.reviewedBy"})
+  List<DriverCnhModel> findBySupersededAtIsNull();
+
+  @EntityGraph(attributePaths = {"review.reviewedBy"})
+  List<DriverCnhModel> findByDriverIdAndSupersededAtIsNotNull(Long driverId);
+
+  @EntityGraph(attributePaths = {"driver.user", "file", "review.reviewedBy"})
+  List<DriverCnhModel> findByDriverIdInAndSupersededAtIsNull(Collection<Long> driverIds);
 
   boolean existsByRegistrationNumber(String registrationNumber);
 
-  boolean existsByDriverId(Long driverId);
+  boolean existsByRegistrationNumberAndDriverIdNot(String registrationNumber, Long driverId);
 
   @Modifying
   @Query(value = "UPDATE driver_cnh SET deleted_at = NULL WHERE token = :token", nativeQuery = true)

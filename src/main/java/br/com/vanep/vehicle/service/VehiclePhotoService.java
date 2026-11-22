@@ -53,7 +53,6 @@ public class VehiclePhotoService {
     return switch (slot) {
       case VEHICLE_PHOTO_FRONT -> vehicle.getPhotoFront();
       case VEHICLE_PHOTO_SIDE -> vehicle.getPhotoSide();
-      case VEHICLE_PHOTO_DOCUMENT -> vehicle.getPhotoDocument();
       default -> throw new IllegalArgumentException("Slot que não pertence ao veículo: " + slot);
     };
   }
@@ -62,7 +61,6 @@ public class VehiclePhotoService {
     switch (slot) {
       case VEHICLE_PHOTO_FRONT -> vehicle.setPhotoFront(media);
       case VEHICLE_PHOTO_SIDE -> vehicle.setPhotoSide(media);
-      case VEHICLE_PHOTO_DOCUMENT -> vehicle.setPhotoDocument(media);
       default -> throw new IllegalArgumentException("Slot que não pertence ao veículo: " + slot);
     }
   }

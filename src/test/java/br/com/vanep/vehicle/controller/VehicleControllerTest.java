@@ -223,7 +223,7 @@ class VehicleControllerTest {
                 .content(body))
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.token").exists())
-        .andExpect(jsonPath("$.plate").value("XYZ-9876"))
+        .andExpect(jsonPath("$.plate").value("XYZ9876"))
         .andExpect(jsonPath("$.driverToken").value(driverToken))
         .andExpect(jsonPath("$.photoFrontUrl").doesNotExist())
         .andExpect(jsonPath("$.photoSideUrl").doesNotExist())

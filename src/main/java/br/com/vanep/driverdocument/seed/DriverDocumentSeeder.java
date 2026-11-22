@@ -2,23 +2,40 @@ package br.com.vanep.driverdocument.seed;
 
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
-import br.com.vanep.driverdocument.enums.DocumentStatusEnum;
-import br.com.vanep.driverdocument.enums.DocumentTypeEnum;
+import br.com.vanep.driverdocument.enums.DriverDocumentType;
 import br.com.vanep.driverdocument.model.DriverDocumentModel;
 import br.com.vanep.driverdocument.repository.DriverDocumentRepository;
+import br.com.vanep.schooltransportcredential.service.SchoolTransportCredentialService;
+import br.com.vanep.shared.document.enums.DocumentStatus;
+import br.com.vanep.shared.document.enums.ReviewMethod;
 import br.com.vanep.user.repository.UserRepository;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 
 @Component
 public class DriverDocumentSeeder {
 
+  public static final List<String> SEED_DRIVER_EMAILS =
+      List.of(
+          "fabio.teixeira@seed.vanep.com.br",
+          "gustavo.santos@seed.vanep.com.br",
+          "helena.costa@seed.vanep.com.br");
+
   private static final Logger log = LoggerFactory.getLogger(DriverDocumentSeeder.class);
-  private static final String SEED_DRIVER_EMAIL = "fabio.teixeira@seed.vanep.com.br";
+
+  private record DocumentSeed(DriverDocumentType type, String numberPrefix, int validMonths) {}
+
+  // Expiry is relative to today so a local database never ends up with expired credentials.
+  private static final List<DocumentSeed> SEEDS =
+      List.of(
+          new DocumentSeed(DriverDocumentType.SCHOOL_DRIVER_COURSE, "CURSO-ESC", 60),
+          new DocumentSeed(DriverDocumentType.CRIMINAL_RECORD, "CERT-CRIM", 3),
+          new DocumentSeed(DriverDocumentType.MUNICIPAL_AUTHORIZATION, "TE", 12));
 
   private final DriverDocumentRepository documents;
   private final DriverRepository drivers;
@@ -32,36 +49,49 @@ public class DriverDocumentSeeder {
   }
 
   public void seed() {
-    Optional<DriverModel> driverOpt = resolveSeedDriver();
-    if (driverOpt.isEmpty()) {
-      log.info(
-          "Seed: driver document seed skipped; seed driver not found ({}).", SEED_DRIVER_EMAIL);
-      return;
+    LocalDate today = SchoolTransportCredentialService.today();
+    for (int index = 0; index < SEED_DRIVER_EMAILS.size(); index++) {
+      String email = SEED_DRIVER_EMAILS.get(index);
+      Optional<DriverModel> driver = resolveDriver(email);
+      if (driver.isEmpty()) {
+        log.info("Seed: driver document seed skipped; seed driver not found ({}).", email);
+        continue;
+      }
+      seedDocuments(driver.get(), index + 1, today);
     }
-
-    DriverModel driver = driverOpt.get();
-    if (!documents.findByDriverId(driver.getId(), Pageable.unpaged()).isEmpty()) {
-      return;
-    }
-
-    DriverDocumentModel doc1 = new DriverDocumentModel();
-    doc1.setDriver(driver);
-    doc1.setDocumentType(DocumentTypeEnum.CRLV);
-    doc1.setExpiresAt(LocalDate.of(2026, 12, 31));
-    doc1.setStatus(DocumentStatusEnum.APPROVED);
-    documents.save(doc1);
-
-    DriverDocumentModel doc2 = new DriverDocumentModel();
-    doc2.setDriver(driver);
-    doc2.setDocumentType(DocumentTypeEnum.CRIMINAL_RECORD);
-    doc2.setExpiresAt(LocalDate.of(2026, 10, 15));
-    doc2.setStatus(DocumentStatusEnum.PENDING);
-    documents.save(doc2);
-
-    log.info("Seed: driver documents created for {}.", SEED_DRIVER_EMAIL);
   }
 
-  private Optional<DriverModel> resolveSeedDriver() {
-    return users.findByEmail(SEED_DRIVER_EMAIL).flatMap(user -> drivers.findByUserId(user.getId()));
+  void seedDocuments(DriverModel driver, int sequence, LocalDate today) {
+    List<DriverDocumentModel> existing =
+        documents.findByDriverIdAndSupersededAtIsNull(driver.getId());
+    for (DocumentSeed seed : SEEDS) {
+      boolean hasValidApproved =
+          existing.stream()
+              .anyMatch(
+                  document ->
+                      document.getDocumentType() == seed.type()
+                          && document.isActive()
+                          && document.getReview().getStatus() == DocumentStatus.APPROVED
+                          && document.getExpiresAt() != null
+                          && !document.getExpiresAt().isBefore(today));
+      if (hasValidApproved) {
+        continue;
+      }
+      DriverDocumentModel document = new DriverDocumentModel();
+      document.setDriver(driver);
+      document.setDocumentType(seed.type());
+      document.setDocumentNumber(
+          "%s-%04d/%d".formatted(seed.numberPrefix(), sequence, today.getYear()));
+      document.setExpiresAt(today.plusMonths(seed.validMonths()));
+      document.getReview().setStatus(DocumentStatus.APPROVED);
+      document.getReview().setReviewMethod(ReviewMethod.MANUAL);
+      document.getReview().setReviewedAt(Instant.now());
+      documents.save(document);
+      log.info("Seed: driver document {} created for driver {}.", seed.type(), driver.getToken());
+    }
+  }
+
+  private Optional<DriverModel> resolveDriver(String email) {
+    return users.findByEmail(email).flatMap(user -> drivers.findByUserId(user.getId()));
   }
 }

@@ -1,14 +1,18 @@
 package br.com.vanep.media.service;
 
 import br.com.vanep.media.enums.MediaSlot;
+import br.com.vanep.media.event.MediaDiscardedEvent;
 import br.com.vanep.media.model.MediaFileModel;
 import br.com.vanep.media.repository.MediaFileRepository;
 import br.com.vanep.media.storage.StorageService;
+import br.com.vanep.shared.error.ApiProblemException;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.HttpStatus;
@@ -26,6 +30,7 @@ public class MediaFileService {
   private final StorageService storage;
   private final MimeTypeDetector mimeTypeDetector;
   private final MessageSource messages;
+  private final ApplicationEventPublisher events;
   private final long maxPhotoBytes;
   private final long maxDocumentBytes;
 
@@ -34,14 +39,28 @@ public class MediaFileService {
       StorageService storage,
       MimeTypeDetector mimeTypeDetector,
       MessageSource messages,
+      ApplicationEventPublisher events,
       @Value("${vanep.media.max-photo-size-mb}") long maxPhotoSizeMb,
-      @Value("${vanep.media.max-document-size-mb}") long maxDocumentSizeMb) {
+      @Value("${vanep.media.max-document-size-mb}") long maxDocumentSizeMb,
+      @Value("${vanep.media.max-upload-size-mb}") long maxUploadSizeMb) {
+    requireUploadAboveMediaLimits(maxUploadSizeMb, maxPhotoSizeMb, maxDocumentSizeMb);
     this.repository = repository;
     this.storage = storage;
     this.mimeTypeDetector = mimeTypeDetector;
     this.messages = messages;
+    this.events = events;
     this.maxPhotoBytes = maxPhotoSizeMb * BYTES_IN_MB;
     this.maxDocumentBytes = maxDocumentSizeMb * BYTES_IN_MB;
+  }
+
+  static void requireUploadAboveMediaLimits(
+      long maxUploadSizeMb, long maxPhotoSizeMb, long maxDocumentSizeMb) {
+    long largestMediaMb = Math.max(maxPhotoSizeMb, maxDocumentSizeMb);
+    if (maxUploadSizeMb <= largestMediaMb) {
+      throw new IllegalStateException(
+          "vanep.media.max-upload-size-mb (%d) must be larger than the largest media limit (%d)"
+              .formatted(maxUploadSizeMb, largestMediaMb));
+    }
   }
 
   @Transactional
@@ -50,10 +69,21 @@ public class MediaFileService {
       throw badRequest("media.file.required");
     }
     if (file.getSize() > maxSizeFor(slot)) {
-      throw payloadTooLarge("media.file.too_large");
+      throw tooLarge();
     }
+    return store(slot, ownerToken, readAll(file), file.getOriginalFilename());
+  }
 
-    byte[] content = readAll(file);
+  // For content that does not come from a request, such as the seed's files.
+  @Transactional
+  public MediaFileModel store(
+      MediaSlot slot, String ownerToken, byte[] content, @Nullable String originalName) {
+    if (content.length == 0) {
+      throw badRequest("media.file.required");
+    }
+    if (content.length > maxSizeFor(slot)) {
+      throw tooLarge();
+    }
     String mimeType =
         mimeTypeDetector.detect(content).orElseThrow(() -> badRequest("media.mime.not_allowed"));
     if (!slot.allows(mimeType)) {
@@ -66,7 +96,7 @@ public class MediaFileService {
     media.setObjectKey(objectKey(slot, ownerToken, media.getToken(), mimeType));
     media.setMimeType(mimeType);
     media.setSizeBytes((long) content.length);
-    media.setOriginalName(file.getOriginalFilename());
+    media.setOriginalName(originalName);
     media.setVisibility(slot.visibility());
 
     storage.upload(
@@ -76,12 +106,12 @@ public class MediaFileService {
   }
 
   @Transactional
-  public void discard(MediaFileModel media) {
+  public void discard(@Nullable MediaFileModel media) {
     if (media == null) {
       return;
     }
     repository.delete(media);
-    storage.delete(media.getObjectKey());
+    events.publishEvent(new MediaDiscardedEvent(media.getObjectKey()));
   }
 
   @Transactional(readOnly = true)
@@ -125,8 +155,8 @@ public class MediaFileService {
     return new ResponseStatusException(HttpStatus.BAD_REQUEST, message(key));
   }
 
-  private ResponseStatusException payloadTooLarge(String key) {
-    return new ResponseStatusException(HttpStatus.CONTENT_TOO_LARGE, message(key));
+  public static ApiProblemException tooLarge() {
+    return new ApiProblemException(HttpStatus.CONTENT_TOO_LARGE, "media.file.too_large");
   }
 
   private String message(String key) {

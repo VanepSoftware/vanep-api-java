@@ -16,6 +16,7 @@ import br.com.vanep.driver.dto.DriverResponseDTO;
 import br.com.vanep.driver.dto.DriverUpdateRequestDTO;
 import br.com.vanep.driver.mapper.DriverMapper;
 import br.com.vanep.driver.model.DriverModel;
+import br.com.vanep.driverrating.repository.DriverRatingRepository;
 import br.com.vanep.user.dto.UserMeResponseDTO;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
@@ -39,13 +40,14 @@ class DriverServiceTest {
   @Mock private DriverRepository repository;
   @Mock private DriverMapper mapper;
   @Mock private UserService userService;
+  @Mock private DriverRatingRepository ratings;
   @Mock private MessageSource messages;
 
   private DriverService service;
 
   @BeforeEach
   void setUp() {
-    service = new DriverService(repository, mapper, userService, messages);
+    service = new DriverService(repository, mapper, userService, ratings, messages);
     lenient()
         .when(messages.getMessage(anyString(), any(), any()))
         .thenAnswer(inv -> inv.getArgument(0));
@@ -217,12 +219,13 @@ class DriverServiceTest {
     UserMeResponseDTO me = null;
     DriverMeSummaryResponseDTO summary =
         new DriverMeSummaryResponseDTO(
-            "tok", null, null, DriverApprovalStatus.APPROVED, true, true, BigDecimal.TEN, me);
+            "tok", null, null, 3, DriverApprovalStatus.APPROVED, true, true, BigDecimal.TEN, 8, me);
     when(userService.requireByTokenAndType("owner-uid", UserType.DRIVER)).thenReturn(user);
     when(repository.findByUserId(1L)).thenReturn(Optional.of(driver));
     when(repository.save(driver)).thenReturn(driver);
     when(userService.toMeResponse(user)).thenReturn(me);
-    when(mapper.toMeSummary(driver, me)).thenReturn(summary);
+    when(ratings.countByDriverId(driver.getId())).thenReturn(3L);
+    when(mapper.toMeSummary(driver, 3L, me)).thenReturn(summary);
 
     var result = service.updateMyAvailability("owner-uid", new DriverAvailabilityRequestDTO(true));
 

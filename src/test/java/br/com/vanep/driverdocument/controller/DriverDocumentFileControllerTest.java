@@ -6,17 +6,18 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
-import br.com.vanep.driverdocument.enums.DocumentTypeEnum;
+import br.com.vanep.driverdocument.enums.DriverDocumentType;
 import br.com.vanep.driverdocument.model.DriverDocumentModel;
 import br.com.vanep.driverdocument.repository.DriverDocumentRepository;
 import br.com.vanep.media.enums.MediaVisibility;
 import br.com.vanep.media.repository.MediaFileRepository;
+import br.com.vanep.shared.document.enums.DocumentStatus;
+import br.com.vanep.shared.document.enums.ReviewMethod;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
@@ -28,7 +29,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor;
@@ -67,7 +67,7 @@ class DriverDocumentFileControllerTest {
 
     DriverDocumentModel document = new DriverDocumentModel();
     document.setDriver(driver);
-    document.setDocumentType(DocumentTypeEnum.CRLV);
+    document.setDocumentType(DriverDocumentType.CRIMINAL_RECORD);
     documentToken = documents.save(document).getToken();
   }
 
@@ -89,23 +89,17 @@ class DriverDocumentFileControllerTest {
   }
 
   @Test
-  void aDocumentIsCreatedWithoutAFile() throws Exception {
-    String body =
-        """
-        {
-          "documentType": "CRLV"
-        }
-        """;
-
+  void aDocumentIsSentWithItsFile() throws Exception {
     mockMvc
         .perform(
-            post("/api/driver-documents")
-                .with(ownerJwt())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(body))
+            multipart("/api/driver-documents")
+                .file(new MockMultipartFile("file", "course.pdf", "application/pdf", pdf()))
+                .param("documentType", "SCHOOL_DRIVER_COURSE")
+                .with(ownerJwt()))
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.token").exists())
-        .andExpect(jsonPath("$.fileUrl").doesNotExist())
+        .andExpect(jsonPath("$.fileUrl").exists())
+        .andExpect(jsonPath("$.file.mimeType").value("application/pdf"))
         .andExpect(jsonPath("$.status").value("PENDING"));
   }
 
@@ -145,7 +139,34 @@ class DriverDocumentFileControllerTest {
     mockMvc
         .perform(get("/api/driver-documents/" + documentToken).with(ownerJwt()))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.fileUrl").value(startsWith(path() + "?v=")));
+        .andExpect(jsonPath("$.fileUrl").value(startsWith(path() + "?v=")))
+        .andExpect(jsonPath("$.file.mimeType").value("application/pdf"))
+        .andExpect(jsonPath("$.file.sizeBytes").value(pdf().length))
+        .andExpect(jsonPath("$.file.originalName").value("crlv.pdf"));
+  }
+
+  @Test
+  void anApprovedDocumentKeepsItsFile() throws Exception {
+    upload(pdf(), "crlv.pdf", "application/pdf", ownerJwt());
+    DriverDocumentModel approved = documents.findByToken(documentToken).orElseThrow();
+    approved.getReview().setStatus(DocumentStatus.APPROVED);
+    approved.getReview().setReviewMethod(ReviewMethod.MANUAL);
+    approved.getReview().setReviewedAt(Instant.now());
+    documents.save(approved);
+
+    String file = approved.getFile().getToken();
+
+    mockMvc
+        .perform(
+            multipart(path())
+                .file(new MockMultipartFile("file", "crlv-novo.pdf", "application/pdf", pdf()))
+                .with(ownerJwt()))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("document.submission.reviewed"));
+
+    DriverDocumentModel stored = documents.findByToken(documentToken).orElseThrow();
+    assertThat(stored.getReview().getStatus()).isEqualTo(DocumentStatus.APPROVED);
+    assertThat(stored.getFile().getToken()).isEqualTo(file);
   }
 
   @Test

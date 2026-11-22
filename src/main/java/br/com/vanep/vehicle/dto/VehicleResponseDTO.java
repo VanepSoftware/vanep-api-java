@@ -14,6 +14,5 @@ public record VehicleResponseDTO(
     Integer capacity,
     @Nullable String photoFrontUrl,
     @Nullable String photoSideUrl,
-    @Nullable String photoDocumentUrl,
     boolean active,
     Instant createdAt) {}

@@ -69,6 +69,24 @@ class DriverRatingRepositoryTest {
         .satisfies(average -> assertThat(average).isEqualByComparingTo("5.00"));
   }
 
+  @Test
+  void countsTheRatingsOfTheDriverOnLiveLinks() {
+    rate(link(createClient("maria@vanep.com", "11144477735")), "5.00");
+    rate(link(createClient("bruno@vanep.com", "12345678909")), "4.00");
+    rate(link(createClient("pedro@vanep.com", "39053344705")), "3.00");
+    ClientDriverModel removed = link(createClient("julia@vanep.com", "93541134780"));
+    rate(removed, "1.00");
+
+    links.delete(removed);
+
+    assertThat(repository.countByDriverId(carlos.getId())).isEqualTo(3);
+  }
+
+  @Test
+  void aDriverWithoutRatingsCountsZero() {
+    assertThat(repository.countByDriverId(carlos.getId())).isZero();
+  }
+
   private ClientDriverModel link(ClientModel client) {
     ClientDriverModel link = new ClientDriverModel();
     link.setClient(client);

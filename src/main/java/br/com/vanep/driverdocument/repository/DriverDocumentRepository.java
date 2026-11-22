@@ -1,10 +1,12 @@
 package br.com.vanep.driverdocument.repository;
 
-import br.com.vanep.driverdocument.enums.DocumentStatusEnum;
-import br.com.vanep.driverdocument.enums.DocumentTypeEnum;
+import br.com.vanep.driverdocument.enums.DriverDocumentType;
 import br.com.vanep.driverdocument.model.DriverDocumentModel;
+import br.com.vanep.shared.document.enums.DocumentStatus;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -18,27 +20,39 @@ public interface DriverDocumentRepository
     extends JpaRepository<DriverDocumentModel, Long>,
         JpaSpecificationExecutor<DriverDocumentModel> {
 
+  @EntityGraph(attributePaths = {"driver.user", "file", "review.reviewedBy"})
   Optional<DriverDocumentModel> findByToken(String token);
 
   // Each document has its own file and reviewer (and, on the admin list, its own driver), so
   // every list fetches them with the rows instead of one select per document (rule 17).
-  @EntityGraph(attributePaths = {"driver.user", "file", "reviewedBy"})
-  List<DriverDocumentModel> findByDriverId(Long driverId);
+  @EntityGraph(attributePaths = {"driver.user", "file", "review.reviewedBy"})
+  List<DriverDocumentModel> findByDriverIdAndSupersededAtIsNull(Long driverId);
 
-  @EntityGraph(attributePaths = {"driver.user", "file", "reviewedBy"})
-  Page<DriverDocumentModel> findByDriverId(Long driverId, Pageable pageable);
+  // The list: every filter is optional, and the ones sent apply together.
+  @EntityGraph(attributePaths = {"driver.user", "file", "review.reviewedBy"})
+  @Query(
+      """
+      select document from DriverDocumentModel document
+      where document.supersededAt is null
+        and (:driverId is null or document.driver.id = :driverId)
+        and (:documentType is null or document.documentType = :documentType)
+        and (:status is null or document.review.status = :status)
+      """)
+  Page<DriverDocumentModel> findFiltered(
+      @Param("driverId") @Nullable Long driverId,
+      @Param("documentType") @Nullable DriverDocumentType documentType,
+      @Param("status") @Nullable DocumentStatus status,
+      Pageable pageable);
 
-  @EntityGraph(attributePaths = {"driver.user", "file", "reviewedBy"})
-  Page<DriverDocumentModel> findByDriverIdAndDocumentType(
-      Long driverId, DocumentTypeEnum documentType, Pageable pageable);
+  @EntityGraph(attributePaths = {"file"})
+  List<DriverDocumentModel> findByDriverIdAndDocumentTypeAndSupersededAtIsNull(
+      Long driverId, DriverDocumentType documentType);
 
-  @EntityGraph(attributePaths = {"driver.user", "file", "reviewedBy"})
-  Page<DriverDocumentModel> findByDriverIdAndStatus(
-      Long driverId, DocumentStatusEnum status, Pageable pageable);
+  @EntityGraph(attributePaths = {"review.reviewedBy"})
+  List<DriverDocumentModel> findByDriverIdAndSupersededAtIsNotNull(Long driverId);
 
-  @EntityGraph(attributePaths = {"driver.user", "file", "reviewedBy"})
-  @Override
-  Page<DriverDocumentModel> findAll(Pageable pageable);
+  @EntityGraph(attributePaths = {"driver.user", "file", "review.reviewedBy"})
+  List<DriverDocumentModel> findByDriverIdInAndSupersededAtIsNull(Collection<Long> driverIds);
 
   @Modifying
   @Query(

@@ -10,7 +10,7 @@ public final class MediaUrl {
   // The owner's own route, so a storage change never reaches the client. The media token
   // changes on every upload, so the "v" parameter makes clients drop the cached old photo.
   public static @Nullable String of(
-      String ownerPath, String ownerToken, String slot, MediaFileModel media) {
+      String ownerPath, String ownerToken, String slot, @Nullable MediaFileModel media) {
     return media == null
         ? null
         : "%s/%s/%s?v=%s".formatted(ownerPath, ownerToken, slot, media.getToken());

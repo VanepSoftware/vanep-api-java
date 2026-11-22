@@ -8,27 +8,43 @@ import br.com.vanep.driver.dto.DriverOnboardingStatusResponseDTO;
 import br.com.vanep.driver.dto.DriverOnboardingStepDTO;
 import br.com.vanep.driver.dto.DriverRejectionRequestDTO;
 import br.com.vanep.driver.dto.DriverResponseDTO;
+import br.com.vanep.driver.dto.VehicleDocumentSummaryDTO;
+import br.com.vanep.driver.dto.VehicleDocumentsStepDTO;
+import br.com.vanep.driver.enums.DriverRejectionReason;
+import br.com.vanep.driver.event.DriverReviewEvent;
 import br.com.vanep.driver.mapper.DriverMapper;
 import br.com.vanep.driver.model.DriverModel;
-import br.com.vanep.drivercnh.model.DriverCnhModel;
-import br.com.vanep.drivercnh.repository.DriverCnhRepository;
-import br.com.vanep.driverdocument.enums.DocumentStatusEnum;
-import br.com.vanep.driverdocument.enums.DocumentTypeEnum;
+import br.com.vanep.drivercompliance.dto.DriverComplianceDTO;
+import br.com.vanep.drivercompliance.dto.DriverComplianceDTO.RequirementDTO;
+import br.com.vanep.drivercompliance.dto.DriverComplianceDTO.VehicleDTO;
+import br.com.vanep.drivercompliance.dto.DriverComplianceInputDTO;
+import br.com.vanep.drivercompliance.enums.ComplianceState;
+import br.com.vanep.drivercompliance.service.DriverCompliancePolicy;
+import br.com.vanep.drivercompliance.service.DriverComplianceService;
+import br.com.vanep.driverdocument.enums.DriverDocumentType;
+import br.com.vanep.driverdocument.mapper.DriverDocumentMapper;
 import br.com.vanep.driverdocument.model.DriverDocumentModel;
-import br.com.vanep.driverdocument.repository.DriverDocumentRepository;
 import br.com.vanep.driverservicearea.repository.DriverServiceAreaRepository;
 import br.com.vanep.media.web.MediaUrl;
+import br.com.vanep.schooltransportcredential.enums.CredentialRequirement;
+import br.com.vanep.schooltransportcredential.service.SchoolTransportCredentialPolicy;
+import br.com.vanep.schooltransportcredential.service.SchoolTransportCredentialService;
+import br.com.vanep.shared.error.ApiProblemException;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.service.UserService;
-import br.com.vanep.vehicle.model.VehicleModel;
-import br.com.vanep.vehicle.repository.VehicleRepository;
+import br.com.vanep.vehicledocument.enums.VehicleDocumentType;
+import br.com.vanep.vehicledocument.mapper.VehicleDocumentMapper;
+import br.com.vanep.vehicledocument.model.VehicleDocumentModel;
 import java.math.BigDecimal;
 import java.time.Instant;
-import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
+import org.jspecify.annotations.Nullable;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.data.domain.Page;
@@ -41,39 +57,30 @@ import org.springframework.web.server.ResponseStatusException;
 @Service
 public class DriverOnboardingService {
 
-  private static final List<DocumentTypeEnum> MANDATORY_DOCUMENT_TYPES =
-      List.of(
-          DocumentTypeEnum.CRLV,
-          DocumentTypeEnum.VEHICLE_INSPECTION,
-          DocumentTypeEnum.MUNICIPAL_AUTHORIZATION);
-
   private final DriverRepository driverRepository;
-  private final VehicleRepository vehicleRepository;
-  private final DriverCnhRepository driverCnhRepository;
-  private final DriverDocumentRepository driverDocumentRepository;
   private final DriverServiceAreaRepository driverServiceAreaRepository;
+  private final DriverComplianceService complianceService;
+  private final DriverCompliancePolicy compliancePolicy;
   private final UserService userService;
-  private final DriverNotificationService driverNotificationService;
+  private final ApplicationEventPublisher events;
   private final DriverMapper mapper;
   private final MessageSource messages;
 
   public DriverOnboardingService(
       DriverRepository driverRepository,
-      VehicleRepository vehicleRepository,
-      DriverCnhRepository driverCnhRepository,
-      DriverDocumentRepository driverDocumentRepository,
       DriverServiceAreaRepository driverServiceAreaRepository,
+      DriverComplianceService complianceService,
+      DriverCompliancePolicy compliancePolicy,
       UserService userService,
-      DriverNotificationService driverNotificationService,
+      ApplicationEventPublisher events,
       DriverMapper mapper,
       MessageSource messages) {
     this.driverRepository = driverRepository;
-    this.vehicleRepository = vehicleRepository;
-    this.driverCnhRepository = driverCnhRepository;
-    this.driverDocumentRepository = driverDocumentRepository;
     this.driverServiceAreaRepository = driverServiceAreaRepository;
+    this.complianceService = complianceService;
+    this.compliancePolicy = compliancePolicy;
     this.userService = userService;
-    this.driverNotificationService = driverNotificationService;
+    this.events = events;
     this.mapper = mapper;
     this.messages = messages;
   }
@@ -95,9 +102,12 @@ public class DriverOnboardingService {
     DriverModel driver = requireDriverByUserId(user.getId());
 
     DriverOnboardingStepDTO profileStep = evaluateProfileStep(driver, user);
-    DriverOnboardingStepDTO vehicleStep = evaluateVehicleStep(driver);
-    DriverOnboardingStepDTO cnhStep = evaluateCnhStep(driver);
-    DriverOnboardingDocumentsStepDTO documentsStep = evaluateDocumentsStep(driver);
+    DriverComplianceInputDTO input = complianceService.loadInput(driver);
+    DriverComplianceDTO compliance =
+        compliancePolicy.evaluate(input, SchoolTransportCredentialService.today());
+    DriverOnboardingStepDTO vehicleStep = evaluateVehicleStep(input);
+    DriverOnboardingStepDTO cnhStep = evaluateCnhStep(compliance);
+    DriverOnboardingDocumentsStepDTO documentsStep = evaluateDocumentsStep(input, compliance);
 
     boolean allStepsCompleted =
         profileStep.completed()
@@ -115,7 +125,8 @@ public class DriverOnboardingService {
         driver.getApprovalStatus(),
         canSubmit,
         driver.getSubmittedAt(),
-        driver.getRejectionReason(),
+        describeRejection(driver),
+        driver.getRejectionReasonCode(),
         profileStep,
         vehicleStep,
         cnhStep,
@@ -134,9 +145,12 @@ public class DriverOnboardingService {
     }
 
     DriverOnboardingStepDTO profileStep = evaluateProfileStep(driver, user);
-    DriverOnboardingStepDTO vehicleStep = evaluateVehicleStep(driver);
-    DriverOnboardingStepDTO cnhStep = evaluateCnhStep(driver);
-    DriverOnboardingDocumentsStepDTO documentsStep = evaluateDocumentsStep(driver);
+    DriverComplianceInputDTO input = complianceService.loadInput(driver);
+    DriverComplianceDTO compliance =
+        compliancePolicy.evaluate(input, SchoolTransportCredentialService.today());
+    DriverOnboardingStepDTO vehicleStep = evaluateVehicleStep(input);
+    DriverOnboardingStepDTO cnhStep = evaluateCnhStep(compliance);
+    DriverOnboardingDocumentsStepDTO documentsStep = evaluateDocumentsStep(input, compliance);
 
     List<String> errors = new ArrayList<>();
     if (!profileStep.completed()) {
@@ -146,21 +160,24 @@ public class DriverOnboardingService {
       errors.add(message("driver.onboarding.vehicle_required"));
     }
     if (!cnhStep.completed()) {
-      if (cnhStep.pendingItems().contains("cnh_expired")) {
+      if (cnhStep.pendingItems().contains("cnh_rejected")) {
+        errors.add(message("driver.onboarding.cnh_rejected"));
+      } else if (cnhStep.pendingItems().contains("cnh_expired")) {
         errors.add(message("driver.onboarding.cnh_expired"));
+      } else if (cnhStep.pendingItems().contains("cnh_category")) {
+        errors.add(message("driver.onboarding.cnh_category"));
+      } else if (cnhStep.pendingItems().contains("cnh_file")) {
+        errors.add(message("driver.onboarding.cnh_file"));
       } else {
         errors.add(message("driver.onboarding.cnh_required"));
       }
     }
-    if (!documentsStep.completed()) {
-      String missing =
-          documentsStep.missingTypes().stream()
-              .map(type -> type.name())
-              .collect(Collectors.joining(", "));
+    String missingDocuments = describeMissingDocuments(documentsStep);
+    if (!documentsStep.completed() && !missingDocuments.isEmpty()) {
       errors.add(
           messages.getMessage(
               "driver.onboarding.documents_missing",
-              new Object[] {missing},
+              new Object[] {missingDocuments},
               LocaleContextHolder.getLocale()));
     }
 
@@ -172,6 +189,7 @@ public class DriverOnboardingService {
     driver.setApprovalStatus(DriverApprovalStatus.UNDER_REVIEW);
     driver.setSubmittedAt(Instant.now());
     driver.setRejectionReason(null);
+    driver.setRejectionReasonCode(null);
     DriverModel savedDriver = driverRepository.save(driver);
 
     return new DriverOnboardingStatusResponseDTO(
@@ -179,11 +197,20 @@ public class DriverOnboardingService {
         savedDriver.getApprovalStatus(),
         false,
         savedDriver.getSubmittedAt(),
-        savedDriver.getRejectionReason(),
+        null,
+        null,
         profileStep,
         vehicleStep,
         cnhStep,
         documentsStep);
+  }
+
+  // A rejection with a code and no message still tells the driver why, in the code's words.
+  @Nullable String describeRejection(DriverModel driver) {
+    if (driver.getRejectionReason() != null || driver.getRejectionReasonCode() == null) {
+      return driver.getRejectionReason();
+    }
+    return message("driver.rejection_reason." + driver.getRejectionReasonCode().name());
   }
 
   DriverOnboardingStepDTO evaluateProfileStep(DriverModel driver, UserModel user) {
@@ -204,76 +231,140 @@ public class DriverOnboardingService {
     return new DriverOnboardingStepDTO(pending.isEmpty(), pending);
   }
 
-  DriverOnboardingStepDTO evaluateVehicleStep(DriverModel driver) {
-    List<VehicleModel> vehicles = vehicleRepository.findByDriverId(driver.getId());
-    boolean hasActiveVehicle = vehicles.stream().anyMatch(vehicle -> vehicle.isActive());
-    List<String> pending = new ArrayList<>();
-    if (!hasActiveVehicle) {
-      pending.add("vehicle");
-    }
-    return new DriverOnboardingStepDTO(pending.isEmpty(), pending);
+  DriverOnboardingStepDTO evaluateVehicleStep(DriverComplianceInputDTO input) {
+    return new DriverOnboardingStepDTO(
+        !input.vehicles().isEmpty(), input.vehicles().isEmpty() ? List.of("vehicle") : List.of());
   }
 
-  DriverOnboardingStepDTO evaluateCnhStep(DriverModel driver) {
-    List<DriverCnhModel> cnhs = driverCnhRepository.findByDriverId(driver.getId());
-    List<DriverCnhModel> activeCnhs = cnhs.stream().filter(cnh -> cnh.isActive()).toList();
-    List<String> pending = new ArrayList<>();
-    if (activeCnhs.isEmpty()) {
-      pending.add("cnh");
-    } else {
-      boolean hasNonExpired =
-          activeCnhs.stream()
-              .anyMatch(
-                  cnh ->
-                      cnh.getValidUntil() != null
-                          && !cnh.getValidUntil().isBefore(LocalDate.now()));
-      if (!hasNonExpired) {
-        pending.add("cnh_expired");
-      }
-    }
-    return new DriverOnboardingStepDTO(pending.isEmpty(), pending);
+  DriverOnboardingStepDTO evaluateCnhStep(DriverComplianceDTO compliance) {
+    RequirementDTO license = compliance.driverRequirement(CredentialRequirement.DRIVER_LICENSE);
+    String pendingItem =
+        switch (license.state()) {
+          case MISSING -> "cnh";
+          case REJECTED -> "cnh_rejected";
+          case EXPIRED -> "cnh_expired";
+          case APPROVED ->
+              SchoolTransportCredentialPolicy.lacksSchoolTransportCategory(
+                      Objects.requireNonNull(license.current()))
+                  ? "cnh_category"
+                  : null;
+          case PENDING ->
+              SchoolTransportCredentialPolicy.lacksSchoolTransportCategory(
+                      Objects.requireNonNull(license.current()))
+                  ? "cnh_category"
+                  : null;
+        };
+    return new DriverOnboardingStepDTO(
+        pendingItem == null, pendingItem == null ? List.of() : List.of(pendingItem));
   }
 
-  DriverOnboardingDocumentsStepDTO evaluateDocumentsStep(DriverModel driver) {
-    List<DriverDocumentModel> documents = driverDocumentRepository.findByDriverId(driver.getId());
-    List<DriverDocumentSummaryDTO> summaries =
-        documents.stream().map(this::toDocumentSummary).toList();
+  DriverOnboardingDocumentsStepDTO evaluateDocumentsStep(
+      DriverComplianceInputDTO input, DriverComplianceDTO compliance) {
+    List<DriverDocumentType> missingDriverTypes =
+        compliance.driverRequirements().stream()
+            .filter(
+                entry ->
+                    SchoolTransportCredentialPolicy.DRIVER_DOCUMENT_TYPES.containsKey(
+                        entry.requirement()))
+            .filter(entry -> !entry.optional() && !isSent(entry))
+            .map(
+                entry ->
+                    SchoolTransportCredentialPolicy.DRIVER_DOCUMENT_TYPES.get(entry.requirement()))
+            .toList();
+    Map<Long, List<VehicleDocumentModel>> documentsByVehicle =
+        input.vehicles().stream()
+            .collect(
+                Collectors.toMap(
+                    vehicle -> vehicle.vehicle().getId(), vehicle -> vehicle.documents()));
+    List<VehicleDocumentsStepDTO> vehicleSteps =
+        compliance.vehicles().stream()
+            .map(
+                vehicle ->
+                    evaluateDocumentsOf(
+                        vehicle,
+                        documentsByVehicle.getOrDefault(vehicle.vehicle().getId(), List.of())))
+            .toList();
+    boolean completed =
+        missingDriverTypes.isEmpty()
+            && vehicleSteps.stream().anyMatch(vehicleStep -> vehicleStep.completed());
 
-    List<DocumentTypeEnum> missingTypes = new ArrayList<>();
-    for (DocumentTypeEnum requiredType : MANDATORY_DOCUMENT_TYPES) {
-      boolean present =
-          documents.stream()
-              .anyMatch(
-                  doc ->
-                      doc.isActive()
-                          && doc.getDocumentType() == requiredType
-                          && doc.getStatus() != DocumentStatusEnum.REJECTED
-                          && doc.getFile() != null);
-      if (!present) {
-        missingTypes.add(requiredType);
-      }
-    }
-
-    return new DriverOnboardingDocumentsStepDTO(missingTypes.isEmpty(), missingTypes, summaries);
+    return new DriverOnboardingDocumentsStepDTO(
+        completed,
+        missingDriverTypes,
+        input.driverDocuments().stream().map(doc -> toDocumentSummary(doc)).toList(),
+        vehicleSteps);
   }
 
-  private DriverDocumentSummaryDTO toDocumentSummary(DriverDocumentModel doc) {
+  VehicleDocumentsStepDTO evaluateDocumentsOf(
+      VehicleDTO vehicle, List<VehicleDocumentModel> documents) {
+    List<VehicleDocumentType> missingTypes =
+        vehicle.requirements().stream()
+            .filter(entry -> !isSent(entry))
+            .map(
+                entry ->
+                    SchoolTransportCredentialPolicy.VEHICLE_DOCUMENT_TYPES.get(entry.requirement()))
+            .toList();
+    return new VehicleDocumentsStepDTO(
+        vehicle.vehicle().getToken(),
+        vehicle.vehicle().getPlate(),
+        missingTypes.isEmpty(),
+        missingTypes,
+        documents.stream().map(doc -> toDocumentSummary(doc)).toList());
+  }
+
+  // Sent: approved, or waiting for review with its file.
+  static boolean isSent(RequirementDTO entry) {
+    return entry.state() == ComplianceState.APPROVED
+        || (entry.state() == ComplianceState.PENDING
+            && Objects.requireNonNull(entry.current()).getReviewedFile() != null);
+  }
+
+  static String describeMissingDocuments(DriverOnboardingDocumentsStepDTO documentsStep) {
+    List<String> parts = new ArrayList<>();
+    if (!documentsStep.missingDriverTypes().isEmpty()) {
+      parts.add(joinNames(documentsStep.missingDriverTypes()));
+    }
+    boolean hasCompleteVehicle =
+        documentsStep.vehicles().stream().anyMatch(vehicleStep -> vehicleStep.completed());
+    documentsStep.vehicles().stream()
+        .filter(vehicleStep -> !hasCompleteVehicle && !vehicleStep.completed())
+        .forEach(
+            vehicleStep ->
+                parts.add(vehicleStep.plate() + ": " + joinNames(vehicleStep.missingTypes())));
+    return String.join("; ", parts);
+  }
+
+  static String joinNames(List<? extends Enum<?>> types) {
+    return types.stream().map(type -> type.name()).collect(Collectors.joining(", "));
+  }
+
+  DriverDocumentSummaryDTO toDocumentSummary(DriverDocumentModel doc) {
     return new DriverDocumentSummaryDTO(
         doc.getToken(),
         doc.getDocumentType(),
-        doc.getStatus(),
-        doc.getRejectionReason(),
-        MediaUrl.of("/api/driver-documents", doc.getToken(), "file", doc.getFile()));
+        doc.getReview().getStatus(),
+        doc.getReview().getRejectionReason(),
+        MediaUrl.of(DriverDocumentMapper.BASE_PATH, doc.getToken(), "file", doc.getFile()));
+  }
+
+  VehicleDocumentSummaryDTO toDocumentSummary(VehicleDocumentModel doc) {
+    return new VehicleDocumentSummaryDTO(
+        doc.getToken(),
+        doc.getDocumentType(),
+        doc.getReview().getStatus(),
+        doc.getReview().getRejectionReason(),
+        MediaUrl.of(VehicleDocumentMapper.BASE_PATH, doc.getToken(), "file", doc.getFile()));
   }
 
   @Transactional
   public DriverResponseDTO approve(String driverToken, String adminUid) {
     UserModel adminUser = userService.requireByToken(adminUid);
-    DriverModel driver = requireDriverByToken(driverToken);
-
-    if (driver.getApprovalStatus() != DriverApprovalStatus.UNDER_REVIEW) {
-      throw new ResponseStatusException(
-          HttpStatus.BAD_REQUEST, message("driver.onboarding.not_under_review"));
+    DriverModel driver = requireDriverForDecision(driverToken);
+    DriverComplianceDTO compliance =
+        complianceService.evaluate(driver, SchoolTransportCredentialService.today());
+    if (!compliance.canApprove()) {
+      throw ApiProblemException.unprocessable("driver.onboarding.documents_not_approved")
+          .withProperty("blockers", compliance.blockers());
     }
 
     driver.setApprovalStatus(DriverApprovalStatus.APPROVED);
@@ -283,7 +374,7 @@ public class DriverOnboardingService {
     driver.setReviewedBy(adminUser);
     DriverModel saved = driverRepository.save(driver);
 
-    driverNotificationService.notifyApproval(saved);
+    events.publishEvent(new DriverReviewEvent.Approved(saved.getToken()));
 
     return mapper.toResponse(saved);
   }
@@ -292,22 +383,37 @@ public class DriverOnboardingService {
   public DriverResponseDTO reject(
       String driverToken, DriverRejectionRequestDTO request, String adminUid) {
     UserModel adminUser = userService.requireByToken(adminUid);
-    DriverModel driver = requireDriverByToken(driverToken);
-
-    if (driver.getApprovalStatus() != DriverApprovalStatus.UNDER_REVIEW) {
-      throw new ResponseStatusException(
-          HttpStatus.BAD_REQUEST, message("driver.onboarding.not_under_review"));
+    if (request.reasonCode() == DriverRejectionReason.OTHER
+        && (request.reason() == null || request.reason().isBlank())) {
+      throw ApiProblemException.badRequest("driver.rejection.reason.required");
     }
+    DriverModel driver = requireDriverForDecision(driverToken);
 
     driver.setApprovalStatus(DriverApprovalStatus.REJECTED);
-    driver.setRejectionReason(request.reason());
+    driver.setRejectionReasonCode(request.reasonCode());
+    driver.setRejectionReason(
+        request.reason() == null || request.reason().isBlank() ? null : request.reason().strip());
     driver.setReviewedAt(Instant.now());
     driver.setReviewedBy(adminUser);
     DriverModel saved = driverRepository.save(driver);
 
-    driverNotificationService.notifyRejection(saved, request.reason());
+    events.publishEvent(new DriverReviewEvent.Rejected(saved.getToken()));
 
     return mapper.toResponse(saved);
+  }
+
+  // The lock queues a concurrent approval and rejection, and the second sees the first's status.
+  DriverModel requireDriverForDecision(String driverToken) {
+    DriverModel driver =
+        driverRepository
+            .findByTokenForUpdate(driverToken)
+            .orElseThrow(
+                () ->
+                    new ResponseStatusException(HttpStatus.NOT_FOUND, message("driver.not_found")));
+    if (driver.getApprovalStatus() != DriverApprovalStatus.UNDER_REVIEW) {
+      throw ApiProblemException.badRequest("driver.onboarding.not_under_review");
+    }
+    return driver;
   }
 
   private DriverModel requireDriverByUserId(Long userId) {
@@ -317,12 +423,5 @@ public class DriverOnboardingService {
             () ->
                 new ResponseStatusException(
                     HttpStatus.NOT_FOUND, message("user.driver_profile.not_found")));
-  }
-
-  private DriverModel requireDriverByToken(String token) {
-    return driverRepository
-        .findByToken(token)
-        .orElseThrow(
-            () -> new ResponseStatusException(HttpStatus.NOT_FOUND, message("driver.not_found")));
   }
 }
