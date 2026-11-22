@@ -1,13 +1,14 @@
 package br.com.vanep.servicerequest.dto;
 
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 
 public record ServiceRequestDriverItemResponseDTO(
-    String dependentToken,
-    String dependentFirstName,
-    Integer dependentAge,
+    @Nullable String dependentToken,
+    @Nullable String dependentFirstName,
+    @Nullable Integer dependentAge,
     String schoolName,
     String pickupCityName,
     String pickupStateUf,
-    String pickupNeighborhood,
+    @Nullable String pickupNeighborhood,
     List<ServiceRequestDayResponseDTO> days) {}

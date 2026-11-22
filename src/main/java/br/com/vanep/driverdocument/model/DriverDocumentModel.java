@@ -27,6 +27,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.SoftDelete;
 import org.hibernate.annotations.SoftDeleteType;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.jspecify.annotations.Nullable;
 
 @Entity
 @Table(name = "driver_document")
@@ -69,7 +70,7 @@ public class DriverDocumentModel {
   private String externalCheckId;
 
   @Column(name = "rejection_reason", length = 255)
-  private String rejectionReason;
+  private @Nullable String rejectionReason;
 
   @ManyToOne(fetch = FetchType.EAGER)
   @JoinColumn(name = "reviewed_by")

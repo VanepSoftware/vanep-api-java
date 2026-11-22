@@ -2,6 +2,7 @@ package br.com.vanep.auth.oauth.grant;
 
 import java.io.Serial;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
 
 /**
@@ -27,7 +28,7 @@ public class MobileClientAuthenticationToken extends AbstractAuthenticationToken
   }
 
   @Override
-  public Object getCredentials() {
+  public @Nullable Object getCredentials() {
     return null;
   }
 }

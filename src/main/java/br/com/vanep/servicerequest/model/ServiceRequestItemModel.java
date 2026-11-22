@@ -22,6 +22,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.type.SqlTypes;
+import org.jspecify.annotations.Nullable;
 
 @Entity
 @Table(name = "service_request_item")
@@ -42,7 +43,7 @@ public class ServiceRequestItemModel {
   private Long dependentId;
 
   @Column(name = "school_id", nullable = false, updatable = false)
-  private Long schoolId;
+  private @Nullable Long schoolId;
 
   @Column(name = "pickup_city_id", nullable = false, updatable = false)
   private Long pickupCityId;
@@ -78,6 +79,6 @@ public class ServiceRequestItemModel {
     public record School(String name) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public record Pickup(String cityName, String stateUf, String neighborhood) {}
+    public record Pickup(String cityName, String stateUf, @Nullable String neighborhood) {}
   }
 }

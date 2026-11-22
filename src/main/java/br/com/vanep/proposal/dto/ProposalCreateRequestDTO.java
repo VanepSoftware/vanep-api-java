@@ -15,6 +15,7 @@ import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 
 public record ProposalCreateRequestDTO(
     @NotNull @FutureOrPresent(message = "{proposal.starts_on.past}") LocalDate startsOn,
@@ -39,7 +40,7 @@ public record ProposalCreateRequestDTO(
     @NotBlank String vehicleToken,
     @Min(value = 1, message = "{proposal.valid_days.invalid}")
         @Max(value = 7, message = "{proposal.valid_days.invalid}")
-        Integer validDays,
+        @Nullable Integer validDays,
     @Size(max = 1000, message = "{proposal.message.too_long}") String message,
     @NotEmpty(message = "{proposal.items.required}")
         List<@NotNull @Valid ProposalItemRequestDTO> items) {}

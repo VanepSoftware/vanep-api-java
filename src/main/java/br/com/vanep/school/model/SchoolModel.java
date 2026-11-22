@@ -19,6 +19,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.SoftDelete;
 import org.hibernate.annotations.SoftDeleteType;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.jspecify.annotations.Nullable;
 
 @Entity
 @Table(name = "school")
@@ -37,14 +38,14 @@ public class SchoolModel {
   private String name;
 
   @Column(name = "google_place_id", length = 255)
-  private String googlePlaceId;
+  private @Nullable String googlePlaceId;
 
   @ManyToOne(fetch = FetchType.EAGER)
   @JoinColumn(name = "city_id")
   private CityModel city;
 
   @Column(name = "address_id")
-  private Long addressId;
+  private @Nullable Long addressId;
 
   @Column(name = "is_active", nullable = false)
   private boolean active = true;

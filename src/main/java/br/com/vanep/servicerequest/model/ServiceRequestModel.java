@@ -25,6 +25,7 @@ import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.jspecify.annotations.Nullable;
 
 @Entity
 @Table(name = "service_request")
@@ -50,7 +51,7 @@ public class ServiceRequestModel {
   private LocalDate desiredStartDate;
 
   @Column(length = 1000)
-  private String notes;
+  private @Nullable String notes;
 
   @Column(name = "decline_reason", length = 500)
   private String declineReason;

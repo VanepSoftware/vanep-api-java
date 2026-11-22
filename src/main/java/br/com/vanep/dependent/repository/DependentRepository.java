@@ -5,6 +5,7 @@ import jakarta.persistence.LockModeType;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
@@ -83,9 +84,9 @@ public interface DependentRepository extends JpaRepository<DependentModel, Long>
 
   boolean existsByDocumentAndTokenNot(String document, String token);
 
-  long countByAddressId(Long addressId);
+  long countByAddressId(@Nullable Long addressId);
 
-  long countByAddressIdAndIdNot(Long addressId, Long id);
+  long countByAddressIdAndIdNot(@Nullable Long addressId, Long id);
 
   @Query(
       value = "SELECT client_id FROM dependent WHERE token = :token AND deleted_at IS NOT NULL",

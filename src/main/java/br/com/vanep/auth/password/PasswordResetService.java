@@ -14,6 +14,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
@@ -169,7 +170,7 @@ public class PasswordResetService {
     return tokens.countByUserIdAndCreatedAtAfter(user.getId(), issuePolicy.dailyWindowStart(now));
   }
 
-  private Instant lastIssuedAt(UserModel user) {
+  private @Nullable Instant lastIssuedAt(UserModel user) {
     return tokens
         .findFirstByUserIdOrderByCreatedAtDesc(user.getId())
         .map(token -> token.getCreatedAt())

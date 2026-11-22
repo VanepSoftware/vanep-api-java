@@ -5,6 +5,7 @@ import br.com.vanep.user.model.UserModel;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserRequest;
@@ -41,7 +42,7 @@ public class VanepOidcUserService extends OidcUserService {
 
     Map<String, Object> claims = new HashMap<>(oidcUser.getClaims());
     if (resolution.registered()) {
-      UserModel user = resolution.user();
+      UserModel user = Objects.requireNonNull(resolution.user());
       claims.put("email", user.getEmail());
       List<GrantedAuthority> authorities =
           List.of(new SimpleGrantedAuthority("ROLE_" + user.getType().name()));

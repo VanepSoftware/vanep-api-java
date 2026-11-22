@@ -13,7 +13,9 @@ import br.com.vanep.user.repository.UserRepository;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
@@ -71,7 +73,7 @@ public class EmailVerificationService {
     if (hasPendingEmail(user)) {
       String rawToken = issueToken(user, now, null);
       mail.send(
-          user.getPendingEmail(),
+          Objects.requireNonNull(user.getPendingEmail()),
           message("user.profile.email.change.subject"),
           "email/email-change",
           Map.of("name", user.getName(), "link", verificationLink(rawToken)));
@@ -110,7 +112,7 @@ public class EmailVerificationService {
     return issuePolicy.retryAfter(lastIssuedAt(user), issuedInWindow(user, now), now);
   }
 
-  private String issueToken(UserModel user, Instant now, String code) {
+  private String issueToken(UserModel user, Instant now, @Nullable String code) {
     tokens.consumeAllActive(user.getId(), now);
     String raw = SecureTokens.generate();
     EmailVerificationTokenModel token = new EmailVerificationTokenModel();
@@ -219,7 +221,7 @@ public class EmailVerificationService {
     return tokens.countByUserIdAndCreatedAtAfter(user.getId(), issuePolicy.dailyWindowStart(now));
   }
 
-  private Instant lastIssuedAt(UserModel user) {
+  private @Nullable Instant lastIssuedAt(UserModel user) {
     return tokens
         .findFirstByUserIdOrderByCreatedAtDesc(user.getId())
         .map(token -> token.getCreatedAt())

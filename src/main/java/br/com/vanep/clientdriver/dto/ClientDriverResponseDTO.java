@@ -4,6 +4,7 @@ import br.com.vanep.clientdriver.enums.LinkOrigin;
 import br.com.vanep.clientdriver.enums.LinkParty;
 import br.com.vanep.clientdriver.enums.RelationshipStatus;
 import java.time.Instant;
+import org.jspecify.annotations.Nullable;
 
 public record ClientDriverResponseDTO(
     String token,
@@ -13,6 +14,6 @@ public record ClientDriverResponseDTO(
     String driverName,
     RelationshipStatus status,
     LinkOrigin origin,
-    LinkParty blockedBy,
+    @Nullable LinkParty blockedBy,
     Instant createdAt,
     Instant updatedAt) {}

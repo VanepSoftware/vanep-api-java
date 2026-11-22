@@ -1,3 +1,6 @@
 package br.com.vanep.contractreadiness.dto;
 
-public record ContractReadinessClientDTO(String document, String phone, Long addressId) {}
+import org.jspecify.annotations.Nullable;
+
+public record ContractReadinessClientDTO(
+    String document, @Nullable String phone, @Nullable Long addressId) {}

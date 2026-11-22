@@ -34,6 +34,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Stream;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -309,7 +310,7 @@ public class DataSeeder implements ApplicationRunner {
   }
 
   private void seedClients() {
-    record ClientSeed(String name, String email, String document, String phone) {}
+    record ClientSeed(String name, String email, String document, @Nullable String phone) {}
     List<ClientSeed> seeds =
         List.of(
             new ClientSeed(

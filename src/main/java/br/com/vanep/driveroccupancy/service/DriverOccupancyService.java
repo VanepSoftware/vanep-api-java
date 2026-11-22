@@ -15,6 +15,7 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -47,7 +48,7 @@ public class DriverOccupancyService {
 
   @Transactional(readOnly = true)
   public DriverOccupancyResponseDTO findOccupancy(
-      DriverModel driver, Long vehicleId, LocalDate today) {
+      DriverModel driver, @Nullable Long vehicleId, LocalDate today) {
     Long driverId = driver.getId();
     long contracted = contractItems.countActiveDependents(driverId, today);
     long studentsWithFamily =

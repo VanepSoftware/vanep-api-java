@@ -3,6 +3,7 @@ package br.com.vanep.clientdriver.mapper;
 import br.com.vanep.clientdriver.dto.ClientDriverResponseDTO;
 import br.com.vanep.clientdriver.enums.LinkParty;
 import br.com.vanep.clientdriver.model.ClientDriverModel;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -22,7 +23,7 @@ public class ClientDriverMapper {
         link.getUpdatedAt());
   }
 
-  LinkParty blockerOf(ClientDriverModel link) {
+  @Nullable LinkParty blockerOf(ClientDriverModel link) {
     if (link.getBlockedBy() == null) {
       return null;
     }

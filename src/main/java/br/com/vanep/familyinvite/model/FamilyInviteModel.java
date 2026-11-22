@@ -15,6 +15,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.SoftDelete;
 import org.hibernate.annotations.SoftDeleteType;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.jspecify.annotations.Nullable;
 
 @Entity
 @Table(name = "family_invite")
@@ -37,7 +38,7 @@ public class FamilyInviteModel {
   private Long driverId;
 
   @Column(name = "unlinked_passenger_id")
-  private Long unlinkedPassengerId;
+  private @Nullable Long unlinkedPassengerId;
 
   @Column(name = "sent_at", nullable = false)
   private Instant sentAt;

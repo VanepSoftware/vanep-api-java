@@ -2,6 +2,7 @@ package br.com.vanep.contract.dto;
 
 import br.com.vanep.schedule.dto.ScheduleSlotResponseDTO;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 
 public record ContractItemResponseDTO(
     String token,
@@ -9,11 +10,11 @@ public record ContractItemResponseDTO(
     String dependentName,
     String schoolToken,
     String schoolName,
-    String pickupZipCode,
+    @Nullable String pickupZipCode,
     String pickupStreet,
-    String pickupNumber,
-    String pickupComplement,
-    String pickupNeighborhood,
+    @Nullable String pickupNumber,
+    @Nullable String pickupComplement,
+    @Nullable String pickupNeighborhood,
     String pickupCityToken,
     String pickupCityName,
     List<ScheduleSlotResponseDTO> slots) {}

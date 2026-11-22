@@ -19,6 +19,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.SoftDelete;
 import org.hibernate.annotations.SoftDeleteType;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.jspecify.annotations.Nullable;
 
 @Entity
 @Table(name = "dependent")
@@ -38,10 +39,10 @@ public class DependentModel {
   private Long clientId;
 
   @Column(name = "school_id")
-  private Long schoolId;
+  private @Nullable Long schoolId;
 
   @Column(name = "address_id")
-  private Long addressId;
+  private @Nullable Long addressId;
 
   @Column(nullable = false)
   private String name;
@@ -54,7 +55,7 @@ public class DependentModel {
   private Gender gender;
 
   @Column(length = 64)
-  private String document;
+  private @Nullable String document;
 
   @Column(length = 32)
   private String phone;

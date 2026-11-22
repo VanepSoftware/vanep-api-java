@@ -3,6 +3,7 @@ package br.com.vanep.vehicle.service;
 import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.vehicle.model.VehicleModel;
 import br.com.vanep.vehicle.repository.VehicleRepository;
+import org.jspecify.annotations.Nullable;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.HttpStatus;
@@ -22,7 +23,7 @@ public class OwnVehicleService {
   }
 
   @Transactional(readOnly = true)
-  public Long findOwnVehicleId(DriverModel driver, String vehicleToken) {
+  public @Nullable Long findOwnVehicleId(DriverModel driver, String vehicleToken) {
     if (vehicleToken == null) {
       return null;
     }

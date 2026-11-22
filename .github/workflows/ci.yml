@@ -93,7 +93,7 @@ jobs:
           java-version: "25"
           cache: maven
 
-      - name: Lint + testes + JaCoCo (Spotless + cobertura ≥ 75% linhas)
+      - name: Lint + testes + JaCoCo (Spotless + NullAway no compile + cobertura ≥ 75% linhas)
         if: needs.changes.outputs.code == 'true'
         run: chmod +x mvnw && ./mvnw verify -B
 

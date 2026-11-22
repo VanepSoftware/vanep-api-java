@@ -1,3 +1,6 @@
 package br.com.vanep.familyinvite.dto;
 
-public record FamilyInviteAcceptResponseDTO(String clientDriverToken, String familyMatchToken) {}
+import org.jspecify.annotations.Nullable;
+
+public record FamilyInviteAcceptResponseDTO(
+    String clientDriverToken, @Nullable String familyMatchToken) {}

@@ -4,6 +4,7 @@ import br.com.vanep.media.model.MediaFileModel;
 import br.com.vanep.media.web.MediaUrl;
 import br.com.vanep.vehicle.dto.VehicleResponseDTO;
 import br.com.vanep.vehicle.model.VehicleModel;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -26,7 +27,7 @@ public class VehicleMapper {
         vehicle.getCreatedAt());
   }
 
-  private static String url(VehicleModel vehicle, String slot, MediaFileModel media) {
+  private static @Nullable String url(VehicleModel vehicle, String slot, MediaFileModel media) {
     return MediaUrl.of("/api/vehicles", vehicle.getToken(), slot, media);
   }
 }

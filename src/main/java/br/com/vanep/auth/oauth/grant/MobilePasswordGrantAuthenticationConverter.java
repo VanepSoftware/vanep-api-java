@@ -1,6 +1,7 @@
 package br.com.vanep.auth.oauth.grant;
 
 import jakarta.servlet.http.HttpServletRequest;
+import org.jspecify.annotations.Nullable;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
@@ -18,7 +19,7 @@ public final class MobilePasswordGrantAuthenticationConverter implements Authent
   private static final String PASSWORD = "password";
 
   @Override
-  public Authentication convert(HttpServletRequest request) {
+  public @Nullable Authentication convert(HttpServletRequest request) {
     if (!MobileAuthorizationGrantTypes.PASSWORD
         .getValue()
         .equals(request.getParameter(OAuth2ParameterNames.GRANT_TYPE))) {

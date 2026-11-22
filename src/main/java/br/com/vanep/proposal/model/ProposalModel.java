@@ -32,6 +32,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.type.SqlTypes;
+import org.jspecify.annotations.Nullable;
 
 @Entity
 @Table(name = "proposal")
@@ -57,7 +58,7 @@ public class ProposalModel {
   private Integer version;
 
   @Column(name = "parent_proposal_id", updatable = false)
-  private Long parentProposalId;
+  private @Nullable Long parentProposalId;
 
   @Enumerated(EnumType.STRING)
   @Column(nullable = false, length = 16)
@@ -95,10 +96,10 @@ public class ProposalModel {
   // Plain ids, not associations: Hibernate hides a soft-deleted row in every join, and the driver
   // can edit, remove and restore the vehicle. The screens read the vehicle from the snapshot.
   @Column(name = "vehicle_id", nullable = false, updatable = false)
-  private Long vehicleId;
+  private @Nullable Long vehicleId;
 
   @Column(length = 1000, updatable = false)
-  private String message;
+  private @Nullable String message;
 
   @Column(name = "decline_reason", length = 500)
   private String declineReason;
@@ -146,11 +147,11 @@ public class ProposalModel {
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record Vehicle(
-        String plate,
-        String brand,
-        String model,
-        Integer manufactureYear,
-        String color,
+        @Nullable String plate,
+        @Nullable String brand,
+        @Nullable String model,
+        @Nullable Integer manufactureYear,
+        @Nullable String color,
         Integer capacity) {}
   }
 }

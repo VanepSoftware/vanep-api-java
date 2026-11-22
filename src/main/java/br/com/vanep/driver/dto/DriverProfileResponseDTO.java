@@ -2,14 +2,15 @@ package br.com.vanep.driver.dto;
 
 import java.math.BigDecimal;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 
 // What any signed-in user may see of an approved driver: never CPF, CNPJ, email or address.
 public record DriverProfileResponseDTO(
     String token,
     String name,
-    String phone,
-    String photo,
-    BigDecimal rating,
+    @Nullable String phone,
+    @Nullable String photo,
+    @Nullable BigDecimal rating,
     String bio,
     Integer experienceYears,
     BigDecimal basePrice,

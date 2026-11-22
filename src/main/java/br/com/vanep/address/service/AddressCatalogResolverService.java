@@ -3,6 +3,7 @@ package br.com.vanep.address.service;
 import br.com.vanep.address.model.AddressModel;
 import br.com.vanep.city.model.CityModel;
 import br.com.vanep.city.repository.CityRepository;
+import org.jspecify.annotations.Nullable;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.HttpStatus;
@@ -53,7 +54,7 @@ public class AddressCatalogResolverService {
     return messages.getMessage(key, null, LocaleContextHolder.getLocale());
   }
 
-  private static String blankToNull(String value) {
+  private static @Nullable String blankToNull(String value) {
     return value == null || value.isBlank() ? null : value;
   }
 }

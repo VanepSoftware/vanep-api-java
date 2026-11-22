@@ -2,12 +2,13 @@ package br.com.vanep.driver.dto;
 
 import java.math.BigDecimal;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 
 public record DriverSearchResponseDTO(
     String token,
     String name,
-    String photo,
-    BigDecimal rating,
+    @Nullable String photo,
+    @Nullable BigDecimal rating,
     BigDecimal basePrice,
     Integer experienceYears,
     boolean available,

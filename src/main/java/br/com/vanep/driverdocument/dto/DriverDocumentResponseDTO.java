@@ -5,18 +5,19 @@ import br.com.vanep.driverdocument.enums.DocumentTypeEnum;
 import br.com.vanep.driverdocument.enums.ReviewMethodEnum;
 import java.time.Instant;
 import java.time.LocalDate;
+import org.jspecify.annotations.Nullable;
 
 public record DriverDocumentResponseDTO(
     String token,
-    String driverToken,
+    @Nullable String driverToken,
     DocumentTypeEnum documentType,
-    String fileUrl,
+    @Nullable String fileUrl,
     LocalDate expiresAt,
     DocumentStatusEnum status,
     ReviewMethodEnum reviewMethod,
     String externalCheckId,
-    String rejectionReason,
-    String reviewedByUserToken,
+    @Nullable String rejectionReason,
+    @Nullable String reviewedByUserToken,
     Instant reviewedAt,
     Instant notifiedAt,
     boolean active,

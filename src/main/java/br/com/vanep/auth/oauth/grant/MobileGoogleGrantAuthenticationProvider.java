@@ -8,6 +8,7 @@ import br.com.vanep.auth.signup.SignupTicketService;
 import br.com.vanep.user.enums.AuthProvider;
 import br.com.vanep.user.model.UserModel;
 import java.util.List;
+import java.util.Objects;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.security.authentication.AuthenticationProvider;
@@ -71,7 +72,7 @@ public final class MobileGoogleGrantAuthenticationProvider implements Authentica
 
     return tokenIssuer.issue(
         clientPrincipal,
-        userPrincipalOf(resolution.user()),
+        userPrincipalOf(Objects.requireNonNull(resolution.user())),
         MobileAuthorizationGrantTypes.GOOGLE,
         request);
   }

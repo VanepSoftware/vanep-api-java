@@ -1,5 +1,7 @@
 package br.com.vanep.auth.security;
 
+import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
@@ -53,7 +55,7 @@ public final class UserBoundPasswordAuthenticationProvider extends DaoAuthentica
           this.messages.getMessage(
               "AbstractUserDetailsAuthenticationProvider.badCredentials", "Bad credentials"));
     }
-    String presentedPassword = authentication.getCredentials().toString();
+    String presentedPassword = Objects.requireNonNull(authentication.getCredentials()).toString();
     if (!this.userPasswords.matches(
         presentedPassword, userDetails.getPassword(), userTokenOf(userDetails))) {
       this.logger.debug("Failed to authenticate since password does not match stored value");
@@ -83,7 +85,8 @@ public final class UserBoundPasswordAuthenticationProvider extends DaoAuthentica
       return user;
     }
     String upgraded =
-        this.userPasswords.encode(authentication.getCredentials().toString(), userToken);
+        this.userPasswords.encode(
+            Objects.requireNonNull(authentication.getCredentials()).toString(), userToken);
     try {
       return this.rehash.storeUpgradedHash(details, upgraded);
     } catch (RuntimeException ex) {
@@ -93,7 +96,7 @@ public final class UserBoundPasswordAuthenticationProvider extends DaoAuthentica
     }
   }
 
-  private static String userTokenOf(UserDetails userDetails) {
+  private static @Nullable String userTokenOf(UserDetails userDetails) {
     if (userDetails instanceof VanepUserDetails details) {
       return details.getUserToken();
     }

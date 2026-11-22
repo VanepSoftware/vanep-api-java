@@ -17,6 +17,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
+import org.jspecify.annotations.Nullable;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.HttpStatus;
@@ -51,18 +52,18 @@ public class AddressService {
     this.schools = schools;
   }
 
-  private String message(String key) {
+  private @Nullable String message(String key) {
     return messages.getMessage(key, null, LocaleContextHolder.getLocale());
   }
 
-  public AddressResponseDTO toResponseOrNull(Long addressId) {
+  public @Nullable AddressResponseDTO toResponseOrNull(@Nullable Long addressId) {
     if (addressId == null) {
       return null;
     }
     return addressRepository.findById(addressId).map(mapper::toResponse).orElse(null);
   }
 
-  public Map<Long, AddressResponseDTO> toResponsesByIds(Collection<Long> addressIds) {
+  public Map<Long, AddressResponseDTO> toResponsesByIds(@Nullable Collection<Long> addressIds) {
     if (addressIds == null || addressIds.isEmpty()) {
       return Map.of();
     }
@@ -144,7 +145,7 @@ public class AddressService {
         .map(address -> attachToSchool(school.getId(), address));
   }
 
-  AddressResponseDTO attachToSchool(Long schoolId, AddressModel address) {
+  @Nullable AddressResponseDTO attachToSchool(Long schoolId, AddressModel address) {
     AddressModel saved = addressRepository.save(address);
     if (schools.attachAddressWhenMissing(schoolId, saved.getId()) == 1) {
       return mapper.toResponse(saved);
@@ -179,7 +180,7 @@ public class AddressService {
   }
 
   private AddressResponseDTO upsertOwnedAddress(
-      Long currentAddressId,
+      @Nullable Long currentAddressId,
       Consumer<AddressModel> writeToNewAddress,
       Consumer<AddressModel> writeToExistingAddress,
       Runnable rejectIfOwnedByAnother,
@@ -204,7 +205,7 @@ public class AddressService {
     return mapper.toResponse(saved);
   }
 
-  private void softDeleteOwnedAddress(Long addressId) {
+  private void softDeleteOwnedAddress(@Nullable Long addressId) {
     if (addressId == null) {
       return;
     }

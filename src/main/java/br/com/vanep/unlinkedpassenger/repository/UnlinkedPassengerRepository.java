@@ -10,6 +10,7 @@ import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -56,7 +57,8 @@ public interface UnlinkedPassengerRepository extends JpaRepository<UnlinkedPasse
               and item.contract.startsOn <= :today
               and item.contract.endsOn >= :today))
       """)
-  List<UnlinkedStudentRowDTO> findStudentsOfDriver(Long driverId, Long vehicleId, LocalDate today);
+  List<UnlinkedStudentRowDTO> findStudentsOfDriver(
+      Long driverId, @Nullable Long vehicleId, LocalDate today);
 
   @Query(
       """
@@ -161,7 +163,8 @@ public interface UnlinkedPassengerRepository extends JpaRepository<UnlinkedPasse
               and item.contract.endsOn >= :today))
       group by slot.shift
       """)
-  List<ShiftOccupancyDTO> countPassengersByShift(Long driverId, Long vehicleId, LocalDate today);
+  List<ShiftOccupancyDTO> countPassengersByShift(
+      Long driverId, @Nullable Long vehicleId, LocalDate today);
 
   @Query(
       """
@@ -184,7 +187,7 @@ public interface UnlinkedPassengerRepository extends JpaRepository<UnlinkedPasse
               and item.contract.startsOn <= :today
               and item.contract.endsOn >= :today))
       """)
-  long countStudents(Long driverId, Long vehicleId, LocalDate today);
+  long countStudents(Long driverId, @Nullable Long vehicleId, LocalDate today);
 
   @Query(
       """
@@ -205,5 +208,5 @@ public interface UnlinkedPassengerRepository extends JpaRepository<UnlinkedPasse
             and item.contract.startsOn <= :today
             and item.contract.endsOn >= :today)
       """)
-  long countMergedStudents(Long driverId, Long vehicleId, LocalDate today);
+  long countMergedStudents(Long driverId, @Nullable Long vehicleId, LocalDate today);
 }

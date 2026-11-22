@@ -2,6 +2,7 @@ package br.com.vanep.auth.oauth.grant;
 
 import java.time.Instant;
 import java.util.Base64;
+import org.jspecify.annotations.Nullable;
 import org.springframework.security.crypto.keygen.Base64StringKeyGenerator;
 import org.springframework.security.crypto.keygen.StringKeyGenerator;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
@@ -24,12 +25,13 @@ public final class MobileRefreshTokenGenerator implements OAuth2TokenGenerator<O
   private final OAuth2RefreshTokenGenerator delegate = new OAuth2RefreshTokenGenerator();
   private final String mobileClientId;
 
+  @Nullable
   public MobileRefreshTokenGenerator(String mobileClientId) {
     this.mobileClientId = mobileClientId;
   }
 
   @Override
-  public OAuth2RefreshToken generate(OAuth2TokenContext context) {
+  public @Nullable OAuth2RefreshToken generate(OAuth2TokenContext context) {
     if (!OAuth2TokenType.REFRESH_TOKEN.equals(context.getTokenType())) {
       return null;
     }

@@ -7,6 +7,7 @@ import br.com.vanep.cep.dto.ViaCepResponseDTO;
 import br.com.vanep.city.model.CityModel;
 import br.com.vanep.city.repository.CityRepository;
 import java.util.regex.Pattern;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -71,7 +72,7 @@ public class CepLookupService {
     return exception;
   }
 
-  static String blankToNull(String value) {
+  static @Nullable String blankToNull(String value) {
     return value == null || value.isBlank() ? null : value;
   }
 

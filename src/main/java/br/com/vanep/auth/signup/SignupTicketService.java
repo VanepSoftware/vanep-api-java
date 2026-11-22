@@ -6,6 +6,7 @@ import br.com.vanep.user.enums.AuthProvider;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,7 +26,11 @@ public class SignupTicketService {
 
   /** Returns the raw ticket, which is never stored: only its hash is. */
   @Transactional
-  public String issue(AuthProvider provider, String providerUid, String email, String name) {
+  public String issue(
+      @Nullable AuthProvider provider,
+      @Nullable String providerUid,
+      @Nullable String email,
+      @Nullable String name) {
     String rawTicket = SecureTokens.generate();
     SignupTicketModel ticket = new SignupTicketModel();
     ticket.setTicketHash(SecureTokens.hash(rawTicket));

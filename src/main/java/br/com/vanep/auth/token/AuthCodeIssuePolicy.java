@@ -3,6 +3,7 @@ package br.com.vanep.auth.token;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -21,7 +22,8 @@ public class AuthCodeIssuePolicy {
     this.maxPerDay = maxPerDay;
   }
 
-  public AuthCodeIssueDecision decide(Instant lastIssuedAt, long issuedInWindow, Instant now) {
+  public AuthCodeIssueDecision decide(
+      @Nullable Instant lastIssuedAt, long issuedInWindow, Instant now) {
     return retryAfter(lastIssuedAt, issuedInWindow, now).isEmpty()
         ? AuthCodeIssueDecision.ISSUE
         : AuthCodeIssueDecision.SKIP;
@@ -33,7 +35,8 @@ public class AuthCodeIssuePolicy {
    *
    * @return empty when a new send is allowed; otherwise when it becomes allowed
    */
-  public Optional<Instant> retryAfter(Instant lastIssuedAt, long issuedInWindow, Instant now) {
+  public Optional<@Nullable Instant> retryAfter(
+      @Nullable Instant lastIssuedAt, long issuedInWindow, Instant now) {
     if (issuedInWindow >= maxPerDay) {
       // A slot frees when the oldest send leaves the window; the newest one is a safe upper bound.
       Instant reference = lastIssuedAt != null ? lastIssuedAt : now;

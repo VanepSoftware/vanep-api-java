@@ -18,6 +18,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.SoftDelete;
 import org.hibernate.annotations.SoftDeleteType;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.jspecify.annotations.Nullable;
 
 @Entity
 @Table(name = "family_match")
@@ -34,7 +35,7 @@ public class FamilyMatchModel {
   private String token;
 
   @Column(name = "unlinked_passenger_id", nullable = false)
-  private Long unlinkedPassengerId;
+  private @Nullable Long unlinkedPassengerId;
 
   @Column(name = "dependent_id", nullable = false)
   private Long dependentId;

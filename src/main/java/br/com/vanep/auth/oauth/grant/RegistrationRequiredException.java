@@ -2,6 +2,7 @@ package br.com.vanep.auth.oauth.grant;
 
 import java.io.Serial;
 import lombok.Getter;
+import org.jspecify.annotations.Nullable;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2Error;
 
@@ -17,11 +18,11 @@ public class RegistrationRequiredException extends OAuth2AuthenticationException
   public static final String ERROR_CODE = "registration_required";
 
   private final String signupTicket;
-  private final String email;
-  private final String name;
+  private final @Nullable String email;
+  private final @Nullable String name;
 
   public RegistrationRequiredException(
-      String description, String signupTicket, String email, String name) {
+      String description, String signupTicket, @Nullable String email, @Nullable String name) {
     super(new OAuth2Error(ERROR_CODE, description, null));
     this.signupTicket = signupTicket;
     this.email = email;

@@ -11,6 +11,7 @@ import br.com.vanep.dependent.model.DependentModel;
 import br.com.vanep.dependent.model.DependentSchoolDayModel;
 import java.util.Comparator;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -33,9 +34,9 @@ public class DependentMapper {
 
   public DependentResponseDTO toResponse(
       DependentModel model,
-      String clientToken,
-      DependentSchoolDTO school,
-      AddressResponseDTO address) {
+      @Nullable String clientToken,
+      @Nullable DependentSchoolDTO school,
+      @Nullable AddressResponseDTO address) {
     return new DependentResponseDTO(
         model.getToken(),
         new DependentClientDTO(clientToken),

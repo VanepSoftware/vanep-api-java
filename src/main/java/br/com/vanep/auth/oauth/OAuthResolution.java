@@ -2,14 +2,15 @@ package br.com.vanep.auth.oauth;
 
 import br.com.vanep.user.enums.AuthProvider;
 import br.com.vanep.user.model.UserModel;
+import org.jspecify.annotations.Nullable;
 
 public record OAuthResolution(
     boolean registered,
-    UserModel user,
-    AuthProvider provider,
-    String providerUid,
-    String email,
-    String name) {
+    @Nullable UserModel user,
+    @Nullable AuthProvider provider,
+    @Nullable String providerUid,
+    @Nullable String email,
+    @Nullable String name) {
 
   public static OAuthResolution registered(UserModel user) {
     return new OAuthResolution(true, user, null, null, null, null);

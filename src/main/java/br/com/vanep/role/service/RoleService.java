@@ -8,6 +8,7 @@ import br.com.vanep.role.model.RoleModel;
 import br.com.vanep.role.repository.RoleRepository;
 import br.com.vanep.rolepermission.model.RolePermissionModel;
 import br.com.vanep.rolepermission.repository.RolePermissionRepository;
+import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -77,7 +78,7 @@ public class RoleService {
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Role not found."));
   }
 
-  private RolePermissionModel resolveRolePermission(String token) {
+  private @Nullable RolePermissionModel resolveRolePermission(String token) {
     if (token == null || token.isBlank()) {
       return null;
     }

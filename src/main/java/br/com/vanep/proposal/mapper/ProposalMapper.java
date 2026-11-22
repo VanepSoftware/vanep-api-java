@@ -17,8 +17,10 @@ import br.com.vanep.vehicle.model.VehicleModel;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
@@ -50,7 +52,7 @@ public class ProposalMapper {
             vehicle.getCapacity()));
   }
 
-  public ProposalItemModel toItemModel(Long dependentId, ScheduleModel schedule) {
+  public ProposalItemModel toItemModel(@Nullable Long dependentId, ScheduleModel schedule) {
     ProposalItemModel item = new ProposalItemModel();
     item.setDependentId(dependentId);
     item.setSchedule(schedule);
@@ -83,7 +85,8 @@ public class ProposalMapper {
                 item,
                 dependentTokens.get(item.getDependentId()),
                 names.get(item.getDependentId()),
-                requestMapper.firstNameOf(names.get(item.getDependentId()))));
+                requestMapper.firstNameOf(
+                    Objects.requireNonNull(names.get(item.getDependentId())))));
   }
 
   public ProposalResponseDTO toDriverResponse(
@@ -91,7 +94,7 @@ public class ProposalMapper {
       ServiceRequestModel request,
       Map<Long, String> dependentTokens,
       List<ProposalAdjustmentModel> adjustments,
-      String vehicleToken) {
+      @Nullable String vehicleToken) {
     Map<Long, String> names = requestedNamesOf(request);
     return toResponse(
         proposal,
@@ -103,14 +106,15 @@ public class ProposalMapper {
                 item,
                 dependentTokens.get(item.getDependentId()),
                 null,
-                requestMapper.firstNameOf(names.get(item.getDependentId()))));
+                requestMapper.firstNameOf(
+                    Objects.requireNonNull(names.get(item.getDependentId())))));
   }
 
   ProposalResponseDTO toResponse(
       ProposalModel proposal,
       ServiceRequestModel request,
       List<ProposalAdjustmentModel> adjustments,
-      String vehicleToken,
+      @Nullable String vehicleToken,
       Function<ProposalItemModel, ProposalResponseDTO.Item> toItem) {
     return new ProposalResponseDTO(
         proposal.getToken(),
@@ -157,13 +161,16 @@ public class ProposalMapper {
   }
 
   ProposalResponseDTO.Item toItemResponse(
-      ProposalItemModel item, String dependentToken, String fullName, String firstName) {
+      ProposalItemModel item,
+      @Nullable String dependentToken,
+      @Nullable String fullName,
+      @Nullable String firstName) {
     return new ProposalResponseDTO.Item(
         dependentToken, fullName, firstName, scheduleMapper.toSlotResponses(item.getSchedule()));
   }
 
   ProposalResponseDTO.Vehicle toVehicleResponse(
-      String token, ProposalModel.Snapshot.Vehicle vehicle) {
+      @Nullable String token, ProposalModel.Snapshot.Vehicle vehicle) {
     return new ProposalResponseDTO.Vehicle(
         token,
         vehicle.plate(),
@@ -189,7 +196,7 @@ public class ProposalMapper {
                 item -> item.getDependentId(), item -> item.getSnapshot().dependent().name()));
   }
 
-  String stripToNull(String value) {
+  @Nullable String stripToNull(String value) {
     return StringUtils.hasText(value) ? value.strip() : null;
   }
 }

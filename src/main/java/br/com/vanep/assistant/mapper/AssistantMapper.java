@@ -10,6 +10,7 @@ import br.com.vanep.assistant.model.AssistantModel;
 import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.media.web.MediaUrl;
 import br.com.vanep.user.dto.UserMeResponseDTO;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -34,7 +35,9 @@ public class AssistantMapper {
   }
 
   public AssistantMeSummaryResponseDTO toMeSummary(
-      AssistantModel assistant, UserMeResponseDTO user, AssistantPendingInviteDTO pendingInvite) {
+      AssistantModel assistant,
+      UserMeResponseDTO user,
+      @Nullable AssistantPendingInviteDTO pendingInvite) {
     return new AssistantMeSummaryResponseDTO(
         assistant.getToken(), photoUrl(assistant), assistant.getStatus(), pendingInvite, user);
   }
@@ -51,7 +54,7 @@ public class AssistantMapper {
         driver.getRating());
   }
 
-  private String photoUrl(AssistantModel assistant) {
+  private @Nullable String photoUrl(AssistantModel assistant) {
     return MediaUrl.of("/api/assistants", assistant.getToken(), "photo", assistant.getPhoto());
   }
 }

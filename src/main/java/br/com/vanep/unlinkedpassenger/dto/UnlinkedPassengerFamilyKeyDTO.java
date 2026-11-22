@@ -1,3 +1,6 @@
 package br.com.vanep.unlinkedpassenger.dto;
 
-public record UnlinkedPassengerFamilyKeyDTO(Long passengerId, Long vehicleId, Long dependentId) {}
+import org.jspecify.annotations.Nullable;
+
+public record UnlinkedPassengerFamilyKeyDTO(
+    Long passengerId, @Nullable Long vehicleId, Long dependentId) {}

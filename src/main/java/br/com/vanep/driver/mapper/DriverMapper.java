@@ -9,6 +9,7 @@ import br.com.vanep.media.web.MediaUrl;
 import br.com.vanep.user.dto.UserMeResponseDTO;
 import br.com.vanep.vehicle.model.VehicleModel;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -77,7 +78,7 @@ public class DriverMapper {
         MediaUrl.of("/api/vehicles", vehicle.getToken(), "photo-side", vehicle.getPhotoSide()));
   }
 
-  private String photoUrl(DriverModel driver) {
+  private @Nullable String photoUrl(DriverModel driver) {
     return MediaUrl.of("/api/drivers", driver.getToken(), "photo", driver.getPhoto());
   }
 }

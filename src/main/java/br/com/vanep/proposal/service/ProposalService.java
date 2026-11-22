@@ -43,6 +43,7 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
@@ -452,7 +453,7 @@ public class ProposalService {
     return proposal.getClientDriver().getDriver().getUser().getToken();
   }
 
-  String reasonOf(ProposalDeclineRequestDTO body) {
+  @Nullable String reasonOf(ProposalDeclineRequestDTO body) {
     return body == null || !StringUtils.hasText(body.reason()) ? null : body.reason().strip();
   }
 

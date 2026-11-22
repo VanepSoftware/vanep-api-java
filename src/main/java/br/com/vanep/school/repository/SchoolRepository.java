@@ -2,6 +2,7 @@ package br.com.vanep.school.repository;
 
 import br.com.vanep.school.model.SchoolModel;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -16,9 +17,9 @@ public interface SchoolRepository extends JpaRepository<SchoolModel, Long> {
 
   Optional<SchoolModel> findFirstByName(String name);
 
-  long countByAddressId(Long addressId);
+  long countByAddressId(@Nullable Long addressId);
 
-  long countByAddressIdAndIdNot(Long addressId, Long id);
+  long countByAddressIdAndIdNot(@Nullable Long addressId, Long id);
 
   // Two resolves completing the same school race here: only the first address is attached.
   @Modifying(flushAutomatically = true, clearAutomatically = true)

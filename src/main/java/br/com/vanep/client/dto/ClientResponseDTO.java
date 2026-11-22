@@ -3,13 +3,14 @@ package br.com.vanep.client.dto;
 import br.com.vanep.address.dto.AddressResponseDTO;
 import java.math.BigDecimal;
 import java.time.Instant;
+import org.jspecify.annotations.Nullable;
 
 public record ClientResponseDTO(
     String token,
     String name,
     String email,
-    String photo,
+    @Nullable String photo,
     BigDecimal rating,
-    AddressResponseDTO address,
+    @Nullable AddressResponseDTO address,
     boolean active,
     Instant createdAt) {}

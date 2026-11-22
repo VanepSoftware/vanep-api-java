@@ -6,8 +6,9 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 
 public record ProposalItemRequestDTO(
-    @NotBlank String dependentToken,
+    @NotBlank @Nullable String dependentToken,
     @NotEmpty(message = "{schedule.slots.required}")
         List<@NotNull @Valid ScheduleSlotRequestDTO> slots) {}

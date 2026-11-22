@@ -20,6 +20,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.SoftDelete;
 import org.hibernate.annotations.SoftDeleteType;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.jspecify.annotations.Nullable;
 
 @Entity
 @Table(name = "users")
@@ -45,7 +46,7 @@ public class UserModel {
   private Long countryId;
 
   @Column(name = "address_id")
-  private Long addressId;
+  private @Nullable Long addressId;
 
   @Column(nullable = false)
   private String name;
@@ -54,7 +55,7 @@ public class UserModel {
   private String email;
 
   @Column(name = "pending_email")
-  private String pendingEmail;
+  private @Nullable String pendingEmail;
 
   @Column(unique = true)
   private String username;
@@ -64,7 +65,7 @@ public class UserModel {
   @Column(nullable = false, unique = true, length = 64)
   private String document;
 
-  @Column private String phone;
+  @Column private @Nullable String phone;
 
   @Column(name = "birth_date")
   private LocalDate birthDate;

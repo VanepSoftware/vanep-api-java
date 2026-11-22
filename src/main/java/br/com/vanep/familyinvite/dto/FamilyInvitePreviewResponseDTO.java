@@ -1,4 +1,8 @@
 package br.com.vanep.familyinvite.dto;
 
+import org.jspecify.annotations.Nullable;
+
 public record FamilyInvitePreviewResponseDTO(
-    String driverFirstName, String schoolName, String studentFirstName) {}
+    @Nullable String driverFirstName,
+    @Nullable String schoolName,
+    @Nullable String studentFirstName) {}

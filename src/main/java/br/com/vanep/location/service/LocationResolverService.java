@@ -22,6 +22,7 @@ import io.micrometer.core.instrument.MeterRegistry;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -172,7 +173,7 @@ public class LocationResolverService {
   }
 
   private Optional<DistrictModel> findDistrict(
-      CityModel city, DistrictModel parent, LocationComponentDTO component) {
+      CityModel city, @Nullable DistrictModel parent, LocationComponentDTO component) {
     String normalized = LocationNameNormalizer.normalize(component.name());
     return parent == null
         ? districts.findByCityIdAndParentIsNullAndNormalizedName(city.getId(), normalized)
@@ -181,7 +182,7 @@ public class LocationResolverService {
   }
 
   private DistrictModel findOrCreateDistrict(
-      CityModel city, DistrictModel parent, LocationComponentDTO component) {
+      CityModel city, @Nullable DistrictModel parent, LocationComponentDTO component) {
     return findDistrict(city, parent, component)
         .orElseGet(
             () -> {

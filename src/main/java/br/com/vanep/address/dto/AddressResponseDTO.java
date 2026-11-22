@@ -1,14 +1,15 @@
 package br.com.vanep.address.dto;
 
 import java.time.Instant;
+import org.jspecify.annotations.Nullable;
 
 public record AddressResponseDTO(
     String token,
-    String zipCode,
+    @Nullable String zipCode,
     String street,
-    String number,
-    String complement,
-    String neighborhood,
+    @Nullable String number,
+    @Nullable String complement,
+    @Nullable String neighborhood,
     String cityToken,
     String cityName,
     String stateUf,

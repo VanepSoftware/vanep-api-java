@@ -2,6 +2,7 @@ package br.com.vanep.drivercnh.dto;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import org.jspecify.annotations.Nullable;
 
 public record DriverCnhResponseDTO(
     String token,
@@ -13,6 +14,6 @@ public record DriverCnhResponseDTO(
     LocalDate firstLicenseDate,
     String securityNumber,
     String issuingState,
-    String photoUrl,
+    @Nullable String photoUrl,
     boolean active,
     Instant createdAt) {}

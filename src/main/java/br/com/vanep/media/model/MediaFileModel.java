@@ -19,6 +19,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.SoftDelete;
 import org.hibernate.annotations.SoftDeleteType;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.jspecify.annotations.Nullable;
 
 @Entity
 @Table(name = "media_file")
@@ -35,7 +36,7 @@ public class MediaFileModel {
 
   @Enumerated(EnumType.STRING)
   @Column(nullable = false, length = 20)
-  private StorageProvider provider;
+  private @Nullable StorageProvider provider;
 
   @Column(name = "object_key", nullable = false, length = 512)
   private String objectKey;
@@ -47,7 +48,7 @@ public class MediaFileModel {
   private Long sizeBytes;
 
   @Column(name = "original_name", length = 255)
-  private String originalName;
+  private @Nullable String originalName;
 
   @Enumerated(EnumType.STRING)
   @Column(nullable = false, length = 20)

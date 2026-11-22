@@ -3,6 +3,7 @@ package br.com.vanep.auth.oauth.grant;
 import java.io.Serial;
 import java.util.Map;
 import lombok.Getter;
+import org.jspecify.annotations.Nullable;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.server.authorization.authentication.OAuth2AuthorizationGrantAuthenticationToken;
 
@@ -14,7 +15,8 @@ public class MobileGoogleGrantAuthenticationToken
 
   private final String idToken;
 
-  public MobileGoogleGrantAuthenticationToken(Authentication clientPrincipal, String idToken) {
+  public MobileGoogleGrantAuthenticationToken(
+      @Nullable Authentication clientPrincipal, String idToken) {
     super(MobileAuthorizationGrantTypes.GOOGLE, clientPrincipal, Map.of());
     this.idToken = idToken;
   }

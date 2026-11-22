@@ -29,6 +29,7 @@ import org.hibernate.annotations.SoftDelete;
 import org.hibernate.annotations.SoftDeleteType;
 import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.type.SqlTypes;
+import org.jspecify.annotations.Nullable;
 
 @Entity
 @Table(name = "driver")
@@ -52,7 +53,7 @@ public class DriverModel {
   private MediaFileModel photo;
 
   @Column(precision = 3, scale = 2)
-  private BigDecimal rating;
+  private @Nullable BigDecimal rating;
 
   @Column private String bio;
 
@@ -85,7 +86,7 @@ public class DriverModel {
   private Instant submittedAt;
 
   @Column(name = "rejection_reason")
-  private String rejectionReason;
+  private @Nullable String rejectionReason;
 
   @Column(name = "reviewed_at")
   private Instant reviewedAt;

@@ -1,6 +1,7 @@
 package br.com.vanep.vehicle.dto;
 
 import java.time.Instant;
+import org.jspecify.annotations.Nullable;
 
 public record VehicleResponseDTO(
     String token,
@@ -11,8 +12,8 @@ public record VehicleResponseDTO(
     Integer manufactureYear,
     String color,
     Integer capacity,
-    String photoFrontUrl,
-    String photoSideUrl,
-    String photoDocumentUrl,
+    @Nullable String photoFrontUrl,
+    @Nullable String photoSideUrl,
+    @Nullable String photoDocumentUrl,
     boolean active,
     Instant createdAt) {}

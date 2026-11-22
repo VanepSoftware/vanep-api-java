@@ -11,7 +11,9 @@ import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.OAuthAccountRepository;
 import br.com.vanep.user.repository.UserRepository;
 import java.time.Instant;
+import java.util.Objects;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
@@ -76,18 +78,18 @@ public class OAuthAccountService {
 
   @Transactional
   public UserModel completeRegistration(
-      AuthProvider provider,
-      String providerUid,
-      String email,
-      String name,
+      @Nullable AuthProvider provider,
+      @Nullable String providerUid,
+      @Nullable String email,
+      @Nullable String name,
       SignupCompletionFields form) {
     UserModel user = new UserModel();
     user.setType(form.getType());
     roles
         .findByRoleName(roleForType(form.getType()))
         .ifPresent(role -> user.setRoleId(role.getId()));
-    user.setName(name);
-    user.setEmail(email);
+    user.setName(Objects.requireNonNull(name));
+    user.setEmail(Objects.requireNonNull(email));
     user.setDocument(form.getDocument());
     user.setPhone(form.getPhone());
     user.setBirthDate(form.getBirthDate());
@@ -98,7 +100,7 @@ public class OAuthAccountService {
 
     registrationService.createRoleRecord(user, form.getType(), form);
 
-    link(user, provider, providerUid, email);
+    link(user, provider, providerUid, Objects.requireNonNull(email));
     return user;
   }
 
@@ -112,7 +114,7 @@ public class OAuthAccountService {
   }
 
   private OAuthAccountModel link(
-      UserModel user, AuthProvider provider, String providerUid, String email) {
+      UserModel user, @Nullable AuthProvider provider, @Nullable String providerUid, String email) {
     OAuthAccountModel account = new OAuthAccountModel();
     account.setUser(user);
     account.setProvider(provider);

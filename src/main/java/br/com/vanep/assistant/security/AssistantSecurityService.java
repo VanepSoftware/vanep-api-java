@@ -1,5 +1,6 @@
 package br.com.vanep.assistant.security;
 
+import br.com.vanep.assistant.model.AssistantModel;
 import br.com.vanep.assistant.repository.AssistantInviteRepository;
 import br.com.vanep.assistant.repository.AssistantRepository;
 import br.com.vanep.auth.security.SecurityHelper;
@@ -34,8 +35,8 @@ public class AssistantSecurityService {
             callerUid ->
                 assistantRepository
                     .findByToken(assistantToken)
-                    .filter(assistant -> assistant.getDriver() != null)
-                    .map(assistant -> assistant.getDriver().getUser().getToken().equals(callerUid)))
+                    .map(AssistantModel::getDriver)
+                    .map(driver -> driver.getUser().getToken().equals(callerUid)))
         .orElse(false);
   }
 }

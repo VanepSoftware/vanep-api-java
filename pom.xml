@@ -23,6 +23,8 @@
 		<spotless.version>3.4.0</spotless.version>
 		<google-java-format.version>1.27.0</google-java-format.version>
 		<bouncycastle.version>1.85</bouncycastle.version>
+		<errorprone.version>2.45.0</errorprone.version>
+		<nullaway.version>0.12.7</nullaway.version>
 	</properties>
 
 	<dependencies>
@@ -113,6 +115,10 @@
 			<optional>true</optional>
 		</dependency>
 		<dependency>
+			<groupId>org.jspecify</groupId>
+			<artifactId>jspecify</artifactId>
+		</dependency>
+		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-test</artifactId>
 			<scope>test</scope>
@@ -155,13 +161,47 @@
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-compiler-plugin</artifactId>
 				<configuration>
+					<showWarnings>true</showWarnings>
+					<compilerArgs>
+						<arg>-Xmaxerrs</arg>
+						<arg>10000</arg>
+						<arg>-XDcompilePolicy=simple</arg>
+						<arg>--should-stop=ifError=FLOW</arg>
+						<!-- Error Prone roda só com o NullAway: os demais checks ficam desligados. -->
+						<arg>-Xplugin:ErrorProne -XepDisableAllChecks -Xep:NullAway:ERROR -XepOpt:NullAway:AnnotatedPackages=br.com.vanep -XepOpt:NullAway:ExternalInitAnnotations=lombok.Setter,jakarta.persistence.Entity,jakarta.persistence.MappedSuperclass,jakarta.persistence.Embeddable -XepOpt:NullAway:ExcludedFieldAnnotations=org.springframework.beans.factory.annotation.Autowired,org.springframework.beans.factory.annotation.Value -XepExcludedPaths:.*/target/generated-sources/.*</arg>
+					</compilerArgs>
 					<annotationProcessorPaths>
 						<path>
 							<groupId>org.projectlombok</groupId>
 							<artifactId>lombok</artifactId>
 						</path>
+						<path>
+							<groupId>com.google.errorprone</groupId>
+							<artifactId>error_prone_core</artifactId>
+							<version>${errorprone.version}</version>
+						</path>
+						<path>
+							<groupId>com.uber.nullaway</groupId>
+							<artifactId>nullaway</artifactId>
+							<version>${nullaway.version}</version>
+						</path>
 					</annotationProcessorPaths>
 				</configuration>
+				<executions>
+					<!-- NullAway só vale para o código de produção; os testes compilam só com o Lombok. -->
+					<execution>
+						<id>default-testCompile</id>
+						<configuration>
+							<compilerArgs combine.self="override" />
+							<annotationProcessorPaths combine.self="override">
+								<path>
+									<groupId>org.projectlombok</groupId>
+									<artifactId>lombok</artifactId>
+								</path>
+							</annotationProcessorPaths>
+						</configuration>
+					</execution>
+				</executions>
 			</plugin>
 			<plugin>
 				<groupId>org.jacoco</groupId>

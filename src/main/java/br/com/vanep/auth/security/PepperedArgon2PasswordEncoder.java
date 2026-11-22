@@ -2,8 +2,10 @@ package br.com.vanep.auth.security;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import java.util.Objects;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
+import org.jspecify.annotations.Nullable;
 import org.springframework.security.crypto.argon2.Argon2PasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
@@ -31,8 +33,9 @@ public class PepperedArgon2PasswordEncoder implements PasswordEncoder {
   }
 
   @Override
-  public String encode(CharSequence rawPassword) {
-    return this.delegate.encode(applyPepper(rawPassword));
+  public String encode(@Nullable CharSequence rawPassword) {
+    return Objects.requireNonNull(
+        this.delegate.encode(applyPepper(Objects.requireNonNull(rawPassword))));
   }
 
   public String encode(CharSequence rawPassword, String userToken) {
@@ -46,7 +49,7 @@ public class PepperedArgon2PasswordEncoder implements PasswordEncoder {
   }
 
   @Override
-  public boolean matches(CharSequence rawPassword, String encodedPassword) {
+  public boolean matches(@Nullable CharSequence rawPassword, @Nullable String encodedPassword) {
     if (rawPassword == null
         || encodedPassword == null
         || encodedPassword.isBlank()
@@ -56,7 +59,8 @@ public class PepperedArgon2PasswordEncoder implements PasswordEncoder {
     return this.delegate.matches(applyPepper(rawPassword), encodedPassword);
   }
 
-  public boolean matches(CharSequence rawPassword, String encodedPassword, String userToken) {
+  public boolean matches(
+      CharSequence rawPassword, @Nullable String encodedPassword, @Nullable String userToken) {
     if (rawPassword == null || encodedPassword == null || encodedPassword.isBlank()) {
       return false;
     }
@@ -72,7 +76,7 @@ public class PepperedArgon2PasswordEncoder implements PasswordEncoder {
     return matches(rawPassword, encodedPassword);
   }
 
-  public boolean requiresUpgrade(String encodedPassword) {
+  public boolean requiresUpgrade(@Nullable String encodedPassword) {
     return encodedPassword != null && !encodedPassword.isBlank() && !isBound(encodedPassword);
   }
 

@@ -28,6 +28,7 @@ import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import org.jspecify.annotations.Nullable;
 import org.openapitools.jackson.nullable.JsonNullable;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
@@ -248,7 +249,7 @@ public class DependentService {
     model.setDocument(document);
   }
 
-  private String normalizeDocument(String document) {
+  private @Nullable String normalizeDocument(String document) {
     return StringUtils.hasText(document) ? CpfValidator.normalize(document) : null;
   }
 
@@ -352,7 +353,8 @@ public class DependentService {
         .toList();
   }
 
-  static List<Long> addressIdsOf(List<DependentModel> models, Collection<SchoolModel> schools) {
+  static @Nullable List<Long> addressIdsOf(
+      List<DependentModel> models, Collection<SchoolModel> schools) {
     return Stream.concat(
             models.stream().map(dependent -> dependent.getAddressId()),
             schools.stream().map(school -> school.getAddressId()))
@@ -361,11 +363,12 @@ public class DependentService {
         .toList();
   }
 
-  static AddressResponseDTO addressOf(Long addressId, Map<Long, AddressResponseDTO> addresses) {
+  static @Nullable AddressResponseDTO addressOf(
+      @Nullable Long addressId, Map<Long, AddressResponseDTO> addresses) {
     return addressId == null ? null : addresses.get(addressId);
   }
 
-  private DependentSchoolDTO schoolDtoFor(
+  private @Nullable DependentSchoolDTO schoolDtoFor(
       DependentModel model,
       Map<Long, SchoolModel> schoolsById,
       Map<Long, AddressResponseDTO> addresses) {
@@ -407,7 +410,7 @@ public class DependentService {
         .collect(Collectors.toMap(school -> school.getId(), school -> school));
   }
 
-  private DependentSchoolDTO toSchoolDto(Long schoolId) {
+  private @Nullable DependentSchoolDTO toSchoolDto(@Nullable Long schoolId) {
     if (schoolId == null) {
       return null;
     }
@@ -417,7 +420,7 @@ public class DependentService {
         .orElse(null);
   }
 
-  private DependentSchoolDTO toSchoolDto(SchoolModel school, AddressResponseDTO address) {
+  private DependentSchoolDTO toSchoolDto(SchoolModel school, @Nullable AddressResponseDTO address) {
     return new DependentSchoolDTO(school.getToken(), school.getName(), address);
   }
 
@@ -447,7 +450,7 @@ public class DependentService {
     }
   }
 
-  private void clearOtherDefaults(Long clientId, String excludeToken) {
+  private void clearOtherDefaults(Long clientId, @Nullable String excludeToken) {
     dependents.findByClientId(clientId).stream()
         .filter(dependent -> excludeToken == null || !dependent.getToken().equals(excludeToken))
         .filter(dependent -> dependent.isDefaultDependent())
@@ -458,7 +461,7 @@ public class DependentService {
             });
   }
 
-  private void assertDocumentAvailable(String document, String excludeToken) {
+  private void assertDocumentAvailable(@Nullable String document, @Nullable String excludeToken) {
     if (!StringUtils.hasText(document)) {
       return;
     }

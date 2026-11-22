@@ -8,6 +8,7 @@ import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.Limit;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -141,7 +142,7 @@ public interface ProposalRepository extends JpaRepository<ProposalModel, Long> {
       where proposal.id = :id
         and proposal.status = br.com.vanep.proposal.enums.ProposalStatus.SENT
       """)
-  int decline(Long id, String declineReason);
+  int decline(Long id, @Nullable String declineReason);
 
   // Holds the row until commit, so a new version and an adjustment of the same proposal queue up.
   @Modifying(flushAutomatically = true, clearAutomatically = true)
