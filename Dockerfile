@@ -39,6 +39,10 @@ RUN groupadd --gid 1500 spring && useradd --uid 1500 --gid 1500 --no-create-home
 # Production must still set VANEP_OAUTH_JWK_PRIVATE_KEY — this only keeps dev sane.
 RUN mkdir -p /app/.dev && chown -R spring:spring /app/.dev
 
+# Application log directory (logging.file.name in application-docker.properties). Created
+# and owned by spring so the container can write even when no host directory is mounted.
+RUN mkdir -p /app/logs && chown -R spring:spring /app/logs
+
 USER spring:spring
 
 COPY --from=builder /out/app.jar app.jar
