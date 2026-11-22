@@ -145,6 +145,10 @@ make up-build
 
 A API fica exposta em **`http://127.0.0.1:${APP_PORT}/`** (por defeito **8080**). Não rode **`make boot-run`** em simultâneo na mesma porta HTTP sem mudar **`APP_PORT`** ou a porta do servidor Spring — os dois serviços disputariam a **8080**.
 
+#### Logs da API no Docker
+
+O profile **`docker`** grava o log em **`/app/logs/vanep-api.log`** (além do console), com rotação: 10 MB por arquivo, 14 dias de histórico e teto de 1 GB. O compose monta esse diretório no host por **`VANEP_LOG_DIR`** (default **`./logs`**, ignorado pelo git), então o histórico sobrevive à recriação do container a cada deploy. No servidor, aponte **`VANEP_LOG_DIR`** para um diretório com dono **1500:1500** (ver `.env.example`). O log do Docker (`docker logs`) também tem rotação: 5 arquivos de 20 MB.
+
 ### 6. Testar sem subir o Postgres
 
 Os testes Maven usam **H2**; não precisam de Docker:

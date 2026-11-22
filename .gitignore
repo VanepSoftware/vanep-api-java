@@ -50,3 +50,6 @@ out/
 
 # Regras locais do Claude (privadas, por máquina)
 .claude/rules/*.local.mdc
+
+# Logs da aplicação (volume do docker-compose em dev)
+/logs/
