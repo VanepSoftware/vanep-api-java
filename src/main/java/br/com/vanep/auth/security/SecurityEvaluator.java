@@ -10,6 +10,7 @@ import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.drivercnh.repository.DriverCnhRepository;
 import br.com.vanep.driverdocument.repository.DriverDocumentRepository;
 import br.com.vanep.driverrating.repository.DriverRatingRepository;
+import br.com.vanep.notification.repository.NotificationRepository;
 import br.com.vanep.trip.repository.TripRepository;
 import br.com.vanep.vehicle.repository.VehicleRepository;
 import br.com.vanep.vehicledocument.repository.VehicleDocumentRepository;
@@ -32,6 +33,7 @@ public class SecurityEvaluator {
   private final ConversationRepository conversationRepository;
   private final ContractRepository contractRepository;
   private final VehicleDocumentRepository vehicleDocumentRepository;
+  private final NotificationRepository notificationRepository;
 
   public SecurityEvaluator(
       DriverRepository driverRepository,
@@ -46,7 +48,8 @@ public class SecurityEvaluator {
       AssistantRepository assistantRepository,
       ConversationRepository conversationRepository,
       ContractRepository contractRepository,
-      VehicleDocumentRepository vehicleDocumentRepository) {
+      VehicleDocumentRepository vehicleDocumentRepository,
+      NotificationRepository notificationRepository) {
     this.driverRepository = driverRepository;
     this.clientRepository = clientRepository;
     this.clientDriverRepository = clientDriverRepository;
@@ -60,6 +63,7 @@ public class SecurityEvaluator {
     this.conversationRepository = conversationRepository;
     this.contractRepository = contractRepository;
     this.vehicleDocumentRepository = vehicleDocumentRepository;
+    this.notificationRepository = notificationRepository;
   }
 
   public boolean isDriverOwner(String token, Authentication authentication) {
@@ -196,6 +200,16 @@ public class SecurityEvaluator {
                             uid.equals(assistant.getUser().getToken())
                                 || (assistant.getDriver() != null
                                     && uid.equals(assistant.getDriver().getUser().getToken()))))
+        .orElse(false);
+  }
+
+  public boolean isNotificationOwner(String token, Authentication authentication) {
+    return SecurityHelper.getCallerUid(authentication)
+        .flatMap(
+            uid ->
+                notificationRepository
+                    .findUserTokenByToken(token)
+                    .map(ownerUserToken -> ownerUserToken.equals(uid)))
         .orElse(false);
   }
 

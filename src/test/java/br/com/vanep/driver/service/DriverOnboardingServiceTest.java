@@ -35,6 +35,7 @@ import br.com.vanep.driverservicearea.model.DriverServiceAreaModel;
 import br.com.vanep.driverservicearea.repository.DriverServiceAreaRepository;
 import br.com.vanep.media.model.MediaFileModel;
 import br.com.vanep.schooltransportcredential.service.SchoolTransportCredentialPolicy;
+import br.com.vanep.schooltransportcredential.service.SchoolTransportCredentialService;
 import br.com.vanep.shared.document.enums.DocumentStatus;
 import br.com.vanep.shared.error.ApiProblemException;
 import br.com.vanep.user.enums.UserType;
@@ -181,7 +182,7 @@ class DriverOnboardingServiceTest {
   }
 
   private void stubQualifiedDriver() {
-    DriverCnhModel license = cnh("D", LocalDate.now().plusYears(2));
+    DriverCnhModel license = cnh("D", SchoolTransportCredentialService.today().plusYears(2));
     license.getReview().setStatus(DocumentStatus.APPROVED);
     List<DriverDocumentModel> documents = completeDriverDocuments();
     documents.forEach(document -> document.getReview().setStatus(DocumentStatus.APPROVED));
@@ -189,7 +190,7 @@ class DriverOnboardingServiceTest {
     List<VehicleDocumentModel> vanDocuments = completeVanDocuments(van);
     vanDocuments.forEach(
         document -> {
-          document.setExpiresAt(LocalDate.now().plusYears(1));
+          document.setExpiresAt(SchoolTransportCredentialService.today().plusYears(1));
           document.getReview().setStatus(DocumentStatus.APPROVED);
         });
     when(driverCnhRepository.findByDriverIdInAndSupersededAtIsNull(List.of(20L)))
@@ -212,7 +213,7 @@ class DriverOnboardingServiceTest {
     user.setAddressId(55L);
     when(vehicleRepository.findByDriverIdInAndActiveTrueOrderByCreatedAtAscIdAsc(List.of(20L)))
         .thenReturn(List.of(vehicle));
-    DriverCnhModel cnh = cnh("D", LocalDate.now().plusYears(1));
+    DriverCnhModel cnh = cnh("D", SchoolTransportCredentialService.today().plusYears(1));
     when(driverCnhRepository.findByDriverIdInAndSupersededAtIsNull(List.of(20L)))
         .thenReturn(List.of(cnh));
     stubCompleteDocuments(vehicle);
@@ -231,7 +232,7 @@ class DriverOnboardingServiceTest {
     DriverServiceAreaModel area = new DriverServiceAreaModel();
     area.setCity(new CityModel());
     when(driverServiceAreaRepository.findByDriverId(20L)).thenReturn(List.of(area));
-    DriverCnhModel cnh = cnh("D", LocalDate.now().plusYears(2));
+    DriverCnhModel cnh = cnh("D", SchoolTransportCredentialService.today().plusYears(2));
     when(driverCnhRepository.findByDriverIdInAndSupersededAtIsNull(List.of(20L)))
         .thenReturn(List.of(cnh));
   }
@@ -388,12 +389,12 @@ class DriverOnboardingServiceTest {
         .thenReturn(List.of(van));
     DriverDocumentModel expiredCourse =
         driverDocument(DriverDocumentType.SCHOOL_DRIVER_COURSE, true);
-    expiredCourse.setExpiresAt(LocalDate.now().minusDays(1));
+    expiredCourse.setExpiresAt(SchoolTransportCredentialService.today().minusDays(1));
     VehicleDocumentModel expiredInspection =
         vehicleDocument(van, VehicleDocumentType.VEHICLE_INSPECTION, true);
-    expiredInspection.setExpiresAt(LocalDate.now().minusDays(1));
+    expiredInspection.setExpiresAt(SchoolTransportCredentialService.today().minusDays(1));
     VehicleDocumentModel crlv = vehicleDocument(van, VehicleDocumentType.CRLV, true);
-    crlv.setExpiresAt(LocalDate.now());
+    crlv.setExpiresAt(SchoolTransportCredentialService.today());
     when(driverDocumentRepository.findByDriverIdInAndSupersededAtIsNull(List.of(20L)))
         .thenReturn(
             List.of(expiredCourse, driverDocument(DriverDocumentType.CRIMINAL_RECORD, true)));
@@ -501,7 +502,7 @@ class DriverOnboardingServiceTest {
   void aCnhWithoutCategoryDOrEIsReportedAsCnhCategory(String category) {
     stubDriverWithArea();
     when(driverCnhRepository.findByDriverIdInAndSupersededAtIsNull(List.of(20L)))
-        .thenReturn(List.of(cnh(category, LocalDate.now().plusYears(2))));
+        .thenReturn(List.of(cnh(category, SchoolTransportCredentialService.today().plusYears(2))));
     when(vehicleRepository.findByDriverIdInAndActiveTrueOrderByCreatedAtAscIdAsc(List.of(20L)))
         .thenReturn(List.of());
     when(driverDocumentRepository.findByDriverIdInAndSupersededAtIsNull(List.of(20L)))
@@ -530,7 +531,7 @@ class DriverOnboardingServiceTest {
   @Test
   void anExpiredPendingCnhIsReportedAsExpired() {
     stubDriverWithArea();
-    DriverCnhModel expired = cnh("D", LocalDate.now().minusDays(1));
+    DriverCnhModel expired = cnh("D", SchoolTransportCredentialService.today().minusDays(1));
     when(driverCnhRepository.findByDriverIdInAndSupersededAtIsNull(List.of(20L)))
         .thenReturn(List.of(expired));
     when(vehicleRepository.findByDriverIdInAndActiveTrueOrderByCreatedAtAscIdAsc(List.of(20L)))
@@ -545,7 +546,7 @@ class DriverOnboardingServiceTest {
   @Test
   void aPendingCnhCountsAsSent() {
     stubDriverWithArea();
-    DriverCnhModel pending = cnh("D", LocalDate.now().plusYears(2));
+    DriverCnhModel pending = cnh("D", SchoolTransportCredentialService.today().plusYears(2));
     pending.getReview().setStatus(DocumentStatus.PENDING);
     when(driverCnhRepository.findByDriverIdInAndSupersededAtIsNull(List.of(20L)))
         .thenReturn(List.of(pending));
@@ -560,7 +561,7 @@ class DriverOnboardingServiceTest {
   @Test
   void aRejectedCnhIsReportedAsCnhRejected() {
     stubDriverWithArea();
-    DriverCnhModel rejected = cnh("D", LocalDate.now().plusYears(2));
+    DriverCnhModel rejected = cnh("D", SchoolTransportCredentialService.today().plusYears(2));
     rejected.getReview().setStatus(DocumentStatus.REJECTED);
     when(driverCnhRepository.findByDriverIdInAndSupersededAtIsNull(List.of(20L)))
         .thenReturn(List.of(rejected));
@@ -580,7 +581,7 @@ class DriverOnboardingServiceTest {
     when(userService.requireByTokenAndType("user-token-10", UserType.DRIVER)).thenReturn(user);
     when(driverRepository.findByUserId(10L)).thenReturn(Optional.of(driver));
     stubReadyToSubmit(vehicle(1L, "ABC1D23"));
-    DriverCnhModel rejected = cnh("D", LocalDate.now().plusYears(2));
+    DriverCnhModel rejected = cnh("D", SchoolTransportCredentialService.today().plusYears(2));
     rejected.getReview().setStatus(DocumentStatus.REJECTED);
     when(driverCnhRepository.findByDriverIdInAndSupersededAtIsNull(List.of(20L)))
         .thenReturn(List.of(rejected));
@@ -597,7 +598,7 @@ class DriverOnboardingServiceTest {
   void aCnhWithCategoryAdCompletesTheStep() {
     stubDriverWithArea();
     when(driverCnhRepository.findByDriverIdInAndSupersededAtIsNull(List.of(20L)))
-        .thenReturn(List.of(cnh("AD", LocalDate.now().plusYears(2))));
+        .thenReturn(List.of(cnh("AD", SchoolTransportCredentialService.today().plusYears(2))));
     when(vehicleRepository.findByDriverIdInAndActiveTrueOrderByCreatedAtAscIdAsc(List.of(20L)))
         .thenReturn(List.of());
     when(driverDocumentRepository.findByDriverIdInAndSupersededAtIsNull(List.of(20L)))
@@ -612,7 +613,7 @@ class DriverOnboardingServiceTest {
     when(driverRepository.findByUserId(10L)).thenReturn(Optional.of(driver));
     stubReadyToSubmit(vehicle(1L, "ABC1D23"));
     when(driverCnhRepository.findByDriverIdInAndSupersededAtIsNull(List.of(20L)))
-        .thenReturn(List.of(cnh("B", LocalDate.now().plusYears(2))));
+        .thenReturn(List.of(cnh("B", SchoolTransportCredentialService.today().plusYears(2))));
 
     assertThatThrownBy(() -> service.submitOnboarding("user-token-10"))
         .isInstanceOf(ResponseStatusException.class)
@@ -662,7 +663,7 @@ class DriverOnboardingServiceTest {
     when(vehicleRepository.findByDriverIdInAndActiveTrueOrderByCreatedAtAscIdAsc(List.of(20L)))
         .thenReturn(List.of(complete, bare));
     when(driverCnhRepository.findByDriverIdInAndSupersededAtIsNull(List.of(20L)))
-        .thenReturn(List.of(cnh("D", LocalDate.now().plusYears(1))));
+        .thenReturn(List.of(cnh("D", SchoolTransportCredentialService.today().plusYears(1))));
     when(driverDocumentRepository.findByDriverIdInAndSupersededAtIsNull(List.of(20L)))
         .thenReturn(completeDriverDocuments());
     when(vehicleDocumentRepository.findUnsupersededByVehicleIdIn(List.of(1L, 2L)))
@@ -790,7 +791,7 @@ class DriverOnboardingServiceTest {
     user.setAddressId(55L);
     when(vehicleRepository.findByDriverIdInAndActiveTrueOrderByCreatedAtAscIdAsc(List.of(20L)))
         .thenReturn(List.of());
-    DriverCnhModel cnh = cnh("D", LocalDate.now().plusYears(1));
+    DriverCnhModel cnh = cnh("D", SchoolTransportCredentialService.today().plusYears(1));
     when(driverCnhRepository.findByDriverIdInAndSupersededAtIsNull(List.of(20L)))
         .thenReturn(List.of(cnh));
     when(driverDocumentRepository.findByDriverIdInAndSupersededAtIsNull(List.of(20L)))
@@ -815,7 +816,7 @@ class DriverOnboardingServiceTest {
     user.setAddressId(55L);
     when(vehicleRepository.findByDriverIdInAndActiveTrueOrderByCreatedAtAscIdAsc(List.of(20L)))
         .thenReturn(List.of());
-    DriverCnhModel cnh = cnh("D", LocalDate.now().plusYears(1));
+    DriverCnhModel cnh = cnh("D", SchoolTransportCredentialService.today().plusYears(1));
     when(driverCnhRepository.findByDriverIdInAndSupersededAtIsNull(List.of(20L)))
         .thenReturn(List.of(cnh));
     when(driverDocumentRepository.findByDriverIdInAndSupersededAtIsNull(List.of(20L)))
@@ -837,7 +838,7 @@ class DriverOnboardingServiceTest {
     when(driverRepository.findByUserId(10L)).thenReturn(Optional.of(driver));
     VehicleModel van = vehicle(1L, "ABC1D23");
     stubReadyToSubmit(van);
-    DriverCnhModel expired = cnh("D", LocalDate.now().minusDays(1));
+    DriverCnhModel expired = cnh("D", SchoolTransportCredentialService.today().minusDays(1));
     expired.getReview().setStatus(DocumentStatus.APPROVED);
     when(driverCnhRepository.findByDriverIdInAndSupersededAtIsNull(List.of(20L)))
         .thenReturn(List.of(expired));

@@ -12,6 +12,7 @@ import br.com.vanep.contract.dto.ContractResponseDTO;
 import br.com.vanep.contract.dto.ContractUpdateRequestDTO;
 import br.com.vanep.contract.enums.ContractStatus;
 import br.com.vanep.contract.enums.ContractTermsViolation;
+import br.com.vanep.contract.event.ContractCreatedEvent;
 import br.com.vanep.contract.mapper.ContractMapper;
 import br.com.vanep.contract.model.ContractItemModel;
 import br.com.vanep.contract.model.ContractModel;
@@ -33,6 +34,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -58,6 +60,7 @@ public class ContractService {
   private final LinkStatusPolicy linkStatusPolicy;
   private final ContractMapper mapper;
   private final UnlinkedPassengerService unlinkedPassengers;
+  private final ApplicationEventPublisher events;
   private final MessageSource messages;
 
   public ContractService(
@@ -73,6 +76,7 @@ public class ContractService {
       LinkStatusPolicy linkStatusPolicy,
       ContractMapper mapper,
       UnlinkedPassengerService unlinkedPassengers,
+      ApplicationEventPublisher events,
       MessageSource messages) {
     this.contracts = contracts;
     this.items = items;
@@ -86,6 +90,7 @@ public class ContractService {
     this.linkStatusPolicy = linkStatusPolicy;
     this.mapper = mapper;
     this.unlinkedPassengers = unlinkedPassengers;
+    this.events = events;
     this.messages = messages;
   }
 
@@ -114,6 +119,7 @@ public class ContractService {
     ContractModel saved = writeKeepingOneActiveContract(() -> contracts.save(contract));
     recomputeLinkStatus(link);
     retireMergedPassengers(saved, saved.getItems());
+    events.publishEvent(new ContractCreatedEvent(saved.getToken(), link.getToken()));
     return mapper.toResponse(saved, saved.getItems());
   }
 

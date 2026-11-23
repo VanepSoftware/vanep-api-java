@@ -25,6 +25,7 @@ import br.com.vanep.driverdocument.model.DriverDocumentModel;
 import br.com.vanep.driverdocument.repository.DriverDocumentRepository;
 import br.com.vanep.media.model.MediaFileModel;
 import br.com.vanep.media.repository.MediaFileRepository;
+import br.com.vanep.schooltransportcredential.service.SchoolTransportCredentialService;
 import br.com.vanep.shared.document.enums.DocumentStatus;
 import br.com.vanep.state.model.StateModel;
 import br.com.vanep.state.repository.StateRepository;
@@ -38,7 +39,6 @@ import br.com.vanep.vehicledocument.model.VehicleDocumentModel;
 import br.com.vanep.vehicledocument.repository.VehicleDocumentRepository;
 import java.math.BigDecimal;
 import java.time.Instant;
-import java.time.LocalDate;
 import java.util.List;
 import java.util.Locale;
 import org.junit.jupiter.api.BeforeEach;
@@ -192,8 +192,8 @@ class DriverOnboardingControllerTest {
     cnh.setDriver(driver);
     cnh.setRegistrationNumber("12345678901");
     cnh.setCategory("D");
-    cnh.setIssueDate(LocalDate.now().minusYears(2));
-    cnh.setValidUntil(LocalDate.now().plusYears(3));
+    cnh.setIssueDate(SchoolTransportCredentialService.today().minusYears(2));
+    cnh.setValidUntil(SchoolTransportCredentialService.today().plusYears(3));
     cnh.setActive(true);
     cnh.getReview().setStatus(DocumentStatus.APPROVED);
     cnh.setFile(saveFile("cnh"));
@@ -214,7 +214,7 @@ class DriverOnboardingControllerTest {
       doc.setDocumentType(type);
       doc.setDocumentNumber(
           type == VehicleDocumentType.SCHOOL_VEHICLE_AUTHORIZATION ? "AUT-1" : null);
-      doc.setExpiresAt(LocalDate.now().plusMonths(6));
+      doc.setExpiresAt(SchoolTransportCredentialService.today().plusMonths(6));
       doc.setFile(saveFile(type.name().toLowerCase()));
       vehicleDocuments.save(doc);
     }
@@ -534,7 +534,7 @@ class DriverOnboardingControllerTest {
             .filter(document -> document.getDocumentType() == DriverDocumentType.CRIMINAL_RECORD)
             .findFirst()
             .orElseThrow();
-    criminalRecord.setExpiresAt(LocalDate.now().minusDays(1));
+    criminalRecord.setExpiresAt(SchoolTransportCredentialService.today().minusDays(1));
     driverDocuments.save(criminalRecord);
 
     mockMvc

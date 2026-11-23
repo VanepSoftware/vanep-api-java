@@ -442,6 +442,61 @@ VANEP_MAIL_ENABLED=false
 
 ---
 
+## Notificações (no app e push pelo Firebase Cloud Messaging)
+
+Cada evento abaixo vira uma **notificação gravada** na tabela `notification`, listada na aba de notificações do app, e um **push** pelo FCM (API HTTP v1, via `firebase-admin`) para todos os aparelhos registrados do usuário. Tudo acontece de forma assíncrona e **depois do commit**: uma falha do FCM nunca desfaz a operação de negócio, e uma transação desfeita não gera nem notificação nem push. A notificação é gravada antes do push, então aparece no app mesmo com o push desligado ou o FCM fora do ar.
+
+### Configuração
+
+| Variável | Default | Descrição |
+| --- | --- | --- |
+| `FIREBASE_CREDENTIALS_PATH` | *(vazio)* | Caminho do JSON da conta de serviço do Firebase. Vazio ou ausente: push desligado (aviso no log, a aplicação sobe normal). Apontando para arquivo ausente ou inválido: a aplicação não sobe. |
+
+- **Maven na máquina:** a aplicação lê o caminho do `.env` direto.
+- **Docker Compose:** o `.env` guarda o caminho **no host**. O compose monta o arquivo como somente leitura em `/run/secrets/firebase-credentials.json` e passa esse caminho para o container. O arquivo precisa ser legível pelo UID 1500 (`chown root:1500` + `chmod 640`).
+- O JSON é credencial: nunca entra no repositório. O `.env.example` traz o passo a passo.
+- Os testes nunca falam com o Firebase: sem a variável no profile de teste, o push fica desligado, e os testes de envio usam o `FirebaseMessaging` mockado.
+
+### Registro de aparelho
+
+Os dois endpoints exigem usuário autenticado (qualquer tipo) e respondem `204`.
+
+| Método | Rota | Corpo | Efeito |
+| --- | --- | --- | --- |
+| `POST` | `/api/devices` | `{"fcmToken": "...", "platform": "ANDROID" \| "IOS" \| "WEB"}` | Registra o token para o usuário logado. Idempotente. Um token já registrado por outro usuário passa para quem logou por último no aparelho. |
+| `DELETE` | `/api/devices/{fcmToken}` | — | Remove o token, se for do usuário logado (chamar no logout). Token de outro usuário ou desconhecido: nada muda. |
+
+Tokens que o FCM devolve como `UNREGISTERED` ou `INVALID_ARGUMENT` são removidos automaticamente no envio.
+
+### Notificações no app
+
+Todos os endpoints exigem usuário autenticado e só enxergam as notificações de quem chama.
+
+| Método | Rota | Resposta |
+| --- | --- | --- |
+| `GET` | `/api/notifications?page=&size=` | Página (padrão 20), mais recentes primeiro: `token`, `type`, `title`, `body`, `data`, `createdAt`, `readAt` (`null` = não lida). |
+| `GET` | `/api/notifications/unread-count` | `{"count": n}`, para o badge. |
+| `POST` | `/api/notifications/{token}/read` | `204`. Idempotente: mantém o primeiro `readAt`. Notificação de outro usuário ou desconhecida: `403`. |
+| `POST` | `/api/notifications/read-all` | `204`. Marca como lidas todas as do usuário. |
+
+### Eventos e `data.type`
+
+Todo push leva `data.type`, que o app usa para escolher a tela, `data.notificationToken`, para marcar a notificação como lida ao tocar, e o token do recurso quando há um. A notificação gravada guarda o mesmo `type` e os tokens do recurso em `data`.
+
+| Evento | Quem recebe | `data.type` | Outros campos de `data` |
+| --- | --- | --- | --- |
+| Nova mensagem no chat | A outra parte da conversa | `CHAT_MESSAGE` | `conversationToken` |
+| Nova proposta | Cliente | `PROPOSAL_RECEIVED` | `proposalToken` |
+| Proposta aceita | Motorista | `PROPOSAL_ACCEPTED` | `proposalToken` |
+| Proposta recusada | Motorista | `PROPOSAL_DECLINED` | `proposalToken` |
+| Contrato criado | Cliente e motorista | `CONTRACT_CREATED` | `contractToken` |
+| Cadastro do motorista aprovado | Motorista | `DRIVER_APPROVED` | — |
+| Cadastro do motorista recusado | Motorista | `DRIVER_REJECTED` | — |
+
+Título e corpo vêm de `messages_pt_BR.properties` (chaves `notification.*`) e ficam gravados como foram enviados. O push de chat leva o nome de quem enviou, mas **não** o texto da mensagem, que é cifrado no banco e não deve trafegar pelo FCM.
+
+---
+
 ## Banco de dados (PostgreSQL + Flyway)
 
 - **Flyway** aplica migrações em `src/main/resources/db/migration` na subida da aplicação. O projeto inclui **`flyway-database-postgresql`** no Maven (PostgreSQL 17.x com Flyway 10+).
