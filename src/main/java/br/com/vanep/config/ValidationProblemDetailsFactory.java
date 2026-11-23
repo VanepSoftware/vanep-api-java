@@ -5,6 +5,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.stereotype.Component;
@@ -45,7 +46,8 @@ public class ValidationProblemDetailsFactory {
     return new ValidationError(field, message, error.getCode());
   }
 
-  private record ValidationError(String field, String message, String constraint) {
+  private record ValidationError(
+      @Nullable String field, @Nullable String message, @Nullable String constraint) {
 
     int priority() {
       return REQUIRED_CONSTRAINTS.contains(constraint) ? 0 : 1;

@@ -191,8 +191,11 @@ pr:
 %:
 	@:
 
+# Spotless (formatação) + NullAway (null-safety via Error Prone, no compile).
+# Mesmo resultado em qualquer IDE e na CI, ao contrário dos warnings do Eclipse/JDT.
 lint:
 	$(MVNW) spotless:check
+	$(MVNW) -B -q compile
 
 lint-fix:
 	$(MVNW) spotless:apply

@@ -6,6 +6,8 @@ import br.com.vanep.places.exception.PlaceNotFoundException;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import java.time.Duration;
+import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -38,7 +40,8 @@ public class PlacesClient {
             .build();
   }
 
-  public PlaceDetailsResponseDTO findPlaceDetails(String placeId, String sessionToken) {
+  public PlaceDetailsResponseDTO findPlaceDetails(
+      @Nullable String placeId, @Nullable String sessionToken) {
     return findPlaceDetails(placeId, sessionToken, FIELD_MASK);
   }
 
@@ -58,7 +61,7 @@ public class PlacesClient {
   }
 
   private PlaceDetailsResponseDTO findPlaceDetails(
-      String placeId, String sessionToken, String fieldMask) {
+      @Nullable String placeId, @Nullable String sessionToken, String fieldMask) {
     if (placeId == null || placeId.isBlank()) {
       throw new IllegalArgumentException("placeId não pode ser nulo ou vazio.");
     }
@@ -78,12 +81,12 @@ public class PlacesClient {
     return fetched;
   }
 
-  boolean hasSession(String sessionToken) {
+  boolean hasSession(@Nullable String sessionToken) {
     return sessionToken != null && !sessionToken.isBlank();
   }
 
   private PlaceDetailsResponseDTO fetchFromGoogle(
-      String placeId, String sessionToken, String fieldMask) {
+      String placeId, @Nullable String sessionToken, String fieldMask) {
     try {
       PlaceDetailsResponseDTO response =
           restClient
@@ -92,7 +95,7 @@ public class PlacesClient {
                   uriBuilder -> {
                     uriBuilder.path("/v1/places/{placeId}");
                     if (hasSession(sessionToken)) {
-                      uriBuilder.queryParam("sessionToken", sessionToken);
+                      uriBuilder.queryParam("sessionToken", Objects.requireNonNull(sessionToken));
                     }
                     return uriBuilder.build(placeId);
                   })

@@ -6,20 +6,21 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 
 public record ServiceRequestClientResponseDTO(
     String token,
     String clientDriverToken,
-    String conversationToken,
+    @Nullable String conversationToken,
     String driverToken,
     String driverName,
-    BigDecimal driverRating,
+    @Nullable BigDecimal driverRating,
     ServiceRequestStatus status,
     LocalDate desiredStartDate,
-    String notes,
+    @Nullable String notes,
     String declineReason,
     Instant expiresAt,
-    ProposalSummaryResponseDTO currentProposal,
+    @Nullable ProposalSummaryResponseDTO currentProposal,
     List<ServiceRequestClientItemResponseDTO> items,
     Instant createdAt,
     Instant updatedAt) {}

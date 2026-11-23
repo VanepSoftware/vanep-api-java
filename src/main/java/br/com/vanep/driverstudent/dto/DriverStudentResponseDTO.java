@@ -7,6 +7,7 @@ import br.com.vanep.schedule.dto.ScheduleSlotResponseDTO;
 import br.com.vanep.shared.enums.SchoolShift;
 import java.time.Instant;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 
 public record DriverStudentResponseDTO(
     String token,
@@ -14,10 +15,10 @@ public record DriverStudentResponseDTO(
     String name,
     String schoolToken,
     String schoolName,
-    SchoolShift schoolShift,
+    @Nullable SchoolShift schoolShift,
     List<ScheduleSlotResponseDTO> slots,
-    String vehicleToken,
-    String dependentToken,
+    @Nullable String vehicleToken,
+    @Nullable String dependentToken,
     FamilyStatus familyStatus,
-    Instant invitedAt,
-    FamilyMatchResponseDTO familyMatch) {}
+    @Nullable Instant invitedAt,
+    @Nullable FamilyMatchResponseDTO familyMatch) {}

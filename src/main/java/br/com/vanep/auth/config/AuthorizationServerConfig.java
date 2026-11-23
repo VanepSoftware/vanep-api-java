@@ -13,6 +13,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -141,7 +142,7 @@ public class AuthorizationServerConfig {
    */
   private static RegisteredClient.Builder buildConfidentialClient(
       String clientId,
-      String encodedSecret,
+      @Nullable String encodedSecret,
       ClientSettings clientSettings,
       TokenSettings tokenSettings) {
     return buildClient(clientId, clientSettings, tokenSettings)

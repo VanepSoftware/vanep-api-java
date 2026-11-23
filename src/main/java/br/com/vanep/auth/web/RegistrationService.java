@@ -23,6 +23,7 @@ import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
 import java.time.Instant;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -78,7 +79,8 @@ public class RegistrationService {
   }
 
   /** Shared with the Google sign-up completion, so every channel creates the same role record. */
-  public void createRoleRecord(UserModel user, UserType type, DriverSignupFields driverFields) {
+  public void createRoleRecord(
+      UserModel user, UserType type, @Nullable DriverSignupFields driverFields) {
     switch (type) {
       case CLIENT -> {
         ClientModel client = new ClientModel();
@@ -124,7 +126,7 @@ public class RegistrationService {
     return users.save(user);
   }
 
-  public void rejectDuplicates(String email, String normalizedDocument) {
+  public void rejectDuplicates(@Nullable String email, String normalizedDocument) {
     if (email != null && users.existsByEmail(email)) {
       throw new SignupDuplicateException(
           "email", "auth.signup.email.duplicate", AuthErrorCode.EMAIL_DUPLICATE);

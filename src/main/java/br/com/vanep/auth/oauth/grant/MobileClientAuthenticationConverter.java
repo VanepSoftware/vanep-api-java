@@ -2,6 +2,7 @@ package br.com.vanep.auth.oauth.grant;
 
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.Set;
+import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.core.Authentication;
@@ -30,6 +31,7 @@ public final class MobileClientAuthenticationConverter implements Authentication
   private final RequestMatcher tokenEndpointMatcher;
   private final RequestMatcher revocationEndpointMatcher;
 
+  @Nullable
   public MobileClientAuthenticationConverter(AuthorizationServerSettings settings) {
     this.tokenEndpointMatcher =
         PathPatternRequestMatcher.withDefaults()
@@ -45,7 +47,7 @@ public final class MobileClientAuthenticationConverter implements Authentication
    * client gets the OAuth {@code invalid_client} body instead of the login redirect.
    */
   @Override
-  public Authentication convert(HttpServletRequest request) {
+  public @Nullable Authentication convert(HttpServletRequest request) {
     if (!isSupportedTokenRequest(request) && !isRevocationRequest(request)) {
       return null;
     }
@@ -70,7 +72,7 @@ public final class MobileClientAuthenticationConverter implements Authentication
         && StringUtils.hasText(request.getParameter(OAuth2ParameterNames.TOKEN));
   }
 
-  private String soleClientId(HttpServletRequest request) {
+  private @Nullable String soleClientId(HttpServletRequest request) {
     String[] clientIds = request.getParameterValues(OAuth2ParameterNames.CLIENT_ID);
     if (clientIds == null
         || clientIds.length != 1

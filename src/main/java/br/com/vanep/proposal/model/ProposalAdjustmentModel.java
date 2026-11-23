@@ -13,6 +13,7 @@ import java.time.Instant;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
+import org.jspecify.annotations.Nullable;
 
 @Entity
 @Table(name = "proposal_adjustment")
@@ -31,10 +32,10 @@ public class ProposalAdjustmentModel {
   private ProposalAdjustmentField field;
 
   @Column(name = "suggested_value", length = 100, updatable = false)
-  private String suggestedValue;
+  private @Nullable String suggestedValue;
 
   @Column(length = 500, updatable = false)
-  private String note;
+  private @Nullable String note;
 
   @CreationTimestamp
   @Column(name = "created_at", nullable = false, updatable = false)

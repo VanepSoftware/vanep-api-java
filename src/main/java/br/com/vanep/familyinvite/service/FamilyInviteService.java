@@ -28,6 +28,7 @@ import br.com.vanep.user.service.UserService;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.function.Supplier;
+import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
@@ -153,7 +154,7 @@ public class FamilyInviteService {
     }
   }
 
-  FamilyInviteModel newInvite(Long driverId, Long passengerId) {
+  FamilyInviteModel newInvite(Long driverId, @Nullable Long passengerId) {
     FamilyInviteModel invite = new FamilyInviteModel();
     invite.setDriverId(driverId);
     invite.setUnlinkedPassengerId(passengerId);
@@ -178,7 +179,7 @@ public class FamilyInviteService {
     return inviteBaseUrl.endsWith("/") ? inviteBaseUrl + code : inviteBaseUrl + "/" + code;
   }
 
-  static String firstNameOf(String name) {
+  static @Nullable String firstNameOf(@Nullable String name) {
     if (name == null || name.isBlank()) {
       return null;
     }

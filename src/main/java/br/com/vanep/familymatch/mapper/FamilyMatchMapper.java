@@ -4,6 +4,7 @@ import br.com.vanep.familymatch.dto.FamilyMatchResponseDTO;
 import br.com.vanep.familymatch.dto.FamilyMatchSummaryRow;
 import java.time.LocalDate;
 import java.time.Period;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -18,7 +19,7 @@ public class FamilyMatchMapper {
         row.clientName());
   }
 
-  public Integer ageOn(LocalDate birthDate, LocalDate today) {
+  public @Nullable Integer ageOn(LocalDate birthDate, LocalDate today) {
     if (birthDate == null || birthDate.isAfter(today)) {
       return null;
     }

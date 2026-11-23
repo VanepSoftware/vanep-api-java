@@ -3,6 +3,7 @@ package br.com.vanep.user.exception;
 import br.com.vanep.user.enums.ProfileErrorCode;
 import java.io.Serial;
 import java.time.Instant;
+import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpStatus;
 
 public abstract class ProfileErrorException extends RuntimeException {
@@ -12,10 +13,14 @@ public abstract class ProfileErrorException extends RuntimeException {
   private final HttpStatus status;
   private final ProfileErrorCode code;
   private final String field;
-  private final Instant retryAfter;
+  private final @Nullable Instant retryAfter;
 
   protected ProfileErrorException(
-      String message, HttpStatus status, ProfileErrorCode code, String field, Instant retryAfter) {
+      String message,
+      HttpStatus status,
+      ProfileErrorCode code,
+      String field,
+      @Nullable Instant retryAfter) {
     super(message);
     this.status = status;
     this.code = code;
@@ -35,7 +40,7 @@ public abstract class ProfileErrorException extends RuntimeException {
     return field;
   }
 
-  public Instant getRetryAfter() {
+  public @Nullable Instant getRetryAfter() {
     return retryAfter;
   }
 }

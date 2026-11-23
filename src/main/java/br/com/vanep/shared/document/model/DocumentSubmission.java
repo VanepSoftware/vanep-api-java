@@ -4,6 +4,7 @@ import br.com.vanep.media.model.MediaFileModel;
 import br.com.vanep.shared.document.enums.DocumentKind;
 import java.time.Instant;
 import java.time.LocalDate;
+import org.jspecify.annotations.Nullable;
 
 public interface DocumentSubmission {
 
@@ -11,9 +12,9 @@ public interface DocumentSubmission {
 
   Instant getCreatedAt();
 
-  LocalDate expiresOn();
+  @Nullable LocalDate expiresOn();
 
-  String number();
+  @Nullable String number();
 
   DocumentKind kind();
 
@@ -31,7 +32,7 @@ public interface DocumentSubmission {
 
   void setSupersededAt(Instant supersededAt);
 
-  MediaFileModel getReviewedFile();
+  @Nullable MediaFileModel getReviewedFile();
 
-  void setReviewedFile(MediaFileModel file);
+  void setReviewedFile(@Nullable MediaFileModel file);
 }

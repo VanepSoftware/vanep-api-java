@@ -29,6 +29,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.SoftDelete;
 import org.hibernate.annotations.SoftDeleteType;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.jspecify.annotations.Nullable;
 
 @Entity
 @Table(name = "driver_document")
@@ -53,14 +54,14 @@ public class DriverDocumentModel implements DocumentSubmission {
   private DriverDocumentType documentType;
 
   @Column(name = "document_number", length = 64)
-  private String documentNumber;
+  private @Nullable String documentNumber;
 
   @ManyToOne(fetch = FetchType.EAGER)
   @JoinColumn(name = "file_media_id")
-  private MediaFileModel file;
+  private @Nullable MediaFileModel file;
 
   @Column(name = "expires_at")
-  private LocalDate expiresAt;
+  private @Nullable LocalDate expiresAt;
 
   @Embedded private DocumentReview review = DocumentReview.pending();
 
@@ -91,22 +92,22 @@ public class DriverDocumentModel implements DocumentSubmission {
   }
 
   @Override
-  public String number() {
+  public @Nullable String number() {
     return documentNumber;
   }
 
   @Override
-  public LocalDate expiresOn() {
+  public @Nullable LocalDate expiresOn() {
     return expiresAt;
   }
 
   @Override
-  public MediaFileModel getReviewedFile() {
+  public @Nullable MediaFileModel getReviewedFile() {
     return file;
   }
 
   @Override
-  public void setReviewedFile(MediaFileModel file) {
+  public void setReviewedFile(@Nullable MediaFileModel file) {
     this.file = file;
   }
 

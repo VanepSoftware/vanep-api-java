@@ -9,6 +9,7 @@ import br.com.vanep.vehicle.model.VehicleModel;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 
 public record DriverComplianceDTO(
     List<RequirementDTO> driverRequirements,
@@ -17,11 +18,11 @@ public record DriverComplianceDTO(
     List<BlockerDTO> blockers,
     NextAction nextAction,
     int pendingReviewCount,
-    Instant oldestPendingAt,
+    @Nullable Instant oldestPendingAt,
     int rejectedCount,
     int missingCount,
     int expiredCount,
-    LocalDate nextExpiryOn) {
+    @Nullable LocalDate nextExpiryOn) {
 
   public List<VehicleDTO> qualifiedVehicles() {
     return vehicles.stream().filter(vehicle -> vehicle.qualified()).toList();
@@ -39,16 +40,16 @@ public record DriverComplianceDTO(
       boolean optional,
       boolean satisfied,
       ComplianceState state,
-      DocumentSubmission current,
-      DocumentSubmission pending) {}
+      @Nullable DocumentSubmission current,
+      @Nullable DocumentSubmission pending) {}
 
   public record VehicleDTO(
       VehicleModel vehicle, boolean qualified, List<RequirementDTO> requirements) {}
 
   public record BlockerDTO(
       BlockerKind kind,
-      CredentialRequirement requirement,
-      ComplianceState state,
-      String vehicleToken,
-      String plate) {}
+      @Nullable CredentialRequirement requirement,
+      @Nullable ComplianceState state,
+      @Nullable String vehicleToken,
+      @Nullable String plate) {}
 }

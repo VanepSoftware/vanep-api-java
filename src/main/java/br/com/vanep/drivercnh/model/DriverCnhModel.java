@@ -26,6 +26,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.SoftDelete;
 import org.hibernate.annotations.SoftDeleteType;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.jspecify.annotations.Nullable;
 
 @Entity
 @Table(name = "driver_cnh")
@@ -46,29 +47,29 @@ public class DriverCnhModel implements DocumentSubmission {
   private DriverModel driver;
 
   @Column(name = "registration_number", length = 20)
-  private String registrationNumber;
+  private @Nullable String registrationNumber;
 
   @Column(length = 5)
-  private String category;
+  private @Nullable String category;
 
   @Column(name = "issue_date")
-  private LocalDate issueDate;
+  private @Nullable LocalDate issueDate;
 
   @Column(name = "valid_until")
-  private LocalDate validUntil;
+  private @Nullable LocalDate validUntil;
 
   @Column(name = "first_license_date")
-  private LocalDate firstLicenseDate;
+  private @Nullable LocalDate firstLicenseDate;
 
   @Column(name = "security_number", length = 20)
-  private String securityNumber;
+  private @Nullable String securityNumber;
 
   @Column(name = "issuing_state", length = 2)
-  private String issuingState;
+  private @Nullable String issuingState;
 
   @ManyToOne(fetch = FetchType.EAGER)
   @JoinColumn(name = "file_media_id")
-  private MediaFileModel file;
+  private @Nullable MediaFileModel file;
 
   @Embedded private DocumentReview review = DocumentReview.pending();
 
@@ -99,22 +100,22 @@ public class DriverCnhModel implements DocumentSubmission {
   }
 
   @Override
-  public String number() {
+  public @Nullable String number() {
     return registrationNumber;
   }
 
   @Override
-  public LocalDate expiresOn() {
+  public @Nullable LocalDate expiresOn() {
     return validUntil;
   }
 
   @Override
-  public MediaFileModel getReviewedFile() {
+  public @Nullable MediaFileModel getReviewedFile() {
     return file;
   }
 
   @Override
-  public void setReviewedFile(MediaFileModel file) {
+  public void setReviewedFile(@Nullable MediaFileModel file) {
     this.file = file;
   }
 

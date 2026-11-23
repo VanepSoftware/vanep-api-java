@@ -12,6 +12,7 @@ import br.com.vanep.unlinkedpassenger.model.UnlinkedPassengerModel;
 import br.com.vanep.unlinkedpassenger.repository.UnlinkedPassengerRepository;
 import br.com.vanep.unlinkedpassenger.service.UnlinkedPassengerService;
 import java.time.Instant;
+import java.util.Objects;
 import java.util.Optional;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
@@ -67,7 +68,7 @@ public class FamilyMatchService {
     }
     UnlinkedPassengerModel passenger =
         passengers
-            .findById(invite.getUnlinkedPassengerId())
+            .findById(Objects.requireNonNull(invite.getUnlinkedPassengerId()))
             .orElseThrow(
                 () -> new ResponseStatusException(HttpStatus.NOT_FOUND, notFoundMessage()));
     if (passenger.getDependentId() != null) {

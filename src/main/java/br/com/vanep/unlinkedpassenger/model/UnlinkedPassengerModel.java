@@ -27,6 +27,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.SoftDelete;
 import org.hibernate.annotations.SoftDeleteType;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.jspecify.annotations.Nullable;
 
 @Entity
 @Table(name = "unlinked_passenger")
@@ -63,10 +64,10 @@ public class UnlinkedPassengerModel {
   private AddressModel address;
 
   @Column(length = 500)
-  private String notes;
+  private @Nullable String notes;
 
   @Column(name = "vehicle_id")
-  private Long vehicleId;
+  private @Nullable Long vehicleId;
 
   @Column(name = "dependent_id")
   private Long dependentId;

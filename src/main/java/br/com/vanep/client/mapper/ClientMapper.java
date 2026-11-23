@@ -6,12 +6,13 @@ import br.com.vanep.client.dto.ClientResponseDTO;
 import br.com.vanep.client.model.ClientModel;
 import br.com.vanep.media.web.MediaUrl;
 import br.com.vanep.user.dto.UserMeResponseDTO;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 @Component
 public class ClientMapper {
 
-  public ClientResponseDTO toResponse(ClientModel client, AddressResponseDTO address) {
+  public ClientResponseDTO toResponse(ClientModel client, @Nullable AddressResponseDTO address) {
     return new ClientResponseDTO(
         client.getToken(),
         client.getUser().getName(),
@@ -24,12 +25,12 @@ public class ClientMapper {
   }
 
   public ClientMeSummaryResponseDTO toMeSummary(
-      ClientModel client, UserMeResponseDTO user, AddressResponseDTO address) {
+      ClientModel client, UserMeResponseDTO user, @Nullable AddressResponseDTO address) {
     return new ClientMeSummaryResponseDTO(
         client.getToken(), photoUrl(client), client.getRating(), client.isActive(), user, address);
   }
 
-  private String photoUrl(ClientModel client) {
+  private @Nullable String photoUrl(ClientModel client) {
     return MediaUrl.of("/api/clients", client.getToken(), "photo", client.getPhoto());
   }
 }

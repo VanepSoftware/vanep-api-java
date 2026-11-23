@@ -5,15 +5,16 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalTime;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 
 public record DriverResponseDTO(
     String token,
     String name,
     String email,
-    String phone,
+    @Nullable String phone,
     String document,
-    String photo,
-    BigDecimal rating,
+    @Nullable String photo,
+    @Nullable BigDecimal rating,
     String bio,
     String cnpj,
     Integer experienceYears,

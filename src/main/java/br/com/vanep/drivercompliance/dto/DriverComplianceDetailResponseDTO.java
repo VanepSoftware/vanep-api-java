@@ -14,6 +14,7 @@ import br.com.vanep.shared.document.enums.DocumentStatus;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 
 public record DriverComplianceDetailResponseDTO(
     LocalDate asOf,
@@ -28,18 +29,18 @@ public record DriverComplianceDetailResponseDTO(
       String token,
       String name,
       String email,
-      String phone,
+      @Nullable String phone,
       String document,
       LocalDate birthDate,
-      String city,
+      @Nullable String city,
       Integer experienceYears,
       Instant createdAt,
       DriverApprovalStatus approvalStatus,
       Instant submittedAt,
-      DriverRejectionReason rejectionReasonCode,
-      String rejectionReason,
+      @Nullable DriverRejectionReason rejectionReasonCode,
+      @Nullable String rejectionReason,
       Instant reviewedAt,
-      ActorResponseDTO reviewedBy) {}
+      @Nullable ActorResponseDTO reviewedBy) {}
 
   public record DecisionResponse(
       boolean canApprove,
@@ -52,15 +53,15 @@ public record DriverComplianceDetailResponseDTO(
       boolean optional,
       boolean satisfied,
       ComplianceState state,
-      SubmissionResponseDTO current,
-      SubmissionResponseDTO pending,
-      LastDecisionResponse lastDecision) {}
+      @Nullable SubmissionResponseDTO current,
+      @Nullable SubmissionResponseDTO pending,
+      @Nullable LastDecisionResponse lastDecision) {}
 
   public record LastDecisionResponse(
       DocumentStatus status,
-      DocumentRejectionReason rejectionReasonCode,
-      String rejectionReason,
-      ActorResponseDTO reviewedBy,
+      @Nullable DocumentRejectionReason rejectionReasonCode,
+      @Nullable String rejectionReason,
+      @Nullable ActorResponseDTO reviewedBy,
       Instant reviewedAt,
       Instant supersededAt) {}
 
@@ -75,14 +76,17 @@ public record DriverComplianceDetailResponseDTO(
       List<RequirementResponse> requirements) {}
 
   public record ReviewQueueItemResponse(
-      DocumentKind kind, String token, CredentialRequirement requirement, String vehicleToken) {}
+      DocumentKind kind,
+      String token,
+      CredentialRequirement requirement,
+      @Nullable String vehicleToken) {}
 
   public record HistoryItemResponse(
       Instant at,
       HistoryKind kind,
-      CredentialRequirement requirement,
-      String vehicleToken,
-      String plate,
-      ActorResponseDTO actor,
-      String rejectionReasonCode) {}
+      @Nullable CredentialRequirement requirement,
+      @Nullable String vehicleToken,
+      @Nullable String plate,
+      @Nullable ActorResponseDTO actor,
+      @Nullable String rejectionReasonCode) {}
 }

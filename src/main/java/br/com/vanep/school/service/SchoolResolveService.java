@@ -12,6 +12,7 @@ import br.com.vanep.school.model.SchoolModel;
 import br.com.vanep.school.repository.SchoolRepository;
 import java.util.Optional;
 import java.util.Set;
+import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
@@ -47,7 +48,8 @@ public class SchoolResolveService {
     this.messages = messages;
   }
 
-  public record Resolution(SchoolModel school, AddressResponseDTO address, boolean created) {}
+  public record Resolution(
+      SchoolModel school, @Nullable AddressResponseDTO address, boolean created) {}
 
   @Transactional
   public Resolution resolve(String callerUid, SchoolResolveRequestDTO request) {
@@ -74,7 +76,7 @@ public class SchoolResolveService {
     return new Resolution(created, findOrCreateAddress(created, details), true);
   }
 
-  AddressResponseDTO findOrCompleteAddress(
+  @Nullable AddressResponseDTO findOrCompleteAddress(
       String callerUid, SchoolModel school, SchoolResolveRequestDTO request) {
     if (!canCompleteAddress(school) || !tryAcquireLookup(callerUid)) {
       places.closeAutocompleteSession(request.placeId(), request.sessionToken());
@@ -85,7 +87,8 @@ public class SchoolResolveService {
     return findOrCreateAddress(school, details);
   }
 
-  AddressResponseDTO findOrCreateAddress(SchoolModel school, PlaceDetailsResponseDTO details) {
+  @Nullable AddressResponseDTO findOrCreateAddress(
+      SchoolModel school, PlaceDetailsResponseDTO details) {
     if (!canCompleteAddress(school)) {
       return addresses.toResponseOrNull(school.getAddressId());
     }

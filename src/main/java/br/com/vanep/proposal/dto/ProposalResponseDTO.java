@@ -9,6 +9,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 
 public record ProposalResponseDTO(
     String token,
@@ -28,7 +29,7 @@ public record ProposalResponseDTO(
     ProposalAdjustmentPolicy adjustmentPolicy,
     ProposalCancellationPolicy cancellationPolicy,
     Vehicle vehicle,
-    String message,
+    @Nullable String message,
     String declineReason,
     Instant acceptedAt,
     List<Item> items,
@@ -38,21 +39,24 @@ public record ProposalResponseDTO(
 
   // dependentName is null for the driver, who sees only the first name (LGPD).
   public record Item(
-      String dependentToken,
-      String dependentName,
-      String dependentFirstName,
+      @Nullable String dependentToken,
+      @Nullable String dependentName,
+      @Nullable String dependentFirstName,
       List<ScheduleSlotResponseDTO> slots) {}
 
   // token is null for the client, who has no use for the driver's vehicle.
   public record Vehicle(
-      String token,
-      String plate,
-      String brand,
-      String model,
-      Integer manufactureYear,
-      String color,
+      @Nullable String token,
+      @Nullable String plate,
+      @Nullable String brand,
+      @Nullable String model,
+      @Nullable Integer manufactureYear,
+      @Nullable String color,
       Integer capacity) {}
 
   public record Adjustment(
-      ProposalAdjustmentField field, String suggestedValue, String note, Instant createdAt) {}
+      ProposalAdjustmentField field,
+      @Nullable String suggestedValue,
+      @Nullable String note,
+      Instant createdAt) {}
 }

@@ -26,6 +26,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.SoftDelete;
 import org.hibernate.annotations.SoftDeleteType;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.jspecify.annotations.Nullable;
 
 @Entity
 @Table(name = "assistant")
@@ -47,7 +48,7 @@ public class AssistantModel {
 
   @ManyToOne(fetch = FetchType.EAGER)
   @JoinColumn(name = "driver_id")
-  private DriverModel driver;
+  private @Nullable DriverModel driver;
 
   @Enumerated(EnumType.STRING)
   @Column(nullable = false, length = 16)
@@ -62,7 +63,7 @@ public class AssistantModel {
   private MediaFileModel photo;
 
   @Column(name = "activated_at")
-  private Instant activatedAt;
+  private @Nullable Instant activatedAt;
 
   @CreationTimestamp
   @Column(name = "created_at", nullable = false, updatable = false)

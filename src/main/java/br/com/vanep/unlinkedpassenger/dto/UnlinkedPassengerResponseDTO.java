@@ -6,6 +6,7 @@ import br.com.vanep.schedule.dto.ScheduleSlotResponseDTO;
 import br.com.vanep.shared.enums.SchoolShift;
 import java.time.Instant;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 
 public record UnlinkedPassengerResponseDTO(
     String token,
@@ -14,11 +15,11 @@ public record UnlinkedPassengerResponseDTO(
     String schoolName,
     SchoolShift schoolShift,
     AddressResponseDTO address,
-    String notes,
+    @Nullable String notes,
     List<ScheduleSlotResponseDTO> slots,
-    String vehicleToken,
-    String dependentToken,
-    Instant invitedAt,
-    FamilyMatchResponseDTO familyMatch,
+    @Nullable String vehicleToken,
+    @Nullable String dependentToken,
+    @Nullable Instant invitedAt,
+    @Nullable FamilyMatchResponseDTO familyMatch,
     Instant createdAt,
     Instant updatedAt) {}

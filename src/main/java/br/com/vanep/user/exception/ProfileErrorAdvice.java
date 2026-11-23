@@ -8,6 +8,7 @@ import br.com.vanep.user.dto.UserEmailChangeRequestDTO;
 import br.com.vanep.user.enums.ProfileErrorCode;
 import java.util.Arrays;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
@@ -62,7 +63,7 @@ public class ProfileErrorAdvice {
    * Prefer NotBlank, then Size, then Email when several constraints fail (e.g. a very long string
    * often fails both {@code @Email} and {@code @Size}).
    */
-  static FieldError selectEmailFieldError(List<FieldError> emailErrors) {
+  static @Nullable FieldError selectEmailFieldError(List<FieldError> emailErrors) {
     if (emailErrors == null || emailErrors.isEmpty()) {
       return null;
     }
@@ -77,7 +78,7 @@ public class ProfileErrorAdvice {
     return emailErrors.getFirst();
   }
 
-  private static FieldError findByCodePrefix(List<FieldError> errors, String prefix) {
+  private static @Nullable FieldError findByCodePrefix(List<FieldError> errors, String prefix) {
     for (FieldError error : errors) {
       if (error.getCodes() == null) {
         continue;
@@ -91,7 +92,7 @@ public class ProfileErrorAdvice {
     return null;
   }
 
-  private static ProfileErrorCode resolveEmailValidationCode(FieldError fieldError) {
+  private static ProfileErrorCode resolveEmailValidationCode(@Nullable FieldError fieldError) {
     if (fieldError == null || fieldError.getCodes() == null) {
       return ProfileErrorCode.EMAIL_INVALID;
     }

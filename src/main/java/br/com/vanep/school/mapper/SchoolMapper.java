@@ -3,6 +3,7 @@ package br.com.vanep.school.mapper;
 import br.com.vanep.address.dto.AddressResponseDTO;
 import br.com.vanep.school.dto.SchoolResponseDTO;
 import br.com.vanep.school.model.SchoolModel;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -11,7 +12,7 @@ public class SchoolMapper {
     return toResponse(school, null);
   }
 
-  public SchoolResponseDTO toResponse(SchoolModel school, AddressResponseDTO address) {
+  public SchoolResponseDTO toResponse(SchoolModel school, @Nullable AddressResponseDTO address) {
     return new SchoolResponseDTO(
         school.getToken(),
         school.getName(),

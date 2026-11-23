@@ -26,6 +26,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -110,7 +111,7 @@ public class DriverUnderReviewSeeder {
     cnhs.save(cnh);
   }
 
-  private void seedDriverDocuments(DriverModel driver, UserModel admin, LocalDate today) {
+  private void seedDriverDocuments(DriverModel driver, @Nullable UserModel admin, LocalDate today) {
     driverDocuments.save(driverDocument(driver, DriverDocumentType.SCHOOL_DRIVER_COURSE));
 
     DriverDocumentModel record = driverDocument(driver, DriverDocumentType.CRIMINAL_RECORD);
@@ -125,7 +126,7 @@ public class DriverUnderReviewSeeder {
     driverDocuments.save(authorization);
   }
 
-  private void seedVehicleDocuments(VehicleModel van, UserModel admin, LocalDate today) {
+  private void seedVehicleDocuments(VehicleModel van, @Nullable UserModel admin, LocalDate today) {
     vehicleDocuments.save(vehicleDocument(van, VehicleDocumentType.CRLV));
     vehicleDocuments.save(vehicleDocument(van, VehicleDocumentType.SCHOOL_VEHICLE_AUTHORIZATION));
 
@@ -156,14 +157,14 @@ public class DriverUnderReviewSeeder {
     return media.store(slot, ownerToken, PDF, name.toLowerCase() + ".pdf");
   }
 
-  private static void approve(DocumentReview review, UserModel admin) {
+  private static void approve(DocumentReview review, @Nullable UserModel admin) {
     review.setStatus(DocumentStatus.APPROVED);
     review.setReviewMethod(ReviewMethod.MANUAL);
     review.setReviewedBy(admin);
     review.setReviewedAt(Instant.now());
   }
 
-  private static void reject(DocumentReview review, UserModel admin, String reason) {
+  private static void reject(DocumentReview review, @Nullable UserModel admin, String reason) {
     review.setStatus(DocumentStatus.REJECTED);
     review.setRejectionReasonCode(DocumentRejectionReason.ILLEGIBLE);
     review.setRejectionReason(reason);

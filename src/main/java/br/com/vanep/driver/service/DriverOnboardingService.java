@@ -41,7 +41,9 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
+import org.jspecify.annotations.Nullable;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
@@ -204,7 +206,7 @@ public class DriverOnboardingService {
   }
 
   // A rejection with a code and no message still tells the driver why, in the code's words.
-  String describeRejection(DriverModel driver) {
+  @Nullable String describeRejection(DriverModel driver) {
     if (driver.getRejectionReason() != null || driver.getRejectionReasonCode() == null) {
       return driver.getRejectionReason();
     }
@@ -242,11 +244,13 @@ public class DriverOnboardingService {
           case REJECTED -> "cnh_rejected";
           case EXPIRED -> "cnh_expired";
           case APPROVED ->
-              SchoolTransportCredentialPolicy.lacksSchoolTransportCategory(license.current())
+              SchoolTransportCredentialPolicy.lacksSchoolTransportCategory(
+                      Objects.requireNonNull(license.current()))
                   ? "cnh_category"
                   : null;
           case PENDING ->
-              SchoolTransportCredentialPolicy.lacksSchoolTransportCategory(license.current())
+              SchoolTransportCredentialPolicy.lacksSchoolTransportCategory(
+                      Objects.requireNonNull(license.current()))
                   ? "cnh_category"
                   : null;
         };
@@ -276,7 +280,9 @@ public class DriverOnboardingService {
         compliance.vehicles().stream()
             .map(
                 vehicle ->
-                    evaluateDocumentsOf(vehicle, documentsByVehicle.get(vehicle.vehicle().getId())))
+                    evaluateDocumentsOf(
+                        vehicle,
+                        documentsByVehicle.getOrDefault(vehicle.vehicle().getId(), List.of())))
             .toList();
     boolean completed =
         missingDriverTypes.isEmpty()
@@ -309,7 +315,8 @@ public class DriverOnboardingService {
   // Sent: approved, or waiting for review with its file.
   static boolean isSent(RequirementDTO entry) {
     return entry.state() == ComplianceState.APPROVED
-        || (entry.state() == ComplianceState.PENDING && entry.current().getReviewedFile() != null);
+        || (entry.state() == ComplianceState.PENDING
+            && Objects.requireNonNull(entry.current()).getReviewedFile() != null);
   }
 
   static String describeMissingDocuments(DriverOnboardingDocumentsStepDTO documentsStep) {

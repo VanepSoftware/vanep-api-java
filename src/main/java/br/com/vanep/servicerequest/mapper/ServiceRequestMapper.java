@@ -19,6 +19,7 @@ import java.time.Period;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -60,8 +61,8 @@ public class ServiceRequestMapper {
   public ServiceRequestClientResponseDTO toClientResponse(
       ServiceRequestModel request,
       Map<Long, String> dependentTokens,
-      ProposalSummaryResponseDTO currentProposal,
-      String conversationToken) {
+      @Nullable ProposalSummaryResponseDTO currentProposal,
+      @Nullable String conversationToken) {
     return new ServiceRequestClientResponseDTO(
         request.getToken(),
         request.getClientDriver().getToken(),
@@ -86,8 +87,8 @@ public class ServiceRequestMapper {
       ServiceRequestModel request,
       Map<Long, String> dependentTokens,
       LocalDate today,
-      ProposalSummaryResponseDTO currentProposal,
-      String conversationToken) {
+      @Nullable ProposalSummaryResponseDTO currentProposal,
+      @Nullable String conversationToken) {
     return new ServiceRequestDriverResponseDTO(
         request.getToken(),
         request.getClientDriver().getToken(),
@@ -151,11 +152,12 @@ public class ServiceRequestMapper {
         .toList();
   }
 
+  @Nullable
   public String firstNameOf(String name) {
     return name.strip().split("\\s+", 2)[0];
   }
 
-  Integer ageOn(LocalDate birthDate, LocalDate today) {
+  @Nullable Integer ageOn(LocalDate birthDate, LocalDate today) {
     return birthDate == null ? null : Period.between(birthDate, today).getYears();
   }
 }

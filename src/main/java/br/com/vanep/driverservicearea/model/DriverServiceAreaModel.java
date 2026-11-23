@@ -21,6 +21,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.SoftDelete;
 import org.hibernate.annotations.SoftDeleteType;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.jspecify.annotations.Nullable;
 
 @Entity
 @Table(name = "driver_service_area")
@@ -45,7 +46,7 @@ public class DriverServiceAreaModel {
 
   @ManyToOne(fetch = FetchType.EAGER)
   @JoinColumn(name = "district_id")
-  private DistrictModel district;
+  private @Nullable DistrictModel district;
 
   @CreationTimestamp
   @Column(name = "created_at", nullable = false, updatable = false)

@@ -1,3 +1,6 @@
 package br.com.vanep.shared.document.dto;
 
-public record DocumentFileResponseDTO(String mimeType, Long sizeBytes, String originalName) {}
+import org.jspecify.annotations.Nullable;
+
+public record DocumentFileResponseDTO(
+    String mimeType, Long sizeBytes, @Nullable String originalName) {}

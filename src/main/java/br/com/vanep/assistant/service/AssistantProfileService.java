@@ -10,6 +10,7 @@ import br.com.vanep.assistant.repository.AssistantRepository;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.service.UserService;
+import org.jspecify.annotations.Nullable;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.HttpStatus;
@@ -60,7 +61,7 @@ public class AssistantProfileService {
                     HttpStatus.NOT_FOUND, message("assistant.profile.not_found")));
   }
 
-  private br.com.vanep.assistant.dto.AssistantPendingInviteDTO resolvePendingInvite(
+  private br.com.vanep.assistant.dto.@Nullable AssistantPendingInviteDTO resolvePendingInvite(
       AssistantModel assistant) {
     if (assistant.getStatus() != AssistantStatus.PENDING) {
       return null;

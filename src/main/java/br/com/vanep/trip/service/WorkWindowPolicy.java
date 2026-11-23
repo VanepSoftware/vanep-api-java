@@ -5,13 +5,17 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.Locale;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 @Component
 public class WorkWindowPolicy {
 
   public boolean isOutsideWorkWindow(
-      List<String> workDays, LocalTime workStart, LocalTime workEnd, LocalDateTime startedAt) {
+      List<String> workDays,
+      LocalTime workStart,
+      LocalTime workEnd,
+      @Nullable LocalDateTime startedAt) {
     if (startedAt == null) {
       return false;
     }
@@ -41,11 +45,11 @@ public class WorkWindowPolicy {
     return parse(configured) != null;
   }
 
-  private boolean matchesDay(String configured, DayOfWeek day) {
+  private @Nullable boolean matchesDay(String configured, DayOfWeek day) {
     return parse(configured) == day;
   }
 
-  private DayOfWeek parse(String configured) {
+  private @Nullable DayOfWeek parse(String configured) {
     if (configured == null || configured.isBlank()) {
       return null;
     }

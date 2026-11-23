@@ -5,6 +5,7 @@ import br.com.vanep.trip.model.TripModel;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -55,7 +56,7 @@ public interface TripRepository extends JpaRepository<TripModel, Long> {
           """,
       countQuery =
           "select count(trip) from TripModel trip where (:driverId is null or trip.driver.id = :driverId)")
-  Page<TripModel> findPage(@Param("driverId") Long driverId, Pageable pageable);
+  Page<TripModel> findPage(@Param("driverId") @Nullable Long driverId, Pageable pageable);
 
   @Modifying
   @Query(value = "UPDATE trip SET deleted_at = NULL WHERE token = :token", nativeQuery = true)

@@ -24,6 +24,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.SoftDelete;
 import org.hibernate.annotations.SoftDeleteType;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.jspecify.annotations.Nullable;
 
 @Entity
 @Table(name = "contract_item")
@@ -55,22 +56,22 @@ public class ContractItemModel {
   private CityModel pickupCity;
 
   @Column(name = "pickup_zip_code", length = 8)
-  private String pickupZipCode;
+  private @Nullable String pickupZipCode;
 
   @Column(name = "pickup_street", nullable = false)
   private String pickupStreet;
 
   @Column(name = "pickup_number", length = 16)
-  private String pickupNumber;
+  private @Nullable String pickupNumber;
 
   @Column(name = "pickup_complement", length = 128)
-  private String pickupComplement;
+  private @Nullable String pickupComplement;
 
   @Column(name = "pickup_neighborhood", length = 128)
-  private String pickupNeighborhood;
+  private @Nullable String pickupNeighborhood;
 
   @Column(name = "pickup_google_place_id")
-  private String pickupGooglePlaceId;
+  private @Nullable String pickupGooglePlaceId;
 
   @OneToOne(fetch = FetchType.EAGER, optional = false, cascade = CascadeType.ALL)
   @JoinColumn(name = "schedule_id", nullable = false)

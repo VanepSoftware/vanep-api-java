@@ -10,6 +10,7 @@ import br.com.vanep.user.model.UserModel;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -59,11 +60,11 @@ public class DocumentReviewPolicy {
     return DocumentReview.pending();
   }
 
-  static boolean isBlank(String value) {
+  static boolean isBlank(@Nullable String value) {
     return value == null || value.isBlank();
   }
 
-  static String stripToNull(String value) {
-    return isBlank(value) ? null : value.strip();
+  static @Nullable String stripToNull(@Nullable String value) {
+    return value == null || value.isBlank() ? null : value.strip();
   }
 }

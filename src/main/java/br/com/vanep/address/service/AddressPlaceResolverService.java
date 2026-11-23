@@ -7,6 +7,7 @@ import br.com.vanep.location.service.LocationResolverService;
 import br.com.vanep.places.client.PlacesClient;
 import br.com.vanep.places.dto.PlaceDetailsResponseDTO;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.HttpStatus;
@@ -58,8 +59,8 @@ public class AddressPlaceResolverService {
       PlaceDetailsResponseDTO details,
       CityModel city,
       String street,
-      String number,
-      String complement) {
+      @Nullable String number,
+      @Nullable String complement) {
     address.setCity(city);
     address.setGooglePlaceId(details.id());
     address.setStreet(street);
@@ -69,7 +70,8 @@ public class AddressPlaceResolverService {
     address.setNeighborhood(StreetAddressExtractor.findNeighborhood(details).orElse(null));
   }
 
-  private String findNumber(PlaceDetailsResponseDTO details, String requestedNumber) {
+  private @Nullable String findNumber(
+      PlaceDetailsResponseDTO details, @Nullable String requestedNumber) {
     return Optional.ofNullable(requestedNumber)
         .filter(value -> !value.isBlank())
         .or(() -> StreetAddressExtractor.findNumber(details))

@@ -17,6 +17,7 @@ import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.jspecify.annotations.Nullable;
 
 @Entity
 @Table(name = "proposal_item")
@@ -34,7 +35,7 @@ public class ProposalItemModel {
   // A plain column for the same reason as in service_request_item: the name shown comes from the
   // request item copy, and a removed dependent must not hide the proposal.
   @Column(name = "dependent_id", nullable = false, updatable = false)
-  private Long dependentId;
+  private @Nullable Long dependentId;
 
   @OneToOne(fetch = FetchType.EAGER, optional = false, cascade = CascadeType.ALL)
   @JoinColumn(name = "schedule_id", nullable = false, updatable = false)

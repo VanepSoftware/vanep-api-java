@@ -3,6 +3,7 @@ package br.com.vanep.auth.oauth.grant;
 import java.io.Serial;
 import java.util.Map;
 import lombok.Getter;
+import org.jspecify.annotations.Nullable;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.server.authorization.authentication.OAuth2AuthorizationGrantAuthenticationToken;
 
@@ -16,7 +17,7 @@ public class MobilePasswordGrantAuthenticationToken
   private final String password;
 
   public MobilePasswordGrantAuthenticationToken(
-      Authentication clientPrincipal, String username, String password) {
+      @Nullable Authentication clientPrincipal, String username, String password) {
     super(MobileAuthorizationGrantTypes.PASSWORD, clientPrincipal, Map.of());
     this.username = username;
     this.password = password;

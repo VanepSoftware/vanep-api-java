@@ -24,6 +24,7 @@ import br.com.vanep.user.repository.UserRepository;
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.dao.CannotAcquireLockException;
@@ -186,18 +187,19 @@ public class DriverCnhService {
   // earliestValidity is today on an approval, and open on a correction: a mistyped expiry of a
   // license that has since expired is corrected to its real, past date.
   void requireApprovalData(DriverCnhModel cnh, DriverCnhDataDTO data, LocalDate earliestValidity) {
-    requireField("registrationNumber", data.registrationNumber());
+    String registrationNumber = requireField("registrationNumber", data.registrationNumber());
     requireField("category", data.category());
-    requireField("issueDate", data.issueDate());
-    requireField("validUntil", data.validUntil());
-    validateDates(data, earliestValidity);
-    requireNumberOfNoOtherDriver(data.registrationNumber(), cnh.getDriver());
+    LocalDate issueDate = requireField("issueDate", data.issueDate());
+    LocalDate validUntil = requireField("validUntil", data.validUntil());
+    validateDates(issueDate, validUntil, earliestValidity);
+    requireNumberOfNoOtherDriver(registrationNumber, cnh.getDriver());
   }
 
-  static void requireField(String field, Object value) {
+  static <T> T requireField(String field, @Nullable T value) {
     if (value == null) {
       throw DocumentReviewService.fieldRequired(field);
     }
+    return value;
   }
 
   @Transactional
@@ -284,16 +286,13 @@ public class DriverCnhService {
     return ApiProblemException.conflict("driver_cnh.registration.duplicate");
   }
 
-  static void validateDates(DriverCnhDataDTO data, LocalDate earliestValidity) {
-    if (data.issueDate().isAfter(SchoolTransportCredentialService.today())) {
+  static void validateDates(LocalDate issueDate, LocalDate validUntil, LocalDate earliestValidity) {
+    if (issueDate.isAfter(SchoolTransportCredentialService.today())) {
       throw ApiProblemException.badRequest("driver_cnh.issue_date.future")
           .withProperty("field", "issueDate");
     }
     DocumentDatesPolicy.requireExpiryWithin(
-        "validUntil",
-        data.validUntil(),
-        data.issueDate().plusYears(LONGEST_VALIDITY_YEARS),
-        earliestValidity);
+        "validUntil", validUntil, issueDate.plusYears(LONGEST_VALIDITY_YEARS), earliestValidity);
   }
 
   static void applyData(DriverCnhModel cnh, DriverCnhDataDTO data) {

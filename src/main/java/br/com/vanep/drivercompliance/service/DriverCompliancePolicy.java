@@ -23,8 +23,10 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Stream;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -128,7 +130,7 @@ public class DriverCompliancePolicy {
         pending);
   }
 
-  static ComplianceState stateOf(DocumentSubmission newest, LocalDate date) {
+  static ComplianceState stateOf(@Nullable DocumentSubmission newest, LocalDate date) {
     if (newest == null) {
       return ComplianceState.MISSING;
     }
@@ -239,10 +241,10 @@ public class DriverCompliancePolicy {
     return (int) entries.stream().filter(entry -> entry.state() == state).count();
   }
 
-  static LocalDate nextExpiry(List<RequirementDTO> entries) {
+  static @Nullable LocalDate nextExpiry(List<RequirementDTO> entries) {
     return entries.stream()
         .filter(entry -> entry.satisfied())
-        .map(entry -> entry.current().expiresOn())
+        .map(entry -> Objects.requireNonNull(entry.current()).expiresOn())
         .filter(value -> value != null)
         .min(Comparator.naturalOrder())
         .orElse(null);

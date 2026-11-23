@@ -7,21 +7,22 @@ import br.com.vanep.shared.document.enums.DocumentStatus;
 import br.com.vanep.shared.document.enums.ReviewMethod;
 import java.time.Instant;
 import java.time.LocalDate;
+import org.jspecify.annotations.Nullable;
 
 public record DriverDocumentResponseDTO(
     String token,
-    String driverToken,
+    @Nullable String driverToken,
     DriverDocumentType documentType,
-    String documentNumber,
-    String fileUrl,
-    DocumentFileResponseDTO file,
-    LocalDate expiresAt,
+    @Nullable String documentNumber,
+    @Nullable String fileUrl,
+    @Nullable DocumentFileResponseDTO file,
+    @Nullable LocalDate expiresAt,
     DocumentStatus status,
     ReviewMethod reviewMethod,
     String externalCheckId,
-    DocumentRejectionReason rejectionReasonCode,
-    String rejectionReason,
-    String reviewedByUserToken,
+    @Nullable DocumentRejectionReason rejectionReasonCode,
+    @Nullable String rejectionReason,
+    @Nullable String reviewedByUserToken,
     Instant reviewedAt,
     Instant dataCorrectedAt,
     Instant notifiedAt,

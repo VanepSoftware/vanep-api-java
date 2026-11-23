@@ -13,6 +13,7 @@ import java.time.Instant;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
+import org.jspecify.annotations.Nullable;
 
 /** Consumable credential, like the tokens in V5: no soft delete. */
 @Entity
@@ -30,16 +31,16 @@ public class SignupTicketModel {
 
   @Enumerated(EnumType.STRING)
   @Column(name = "provider", nullable = false, length = 16)
-  private AuthProvider provider;
+  private @Nullable AuthProvider provider;
 
   @Column(name = "provider_uid", nullable = false)
-  private String providerUid;
+  private @Nullable String providerUid;
 
   @Column(name = "email", nullable = false)
-  private String email;
+  private @Nullable String email;
 
   @Column(name = "name")
-  private String name;
+  private @Nullable String name;
 
   @Column(name = "expires_at", nullable = false)
   private Instant expiresAt;

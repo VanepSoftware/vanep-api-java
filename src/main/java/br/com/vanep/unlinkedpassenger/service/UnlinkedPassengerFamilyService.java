@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -118,7 +119,7 @@ public class UnlinkedPassengerFamilyService {
                 row -> row.unlinkedPassengerId(), row -> matchMapper.toResponse(row, today)));
   }
 
-  static <V> V findOrNull(Map<Long, V> valuesById, Long id) {
+  static <V> @Nullable V findOrNull(Map<Long, V> valuesById, @Nullable Long id) {
     return id == null ? null : valuesById.get(id);
   }
 

@@ -6,6 +6,7 @@ import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.Limit;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -193,5 +194,5 @@ public interface ServiceRequestRepository extends JpaRepository<ServiceRequestMo
       Long id,
       Collection<ServiceRequestStatus> from,
       ServiceRequestStatus to,
-      String declineReason);
+      @Nullable String declineReason);
 }

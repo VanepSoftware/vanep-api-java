@@ -1,3 +1,5 @@
 package br.com.vanep.dependent.dto;
 
-public record DependentClientDTO(String token) {}
+import org.jspecify.annotations.Nullable;
+
+public record DependentClientDTO(@Nullable String token) {}

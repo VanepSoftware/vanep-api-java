@@ -17,6 +17,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.springframework.data.domain.Page;
@@ -112,7 +113,10 @@ public class DriverComplianceQueueService {
   List<EvaluatedDriver> evaluate(List<DriverModel> candidates, LocalDate today) {
     Map<Long, DriverComplianceDTO> evaluations = complianceService.evaluateAll(candidates, today);
     return candidates.stream()
-        .map(driver -> new EvaluatedDriver(driver, evaluations.get(driver.getId())))
+        .map(
+            driver ->
+                new EvaluatedDriver(
+                    driver, Objects.requireNonNull(evaluations.get(driver.getId()))))
         .toList();
   }
 

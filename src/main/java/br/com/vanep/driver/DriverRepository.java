@@ -5,6 +5,7 @@ import jakarta.persistence.LockModeType;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -31,9 +32,9 @@ public interface DriverRepository extends JpaRepository<DriverModel, Long> {
                           and vehicle.plate like :plate escape '\\'))
       """)
   List<DriverModel> findQueueCandidates(
-      @Param("status") DriverApprovalStatus status,
-      @Param("text") String text,
-      @Param("plate") String plate);
+      @Param("status") @Nullable DriverApprovalStatus status,
+      @Param("text") @Nullable String text,
+      @Param("plate") @Nullable String plate);
 
   @Query(
       """

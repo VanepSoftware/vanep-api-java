@@ -20,12 +20,13 @@ import br.com.vanep.shared.document.model.DocumentSubmission;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.vehicledocument.mapper.VehicleDocumentMapper;
 import java.util.Map;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 @Component
 public class DriverComplianceDetailMapper {
 
-  public DriverResponse toDriver(DriverModel driver, String city) {
+  public DriverResponse toDriver(DriverModel driver, @Nullable String city) {
     UserModel user = driver.getUser();
     return new DriverResponse(
         driver.getToken(),
@@ -54,7 +55,9 @@ public class DriverComplianceDetailMapper {
   }
 
   public RequirementResponse toRequirement(
-      RequirementDTO entry, DocumentSubmission lastDecided, Map<Long, UserModel> correctors) {
+      RequirementDTO entry,
+      @Nullable DocumentSubmission lastDecided,
+      Map<Long, UserModel> correctors) {
     return new RequirementResponse(
         entry.requirement(),
         entry.optional(),
@@ -65,8 +68,8 @@ public class DriverComplianceDetailMapper {
         toLastDecision(lastDecided));
   }
 
-  public SubmissionResponseDTO toSubmission(
-      DocumentSubmission submission, Map<Long, UserModel> correctors) {
+  public @Nullable SubmissionResponseDTO toSubmission(
+      @Nullable DocumentSubmission submission, Map<Long, UserModel> correctors) {
     if (submission == null) {
       return null;
     }
@@ -98,7 +101,7 @@ public class DriverComplianceDetailMapper {
         cnh == null ? null : cnh.getIssuingState());
   }
 
-  LastDecisionResponse toLastDecision(DocumentSubmission superseded) {
+  @Nullable LastDecisionResponse toLastDecision(@Nullable DocumentSubmission superseded) {
     if (superseded == null) {
       return null;
     }
@@ -112,17 +115,18 @@ public class DriverComplianceDetailMapper {
         superseded.getSupersededAt());
   }
 
-  public static UserModel correctorOf(DocumentReview review, Map<Long, UserModel> correctors) {
+  public static @Nullable UserModel correctorOf(
+      DocumentReview review, Map<Long, UserModel> correctors) {
     return review.getDataCorrectedById() == null
         ? null
         : correctors.get(review.getDataCorrectedById());
   }
 
-  public static ActorResponseDTO toActor(UserModel user) {
+  public static @Nullable ActorResponseDTO toActor(@Nullable UserModel user) {
     return user == null ? null : new ActorResponseDTO(user.getToken(), user.getName());
   }
 
-  static String fileUrlOf(DocumentSubmission submission, MediaFileModel file) {
+  static @Nullable String fileUrlOf(DocumentSubmission submission, @Nullable MediaFileModel file) {
     String basePath =
         switch (submission.kind()) {
           case DRIVER_CNH -> DriverCnhMapper.BASE_PATH;

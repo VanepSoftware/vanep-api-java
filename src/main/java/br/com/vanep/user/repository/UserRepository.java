@@ -4,6 +4,7 @@ import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import java.util.List;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -29,6 +30,6 @@ public interface UserRepository extends JpaRepository<UserModel, Long> {
       nativeQuery = true)
   int upgradePasswordIfCurrent(
       @Param("email") String email,
-      @Param("current") String current,
+      @Param("current") @Nullable String current,
       @Param("upgraded") String upgraded);
 }

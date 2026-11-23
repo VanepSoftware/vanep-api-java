@@ -18,6 +18,7 @@ import br.com.vanep.shared.document.model.DocumentSubmission;
 import br.com.vanep.vehicle.model.VehicleModel;
 import java.time.LocalDate;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -65,7 +66,7 @@ public class DriverMeComplianceMapper {
         && !expiresOn.isAfter(asOf.plusDays(DriverComplianceView.EXPIRY_WINDOW_DAYS));
   }
 
-  SubmissionResponse toSubmission(DocumentSubmission submission) {
+  @Nullable SubmissionResponse toSubmission(@Nullable DocumentSubmission submission) {
     if (submission == null) {
       return null;
     }

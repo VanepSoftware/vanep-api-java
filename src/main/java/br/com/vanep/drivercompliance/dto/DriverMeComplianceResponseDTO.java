@@ -10,6 +10,7 @@ import br.com.vanep.shared.document.enums.DocumentStatus;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 
 public record DriverMeComplianceResponseDTO(
     LocalDate asOf,
@@ -31,23 +32,23 @@ public record DriverMeComplianceResponseDTO(
       boolean satisfied,
       ComplianceState state,
       boolean expiringSoon,
-      SubmissionResponse current,
-      SubmissionResponse pending) {}
+      @Nullable SubmissionResponse current,
+      @Nullable SubmissionResponse pending) {}
 
   public record SubmissionResponse(
       DocumentKind kind,
       String token,
-      String documentNumber,
-      LocalDate expiresAt,
+      @Nullable String documentNumber,
+      @Nullable LocalDate expiresAt,
       DocumentStatus status,
-      DocumentRejectionReason rejectionReasonCode,
-      String rejectionReason,
+      @Nullable DocumentRejectionReason rejectionReasonCode,
+      @Nullable String rejectionReason,
       Instant reviewedAt,
       Instant createdAt,
       Long version,
-      String fileUrl,
-      DocumentFileResponseDTO file,
-      String category,
-      LocalDate issueDate,
-      String registrationNumber) {}
+      @Nullable String fileUrl,
+      @Nullable DocumentFileResponseDTO file,
+      @Nullable String category,
+      @Nullable LocalDate issueDate,
+      @Nullable String registrationNumber) {}
 }

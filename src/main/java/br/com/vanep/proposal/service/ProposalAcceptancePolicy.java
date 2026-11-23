@@ -22,6 +22,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -33,7 +34,7 @@ public class ProposalAcceptancePolicy {
       List<DependentModel> dependents,
       Map<Long, AddressModel> pickupsById,
       List<DependentSchoolDayModel> grids,
-      VehicleModel vehicle,
+      @Nullable VehicleModel vehicle,
       DriverModel driver) {
     Set<ProposalAcceptanceChange> changes = EnumSet.noneOf(ProposalAcceptanceChange.class);
     Map<Long, DependentModel> dependentsById = indexBy(dependents, dependent -> dependent.getId());
@@ -63,7 +64,7 @@ public class ProposalAcceptancePolicy {
     return changes;
   }
 
-  boolean hasAnotherPickup(ServiceRequestItemModel item, AddressModel pickup) {
+  boolean hasAnotherPickup(ServiceRequestItemModel item, @Nullable AddressModel pickup) {
     return pickup == null
         || !Objects.equals(pickup.getCity().getId(), item.getPickupCityId())
         || !normalized(pickup.getNeighborhood())
@@ -79,7 +80,8 @@ public class ProposalAcceptancePolicy {
     return false;
   }
 
-  boolean isAnotherVehicle(ProposalModel proposal, VehicleModel vehicle, DriverModel driver) {
+  boolean isAnotherVehicle(
+      ProposalModel proposal, @Nullable VehicleModel vehicle, DriverModel driver) {
     ProposalModel.Snapshot.Vehicle offered = proposal.getSnapshot().vehicle();
     return vehicle == null
         || !vehicle.isActive()
@@ -88,7 +90,7 @@ public class ProposalAcceptancePolicy {
         || !Objects.equals(vehicle.getCapacity(), offered.capacity());
   }
 
-  String normalized(String neighborhood) {
+  String normalized(@Nullable String neighborhood) {
     return neighborhood == null ? "" : neighborhood.strip().toLowerCase(Locale.ROOT);
   }
 

@@ -23,6 +23,7 @@ import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -101,7 +102,7 @@ public class ServiceRequestSeeder {
         > 0;
   }
 
-  DriverModel findDriverNotLinkedTo(ClientModel client) {
+  @Nullable DriverModel findDriverNotLinkedTo(ClientModel client) {
     return drivers.findAll().stream()
         .filter(driver -> driver.getApprovalStatus() == DriverApprovalStatus.APPROVED)
         .filter(driver -> driver.isActive() && driver.isAvailable())

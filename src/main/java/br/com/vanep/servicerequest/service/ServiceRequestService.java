@@ -50,11 +50,13 @@ import java.util.Collection;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
@@ -200,7 +202,7 @@ public class ServiceRequestService {
     return page.map(
         request ->
             mapper.toClientResponse(
-                withItems.get(request.getId()),
+                Objects.requireNonNull(withItems.get(request.getId())),
                 tokens,
                 current.get(request.getId()),
                 conversationTokens.get(request.getId())));
@@ -236,7 +238,7 @@ public class ServiceRequestService {
     return page.map(
         request ->
             mapper.toDriverResponse(
-                withItems.get(request.getId()),
+                Objects.requireNonNull(withItems.get(request.getId())),
                 tokens,
                 today,
                 current.get(request.getId()),
@@ -375,7 +377,7 @@ public class ServiceRequestService {
     draft.setNotes(StringUtils.hasText(body.notes()) ? body.notes().strip() : null);
     draft.setExpiresAt(Instant.now().plus(ANSWER_WINDOW));
     for (ServiceRequestItemRequestDTO itemRequest : body.items()) {
-      DependentModel dependent = byToken.get(itemRequest.dependentToken());
+      DependentModel dependent = Objects.requireNonNull(byToken.get(itemRequest.dependentToken()));
       draft.addItem(
           newItem(
               itemRequest,
@@ -390,8 +392,8 @@ public class ServiceRequestService {
   ServiceRequestItemModel newItem(
       ServiceRequestItemRequestDTO itemRequest,
       DependentModel dependent,
-      SchoolModel school,
-      AddressModel pickup,
+      @Nullable SchoolModel school,
+      @Nullable AddressModel pickup,
       Map<DayOfWeek, SchoolShift> grid) {
     if (school == null || pickup == null) {
       throw unprocessableContent("service_request.not_ready");
@@ -476,7 +478,7 @@ public class ServiceRequestService {
             proposal -> proposals.updateStatus(proposal.getId(), ProposalStatus.SENT, closedAs));
   }
 
-  String reasonOf(ServiceRequestDeclineRequestDTO body) {
+  @Nullable String reasonOf(ServiceRequestDeclineRequestDTO body) {
     return body == null || !StringUtils.hasText(body.reason()) ? null : body.reason().strip();
   }
 

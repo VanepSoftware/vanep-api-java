@@ -32,6 +32,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.PageRequest;
@@ -94,7 +95,7 @@ public class ProposalSeeder {
     log.info("Seed: SENT proposal created for the seeded service request.");
   }
 
-  ServiceRequestModel findOpenSeedRequest() {
+  @Nullable ServiceRequestModel findOpenSeedRequest() {
     UserModel user = users.findByEmail(SEED_CLIENT_EMAIL).orElse(null);
     ClientModel client = user == null ? null : clients.findByUserId(user.getId()).orElse(null);
     if (client == null) {

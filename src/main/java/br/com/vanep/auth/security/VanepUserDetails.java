@@ -1,17 +1,18 @@
 package br.com.vanep.auth.security;
 
 import java.util.Collection;
+import org.jspecify.annotations.Nullable;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.User;
 
 public final class VanepUserDetails extends User {
 
-  private final String userToken;
+  private final @Nullable String userToken;
 
   public VanepUserDetails(
       String username,
-      String password,
-      String userToken,
+      @Nullable String password,
+      @Nullable String userToken,
       boolean enabled,
       boolean accountNonLocked,
       Collection<? extends GrantedAuthority> authorities) {
@@ -20,8 +21,8 @@ public final class VanepUserDetails extends User {
 
   public VanepUserDetails(
       String username,
-      String password,
-      String userToken,
+      @Nullable String password,
+      @Nullable String userToken,
       boolean enabled,
       boolean accountNonExpired,
       boolean credentialsNonExpired,
@@ -38,7 +39,7 @@ public final class VanepUserDetails extends User {
     this.userToken = userToken;
   }
 
-  public String getUserToken() {
+  public @Nullable String getUserToken() {
     return userToken;
   }
 

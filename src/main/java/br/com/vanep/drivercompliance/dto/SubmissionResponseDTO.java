@@ -7,30 +7,31 @@ import br.com.vanep.shared.document.enums.DocumentStatus;
 import br.com.vanep.shared.document.enums.ReviewMethod;
 import java.time.Instant;
 import java.time.LocalDate;
+import org.jspecify.annotations.Nullable;
 
 public record SubmissionResponseDTO(
     DocumentKind kind,
     String token,
-    String documentNumber,
-    LocalDate expiresAt,
+    @Nullable String documentNumber,
+    @Nullable LocalDate expiresAt,
     DocumentStatus status,
     ReviewMethod reviewMethod,
-    DocumentRejectionReason rejectionReasonCode,
-    String rejectionReason,
-    ActorResponseDTO reviewedBy,
+    @Nullable DocumentRejectionReason rejectionReasonCode,
+    @Nullable String rejectionReason,
+    @Nullable ActorResponseDTO reviewedBy,
     Instant reviewedAt,
     Instant dataCorrectedAt,
-    ActorResponseDTO dataCorrectedBy,
+    @Nullable ActorResponseDTO dataCorrectedBy,
     Instant createdAt,
     Long version,
-    String fileUrl,
-    DocumentFileResponseDTO file,
-    String category,
-    LocalDate issueDate,
-    String registrationNumber,
-    LocalDate firstLicenseDate,
-    String securityNumber,
-    String issuingState) {
+    @Nullable String fileUrl,
+    @Nullable DocumentFileResponseDTO file,
+    @Nullable String category,
+    @Nullable LocalDate issueDate,
+    @Nullable String registrationNumber,
+    @Nullable LocalDate firstLicenseDate,
+    @Nullable String securityNumber,
+    @Nullable String issuingState) {
 
   public record ActorResponseDTO(String token, String name) {}
 }

@@ -3,13 +3,17 @@ package br.com.vanep.drivercompliance.mapper;
 import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.drivercompliance.dto.DriverComplianceDTO;
 import br.com.vanep.drivercompliance.dto.DriverComplianceRowResponseDTO;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 @Component
 public class DriverComplianceMapper {
 
   public DriverComplianceRowResponseDTO toRow(
-      DriverModel driver, DriverComplianceDTO compliance, String city, long vehicleCount) {
+      DriverModel driver,
+      DriverComplianceDTO compliance,
+      @Nullable String city,
+      long vehicleCount) {
     return new DriverComplianceRowResponseDTO(
         driver.getToken(),
         driver.getUser().getName(),

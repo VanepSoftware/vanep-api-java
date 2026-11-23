@@ -5,18 +5,19 @@ import br.com.vanep.servicerequest.enums.ServiceRequestStatus;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 
 public record ServiceRequestDriverResponseDTO(
     String token,
     String clientDriverToken,
-    String conversationToken,
-    String clientFirstName,
+    @Nullable String conversationToken,
+    @Nullable String clientFirstName,
     ServiceRequestStatus status,
     LocalDate desiredStartDate,
-    String notes,
+    @Nullable String notes,
     String declineReason,
     Instant expiresAt,
-    ProposalSummaryResponseDTO currentProposal,
+    @Nullable ProposalSummaryResponseDTO currentProposal,
     List<ServiceRequestDriverItemResponseDTO> items,
     Instant createdAt,
     Instant updatedAt) {}

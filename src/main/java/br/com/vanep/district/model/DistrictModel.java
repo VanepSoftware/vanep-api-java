@@ -22,6 +22,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.SoftDelete;
 import org.hibernate.annotations.SoftDeleteType;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.jspecify.annotations.Nullable;
 
 @Entity
 @Table(
@@ -47,7 +48,7 @@ public class DistrictModel {
 
   @ManyToOne(fetch = FetchType.EAGER)
   @JoinColumn(name = "parent_id")
-  private DistrictModel parent;
+  private @Nullable DistrictModel parent;
 
   @Column(nullable = false, length = 128)
   private String name;
@@ -56,7 +57,7 @@ public class DistrictModel {
   private String normalizedName;
 
   @Column(name = "google_place_id", length = 255)
-  private String googlePlaceId;
+  private @Nullable String googlePlaceId;
 
   @Column(name = "is_active", nullable = false)
   private boolean active = true;

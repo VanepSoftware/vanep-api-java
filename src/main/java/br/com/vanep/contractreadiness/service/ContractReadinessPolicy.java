@@ -7,6 +7,7 @@ import br.com.vanep.contractreadiness.enums.ContractReadinessField;
 import br.com.vanep.contractreadiness.enums.ContractReadinessSubject;
 import java.util.ArrayList;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -51,7 +52,7 @@ public class ContractReadinessPolicy {
     return missing;
   }
 
-  private boolean isBlank(String value) {
+  private boolean isBlank(@Nullable String value) {
     return value == null || value.isBlank();
   }
 

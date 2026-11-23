@@ -19,6 +19,7 @@ import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.jspecify.annotations.Nullable;
 
 @Entity
 @Table(name = "oauth_account")
@@ -39,10 +40,10 @@ public class OAuthAccountModel {
 
   @Enumerated(EnumType.STRING)
   @Column(nullable = false, length = 16)
-  private AuthProvider provider;
+  private @Nullable AuthProvider provider;
 
   @Column(name = "provider_uid", nullable = false)
-  private String providerUid;
+  private @Nullable String providerUid;
 
   @Column private String email;
 

@@ -5,6 +5,7 @@ import jakarta.persistence.LockModeType;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -26,7 +27,7 @@ public interface VehicleRepository extends JpaRepository<VehicleModel, Long> {
 
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   @Query("select vehicle from VehicleModel vehicle where vehicle.id = :id")
-  Optional<VehicleModel> lockById(@Param("id") Long id);
+  Optional<VehicleModel> lockById(@Param("id") @Nullable Long id);
 
   boolean existsByPlate(String plate);
 

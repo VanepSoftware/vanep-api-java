@@ -1,5 +1,7 @@
 package br.com.vanep.auth.security;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * User-password hashing. Separate from the {@link
  * org.springframework.security.crypto.password.PasswordEncoder} bean, which hashes the OAuth client
@@ -19,12 +21,13 @@ public final class UserBoundPasswordEncoder implements UserPasswordEncoder {
   }
 
   @Override
-  public boolean matches(CharSequence rawPassword, String encodedPassword, String userToken) {
+  public boolean matches(
+      CharSequence rawPassword, @Nullable String encodedPassword, @Nullable String userToken) {
     return this.encoder.matches(rawPassword, encodedPassword, userToken);
   }
 
   @Override
-  public boolean requiresUpgrade(String encodedPassword) {
+  public boolean requiresUpgrade(@Nullable String encodedPassword) {
     return this.encoder.requiresUpgrade(encodedPassword);
   }
 

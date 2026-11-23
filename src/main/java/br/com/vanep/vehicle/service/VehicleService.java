@@ -15,6 +15,8 @@ import br.com.vanep.vehicle.model.VehicleModel;
 import br.com.vanep.vehicle.repository.VehicleRepository;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.HttpStatus;
@@ -101,7 +103,7 @@ public class VehicleService {
   }
 
   VehicleResponseDTO createFor(DriverModel driver, VehicleRequestDTO request) {
-    String plate = normalizePlate(request.plate());
+    String plate = Objects.requireNonNull(normalizePlate(request.plate()));
     if (vehicleRepository.existsByPlate(plate)) {
       throw ApiProblemException.conflict("vehicle.plate.duplicate");
     }
@@ -161,7 +163,7 @@ public class VehicleService {
   public VehicleResponseDTO update(String token, VehicleRequestDTO request) {
     VehicleModel vehicle = requireByToken(token);
 
-    String plate = normalizePlate(request.plate());
+    String plate = Objects.requireNonNull(normalizePlate(request.plate()));
     if (!vehicle.getPlate().equals(plate) && vehicleRepository.existsByPlate(plate)) {
       throw ApiProblemException.conflict("vehicle.plate.duplicate");
     }
@@ -207,7 +209,7 @@ public class VehicleService {
   }
 
   // A plate is stored in one spelling so "ABC-1D23" and "abc1d23" are the same van.
-  public static String normalizePlate(String plate) {
+  public static @Nullable String normalizePlate(@Nullable String plate) {
     return plate == null ? null : plate.replaceAll("[\\s-]", "").toUpperCase(Locale.ROOT);
   }
 }

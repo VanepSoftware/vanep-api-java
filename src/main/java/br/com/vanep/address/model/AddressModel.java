@@ -19,6 +19,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.SoftDelete;
 import org.hibernate.annotations.SoftDeleteType;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.jspecify.annotations.Nullable;
 
 @Entity
 @Table(name = "address")
@@ -38,22 +39,22 @@ public class AddressModel {
   private CityModel city;
 
   @Column(name = "zip_code", length = 8)
-  private String zipCode;
+  private @Nullable String zipCode;
 
   @Column(nullable = false, length = 255)
   private String street;
 
   @Column(length = 16)
-  private String number;
+  private @Nullable String number;
 
   @Column(length = 128)
-  private String complement;
+  private @Nullable String complement;
 
   @Column(length = 128)
-  private String neighborhood;
+  private @Nullable String neighborhood;
 
   @Column(name = "google_place_id", length = 255)
-  private String googlePlaceId;
+  private @Nullable String googlePlaceId;
 
   @Column(name = "is_active", nullable = false)
   private boolean active = true;

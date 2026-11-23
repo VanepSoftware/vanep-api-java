@@ -74,6 +74,7 @@ public class VehicleDocumentSeeder {
                       document.getVehicle().getId().equals(van.getId())
                           && document.getDocumentType() == seed.type()
                           && document.getReview().getStatus() == DocumentStatus.APPROVED
+                          && document.getExpiresAt() != null
                           && !document.getExpiresAt().isBefore(today));
       if (hasValidApproved) {
         continue;

@@ -13,7 +13,9 @@ import java.time.Instant;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.MessageSource;
@@ -112,7 +114,9 @@ public class DocumentNotificationService {
       } else {
         variables.put(
             "reason",
-            message("document.rejection_reason." + review.getRejectionReasonCode().name()));
+            message(
+                "document.rejection_reason."
+                    + Objects.requireNonNull(review.getRejectionReasonCode()).name()));
         variables.put("details", review.getRejectionReason());
       }
       variables.put("action", message("email.document_rejected.action"));
@@ -132,5 +136,8 @@ public class DocumentNotificationService {
   }
 
   record RejectionNotice(
-      DocumentSubmission submission, DriverModel driver, String documentName, String plate) {}
+      DocumentSubmission submission,
+      DriverModel driver,
+      String documentName,
+      @Nullable String plate) {}
 }

@@ -3,6 +3,7 @@ package br.com.vanep.auth.security;
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import java.util.Set;
+import org.jspecify.annotations.Nullable;
 import org.springframework.security.core.GrantedAuthority;
 import tools.jackson.core.JacksonException;
 import tools.jackson.core.JsonParser;
@@ -53,7 +54,7 @@ public final class VanepUserDetailsDeserializer extends ValueDeserializer<VanepU
     return node.has(field) ? node.get(field) : MissingNode.getInstance();
   }
 
-  private static String text(JsonNode node, String field) {
+  private static @Nullable String text(JsonNode node, String field) {
     JsonNode value = read(node, field);
     return value.isMissingNode() || value.isNull() ? null : value.asString();
   }

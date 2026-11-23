@@ -14,6 +14,7 @@ import jakarta.persistence.ManyToOne;
 import java.time.Instant;
 import lombok.Getter;
 import lombok.Setter;
+import org.jspecify.annotations.Nullable;
 
 @Embeddable
 @Getter
@@ -33,14 +34,14 @@ public class DocumentReview {
 
   @Enumerated(EnumType.STRING)
   @Column(name = "rejection_reason_code", length = 30)
-  private DocumentRejectionReason rejectionReasonCode;
+  private @Nullable DocumentRejectionReason rejectionReasonCode;
 
   @Column(name = "rejection_reason", length = 255)
-  private String rejectionReason;
+  private @Nullable String rejectionReason;
 
   @ManyToOne(fetch = FetchType.EAGER)
   @JoinColumn(name = "reviewed_by")
-  private UserModel reviewedBy;
+  private @Nullable UserModel reviewedBy;
 
   @Column(name = "reviewed_at")
   private Instant reviewedAt;

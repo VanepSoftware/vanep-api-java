@@ -37,6 +37,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -181,8 +182,8 @@ public class DriverComplianceDetailService {
   }
 
   // The newest decision the requirement does not already show as its current or pending one.
-  static DocumentSubmission lastDecided(
-      RequirementDTO entry, VehicleModel vehicle, Submissions submissions) {
+  static @Nullable DocumentSubmission lastDecided(
+      RequirementDTO entry, @Nullable VehicleModel vehicle, Submissions submissions) {
     Stream<? extends DocumentSubmission> candidates =
         vehicle == null
             ? Stream.concat(submissions.cnhs().stream(), submissions.driverDocuments().stream())
@@ -238,7 +239,9 @@ public class DriverComplianceDetailService {
   }
 
   static ReviewQueueItemResponse queueItem(
-      DocumentSubmission submission, CredentialRequirement requirement, String vehicleToken) {
+      DocumentSubmission submission,
+      CredentialRequirement requirement,
+      @Nullable String vehicleToken) {
     return new ReviewQueueItemResponse(
         submission.kind(), submission.getToken(), requirement, vehicleToken);
   }
@@ -267,7 +270,7 @@ public class DriverComplianceDetailService {
   static void addSubmissionEvents(
       List<HistoryItemResponse> items,
       DocumentSubmission submission,
-      VehicleModel vehicle,
+      @Nullable VehicleModel vehicle,
       Map<Long, UserModel> correctors) {
     CredentialRequirement requirement = SchoolTransportCredentialPolicy.requirementOf(submission);
     String vehicleToken = vehicle == null ? null : vehicle.getToken();

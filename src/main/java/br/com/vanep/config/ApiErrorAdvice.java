@@ -3,6 +3,7 @@ package br.com.vanep.config;
 import br.com.vanep.media.service.MediaFileService;
 import br.com.vanep.shared.document.model.DocumentSubmission;
 import br.com.vanep.shared.error.ApiProblemException;
+import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
@@ -26,7 +27,7 @@ public class ApiErrorAdvice extends ResponseEntityExceptionHandler {
   }
 
   @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
-  public ResponseEntity<Object> handleOptimisticLockingFailure(
+  public @Nullable ResponseEntity<Object> handleOptimisticLockingFailure(
       ObjectOptimisticLockingFailureException exception, WebRequest request) {
     ApiProblemException conflict =
         ApiProblemException.conflict(
@@ -44,7 +45,7 @@ public class ApiErrorAdvice extends ResponseEntityExceptionHandler {
   }
 
   @Override
-  protected ResponseEntity<Object> handleMaxUploadSizeExceededException(
+  protected @Nullable ResponseEntity<Object> handleMaxUploadSizeExceededException(
       MaxUploadSizeExceededException exception,
       HttpHeaders headers,
       HttpStatusCode status,
@@ -54,7 +55,7 @@ public class ApiErrorAdvice extends ResponseEntityExceptionHandler {
   }
 
   @Override
-  protected ResponseEntity<Object> handleMethodArgumentNotValid(
+  protected @Nullable ResponseEntity<Object> handleMethodArgumentNotValid(
       MethodArgumentNotValidException exception,
       HttpHeaders headers,
       HttpStatusCode status,

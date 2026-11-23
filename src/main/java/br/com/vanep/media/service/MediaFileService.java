@@ -10,6 +10,7 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.MessageSource;
@@ -76,7 +77,7 @@ public class MediaFileService {
   // For content that does not come from a request, such as the seed's files.
   @Transactional
   public MediaFileModel store(
-      MediaSlot slot, String ownerToken, byte[] content, String originalName) {
+      MediaSlot slot, String ownerToken, byte[] content, @Nullable String originalName) {
     if (content.length == 0) {
       throw badRequest("media.file.required");
     }
@@ -105,7 +106,7 @@ public class MediaFileService {
   }
 
   @Transactional
-  public void discard(MediaFileModel media) {
+  public void discard(@Nullable MediaFileModel media) {
     if (media == null) {
       return;
     }
