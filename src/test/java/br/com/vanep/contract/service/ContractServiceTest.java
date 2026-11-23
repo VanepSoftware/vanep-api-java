@@ -26,6 +26,7 @@ import br.com.vanep.contract.dto.ContractItemRequestDTO;
 import br.com.vanep.contract.dto.ContractResponseDTO;
 import br.com.vanep.contract.dto.ContractUpdateRequestDTO;
 import br.com.vanep.contract.enums.ContractStatus;
+import br.com.vanep.contract.event.ContractCreatedEvent;
 import br.com.vanep.contract.mapper.ContractMapper;
 import br.com.vanep.contract.model.ContractItemModel;
 import br.com.vanep.contract.model.ContractModel;
@@ -66,6 +67,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.openapitools.jackson.nullable.JsonNullable;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.MessageSource;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.web.server.ResponseStatusException;
@@ -86,6 +88,7 @@ class ContractServiceTest {
   @Mock private ScheduleRepository scheduleRepository;
   @Mock private MessageSource messages;
   @Mock private UnlinkedPassengerService unlinkedPassengers;
+  @Mock private ApplicationEventPublisher events;
 
   @Captor private ArgumentCaptor<ContractModel> savedContract;
 
@@ -122,6 +125,7 @@ class ContractServiceTest {
             new LinkStatusPolicy(),
             new ContractMapper(new ScheduleMapper(), new InstallmentMapper()),
             unlinkedPassengers,
+            events,
             messages);
 
     campinas = new CityModel();
@@ -182,6 +186,34 @@ class ContractServiceTest {
     assertThat(response.items()).hasSize(2);
     verify(links).updateStatusUnlessBlocked(3L, "ACTIVE");
     verify(links, never()).save(any());
+  }
+
+  @Test
+  void creatingAContractAnnouncesItWithItsLink() {
+    when(contracts.findStatusesByClientDriverId(3L)).thenReturn(List.of(ContractStatus.ACTIVE));
+    when(contracts.save(any()))
+        .thenAnswer(
+            call -> {
+              ContractModel contract = call.getArgument(0);
+              contract.setToken("contract-token");
+              return contract;
+            });
+
+    service.create(createRequest(item("lucas", outbound())));
+
+    verify(events).publishEvent(new ContractCreatedEvent("contract-token", link.getToken()));
+  }
+
+  @Test
+  void aRejectedContractIsNotAnnounced() {
+    when(contracts.findStatusesByClientDriverId(3L)).thenReturn(List.of(ContractStatus.ACTIVE));
+    when(contracts.findActiveByClientDriverId(anyLong()))
+        .thenReturn(Optional.of(new ContractModel()));
+
+    assertThatThrownBy(() -> service.create(createRequest(item("lucas", outbound()))))
+        .isInstanceOf(ResponseStatusException.class);
+
+    verify(events, never()).publishEvent(any());
   }
 
   @Test

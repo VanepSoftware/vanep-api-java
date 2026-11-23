@@ -54,6 +54,10 @@ services:
       # Dentro do container o caminho é sempre este. MEDIA_STORAGE_ROOT no .env é o
       # caminho NO HOST, que muda por ambiente (em dev pode ser até caminho Windows).
       MEDIA_STORAGE_ROOT: /var/lib/vanep/media
+      # Mesmo esquema da mídia: no .env fica o caminho NO HOST, e aqui o caminho do arquivo
+      # montado. Sem FIREBASE_CREDENTIALS_PATH no .env, a variável chega vazia e o push fica
+      # desligado em vez de derrubar a subida.
+      FIREBASE_CREDENTIALS_PATH: ${FIREBASE_CREDENTIALS_PATH:+/run/secrets/firebase-credentials.json}
     volumes:
       # Mantém a JWK de dev entre recriações do container. Em produção a chave vem de
       # VANEP_OAUTH_JWK_PRIVATE_KEY e este volume fica sem uso.
@@ -67,6 +71,9 @@ services:
       # O `:?` derruba o compose com mensagem clara se a variável faltar, do mesmo
       # jeito que a aplicação se recusa a subir sem raiz de storage configurada.
       - ${MEDIA_STORAGE_ROOT:?defina MEDIA_STORAGE_ROOT no .env}:/var/lib/vanep/media
+      # Conta de serviço do Firebase, só leitura. Sem a variável, monta /dev/null no lugar
+      # para o compose não exigir um arquivo que o ambiente não tem.
+      - ${FIREBASE_CREDENTIALS_PATH:-/dev/null}:/run/secrets/firebase-credentials.json:ro
     # Rotação do log do Docker (stdout/stderr). Sem limite, o json-file cresce até
     # encher o disco da VPS.
     logging:
