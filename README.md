@@ -442,9 +442,9 @@ VANEP_MAIL_ENABLED=false
 
 ---
 
-## Notificações push (Firebase Cloud Messaging)
+## Notificações (no app e push pelo Firebase Cloud Messaging)
 
-A API envia push pelo FCM (API HTTP v1, via `firebase-admin`) para todos os aparelhos registrados do usuário. O envio é assíncrono e acontece **depois do commit**: uma falha do FCM nunca desfaz a operação de negócio, e uma transação desfeita nunca gera push.
+Cada evento abaixo vira uma **notificação gravada** na tabela `notification`, listada na aba de notificações do app, e um **push** pelo FCM (API HTTP v1, via `firebase-admin`) para todos os aparelhos registrados do usuário. Tudo acontece de forma assíncrona e **depois do commit**: uma falha do FCM nunca desfaz a operação de negócio, e uma transação desfeita não gera nem notificação nem push. A notificação é gravada antes do push, então aparece no app mesmo com o push desligado ou o FCM fora do ar.
 
 ### Configuração
 
@@ -468,9 +468,20 @@ Os dois endpoints exigem usuário autenticado (qualquer tipo) e respondem `204`.
 
 Tokens que o FCM devolve como `UNREGISTERED` ou `INVALID_ARGUMENT` são removidos automaticamente no envio.
 
+### Notificações no app
+
+Todos os endpoints exigem usuário autenticado e só enxergam as notificações de quem chama.
+
+| Método | Rota | Resposta |
+| --- | --- | --- |
+| `GET` | `/api/notifications?page=&size=` | Página (padrão 20), mais recentes primeiro: `token`, `type`, `title`, `body`, `data`, `createdAt`, `readAt` (`null` = não lida). |
+| `GET` | `/api/notifications/unread-count` | `{"count": n}`, para o badge. |
+| `POST` | `/api/notifications/{token}/read` | `204`. Idempotente: mantém o primeiro `readAt`. Notificação de outro usuário ou desconhecida: `403`. |
+| `POST` | `/api/notifications/read-all` | `204`. Marca como lidas todas as do usuário. |
+
 ### Eventos e `data.type`
 
-Todo push leva `data.type`, que o app usa para escolher a tela, e o token do recurso quando há um.
+Todo push leva `data.type`, que o app usa para escolher a tela, `data.notificationToken`, para marcar a notificação como lida ao tocar, e o token do recurso quando há um. A notificação gravada guarda o mesmo `type` e os tokens do recurso em `data`.
 
 | Evento | Quem recebe | `data.type` | Outros campos de `data` |
 | --- | --- | --- | --- |
@@ -482,7 +493,7 @@ Todo push leva `data.type`, que o app usa para escolher a tela, e o token do rec
 | Cadastro do motorista aprovado | Motorista | `DRIVER_APPROVED` | — |
 | Cadastro do motorista recusado | Motorista | `DRIVER_REJECTED` | — |
 
-Título e corpo vêm de `messages_pt_BR.properties` (chaves `push.*`). O push de chat leva o nome de quem enviou, mas **não** o texto da mensagem, que é cifrado no banco e não deve trafegar pelo FCM.
+Título e corpo vêm de `messages_pt_BR.properties` (chaves `notification.*`) e ficam gravados como foram enviados. O push de chat leva o nome de quem enviou, mas **não** o texto da mensagem, que é cifrado no banco e não deve trafegar pelo FCM.
 
 ---
 

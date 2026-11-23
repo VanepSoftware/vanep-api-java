@@ -37,6 +37,7 @@ delete from driver_cnh;
 delete from driver_document;
 delete from driver;
 delete from media_file;
+delete from notification;
 delete from device_token;
 delete from users;
 delete from roles;

@@ -3,6 +3,7 @@ package br.com.vanep.notification.listener;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.after;
 import static org.mockito.Mockito.doAnswer;
@@ -13,13 +14,15 @@ import br.com.vanep.driver.DriverApprovalStatus;
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.event.DriverReviewEvent;
 import br.com.vanep.driver.model.DriverModel;
+import br.com.vanep.notification.enums.NotificationType;
+import br.com.vanep.notification.model.NotificationModel;
+import br.com.vanep.notification.repository.NotificationRepository;
 import br.com.vanep.notification.service.PushNotificationService;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
 import java.math.BigDecimal;
 import java.time.Instant;
-import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -34,13 +37,14 @@ import org.springframework.transaction.support.TransactionTemplate;
 @SpringBootTest
 @ActiveProfiles("test")
 @Sql(scripts = "/db/clean.sql", executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
-class PushNotificationAfterCommitTest {
+class NotificationAfterCommitTest {
 
   @MockitoBean private PushNotificationService push;
   @Autowired private ApplicationEventPublisher events;
   @Autowired private TransactionTemplate transaction;
   @Autowired private UserRepository users;
   @Autowired private DriverRepository drivers;
+  @Autowired private NotificationRepository notifications;
 
   private DriverModel carlos;
 
@@ -79,8 +83,17 @@ class PushNotificationAfterCommitTest {
             eq(carlos.getUser().getId()),
             eq("Cadastro aprovado"),
             any(),
-            eq(Map.of("type", "DRIVER_APPROVED")));
+            argThat(data -> "DRIVER_APPROVED".equals(data.get("type"))));
     assertThat(thread.get()).startsWith("push-");
+    NotificationModel stored = notifications.findAll().getFirst();
+    assertThat(stored.getUserId()).isEqualTo(carlos.getUser().getId());
+    assertThat(stored.getType()).isEqualTo(NotificationType.DRIVER_APPROVED);
+    verify(push)
+        .sendToUser(
+            anyLong(),
+            any(),
+            any(),
+            argThat(data -> stored.getToken().equals(data.get("notificationToken"))));
   }
 
   @Test
@@ -92,5 +105,6 @@ class PushNotificationAfterCommitTest {
         });
 
     verify(push, after(500).never()).sendToUser(anyLong(), any(), any(), any());
+    assertThat(notifications.count()).isZero();
   }
 }

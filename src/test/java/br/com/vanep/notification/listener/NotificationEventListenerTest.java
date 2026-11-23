@@ -18,7 +18,8 @@ import br.com.vanep.conversation.repository.ConversationRepository;
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.event.DriverReviewEvent;
 import br.com.vanep.driver.model.DriverModel;
-import br.com.vanep.notification.service.PushNotificationService;
+import br.com.vanep.notification.enums.NotificationType;
+import br.com.vanep.notification.service.NotificationService;
 import br.com.vanep.proposal.event.ProposalEvent;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.service.UserService;
@@ -33,15 +34,15 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.support.ResourceBundleMessageSource;
 
 @ExtendWith(MockitoExtension.class)
-class PushNotificationEventListenerTest {
+class NotificationEventListenerTest {
 
-  @Mock private PushNotificationService push;
+  @Mock private NotificationService notifications;
   @Mock private UserService users;
   @Mock private ConversationRepository conversations;
   @Mock private ClientDriverRepository links;
   @Mock private DriverRepository drivers;
 
-  private PushNotificationEventListener listener;
+  private NotificationEventListener listener;
   private UserModel maria;
   private UserModel carlos;
   private ClientModel mariaClient;
@@ -54,7 +55,8 @@ class PushNotificationEventListenerTest {
     messages.setDefaultEncoding("UTF-8");
     messages.setFallbackToSystemLocale(false);
     listener =
-        new PushNotificationEventListener(push, users, conversations, links, drivers, messages);
+        new NotificationEventListener(
+            notifications, users, conversations, links, drivers, messages);
 
     maria = user(1L, "maria-uid", "Maria");
     carlos = user(2L, "carlos-uid", "Carlos");
@@ -70,12 +72,13 @@ class PushNotificationEventListenerTest {
 
     listener.notifyMessageSent(messageSent(ConversationParticipant.CLIENT));
 
-    verify(push)
-        .sendToUser(
+    verify(notifications)
+        .notifyUser(
             2L,
+            NotificationType.CHAT_MESSAGE,
             "Nova mensagem de Maria",
             "Toque para abrir a conversa.",
-            Map.of("type", "CHAT_MESSAGE", "conversationToken", "conv-1"));
+            Map.of("conversationToken", "conv-1"));
   }
 
   @Test
@@ -84,12 +87,13 @@ class PushNotificationEventListenerTest {
 
     listener.notifyMessageSent(messageSent(ConversationParticipant.DRIVER));
 
-    verify(push)
-        .sendToUser(
+    verify(notifications)
+        .notifyUser(
             1L,
+            NotificationType.CHAT_MESSAGE,
             "Nova mensagem de Carlos",
             "Toque para abrir a conversa.",
-            Map.of("type", "CHAT_MESSAGE", "conversationToken", "conv-1"));
+            Map.of("conversationToken", "conv-1"));
   }
 
   @Test
@@ -98,7 +102,7 @@ class PushNotificationEventListenerTest {
 
     listener.notifyMessageSent(messageSent(ConversationParticipant.CLIENT));
 
-    verify(push, never()).sendToUser(anyLong(), any(), any(), any());
+    verify(notifications, never()).notifyUser(anyLong(), any(), any(), any(), any());
   }
 
   @Test
@@ -107,12 +111,13 @@ class PushNotificationEventListenerTest {
 
     listener.notifyProposalSent(new ProposalEvent.Sent("prop-1", "maria-uid"));
 
-    verify(push)
-        .sendToUser(
+    verify(notifications)
+        .notifyUser(
             1L,
+            NotificationType.PROPOSAL_RECEIVED,
             "Nova proposta",
             "Você recebeu uma proposta de transporte. Toque para ver os detalhes.",
-            Map.of("type", "PROPOSAL_RECEIVED", "proposalToken", "prop-1"));
+            Map.of("proposalToken", "prop-1"));
   }
 
   @Test
@@ -121,12 +126,13 @@ class PushNotificationEventListenerTest {
 
     listener.notifyProposalAccepted(new ProposalEvent.Accepted("prop-1", "carlos-uid"));
 
-    verify(push)
-        .sendToUser(
+    verify(notifications)
+        .notifyUser(
             2L,
+            NotificationType.PROPOSAL_ACCEPTED,
             "Proposta aceita",
             "O responsável aceitou a sua proposta.",
-            Map.of("type", "PROPOSAL_ACCEPTED", "proposalToken", "prop-1"));
+            Map.of("proposalToken", "prop-1"));
   }
 
   @Test
@@ -135,12 +141,13 @@ class PushNotificationEventListenerTest {
 
     listener.notifyProposalDeclined(new ProposalEvent.Declined("prop-1", "carlos-uid"));
 
-    verify(push)
-        .sendToUser(
+    verify(notifications)
+        .notifyUser(
             2L,
+            NotificationType.PROPOSAL_DECLINED,
             "Proposta recusada",
             "O responsável recusou a sua proposta.",
-            Map.of("type", "PROPOSAL_DECLINED", "proposalToken", "prop-1"));
+            Map.of("proposalToken", "prop-1"));
   }
 
   @Test
@@ -152,10 +159,12 @@ class PushNotificationEventListenerTest {
 
     listener.notifyContractCreated(new ContractCreatedEvent("contract-1", "link-1"));
 
-    Map<String, String> data = Map.of("type", "CONTRACT_CREATED", "contractToken", "contract-1");
+    Map<String, String> data = Map.of("contractToken", "contract-1");
     String body = "Um novo contrato foi criado. Toque para ver os detalhes.";
-    verify(push).sendToUser(1L, "Contrato criado", body, data);
-    verify(push).sendToUser(2L, "Contrato criado", body, data);
+    verify(notifications)
+        .notifyUser(1L, NotificationType.CONTRACT_CREATED, "Contrato criado", body, data);
+    verify(notifications)
+        .notifyUser(2L, NotificationType.CONTRACT_CREATED, "Contrato criado", body, data);
   }
 
   @Test
@@ -164,12 +173,13 @@ class PushNotificationEventListenerTest {
 
     listener.notifyDriverReviewed(new DriverReviewEvent.Approved("driver-1"));
 
-    verify(push)
-        .sendToUser(
+    verify(notifications)
+        .notifyUser(
             2L,
+            NotificationType.DRIVER_APPROVED,
             "Cadastro aprovado",
             "Seu cadastro de motorista foi aprovado. Você já pode receber pedidos.",
-            Map.of("type", "DRIVER_APPROVED"));
+            Map.of());
   }
 
   @Test
@@ -178,12 +188,13 @@ class PushNotificationEventListenerTest {
 
     listener.notifyDriverReviewed(new DriverReviewEvent.Rejected("driver-1"));
 
-    verify(push)
-        .sendToUser(
+    verify(notifications)
+        .notifyUser(
             2L,
+            NotificationType.DRIVER_REJECTED,
             "Cadastro recusado",
             "Seu cadastro de motorista foi recusado. Toque para ver o motivo.",
-            Map.of("type", "DRIVER_REJECTED"));
+            Map.of());
   }
 
   private ConversationModel conversation() {

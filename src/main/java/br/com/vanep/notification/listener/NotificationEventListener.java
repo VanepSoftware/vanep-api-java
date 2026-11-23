@@ -8,12 +8,11 @@ import br.com.vanep.conversation.repository.ConversationRepository;
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.event.DriverReviewEvent;
 import br.com.vanep.notification.config.PushNotificationAsyncConfig;
-import br.com.vanep.notification.enums.PushNotificationType;
-import br.com.vanep.notification.service.PushNotificationService;
+import br.com.vanep.notification.enums.NotificationType;
+import br.com.vanep.notification.service.NotificationService;
 import br.com.vanep.proposal.event.ProposalEvent;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.service.UserService;
-import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 import org.springframework.context.MessageSource;
@@ -23,28 +22,26 @@ import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
 @Component
-public class PushNotificationEventListener {
-
-  public static final String TYPE_KEY = "type";
+public class NotificationEventListener {
 
   // Runs on a pool thread, outside any request, so the request's fixed pt-BR locale is not there.
   private static final Locale PT_BR = Locale.forLanguageTag("pt-BR");
 
-  private final PushNotificationService push;
+  private final NotificationService notifications;
   private final UserService users;
   private final ConversationRepository conversations;
   private final ClientDriverRepository links;
   private final DriverRepository drivers;
   private final MessageSource messages;
 
-  public PushNotificationEventListener(
-      PushNotificationService push,
+  public NotificationEventListener(
+      NotificationService notifications,
       UserService users,
       ConversationRepository conversations,
       ClientDriverRepository links,
       DriverRepository drivers,
       MessageSource messages) {
-    this.push = push;
+    this.notifications = notifications;
     this.users = users;
     this.conversations = conversations;
     this.links = links;
@@ -70,7 +67,7 @@ public class PushNotificationEventListener {
                       : conversation.getClient().getUser();
               send(
                   recipient,
-                  PushNotificationType.CHAT_MESSAGE,
+                  NotificationType.CHAT_MESSAGE,
                   Map.of("conversationToken", event.conversationToken()),
                   sender.getName());
             });
@@ -79,19 +76,19 @@ public class PushNotificationEventListener {
   @Async(PushNotificationAsyncConfig.EXECUTOR)
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
   public void notifyProposalSent(ProposalEvent.Sent event) {
-    send(event.clientUid(), PushNotificationType.PROPOSAL_RECEIVED, proposalData(event));
+    send(event.clientUid(), NotificationType.PROPOSAL_RECEIVED, proposalData(event));
   }
 
   @Async(PushNotificationAsyncConfig.EXECUTOR)
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
   public void notifyProposalAccepted(ProposalEvent.Accepted event) {
-    send(event.driverUid(), PushNotificationType.PROPOSAL_ACCEPTED, proposalData(event));
+    send(event.driverUid(), NotificationType.PROPOSAL_ACCEPTED, proposalData(event));
   }
 
   @Async(PushNotificationAsyncConfig.EXECUTOR)
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
   public void notifyProposalDeclined(ProposalEvent.Declined event) {
-    send(event.driverUid(), PushNotificationType.PROPOSAL_DECLINED, proposalData(event));
+    send(event.driverUid(), NotificationType.PROPOSAL_DECLINED, proposalData(event));
   }
 
   @Async(PushNotificationAsyncConfig.EXECUTOR)
@@ -102,18 +99,18 @@ public class PushNotificationEventListener {
         .findByToken(event.clientDriverToken())
         .ifPresent(
             link -> {
-              send(link.getClient().getUser(), PushNotificationType.CONTRACT_CREATED, data);
-              send(link.getDriver().getUser(), PushNotificationType.CONTRACT_CREATED, data);
+              send(link.getClient().getUser(), NotificationType.CONTRACT_CREATED, data);
+              send(link.getDriver().getUser(), NotificationType.CONTRACT_CREATED, data);
             });
   }
 
   @Async(PushNotificationAsyncConfig.EXECUTOR)
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
   public void notifyDriverReviewed(DriverReviewEvent event) {
-    PushNotificationType type =
+    NotificationType type =
         switch (event) {
-          case DriverReviewEvent.Approved approved -> PushNotificationType.DRIVER_APPROVED;
-          case DriverReviewEvent.Rejected rejected -> PushNotificationType.DRIVER_REJECTED;
+          case DriverReviewEvent.Approved approved -> NotificationType.DRIVER_APPROVED;
+          case DriverReviewEvent.Rejected rejected -> NotificationType.DRIVER_REJECTED;
         };
     drivers
         .findByToken(event.driverToken())
@@ -124,21 +121,17 @@ public class PushNotificationEventListener {
     return Map.of("proposalToken", event.proposalToken());
   }
 
-  void send(String recipientUid, PushNotificationType type, Map<String, String> data) {
+  void send(String recipientUid, NotificationType type, Map<String, String> data) {
     send(users.requireByToken(recipientUid), type, data);
   }
 
   void send(
-      UserModel recipient,
-      PushNotificationType type,
-      Map<String, String> data,
-      Object... titleArgs) {
-    Map<String, String> payload = new HashMap<>(data);
-    payload.put(TYPE_KEY, type.name());
-    push.sendToUser(
+      UserModel recipient, NotificationType type, Map<String, String> data, Object... titleArgs) {
+    notifications.notifyUser(
         recipient.getId(),
+        type,
         messages.getMessage(type.titleKey(), titleArgs, PT_BR),
         messages.getMessage(type.bodyKey(), null, PT_BR),
-        payload);
+        data);
   }
 }
