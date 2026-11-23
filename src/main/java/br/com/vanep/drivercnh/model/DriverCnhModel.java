@@ -100,12 +100,12 @@ public class DriverCnhModel implements DocumentSubmission {
   }
 
   @Override
-  public String number() {
+  public @Nullable String number() {
     return registrationNumber;
   }
 
   @Override
-  public LocalDate expiresOn() {
+  public @Nullable LocalDate expiresOn() {
     return validUntil;
   }
 

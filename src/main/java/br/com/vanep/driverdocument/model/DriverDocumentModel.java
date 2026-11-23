@@ -92,12 +92,12 @@ public class DriverDocumentModel implements DocumentSubmission {
   }
 
   @Override
-  public String number() {
+  public @Nullable String number() {
     return documentNumber;
   }
 
   @Override
-  public LocalDate expiresOn() {
+  public @Nullable LocalDate expiresOn() {
     return expiresAt;
   }
 
