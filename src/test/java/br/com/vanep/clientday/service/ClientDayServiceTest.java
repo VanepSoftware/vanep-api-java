@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 
 import br.com.vanep.client.model.ClientModel;
 import br.com.vanep.client.repository.ClientRepository;
+import br.com.vanep.clientday.dto.ClientDayChildDTO;
 import br.com.vanep.clientday.dto.ClientDayResponseDTO;
 import br.com.vanep.clientday.dto.ClientDayRiderDTO;
 import br.com.vanep.clientday.dto.ClientDayUpcomingDTO;
@@ -18,6 +19,7 @@ import br.com.vanep.contract.model.ContractItemModel;
 import br.com.vanep.contract.model.ContractModel;
 import br.com.vanep.contract.repository.ContractItemRepository;
 import br.com.vanep.dependent.model.DependentModel;
+import br.com.vanep.dependent.repository.DependentRepository;
 import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.routepassenger.dto.RoutePassengerDTO;
 import br.com.vanep.routepassenger.service.RoutePassengerQueryService;
@@ -63,6 +65,7 @@ class ClientDayServiceTest {
   @Mock private UserService users;
   @Mock private ClientRepository clients;
   @Mock private ContractItemRepository items;
+  @Mock private DependentRepository dependentRepository;
   @Mock private VehicleRepository vehicles;
   @Mock private RoutePassengerQueryService passengers;
   @Mock private MessageSource messages;
@@ -73,7 +76,9 @@ class ClientDayServiceTest {
 
   @BeforeEach
   void setUp() {
-    service = new ClientDayService(users, clients, items, vehicles, passengers, messages, CLOCK);
+    service =
+        new ClientDayService(
+            users, clients, items, dependentRepository, vehicles, passengers, messages, CLOCK);
 
     UserModel user = new UserModel();
     user.setId(1L);
@@ -231,6 +236,33 @@ class ClientDayServiceTest {
 
     assertThat(day.vans()).isEmpty();
     assertThat(day.upcoming()).isEmpty();
+  }
+
+  @Test
+  void listsTheChildrenNoContractCoversToday() {
+    DependentModel pedro = dependent("dep-pedro", "Pedro");
+    pedro.setId(1L);
+    DependentModel davi = dependent("dep-davi", "Davi");
+    davi.setId(2L);
+    DependentModel bia = dependent("dep-bia", "Bia");
+    bia.setId(3L);
+    DependentModel guardian = dependent("dep-self", "Marina");
+    guardian.setId(4L);
+    guardian.setSelf(true);
+    ContractItemModel startsLater =
+        item(carlos, bia, slot(DayOfWeek.MONDAY, RouteLeg.OUTBOUND, OperationShift.MORNING, 7, 0));
+    startsLater.getContract().setStartsOn(MONDAY.plusDays(3));
+    givenItems(
+        item(
+            carlos,
+            pedro,
+            slot(DayOfWeek.TUESDAY, RouteLeg.OUTBOUND, OperationShift.MORNING, 6, 50)),
+        startsLater);
+    when(dependentRepository.findByClientId(10L)).thenReturn(List.of(pedro, davi, bia, guardian));
+
+    assertThat(service.findMyDay(CALLER).childrenWithoutVan())
+        .extracting(ClientDayChildDTO::name)
+        .containsExactly("Bia", "Davi");
   }
 
   @Test

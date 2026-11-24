@@ -93,6 +93,7 @@ class ClientDayControllerTest {
     DependentModel ana = createDependent("Ana");
     ClientDriverModel link = createLink(driver);
     contracts.save(activeContract(link, everyDayItem(ana)));
+    createDependent("Davi");
 
     mockMvc
         .perform(get("/api/clients/me/day").with(clientJwt()))
@@ -106,7 +107,9 @@ class ClientDayControllerTest {
         .andExpect(jsonPath("$.vans[0].riders[0].name").value("Ana"))
         .andExpect(jsonPath("$.vans[0].boardingStart").value("06:40:00"))
         .andExpect(jsonPath("$.vans[0].schoolDeparture").value("12:30:00"))
-        .andExpect(jsonPath("$.upcoming.length()").value(0));
+        .andExpect(jsonPath("$.upcoming.length()").value(0))
+        .andExpect(jsonPath("$.childrenWithoutVan.length()").value(1))
+        .andExpect(jsonPath("$.childrenWithoutVan[0].name").value("Davi"));
   }
 
   @Test

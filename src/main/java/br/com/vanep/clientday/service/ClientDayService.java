@@ -2,6 +2,7 @@ package br.com.vanep.clientday.service;
 
 import br.com.vanep.client.model.ClientModel;
 import br.com.vanep.client.repository.ClientRepository;
+import br.com.vanep.clientday.dto.ClientDayChildDTO;
 import br.com.vanep.clientday.dto.ClientDayResponseDTO;
 import br.com.vanep.clientday.dto.ClientDayRiderDTO;
 import br.com.vanep.clientday.dto.ClientDayUpcomingDTO;
@@ -10,6 +11,7 @@ import br.com.vanep.contract.model.ContractItemModel;
 import br.com.vanep.contract.model.ContractModel;
 import br.com.vanep.contract.repository.ContractItemRepository;
 import br.com.vanep.dependent.model.DependentModel;
+import br.com.vanep.dependent.repository.DependentRepository;
 import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.routepassenger.dto.RoutePassengerDTO;
 import br.com.vanep.routepassenger.service.RoutePassengerQueryService;
@@ -32,6 +34,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
@@ -54,6 +58,7 @@ public class ClientDayService {
   private final UserService userService;
   private final ClientRepository clientRepository;
   private final ContractItemRepository contractItems;
+  private final DependentRepository dependentRepository;
   private final VehicleRepository vehicleRepository;
   private final RoutePassengerQueryService passengerService;
   private final MessageSource messages;
@@ -63,6 +68,7 @@ public class ClientDayService {
       UserService userService,
       ClientRepository clientRepository,
       ContractItemRepository contractItems,
+      DependentRepository dependentRepository,
       VehicleRepository vehicleRepository,
       RoutePassengerQueryService passengerService,
       MessageSource messages,
@@ -70,6 +76,7 @@ public class ClientDayService {
     this.userService = userService;
     this.clientRepository = clientRepository;
     this.contractItems = contractItems;
+    this.dependentRepository = dependentRepository;
     this.vehicleRepository = vehicleRepository;
     this.passengerService = passengerService;
     this.messages = messages;
@@ -104,7 +111,30 @@ public class ClientDayService {
                     Comparator.nullsLast(Comparator.naturalOrder())))
             .toList();
     List<ClientDayUpcomingDTO> upcoming = vans.isEmpty() ? upcomingDays(items, today) : List.of();
-    return new ClientDayResponseDTO(today, vans, upcoming);
+    return new ClientDayResponseDTO(
+        today, vans, upcoming, childrenWithoutVan(client, items, today));
+  }
+
+  /**
+   * Dependents of the client that no contract in force today covers. The client registered as their
+   * own passenger is left out: they are not a child waiting for a van.
+   */
+  private List<ClientDayChildDTO> childrenWithoutVan(
+      ClientModel client, List<ContractItemModel> items, LocalDate today) {
+    Set<Long> covered =
+        items.stream()
+            .filter(item -> isInForce(item.getContract(), today))
+            .map(item -> item.getDependent().getId())
+            .collect(Collectors.toSet());
+    return dependentRepository.findByClientId(client.getId()).stream()
+        .filter(dependent -> !dependent.isSelf() && !covered.contains(dependent.getId()))
+        .sorted(Comparator.comparing(DependentModel::getName))
+        .map(dependent -> new ClientDayChildDTO(dependent.getToken(), dependent.getName()))
+        .toList();
+  }
+
+  private static boolean isInForce(ContractModel contract, LocalDate date) {
+    return !contract.getStartsOn().isAfter(date) && !contract.getEndsOn().isBefore(date);
   }
 
   /**
@@ -149,7 +179,7 @@ public class ClientDayService {
   /** The slots of the item on {@code date}, none when its contract is not in force then. */
   private static List<ScheduleSlotModel> slotsOn(ContractItemModel item, LocalDate date) {
     ContractModel contract = item.getContract();
-    if (contract.getStartsOn().isAfter(date) || contract.getEndsOn().isBefore(date)) {
+    if (!isInForce(contract, date)) {
       return List.of();
     }
     return item.getSchedule().getSlots().stream()
