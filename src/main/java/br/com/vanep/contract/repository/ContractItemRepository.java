@@ -31,6 +31,26 @@ public interface ContractItemRepository extends JpaRepository<ContractItemModel,
       """)
   List<ContractItemModel> findByContractIdIn(Collection<Long> contractIds);
 
+  /**
+   * Items of the client's ACTIVE contracts in force on {@code serviceDate}, with their schedule.
+   */
+  @Query(
+      """
+      select distinct item from ContractItemModel item
+      join fetch item.contract contract
+      join fetch contract.clientDriver clientDriver
+      join fetch clientDriver.driver driver
+      join fetch driver.user
+      join fetch item.dependent
+      join fetch item.school
+      join fetch item.schedule schedule
+      left join fetch schedule.slots
+      where clientDriver.client.id = :clientId
+        and contract.status = br.com.vanep.contract.enums.ContractStatus.ACTIVE
+        and contract.startsOn <= :serviceDate and contract.endsOn >= :serviceDate
+      """)
+  List<ContractItemModel> findActiveOfClientOn(Long clientId, LocalDate serviceDate);
+
   @Query(
       """
       select slot from ScheduleSlotModel slot
