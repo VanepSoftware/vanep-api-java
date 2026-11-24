@@ -46,10 +46,17 @@ public class AuthErrorAdvice {
 
   @ExceptionHandler(SignupDuplicateException.class)
   public ResponseEntity<AuthErrorResponseDTO> handleDuplicate(SignupDuplicateException exception) {
+    List<AuthErrorResponseDTO.FieldErrorDTO> errors =
+        exception.getDuplicates().stream()
+            .map(
+                duplicate ->
+                    new AuthErrorResponseDTO.FieldErrorDTO(
+                        duplicate.field(), message(duplicate.messageKey())))
+            .toList();
     return ResponseEntity.status(HttpStatus.CONFLICT)
         .body(
-            AuthErrorResponseDTO.of(
-                exception.getCode().value(), message(exception.getMessageKey())));
+            new AuthErrorResponseDTO(
+                exception.getCode().value(), errors.getFirst().message(), errors));
   }
 
   @ExceptionHandler(InvalidSignupTicketException.class)

@@ -19,6 +19,8 @@ public interface UserRepository extends JpaRepository<UserModel, Long> {
 
   boolean existsByDocument(String document);
 
+  boolean existsByPhone(String phone);
+
   List<UserModel> findByTypeAndRoleIdIsNull(UserType type);
 
   @Modifying(flushAutomatically = true)

@@ -1,6 +1,7 @@
 package br.com.vanep.auth.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.contains;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -226,6 +227,62 @@ class SignupApiControllerTest {
   }
 
   @Test
+  void signupListsEveryDuplicatedFieldAtOnce() throws Exception {
+    persistExistingUser();
+
+    mockMvc
+        .perform(
+            post("/api/auth/signup/client")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {"name":"Other","email":"existing@vanep.com","password":"Secret@1",
+                     "document":"529.982.247-25","phone":"11987654321","acceptTerms":true}
+                    """))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("email_duplicate"))
+        .andExpect(jsonPath("$.errors[*].field").value(contains("email", "document", "phone")));
+
+    assertThat(users.count()).isEqualTo(1);
+  }
+
+  @Test
+  void checkAnswersNoContentWhenNothingIsTaken() throws Exception {
+    persistExistingUser();
+
+    mockMvc
+        .perform(
+            post("/api/auth/signup/check")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {"email":"new@vanep.com","document":"%s","phone":"11911112222"}
+                    """
+                        .formatted(VALID_CPF)))
+        .andExpect(status().isNoContent());
+  }
+
+  @Test
+  void checkListsEveryTakenFieldWithoutCreatingAnAccount() throws Exception {
+    persistExistingUser();
+
+    mockMvc
+        .perform(
+            post("/api/auth/signup/check")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {"document":"529.982.247-25","phone":"(11) 98765-4321"}
+                    """))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("document_duplicate"))
+        .andExpect(jsonPath("$.errors[*].field").value(contains("document", "phone")))
+        .andExpect(jsonPath("$.errors[1].message").value("Já existe uma conta com este telefone."));
+
+    assertThat(users.count()).isEqualTo(1);
+  }
+
+  @Test
   void authRoutesAnswerWithoutATokenAndEvenWithAStaleOne() throws Exception {
     mockMvc
         .perform(
@@ -251,6 +308,7 @@ class SignupApiControllerTest {
     existing.setName("Existing");
     existing.setEmail("existing@vanep.com");
     existing.setDocument(OTHER_CPF);
+    existing.setPhone("11987654321");
     existing.setPassword(passwordEncoder.encode("secret1"));
     users.save(existing);
   }
