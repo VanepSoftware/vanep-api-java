@@ -2,6 +2,7 @@ package br.com.vanep.clientday.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.groups.Tuple.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
@@ -10,6 +11,7 @@ import br.com.vanep.client.model.ClientModel;
 import br.com.vanep.client.repository.ClientRepository;
 import br.com.vanep.clientday.dto.ClientDayResponseDTO;
 import br.com.vanep.clientday.dto.ClientDayRiderDTO;
+import br.com.vanep.clientday.dto.ClientDayUpcomingDTO;
 import br.com.vanep.clientday.dto.ClientDayVanDTO;
 import br.com.vanep.clientdriver.model.ClientDriverModel;
 import br.com.vanep.contract.model.ContractItemModel;
@@ -130,6 +132,8 @@ class ClientDayServiceTest {
     assertThat(morning.boardingEnd()).isEqualTo(LocalTime.of(6, 50));
     assertThat(morning.schoolDeparture()).isEqualTo(LocalTime.of(12, 30));
 
+    assertThat(day.upcoming()).isEmpty();
+
     ClientDayVanDTO afternoon = day.vans().get(1);
     assertThat(afternoon.driverName()).isEqualTo("Rita Lima");
     assertThat(afternoon.vehicleModel()).isNull();
@@ -159,14 +163,74 @@ class ClientDayServiceTest {
   }
 
   @Test
-  void hasNoVansWhenNoChildRidesToday() {
+  void listsTheNextSchoolDaysWhenNoChildRidesToday() {
     givenItems(
         item(
             carlos,
             dependent("dep-pedro", "Pedro"),
-            slot(DayOfWeek.TUESDAY, RouteLeg.OUTBOUND, OperationShift.MORNING, 6, 50)));
+            slot(DayOfWeek.TUESDAY, RouteLeg.OUTBOUND, OperationShift.MORNING, 6, 50),
+            slot(DayOfWeek.TUESDAY, RouteLeg.RETURN, OperationShift.MORNING, 12, 30),
+            slot(DayOfWeek.THURSDAY, RouteLeg.OUTBOUND, OperationShift.MORNING, 7, 0)));
 
-    assertThat(service.findMyDay(CALLER).vans()).isEmpty();
+    ClientDayResponseDTO day = service.findMyDay(CALLER);
+
+    assertThat(day.vans()).isEmpty();
+    assertThat(day.upcoming())
+        .extracting(
+            ClientDayUpcomingDTO::date,
+            ClientDayUpcomingDTO::going,
+            ClientDayUpcomingDTO::returning,
+            ClientDayUpcomingDTO::firstPickup)
+        .containsExactly(
+            tuple(MONDAY.plusDays(1), true, true, LocalTime.of(6, 50)),
+            tuple(MONDAY.plusDays(2), false, false, null),
+            tuple(MONDAY.plusDays(3), true, false, LocalTime.of(7, 0)),
+            tuple(MONDAY.plusDays(4), false, false, null),
+            tuple(MONDAY.plusDays(7), false, false, null));
+  }
+
+  @Test
+  void slidesTheWindowSoALaterNextRouteIsShown() {
+    ContractItemModel late =
+        item(
+            carlos,
+            dependent("dep-pedro", "Pedro"),
+            slot(DayOfWeek.WEDNESDAY, RouteLeg.OUTBOUND, OperationShift.MORNING, 6, 50));
+    late.getContract().setStartsOn(MONDAY.plusDays(8));
+    givenItems(late);
+
+    assertThat(service.findMyDay(CALLER).upcoming())
+        .hasSize(5)
+        .last()
+        .satisfies(
+            last -> {
+              assertThat(last.date()).isEqualTo(MONDAY.plusDays(9));
+              assertThat(last.going()).isTrue();
+            });
+  }
+
+  @Test
+  void showsAWeekendDayOnlyWhenSomeoneRides() {
+    givenItems(
+        item(
+            carlos,
+            dependent("dep-pedro", "Pedro"),
+            slot(DayOfWeek.SATURDAY, RouteLeg.OUTBOUND, OperationShift.MORNING, 8, 0)));
+
+    assertThat(service.findMyDay(CALLER).upcoming())
+        .extracting(ClientDayUpcomingDTO::date)
+        .contains(MONDAY.plusDays(5))
+        .doesNotContain(MONDAY.plusDays(6));
+  }
+
+  @Test
+  void hasNothingUpcomingWithoutAnyRideAhead() {
+    givenItems();
+
+    ClientDayResponseDTO day = service.findMyDay(CALLER);
+
+    assertThat(day.vans()).isEmpty();
+    assertThat(day.upcoming()).isEmpty();
   }
 
   @Test
@@ -179,7 +243,8 @@ class ClientDayServiceTest {
   }
 
   private void givenItems(ContractItemModel... contractItems) {
-    when(items.findActiveOfClientOn(10L, MONDAY)).thenReturn(List.of(contractItems));
+    when(items.findActiveOfClientBetween(10L, MONDAY, MONDAY.plusDays(14)))
+        .thenReturn(List.of(contractItems));
   }
 
   private static DriverModel driver(Long id, String token, String name) {
@@ -212,6 +277,8 @@ class ClientDayServiceTest {
     link.setDriver(driver);
     ContractModel contract = new ContractModel();
     contract.setClientDriver(link);
+    contract.setStartsOn(MONDAY.minusMonths(1));
+    contract.setEndsOn(MONDAY.plusMonths(2));
     ScheduleModel schedule = new ScheduleModel();
     for (ScheduleSlotModel slot : slots) {
       schedule.addSlot(slot);

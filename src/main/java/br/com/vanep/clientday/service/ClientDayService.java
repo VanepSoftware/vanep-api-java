@@ -4,8 +4,10 @@ import br.com.vanep.client.model.ClientModel;
 import br.com.vanep.client.repository.ClientRepository;
 import br.com.vanep.clientday.dto.ClientDayResponseDTO;
 import br.com.vanep.clientday.dto.ClientDayRiderDTO;
+import br.com.vanep.clientday.dto.ClientDayUpcomingDTO;
 import br.com.vanep.clientday.dto.ClientDayVanDTO;
 import br.com.vanep.contract.model.ContractItemModel;
+import br.com.vanep.contract.model.ContractModel;
 import br.com.vanep.contract.repository.ContractItemRepository;
 import br.com.vanep.dependent.model.DependentModel;
 import br.com.vanep.driver.model.DriverModel;
@@ -30,6 +32,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.stream.IntStream;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.HttpStatus;
@@ -44,6 +47,9 @@ import org.springframework.web.server.ResponseStatusException;
  */
 @Service
 public class ClientDayService {
+
+  static final int DAYS_TO_LOOK_AHEAD = 14;
+  static final int UPCOMING_DAYS_SHOWN = 5;
 
   private final UserService userService;
   private final ClientRepository clientRepository;
@@ -75,13 +81,14 @@ public class ClientDayService {
     ClientModel client = resolveClient(callerUid);
     LocalDate today = LocalDate.now(clock.withZone(TripService.SERVICE_ZONE));
 
+    List<ContractItemModel> items =
+        contractItems.findActiveOfClientBetween(
+            client.getId(), today, today.plusDays(DAYS_TO_LOOK_AHEAD));
+
     Map<VanKey, List<RiderSlot>> slotsByVan = new LinkedHashMap<>();
-    for (ContractItemModel item : contractItems.findActiveOfClientOn(client.getId(), today)) {
+    for (ContractItemModel item : items) {
       DriverModel driver = item.getContract().getClientDriver().getDriver();
-      for (ScheduleSlotModel slot : item.getSchedule().getSlots()) {
-        if (slot.getWeekday() != today.getDayOfWeek()) {
-          continue;
-        }
+      for (ScheduleSlotModel slot : slotsOn(item, today)) {
         slotsByVan
             .computeIfAbsent(new VanKey(driver, slot.getShift()), key -> new ArrayList<>())
             .add(new RiderSlot(item.getDependent(), slot.getLeg(), slot.getPickupTime()));
@@ -96,7 +103,58 @@ public class ClientDayService {
                     ClientDayVanDTO::departureTime,
                     Comparator.nullsLast(Comparator.naturalOrder())))
             .toList();
-    return new ClientDayResponseDTO(today, vans);
+    List<ClientDayUpcomingDTO> upcoming = vans.isEmpty() ? upcomingDays(items, today) : List.of();
+    return new ClientDayResponseDTO(today, vans, upcoming);
+  }
+
+  /**
+   * The next {@value #UPCOMING_DAYS_SHOWN} school days after {@code today}: every Monday to Friday,
+   * plus weekend days on which some child rides. Empty when nobody rides within the look-ahead
+   * window.
+   */
+  private static List<ClientDayUpcomingDTO> upcomingDays(
+      List<ContractItemModel> items, LocalDate today) {
+    List<ClientDayUpcomingDTO> days =
+        IntStream.rangeClosed(1, DAYS_TO_LOOK_AHEAD)
+            .mapToObj(offset -> upcomingDay(items, today.plusDays(offset)))
+            .filter(day -> day.date().getDayOfWeek().getValue() <= 5 || day.firstPickup() != null)
+            .toList();
+    int firstRide =
+        IntStream.range(0, days.size())
+            .filter(index -> days.get(index).going() || days.get(index).returning())
+            .findFirst()
+            .orElse(-1);
+    if (firstRide < 0) {
+      return List.of();
+    }
+    // Keeps the next route visible even when it is further than the days shown.
+    int from = Math.max(0, firstRide - UPCOMING_DAYS_SHOWN + 1);
+    return days.subList(from, Math.min(days.size(), from + UPCOMING_DAYS_SHOWN));
+  }
+
+  private static ClientDayUpcomingDTO upcomingDay(List<ContractItemModel> items, LocalDate date) {
+    List<ScheduleSlotModel> slots =
+        items.stream().flatMap(item -> slotsOn(item, date).stream()).toList();
+    return new ClientDayUpcomingDTO(
+        date,
+        slots.stream().anyMatch(slot -> slot.getLeg() == RouteLeg.OUTBOUND),
+        slots.stream().anyMatch(slot -> slot.getLeg() == RouteLeg.RETURN),
+        slots.stream()
+            .map(ScheduleSlotModel::getPickupTime)
+            .filter(Objects::nonNull)
+            .min(Comparator.naturalOrder())
+            .orElse(null));
+  }
+
+  /** The slots of the item on {@code date}, none when its contract is not in force then. */
+  private static List<ScheduleSlotModel> slotsOn(ContractItemModel item, LocalDate date) {
+    ContractModel contract = item.getContract();
+    if (contract.getStartsOn().isAfter(date) || contract.getEndsOn().isBefore(date)) {
+      return List.of();
+    }
+    return item.getSchedule().getSlots().stream()
+        .filter(slot -> slot.getWeekday() == date.getDayOfWeek())
+        .toList();
   }
 
   private ClientDayVanDTO toVan(VanKey key, List<RiderSlot> slots, LocalDate today) {

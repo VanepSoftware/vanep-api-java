@@ -105,7 +105,8 @@ class ClientDayControllerTest {
         .andExpect(jsonPath("$.vans[0].shift").value("MORNING"))
         .andExpect(jsonPath("$.vans[0].riders[0].name").value("Ana"))
         .andExpect(jsonPath("$.vans[0].boardingStart").value("06:40:00"))
-        .andExpect(jsonPath("$.vans[0].schoolDeparture").value("12:30:00"));
+        .andExpect(jsonPath("$.vans[0].schoolDeparture").value("12:30:00"))
+        .andExpect(jsonPath("$.upcoming.length()").value(0));
   }
 
   @Test
@@ -120,6 +121,24 @@ class ClientDayControllerTest {
         .perform(get("/api/clients/me/day").with(clientJwt()))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.vans.length()").value(0));
+  }
+
+  @Test
+  void listsTheNextDaysWhenNothingRidesToday() throws Exception {
+    DriverModel driver = createDriver();
+    ClientDriverModel link = createLink(driver);
+    DependentModel ana = createDependent("Ana");
+    ContractItemModel item = everyDayItem(ana);
+    DayOfWeek today = LocalDate.now(TripService.SERVICE_ZONE).getDayOfWeek();
+    item.getSchedule().getSlots().removeIf(slot -> slot.getWeekday() == today);
+    contracts.save(activeContract(link, item));
+
+    mockMvc
+        .perform(get("/api/clients/me/day").with(clientJwt()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.vans.length()").value(0))
+        .andExpect(jsonPath("$.upcoming.length()").value(5))
+        .andExpect(jsonPath("$.upcoming[0].going").exists());
   }
 
   @Test

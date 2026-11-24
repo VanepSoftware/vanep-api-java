@@ -47,9 +47,9 @@ public interface ContractItemRepository extends JpaRepository<ContractItemModel,
       left join fetch schedule.slots
       where clientDriver.client.id = :clientId
         and contract.status = br.com.vanep.contract.enums.ContractStatus.ACTIVE
-        and contract.startsOn <= :serviceDate and contract.endsOn >= :serviceDate
+        and contract.startsOn <= :to and contract.endsOn >= :from
       """)
-  List<ContractItemModel> findActiveOfClientOn(Long clientId, LocalDate serviceDate);
+  List<ContractItemModel> findActiveOfClientBetween(Long clientId, LocalDate from, LocalDate to);
 
   @Query(
       """
