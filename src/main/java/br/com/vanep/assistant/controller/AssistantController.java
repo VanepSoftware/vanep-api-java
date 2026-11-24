@@ -5,10 +5,12 @@ import br.com.vanep.assistant.dto.AssistantInviteResponseDTO;
 import br.com.vanep.assistant.dto.AssistantListItemResponseDTO;
 import br.com.vanep.assistant.dto.AssistantMeSummaryResponseDTO;
 import br.com.vanep.assistant.dto.AssistantPendingInviteDTO;
+import br.com.vanep.assistant.dto.AssistantVanResponseDTO;
 import br.com.vanep.assistant.service.AssistantInviteService;
 import br.com.vanep.assistant.service.AssistantLinkService;
 import br.com.vanep.assistant.service.AssistantPhotoService;
 import br.com.vanep.assistant.service.AssistantProfileService;
+import br.com.vanep.assistant.service.AssistantVansService;
 import br.com.vanep.auth.security.SecurityHelper;
 import br.com.vanep.media.web.MediaResponder;
 import jakarta.validation.Valid;
@@ -42,13 +44,16 @@ public class AssistantController {
   private final AssistantProfileService profileService;
   private final AssistantPhotoService photoService;
   private final MediaResponder mediaResponder;
+  private final AssistantVansService vansService;
 
   public AssistantController(
       AssistantInviteService inviteService,
       AssistantLinkService linkService,
       AssistantProfileService profileService,
       AssistantPhotoService photoService,
-      MediaResponder mediaResponder) {
+      MediaResponder mediaResponder,
+      AssistantVansService vansService) {
+    this.vansService = vansService;
     this.photoService = photoService;
     this.mediaResponder = mediaResponder;
     this.inviteService = inviteService;
@@ -66,6 +71,12 @@ public class AssistantController {
   @PreAuthorize("isAuthenticated()")
   public AssistantPendingInviteDTO getPendingInvite(Authentication authentication) {
     return inviteService.getPendingInvite(SecurityHelper.requireCallerUid(authentication));
+  }
+
+  @GetMapping("/me/vans")
+  @PreAuthorize("isAuthenticated()")
+  public List<AssistantVanResponseDTO> myVans(Authentication authentication) {
+    return vansService.listMine(SecurityHelper.requireCallerUid(authentication));
   }
 
   @PostMapping("/me/invite/accept")

@@ -20,6 +20,8 @@ import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
+import br.com.vanep.vehicle.model.VehicleModel;
+import br.com.vanep.vehicle.repository.VehicleRepository;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -47,6 +49,7 @@ class AssistantControllerTest {
   @Autowired private DriverRepository drivers;
   @Autowired private AssistantRepository assistants;
   @Autowired private AssistantInviteRepository invites;
+  @Autowired private VehicleRepository vehicles;
 
   private MockMvc mockMvc;
 
@@ -354,6 +357,57 @@ class AssistantControllerTest {
   }
 
   @Test
+  void getMeCountsDriversTheAssistantWorkedWithBefore() throws Exception {
+    AssistantModel assistant =
+        createLinkedAssistant("history@vanep.com", "19202122232", AssistantStatus.ACTIVE);
+    DriverModel formerDriver =
+        createDriver(createUser(UserType.DRIVER, "Former", "former@vanep.com", "52998224725"));
+    acceptedInvite(formerDriver, assistant);
+    acceptedInvite(formerDriver, assistant);
+    acceptedInvite(driver, assistant);
+
+    mockMvc
+        .perform(get("/api/assistants/me").with(assistantJwt(assistant.getUser())))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.formerLinkCount").value(1));
+  }
+
+  @Test
+  void myVansShowsTheMainVehicleOfTheLinkedDriver() throws Exception {
+    AssistantModel assistant =
+        createLinkedAssistant("vans@vanep.com", "20212223242", AssistantStatus.ACTIVE);
+    saveVehicle(driver, "ABC1D23", "Sprinter");
+    saveVehicle(driver, "XYZ9F87", "Ducato");
+
+    mockMvc
+        .perform(get("/api/assistants/me/vans").with(assistantJwt(assistant.getUser())))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.length()").value(1))
+        .andExpect(jsonPath("$[0].plate").value("ABC1D23"))
+        .andExpect(jsonPath("$[0].model").value("Sprinter"))
+        .andExpect(jsonPath("$[0].driverToken").value(driver.getToken()))
+        .andExpect(jsonPath("$[0].driverName").value("Main Driver"))
+        .andExpect(jsonPath("$[0].studentCount").value(0))
+        .andExpect(jsonPath("$[0].hasRouteToday").value(false));
+  }
+
+  @Test
+  void myVansIsEmptyForAnUnlinkedAssistant() throws Exception {
+    AssistantModel assistant = createAssistant("novans@vanep.com", "21222324252");
+    saveVehicle(driver, "ABC1D23", "Sprinter");
+
+    mockMvc
+        .perform(get("/api/assistants/me/vans").with(assistantJwt(assistant.getUser())))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.length()").value(0));
+  }
+
+  @Test
+  void myVansUnauthorizedWithoutJwt() throws Exception {
+    mockMvc.perform(get("/api/assistants/me/vans")).andExpect(status().isUnauthorized());
+  }
+
+  @Test
   void getMeForbiddenForDriver() throws Exception {
     mockMvc.perform(get("/api/assistants/me").with(driverJwt())).andExpect(status().isForbidden());
   }
@@ -511,5 +565,24 @@ class AssistantControllerTest {
     invite.setAssistant(assistant);
     invite.setExpiresAt(expiresAt);
     return invites.save(invite);
+  }
+
+  private void acceptedInvite(DriverModel inviteDriver, AssistantModel assistant) {
+    AssistantInviteModel invite = saveInvite(inviteDriver, assistant, Instant.now());
+    invite.setStatus(AssistantInviteStatus.ACCEPTED);
+    invite.setRespondedAt(Instant.now());
+    invites.save(invite);
+  }
+
+  private VehicleModel saveVehicle(DriverModel owner, String plate, String model) {
+    VehicleModel vehicle = new VehicleModel();
+    vehicle.setDriver(owner);
+    vehicle.setPlate(plate);
+    vehicle.setBrand("Brand");
+    vehicle.setModel(model);
+    vehicle.setManufactureYear(2020);
+    vehicle.setColor("Branca");
+    vehicle.setCapacity(15);
+    return vehicles.save(vehicle);
   }
 }

@@ -5,6 +5,7 @@ import br.com.vanep.assistant.model.AssistantInviteModel;
 import java.time.Instant;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 
 public interface AssistantInviteRepository extends JpaRepository<AssistantInviteModel, Long> {
 
@@ -18,4 +19,17 @@ public interface AssistantInviteRepository extends JpaRepository<AssistantInvite
 
   Optional<AssistantInviteModel> findByDriverIdAndAssistantIdAndStatus(
       Long driverId, Long assistantId, AssistantInviteStatus status);
+
+  /**
+   * Drivers the assistant once worked with: distinct drivers of accepted invites, leaving out
+   * {@code currentDriverId} (pass -1 when the assistant has no driver now).
+   */
+  @Query(
+      """
+      select count(distinct invite.driver.id) from AssistantInviteModel invite
+      where invite.assistant.id = :assistantId
+        and invite.status = br.com.vanep.assistant.enums.AssistantInviteStatus.ACCEPTED
+        and invite.driver.id <> :currentDriverId
+      """)
+  long countFormerDrivers(Long assistantId, Long currentDriverId);
 }

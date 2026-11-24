@@ -34,9 +34,17 @@ public class AssistantMapper {
   }
 
   public AssistantMeSummaryResponseDTO toMeSummary(
-      AssistantModel assistant, UserMeResponseDTO user, AssistantPendingInviteDTO pendingInvite) {
+      AssistantModel assistant,
+      UserMeResponseDTO user,
+      AssistantPendingInviteDTO pendingInvite,
+      long formerLinkCount) {
     return new AssistantMeSummaryResponseDTO(
-        assistant.getToken(), photoUrl(assistant), assistant.getStatus(), pendingInvite, user);
+        assistant.getToken(),
+        photoUrl(assistant),
+        assistant.getStatus(),
+        pendingInvite,
+        user,
+        formerLinkCount);
   }
 
   public AssistantPendingInviteDTO toPendingInvite(AssistantInviteModel invite) {

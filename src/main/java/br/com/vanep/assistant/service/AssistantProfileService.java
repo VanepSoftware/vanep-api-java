@@ -48,7 +48,15 @@ public class AssistantProfileService {
     UserModel user = userService.requireByTokenAndType(callerUid, UserType.ASSISTANT);
     AssistantModel assistant = requireByUserId(user.getId());
     return mapper.toMeSummary(
-        assistant, userService.toMeResponse(user), resolvePendingInvite(assistant));
+        assistant,
+        userService.toMeResponse(user),
+        resolvePendingInvite(assistant),
+        countFormerLinks(assistant));
+  }
+
+  private long countFormerLinks(AssistantModel assistant) {
+    Long currentDriverId = assistant.getDriver() == null ? -1L : assistant.getDriver().getId();
+    return inviteRepository.countFormerDrivers(assistant.getId(), currentDriverId);
   }
 
   private AssistantModel requireByUserId(Long userId) {
