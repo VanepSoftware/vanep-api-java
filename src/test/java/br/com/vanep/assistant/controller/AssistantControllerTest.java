@@ -403,6 +403,50 @@ class AssistantControllerTest {
   }
 
   @Test
+  void myStudentsIsEmptyWhenTheShiftHasNoPassengers() throws Exception {
+    AssistantModel assistant =
+        createLinkedAssistant("students@vanep.com", "22232425262", AssistantStatus.ACTIVE);
+    VehicleModel vehicle = saveVehicle(driver, "ABC1D23", "Sprinter");
+
+    mockMvc
+        .perform(
+            get("/api/assistants/me/vans/" + vehicle.getToken() + "/students")
+                .param("shift", "MORNING")
+                .with(assistantJwt(assistant.getUser())))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.length()").value(0));
+  }
+
+  @Test
+  void myStudentsIsNotFoundForAVanOfAnotherDriver() throws Exception {
+    AssistantModel assistant =
+        createLinkedAssistant("foreign@vanep.com", "23242526272", AssistantStatus.ACTIVE);
+    DriverModel stranger =
+        createDriver(createUser(UserType.DRIVER, "Stranger", "stranger@vanep.com", "39053344705"));
+    VehicleModel vehicle = saveVehicle(stranger, "QWE4R56", "Master");
+
+    mockMvc
+        .perform(
+            get("/api/assistants/me/vans/" + vehicle.getToken() + "/students")
+                .param("shift", "MORNING")
+                .with(assistantJwt(assistant.getUser())))
+        .andExpect(status().isNotFound());
+  }
+
+  @Test
+  void myStudentsRequiresTheShift() throws Exception {
+    AssistantModel assistant =
+        createLinkedAssistant("noshift@vanep.com", "24252627282", AssistantStatus.ACTIVE);
+    VehicleModel vehicle = saveVehicle(driver, "ABC1D23", "Sprinter");
+
+    mockMvc
+        .perform(
+            get("/api/assistants/me/vans/" + vehicle.getToken() + "/students")
+                .with(assistantJwt(assistant.getUser())))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
   void myVansUnauthorizedWithoutJwt() throws Exception {
     mockMvc.perform(get("/api/assistants/me/vans")).andExpect(status().isUnauthorized());
   }

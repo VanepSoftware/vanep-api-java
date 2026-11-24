@@ -5,6 +5,7 @@ import br.com.vanep.assistant.dto.AssistantInviteResponseDTO;
 import br.com.vanep.assistant.dto.AssistantListItemResponseDTO;
 import br.com.vanep.assistant.dto.AssistantMeSummaryResponseDTO;
 import br.com.vanep.assistant.dto.AssistantPendingInviteDTO;
+import br.com.vanep.assistant.dto.AssistantStudentResponseDTO;
 import br.com.vanep.assistant.dto.AssistantVanResponseDTO;
 import br.com.vanep.assistant.service.AssistantInviteService;
 import br.com.vanep.assistant.service.AssistantLinkService;
@@ -13,6 +14,7 @@ import br.com.vanep.assistant.service.AssistantProfileService;
 import br.com.vanep.assistant.service.AssistantVansService;
 import br.com.vanep.auth.security.SecurityHelper;
 import br.com.vanep.media.web.MediaResponder;
+import br.com.vanep.shared.enums.OperationShift;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.core.io.InputStreamResource;
@@ -77,6 +79,16 @@ public class AssistantController {
   @PreAuthorize("isAuthenticated()")
   public List<AssistantVanResponseDTO> myVans(Authentication authentication) {
     return vansService.listMine(SecurityHelper.requireCallerUid(authentication));
+  }
+
+  @GetMapping("/me/vans/{vehicleToken}/students")
+  @PreAuthorize("isAuthenticated()")
+  public List<AssistantStudentResponseDTO> myStudents(
+      @PathVariable String vehicleToken,
+      @RequestParam OperationShift shift,
+      Authentication authentication) {
+    return vansService.listStudents(
+        SecurityHelper.requireCallerUid(authentication), vehicleToken, shift);
   }
 
   @PostMapping("/me/invite/accept")

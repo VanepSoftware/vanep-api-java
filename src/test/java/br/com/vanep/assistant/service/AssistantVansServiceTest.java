@@ -1,10 +1,12 @@
 package br.com.vanep.assistant.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.groups.Tuple.tuple;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import br.com.vanep.assistant.dto.AssistantStudentResponseDTO;
 import br.com.vanep.assistant.dto.AssistantVanResponseDTO;
 import br.com.vanep.assistant.enums.AssistantStatus;
 import br.com.vanep.assistant.model.AssistantModel;
@@ -14,8 +16,10 @@ import br.com.vanep.driveroccupancy.dto.DriverOccupancyResponseDTO;
 import br.com.vanep.driveroccupancy.dto.ShiftOccupancyDTO;
 import br.com.vanep.driveroccupancy.service.DriverOccupancyService;
 import br.com.vanep.routepassenger.dto.RoutePassengerDTO;
+import br.com.vanep.routepassenger.enums.PassengerSource;
 import br.com.vanep.routepassenger.service.RoutePassengerQueryService;
 import br.com.vanep.shared.enums.OperationShift;
+import br.com.vanep.shared.enums.RouteLeg;
 import br.com.vanep.trip.enums.TripStatus;
 import br.com.vanep.trip.model.TripModel;
 import br.com.vanep.trip.repository.TripRepository;
@@ -37,6 +41,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.MessageSource;
+import org.springframework.web.server.ResponseStatusException;
 
 @ExtendWith(MockitoExtension.class)
 class AssistantVansServiceTest {
@@ -218,6 +223,134 @@ class AssistantVansServiceTest {
   private static RoutePassengerDTO pickupAt(LocalTime time) {
     return new RoutePassengerDTO(
         null, null, "Aluno", null, null, null, null, time, null, null, null, null, null, null, null,
+        null);
+  }
+
+  @Test
+  void listsTheStudentsOfAShiftOncePerPassengerInPickupOrder() {
+    givenVehicleOf(driver, true);
+    when(passengers.findPassengers(driver, TODAY, OperationShift.MORNING))
+        .thenReturn(
+            List.of(
+                passenger(
+                    PassengerSource.CONTRACT_ITEM,
+                    "p-ana",
+                    "Ana",
+                    RouteLeg.RETURN,
+                    LocalTime.of(12, 0),
+                    "Centro",
+                    "Escola A"),
+                passenger(
+                    PassengerSource.UNLINKED_PASSENGER,
+                    "p-bia",
+                    "Bia",
+                    RouteLeg.OUTBOUND,
+                    LocalTime.of(6, 40),
+                    "  ",
+                    "Escola B"),
+                passenger(
+                    PassengerSource.CONTRACT_ITEM,
+                    "p-ana",
+                    "Ana",
+                    RouteLeg.OUTBOUND,
+                    LocalTime.of(6, 20),
+                    "Centro",
+                    "Escola A")));
+
+    List<AssistantStudentResponseDTO> students =
+        service.listStudents(CALLER, "van-sprinter", OperationShift.MORNING);
+
+    assertThat(students)
+        .extracting(
+            AssistantStudentResponseDTO::token,
+            AssistantStudentResponseDTO::stopNumber,
+            AssistantStudentResponseDTO::placeName,
+            AssistantStudentResponseDTO::hasFamilyInApp)
+        .containsExactly(tuple("p-ana", 1, "Centro", true), tuple("p-bia", 2, "Escola B", false));
+  }
+
+  @Test
+  void looksAheadToTheNextDayTheShiftRunsWhenItDoesNotRunToday() {
+    givenVehicleOf(driver, true);
+    when(passengers.findPassengers(driver, TODAY, OperationShift.MORNING)).thenReturn(List.of());
+    when(passengers.findPassengers(driver, TODAY.plusDays(1), OperationShift.MORNING))
+        .thenReturn(List.of());
+    when(passengers.findPassengers(driver, TODAY.plusDays(2), OperationShift.MORNING))
+        .thenReturn(
+            List.of(
+                passenger(
+                    PassengerSource.CONTRACT_ITEM,
+                    "p-ana",
+                    "Ana",
+                    RouteLeg.OUTBOUND,
+                    LocalTime.of(6, 20),
+                    "Centro",
+                    "Escola A")));
+
+    assertThat(service.listStudents(CALLER, "van-sprinter", OperationShift.MORNING))
+        .extracting(AssistantStudentResponseDTO::token)
+        .containsExactly("p-ana");
+  }
+
+  @Test
+  void refusesAVehicleOfAnotherDriver() {
+    DriverModel other = new DriverModel();
+    other.setId(99L);
+    givenVehicleOf(other, true);
+
+    assertThatThrownBy(() -> service.listStudents(CALLER, "van-sprinter", OperationShift.MORNING))
+        .isInstanceOf(ResponseStatusException.class)
+        .hasMessageContaining("404");
+    verifyNoInteractions(passengers);
+  }
+
+  @Test
+  void refusesAnInactiveVehicle() {
+    givenVehicleOf(driver, false);
+
+    assertThatThrownBy(() -> service.listStudents(CALLER, "van-sprinter", OperationShift.MORNING))
+        .isInstanceOf(ResponseStatusException.class);
+  }
+
+  @Test
+  void refusesWhileTheLinkIsPaused() {
+    assistant.setStatus(AssistantStatus.INACTIVE);
+
+    assertThatThrownBy(() -> service.listStudents(CALLER, "van-sprinter", OperationShift.MORNING))
+        .isInstanceOf(ResponseStatusException.class);
+    verifyNoInteractions(vehicles, passengers);
+  }
+
+  private void givenVehicleOf(DriverModel owner, boolean active) {
+    mainVehicle.setDriver(owner);
+    mainVehicle.setActive(active);
+    when(vehicles.findByToken("van-sprinter")).thenReturn(Optional.of(mainVehicle));
+  }
+
+  private static RoutePassengerDTO passenger(
+      PassengerSource source,
+      String token,
+      String name,
+      RouteLeg leg,
+      LocalTime pickup,
+      String neighborhood,
+      String school) {
+    return new RoutePassengerDTO(
+        source,
+        token,
+        name,
+        null,
+        null,
+        school,
+        leg,
+        pickup,
+        null,
+        null,
+        null,
+        null,
+        neighborhood,
+        null,
+        null,
         null);
   }
 }
