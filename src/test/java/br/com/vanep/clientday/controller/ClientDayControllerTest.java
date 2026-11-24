@@ -27,6 +27,7 @@ import br.com.vanep.schedule.model.ScheduleModel;
 import br.com.vanep.schedule.model.ScheduleSlotModel;
 import br.com.vanep.school.model.SchoolModel;
 import br.com.vanep.school.repository.SchoolRepository;
+import br.com.vanep.shared.document.enums.DocumentStatus;
 import br.com.vanep.shared.enums.OperationShift;
 import br.com.vanep.shared.enums.RouteLeg;
 import br.com.vanep.state.model.StateModel;
@@ -37,6 +38,9 @@ import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
 import br.com.vanep.vehicle.model.VehicleModel;
 import br.com.vanep.vehicle.repository.VehicleRepository;
+import br.com.vanep.vehicledocument.enums.VehicleDocumentType;
+import br.com.vanep.vehicledocument.model.VehicleDocumentModel;
+import br.com.vanep.vehicledocument.repository.VehicleDocumentRepository;
 import java.math.BigDecimal;
 import java.time.DayOfWeek;
 import java.time.Instant;
@@ -69,6 +73,7 @@ class ClientDayControllerTest {
   @Autowired private DependentRepository dependents;
   @Autowired private SchoolRepository schools;
   @Autowired private VehicleRepository vehicles;
+  @Autowired private VehicleDocumentRepository vehicleDocuments;
   @Autowired private CityRepository cities;
   @Autowired private StateRepository states;
   @Autowired private CountryRepository countries;
@@ -142,6 +147,28 @@ class ClientDayControllerTest {
         .andExpect(jsonPath("$.vans.length()").value(0))
         .andExpect(jsonPath("$.upcoming.length()").value(5))
         .andExpect(jsonPath("$.upcoming[0].going").exists());
+  }
+
+  @Test
+  void warnsAboutAnExpiredVanInspection() throws Exception {
+    DriverModel driver = createDriver();
+    VehicleModel vehicle = saveVehicle(driver);
+    ClientDriverModel link = createLink(driver);
+    contracts.save(activeContract(link, everyDayItem(createDependent("Ana"))));
+    LocalDate expired = LocalDate.now(TripService.SERVICE_ZONE).minusDays(2);
+    VehicleDocumentModel inspection = new VehicleDocumentModel();
+    inspection.setVehicle(vehicle);
+    inspection.setDocumentType(VehicleDocumentType.VEHICLE_INSPECTION);
+    inspection.setExpiresAt(expired);
+    inspection.getReview().setStatus(DocumentStatus.APPROVED);
+    vehicleDocuments.save(inspection);
+
+    mockMvc
+        .perform(get("/api/clients/me/day").with(clientJwt()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.expiredInspections.length()").value(1))
+        .andExpect(jsonPath("$.expiredInspections[0].driverName").value("Carlos Souza"))
+        .andExpect(jsonPath("$.expiredInspections[0].expiredOn").value(expired.toString()));
   }
 
   @Test
@@ -229,7 +256,7 @@ class ClientDayControllerTest {
     return dependents.save(dependent);
   }
 
-  private void saveVehicle(DriverModel owner) {
+  private VehicleModel saveVehicle(DriverModel owner) {
     VehicleModel vehicle = new VehicleModel();
     vehicle.setDriver(owner);
     vehicle.setPlate("SDF4E21");
@@ -238,7 +265,7 @@ class ClientDayControllerTest {
     vehicle.setManufactureYear(2020);
     vehicle.setColor("Branca");
     vehicle.setCapacity(15);
-    vehicles.save(vehicle);
+    return vehicles.save(vehicle);
   }
 
   private UserModel createUser(UserType type, String name, String email, String document) {

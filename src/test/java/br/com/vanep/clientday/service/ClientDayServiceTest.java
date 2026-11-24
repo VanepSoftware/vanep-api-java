@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 import br.com.vanep.client.model.ClientModel;
 import br.com.vanep.client.repository.ClientRepository;
 import br.com.vanep.clientday.dto.ClientDayChildDTO;
+import br.com.vanep.clientday.dto.ClientDayExpiredInspectionDTO;
 import br.com.vanep.clientday.dto.ClientDayResponseDTO;
 import br.com.vanep.clientday.dto.ClientDayRiderDTO;
 import br.com.vanep.clientday.dto.ClientDayUpcomingDTO;
@@ -25,6 +26,7 @@ import br.com.vanep.routepassenger.dto.RoutePassengerDTO;
 import br.com.vanep.routepassenger.service.RoutePassengerQueryService;
 import br.com.vanep.schedule.model.ScheduleModel;
 import br.com.vanep.schedule.model.ScheduleSlotModel;
+import br.com.vanep.shared.document.enums.DocumentStatus;
 import br.com.vanep.shared.enums.OperationShift;
 import br.com.vanep.shared.enums.RouteLeg;
 import br.com.vanep.user.enums.UserType;
@@ -32,6 +34,9 @@ import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.service.UserService;
 import br.com.vanep.vehicle.model.VehicleModel;
 import br.com.vanep.vehicle.repository.VehicleRepository;
+import br.com.vanep.vehicledocument.enums.VehicleDocumentType;
+import br.com.vanep.vehicledocument.model.VehicleDocumentModel;
+import br.com.vanep.vehicledocument.repository.VehicleDocumentRepository;
 import java.time.Clock;
 import java.time.DayOfWeek;
 import java.time.Instant;
@@ -67,6 +72,7 @@ class ClientDayServiceTest {
   @Mock private ContractItemRepository items;
   @Mock private DependentRepository dependentRepository;
   @Mock private VehicleRepository vehicles;
+  @Mock private VehicleDocumentRepository vehicleDocuments;
   @Mock private RoutePassengerQueryService passengers;
   @Mock private MessageSource messages;
 
@@ -78,7 +84,15 @@ class ClientDayServiceTest {
   void setUp() {
     service =
         new ClientDayService(
-            users, clients, items, dependentRepository, vehicles, passengers, messages, CLOCK);
+            users,
+            clients,
+            items,
+            dependentRepository,
+            vehicles,
+            vehicleDocuments,
+            passengers,
+            messages,
+            CLOCK);
 
     UserModel user = new UserModel();
     user.setId(1L);
@@ -263,6 +277,51 @@ class ClientDayServiceTest {
     assertThat(service.findMyDay(CALLER).childrenWithoutVan())
         .extracting(ClientDayChildDTO::name)
         .containsExactly("Bia", "Davi");
+  }
+
+  @Test
+  void reportsTheDriverWhoseApprovedInspectionExpired() {
+    givenItems(item(carlos, dependent("dep-pedro", "Pedro")));
+    givenInspections(
+        inspection(MONDAY.minusDays(40), DocumentStatus.APPROVED),
+        inspection(MONDAY.minusDays(3), DocumentStatus.APPROVED),
+        inspection(MONDAY.plusMonths(6), DocumentStatus.PENDING));
+
+    assertThat(service.findMyDay(CALLER).expiredInspections())
+        .extracting(
+            ClientDayExpiredInspectionDTO::driverName, ClientDayExpiredInspectionDTO::expiredOn)
+        .containsExactly(tuple("Carlos Souza", MONDAY.minusDays(3)));
+  }
+
+  @Test
+  void anInspectionValidUntilTodayIsNotExpired() {
+    givenItems(item(carlos, dependent("dep-pedro", "Pedro")));
+    givenInspections(
+        inspection(MONDAY.minusDays(40), DocumentStatus.APPROVED),
+        inspection(MONDAY, DocumentStatus.APPROVED));
+
+    assertThat(service.findMyDay(CALLER).expiredInspections()).isEmpty();
+  }
+
+  @Test
+  void aVanWithoutApprovedInspectionIsNotReported() {
+    givenItems(item(carlos, dependent("dep-pedro", "Pedro")));
+    givenInspections(inspection(MONDAY.minusDays(3), DocumentStatus.REJECTED));
+
+    assertThat(service.findMyDay(CALLER).expiredInspections()).isEmpty();
+  }
+
+  private void givenInspections(VehicleDocumentModel... documents) {
+    when(vehicleDocuments.findByVehicleIdAndDocumentTypeAndSupersededAtIsNull(
+            any(), eq(VehicleDocumentType.VEHICLE_INSPECTION)))
+        .thenReturn(List.of(documents));
+  }
+
+  private static VehicleDocumentModel inspection(LocalDate expiresAt, DocumentStatus status) {
+    VehicleDocumentModel document = new VehicleDocumentModel();
+    document.setExpiresAt(expiresAt);
+    document.getReview().setStatus(status);
+    return document;
   }
 
   @Test

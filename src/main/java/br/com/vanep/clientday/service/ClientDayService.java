@@ -3,6 +3,7 @@ package br.com.vanep.clientday.service;
 import br.com.vanep.client.model.ClientModel;
 import br.com.vanep.client.repository.ClientRepository;
 import br.com.vanep.clientday.dto.ClientDayChildDTO;
+import br.com.vanep.clientday.dto.ClientDayExpiredInspectionDTO;
 import br.com.vanep.clientday.dto.ClientDayResponseDTO;
 import br.com.vanep.clientday.dto.ClientDayRiderDTO;
 import br.com.vanep.clientday.dto.ClientDayUpcomingDTO;
@@ -16,6 +17,7 @@ import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.routepassenger.dto.RoutePassengerDTO;
 import br.com.vanep.routepassenger.service.RoutePassengerQueryService;
 import br.com.vanep.schedule.model.ScheduleSlotModel;
+import br.com.vanep.shared.document.enums.DocumentStatus;
 import br.com.vanep.shared.enums.OperationShift;
 import br.com.vanep.shared.enums.RouteLeg;
 import br.com.vanep.trip.service.TripService;
@@ -24,6 +26,9 @@ import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.service.UserService;
 import br.com.vanep.vehicle.model.VehicleModel;
 import br.com.vanep.vehicle.repository.VehicleRepository;
+import br.com.vanep.vehicledocument.enums.VehicleDocumentType;
+import br.com.vanep.vehicledocument.model.VehicleDocumentModel;
+import br.com.vanep.vehicledocument.repository.VehicleDocumentRepository;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -60,6 +65,7 @@ public class ClientDayService {
   private final ContractItemRepository contractItems;
   private final DependentRepository dependentRepository;
   private final VehicleRepository vehicleRepository;
+  private final VehicleDocumentRepository vehicleDocuments;
   private final RoutePassengerQueryService passengerService;
   private final MessageSource messages;
   private final Clock clock;
@@ -70,6 +76,7 @@ public class ClientDayService {
       ContractItemRepository contractItems,
       DependentRepository dependentRepository,
       VehicleRepository vehicleRepository,
+      VehicleDocumentRepository vehicleDocuments,
       RoutePassengerQueryService passengerService,
       MessageSource messages,
       Clock clock) {
@@ -78,6 +85,7 @@ public class ClientDayService {
     this.contractItems = contractItems;
     this.dependentRepository = dependentRepository;
     this.vehicleRepository = vehicleRepository;
+    this.vehicleDocuments = vehicleDocuments;
     this.passengerService = passengerService;
     this.messages = messages;
     this.clock = clock;
@@ -112,7 +120,58 @@ public class ClientDayService {
             .toList();
     List<ClientDayUpcomingDTO> upcoming = vans.isEmpty() ? upcomingDays(items, today) : List.of();
     return new ClientDayResponseDTO(
-        today, vans, upcoming, childrenWithoutVan(client, items, today));
+        today,
+        vans,
+        upcoming,
+        childrenWithoutVan(client, items, today),
+        expiredInspections(items, today));
+  }
+
+  /**
+   * Drivers of the contracts in force whose main van only has expired approved inspections. A van
+   * that never had one approved is not reported as expired.
+   */
+  private List<ClientDayExpiredInspectionDTO> expiredInspections(
+      List<ContractItemModel> items, LocalDate today) {
+    Map<Long, DriverModel> drivers = new LinkedHashMap<>();
+    items.stream()
+        .filter(item -> isInForce(item.getContract(), today))
+        .map(item -> item.getContract().getClientDriver().getDriver())
+        .forEach(driver -> drivers.putIfAbsent(driver.getId(), driver));
+    return drivers.values().stream()
+        .flatMap(driver -> expiredInspectionOf(driver, today).stream())
+        .sorted(Comparator.comparing(ClientDayExpiredInspectionDTO::expiredOn))
+        .toList();
+  }
+
+  private Optional<ClientDayExpiredInspectionDTO> expiredInspectionOf(
+      DriverModel driver, LocalDate today) {
+    Optional<VehicleModel> vehicle = mainVehicleOf(driver);
+    if (vehicle.isEmpty()) {
+      return Optional.empty();
+    }
+    List<VehicleDocumentModel> approved =
+        vehicleDocuments
+            .findByVehicleIdAndDocumentTypeAndSupersededAtIsNull(
+                vehicle.get().getId(), VehicleDocumentType.VEHICLE_INSPECTION)
+            .stream()
+            .filter(document -> document.getReview().getStatus() == DocumentStatus.APPROVED)
+            .toList();
+    boolean stillValid =
+        approved.stream()
+            .anyMatch(
+                document ->
+                    document.getExpiresAt() == null || !document.getExpiresAt().isBefore(today));
+    if (stillValid) {
+      return Optional.empty();
+    }
+    return approved.stream()
+        .map(VehicleDocumentModel::getExpiresAt)
+        .max(Comparator.naturalOrder())
+        .map(
+            expiredOn ->
+                new ClientDayExpiredInspectionDTO(
+                    driver.getToken(), driver.getUser().getName(), expiredOn));
   }
 
   /**
