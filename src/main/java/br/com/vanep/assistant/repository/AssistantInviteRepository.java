@@ -3,6 +3,7 @@ package br.com.vanep.assistant.repository;
 import br.com.vanep.assistant.enums.AssistantInviteStatus;
 import br.com.vanep.assistant.model.AssistantInviteModel;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -19,6 +20,9 @@ public interface AssistantInviteRepository extends JpaRepository<AssistantInvite
 
   Optional<AssistantInviteModel> findByDriverIdAndAssistantIdAndStatus(
       Long driverId, Long assistantId, AssistantInviteStatus status);
+
+  List<AssistantInviteModel> findByDriverIdAndStatusAndExpiresAtAfterOrderByCreatedAtDesc(
+      Long driverId, AssistantInviteStatus status, Instant now);
 
   /**
    * Drivers the assistant once worked with: distinct drivers of accepted invites, leaving out

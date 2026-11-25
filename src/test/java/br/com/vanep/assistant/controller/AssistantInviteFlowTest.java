@@ -67,6 +67,30 @@ class AssistantInviteFlowTest {
   }
 
   @Test
+  void driverSeesThePendingInviteWithoutTheAccountName() throws Exception {
+    UserModel assistantUser = createAssistantUser("pendente@vanep.com");
+    createAssistant(assistantUser);
+    UserModel driverUser = createDriverUser("motorista.lista@vanep.com", "Paulo");
+    createDriver(driverUser);
+
+    mockMvc
+        .perform(
+            post("/api/assistants/invites")
+                .with(driverJwt(driverUser))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"email\":\"pendente@vanep.com\"}"))
+        .andExpect(status().isCreated());
+
+    mockMvc
+        .perform(get("/api/assistants").with(driverJwt(driverUser)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.length()").value(1))
+        .andExpect(jsonPath("$[0].status").value("PENDING"))
+        .andExpect(jsonPath("$[0].name").value("pendente@vanep.com"))
+        .andExpect(jsonPath("$[0].email").isEmpty());
+  }
+
+  @Test
   void inviteAcceptFlowViaRestApi() throws Exception {
     UserModel assistantUser = createAssistantUser("carla@vanep.com");
     AssistantModel assistant = createAssistant(assistantUser);

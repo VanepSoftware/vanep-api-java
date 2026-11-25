@@ -5,6 +5,7 @@ import br.com.vanep.assistant.dto.AssistantInviteResponseDTO;
 import br.com.vanep.assistant.dto.AssistantListItemResponseDTO;
 import br.com.vanep.assistant.dto.AssistantMeSummaryResponseDTO;
 import br.com.vanep.assistant.dto.AssistantPendingInviteDTO;
+import br.com.vanep.assistant.enums.AssistantStatus;
 import br.com.vanep.assistant.model.AssistantInviteModel;
 import br.com.vanep.assistant.model.AssistantModel;
 import br.com.vanep.driver.model.DriverModel;
@@ -31,6 +32,21 @@ public class AssistantMapper {
         photoUrl(assistant),
         assistant.getStatus(),
         assistant.getActivatedAt());
+  }
+
+  /**
+   * An invite the assistant has not answered. The driver only typed an e-mail, so nothing else
+   * about the account is shown before the invite is accepted.
+   */
+  public AssistantListItemResponseDTO toPendingListItem(AssistantInviteModel invite) {
+    AssistantModel assistant = invite.getAssistant();
+    return new AssistantListItemResponseDTO(
+        assistant.getToken(),
+        assistant.getUser().getEmail(),
+        null,
+        null,
+        AssistantStatus.PENDING,
+        null);
   }
 
   public AssistantMeSummaryResponseDTO toMeSummary(
