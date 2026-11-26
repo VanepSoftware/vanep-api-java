@@ -1,7 +1,10 @@
 package br.com.vanep.notification.service;
 
+import br.com.vanep.job.enums.JobType;
+import br.com.vanep.job.service.JobService;
 import br.com.vanep.notification.dto.NotificationResponseDTO;
 import br.com.vanep.notification.enums.NotificationType;
+import br.com.vanep.notification.handler.SendPushJobHandler;
 import br.com.vanep.notification.model.NotificationModel;
 import br.com.vanep.notification.repository.NotificationRepository;
 import br.com.vanep.user.service.UserService;
@@ -9,10 +12,12 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -22,27 +27,31 @@ public class NotificationService {
   public static final String NOTIFICATION_TOKEN_KEY = "notificationToken";
 
   private final NotificationRepository notifications;
-  private final PushNotificationService push;
+  private final JobService jobs;
   private final UserService users;
   private final Clock clock;
 
   public NotificationService(
-      NotificationRepository notifications,
-      PushNotificationService push,
-      UserService users,
-      Clock clock) {
+      NotificationRepository notifications, JobService jobs, UserService users, Clock clock) {
     this.notifications = notifications;
-    this.push = push;
+    this.jobs = jobs;
     this.users = users;
     this.clock = clock;
   }
 
-  // Stored before the push, so the push can carry the token the app marks as read on tap, and
-  // the notification is listed even when push is disabled or FCM is down.
-  public void notifyUser(
+  // Stored in the caller's transaction and pushed by a job, so a retried push never stores the
+  // notification twice and the in-app list never depends on FCM.
+  @Transactional(propagation = Propagation.MANDATORY)
+  public NotificationModel notifyUser(
       Long userId, NotificationType type, String title, String body, Map<String, String> data) {
     NotificationModel saved = notifications.save(newNotification(userId, type, title, body, data));
-    push.sendToUser(userId, title, body, pushData(saved));
+    jobs.enqueue(JobType.SEND_PUSH, new SendPushJobHandler.Payload(saved.getToken(), null));
+    return saved;
+  }
+
+  @Transactional(readOnly = true)
+  public Optional<NotificationModel> findByToken(String token) {
+    return notifications.findByToken(token);
   }
 
   NotificationModel newNotification(
@@ -56,7 +65,7 @@ public class NotificationService {
     return notification;
   }
 
-  Map<String, String> pushData(NotificationModel notification) {
+  public Map<String, String> pushData(NotificationModel notification) {
     Map<String, String> data = new HashMap<>(notification.getData());
     data.put(TYPE_KEY, notification.getType().name());
     data.put(NOTIFICATION_TOKEN_KEY, notification.getToken());

@@ -22,7 +22,7 @@ import br.com.vanep.notification.enums.NotificationType;
 import br.com.vanep.notification.service.NotificationService;
 import br.com.vanep.proposal.event.ProposalEvent;
 import br.com.vanep.user.model.UserModel;
-import br.com.vanep.user.service.UserService;
+import br.com.vanep.user.repository.UserRepository;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Optional;
@@ -37,7 +37,7 @@ import org.springframework.context.support.ResourceBundleMessageSource;
 class NotificationEventListenerTest {
 
   @Mock private NotificationService notifications;
-  @Mock private UserService users;
+  @Mock private UserRepository users;
   @Mock private ConversationRepository conversations;
   @Mock private ClientDriverRepository links;
   @Mock private DriverRepository drivers;
@@ -107,7 +107,7 @@ class NotificationEventListenerTest {
 
   @Test
   void aSentProposalNotifiesTheClient() {
-    when(users.requireByToken("maria-uid")).thenReturn(maria);
+    when(users.findByToken("maria-uid")).thenReturn(Optional.of(maria));
 
     listener.notifyProposalSent(new ProposalEvent.Sent("prop-1", "maria-uid"));
 
@@ -122,7 +122,7 @@ class NotificationEventListenerTest {
 
   @Test
   void anAcceptedProposalNotifiesTheDriver() {
-    when(users.requireByToken("carlos-uid")).thenReturn(carlos);
+    when(users.findByToken("carlos-uid")).thenReturn(Optional.of(carlos));
 
     listener.notifyProposalAccepted(new ProposalEvent.Accepted("prop-1", "carlos-uid"));
 
@@ -137,7 +137,7 @@ class NotificationEventListenerTest {
 
   @Test
   void aDeclinedProposalNotifiesTheDriver() {
-    when(users.requireByToken("carlos-uid")).thenReturn(carlos);
+    when(users.findByToken("carlos-uid")).thenReturn(Optional.of(carlos));
 
     listener.notifyProposalDeclined(new ProposalEvent.Declined("prop-1", "carlos-uid"));
 
@@ -195,6 +195,33 @@ class NotificationEventListenerTest {
             "Cadastro recusado",
             "Seu cadastro de motorista foi recusado. Toque para ver o motivo.",
             Map.of());
+  }
+
+  @Test
+  void aProposalForAnUnknownUserNotifiesNoOneAndDoesNotThrow() {
+    when(users.findByToken("ghost-uid")).thenReturn(Optional.empty());
+
+    listener.notifyProposalSent(new ProposalEvent.Sent("prop-1", "ghost-uid"));
+
+    verify(notifications, never()).notifyUser(anyLong(), any(), any(), any(), any());
+  }
+
+  @Test
+  void aContractOfAVanishedLinkNotifiesNoOne() {
+    when(links.findByToken("link-1")).thenReturn(Optional.empty());
+
+    listener.notifyContractCreated(new ContractCreatedEvent("contract-1", "link-1"));
+
+    verify(notifications, never()).notifyUser(anyLong(), any(), any(), any(), any());
+  }
+
+  @Test
+  void aReviewOfAVanishedDriverNotifiesNoOne() {
+    when(drivers.findByToken("driver-1")).thenReturn(Optional.empty());
+
+    listener.notifyDriverReviewed(new DriverReviewEvent.Approved("driver-1"));
+
+    verify(notifications, never()).notifyUser(anyLong(), any(), any(), any(), any());
   }
 
   private ConversationModel conversation() {

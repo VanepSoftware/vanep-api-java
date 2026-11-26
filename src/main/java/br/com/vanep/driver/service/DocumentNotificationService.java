@@ -49,8 +49,8 @@ public class DocumentNotificationService {
     this.messages = messages;
   }
 
-  // A new transaction after the decision's commit: a failed e-mail never undoes the decision,
-  // and notifiedAt stays empty, with no retry.
+  // A new transaction after the decision's commit: a failed e-mail never undoes the decision.
+  // notifiedAt marks the e-mail as queued; delivery and its retries belong to the job queue.
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
   @Transactional(propagation = Propagation.REQUIRES_NEW)
   public void notifyRejection(DocumentRejectedEvent event) {
@@ -62,7 +62,7 @@ public class DocumentNotificationService {
     if (send(notice.get())) {
       notice.get().submission().setNotifiedAt(Instant.now());
     } else {
-      log.warn("The rejection of {} {} was not e-mailed.", event.kind(), event.token());
+      log.warn("The rejection e-mail of {} {} was not queued.", event.kind(), event.token());
     }
   }
 
@@ -116,11 +116,12 @@ public class DocumentNotificationService {
         variables.put("details", review.getRejectionReason());
       }
       variables.put("action", message("email.document_rejected.action"));
-      return mailService.send(
+      mailService.send(
           notice.driver().getUser().getEmail(),
           message("email.document_rejected.subject"),
           "email/document-rejected",
           variables);
+      return true;
     } catch (RuntimeException failure) {
       log.error("Could not build the rejection e-mail.", failure);
       return false;

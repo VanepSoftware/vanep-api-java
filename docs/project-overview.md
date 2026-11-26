@@ -112,6 +112,21 @@ Sem código formatado segundo o Spotless, o **CI falha**.
 
 ---
 
+## Jobs em background (fila no Postgres)
+
+Trabalho que não precisa acontecer dentro da requisição vai para a fila `jobs` (pacote `br.com.vanep.job`). Hoje são o push de notificação (`SEND_PUSH`) e todo e-mail (`SEND_EMAIL`); jobs diários (VAN-66, VAN-68) entram do mesmo jeito.
+
+- **Enfileirar:** `JobService.enqueue(JobType, payload)` dentro da transação do negócio (`Propagation.MANDATORY`). O job só existe se o commit acontecer.
+- **Processar:** o `JobWorker` (`@Scheduled`, a cada 1 s) pega lotes com `SKIP LOCKED`, então várias instâncias não pegam o mesmo job. Job concluído é apagado.
+- **Falha:** o job volta para a fila com `run_at` no futuro (backoff exponencial definido por tipo no enum `JobType`) e não segura os outros. Esgotadas as tentativas, vai para `failed_jobs`.
+- **`failed_jobs`:** a linha fica lá enquanto falhar e guarda em `retry_at` quando volta para a fila. O atraso cresce a cada replay que falha, conforme o `JobType`: e-mail 15 min → 1 h → 6 h; push 2 h, cinco vezes. O `FailedJobReplayer` verifica a cada minuto e devolve **no máximo 20** linhas vencidas por vez, com uma tentativa cada. Sucesso apaga a linha; falha soma 1 em `tries` e agenda o próximo `retry_at`. Linhas `permanent` (tipo sem handler, payload ilegível, recurso que sumiu, endereço de e-mail inválido) ou com os replays esgotados ficam com `retry_at` nulo e param para análise manual.
+- **E-mail:** `MailService.send(...)` só enfileira um `SEND_EMAIL` (precisa de transação). Quem renderiza o template e fala com o SMTP é o `SendEmailJobHandler`, no worker. E-mail tem uma única tentativa na fila: a primeira falha já vai para `failed_jobs`.
+- **Novo tipo de job:** um valor em `JobType` com a política de retry, um record de payload e um `@Component` que implementa `JobHandler<T>`. O registro é automático; dois handlers para o mesmo tipo derrubam a subida.
+
+**Onde roda:** com docker compose, a API (`vanep`) sobe com `WORKER_ENABLED=false` e o serviço `vanep-worker` (mesma imagem, sem porta) com `true`; a varredura de prazos e os seeders rodam só na API. Rodando com Maven na máquina, a própria API processa os jobs. Nos testes o worker fica desligado; para exercitar um ciclo, instancie o `JobWorker` e chame `runCycle()` (ver `NotificationDeliveryTest`).
+
+---
+
 ## Documentação
 
 | Documento | Conteúdo |

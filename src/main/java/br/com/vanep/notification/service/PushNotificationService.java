@@ -13,6 +13,7 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Predicate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
@@ -27,6 +28,12 @@ public class PushNotificationService {
   // payload is built here and never malformed, so the token is the one to blame.
   static final Set<MessagingErrorCode> STALE_TOKEN_ERRORS =
       EnumSet.of(MessagingErrorCode.UNREGISTERED, MessagingErrorCode.INVALID_ARGUMENT);
+
+  static final Set<MessagingErrorCode> TRANSIENT_ERRORS =
+      EnumSet.of(
+          MessagingErrorCode.UNAVAILABLE,
+          MessagingErrorCode.INTERNAL,
+          MessagingErrorCode.QUOTA_EXCEEDED);
 
   private final FirebaseMessaging messaging;
   private final DeviceTokenService devices;
@@ -44,20 +51,54 @@ public class PushNotificationService {
     return messaging != null;
   }
 
-  public void sendToUser(Long userId, String title, String body, Map<String, String> data) {
+  /**
+   * Returns the device tokens that failed with a transient error, so the caller can retry only
+   * those. A null {@code onlyFcmTokens} sends to every device of the user.
+   */
+  public List<String> sendToUser(
+      Long userId,
+      String title,
+      String body,
+      Map<String, String> data,
+      List<String> onlyFcmTokens) {
     if (!isEnabled()) {
-      return;
+      return List.of();
     }
-    List<String> fcmTokens = devices.findFcmTokensOf(userId);
+    List<String> fcmTokens = findTargetTokens(userId, onlyFcmTokens);
     if (fcmTokens.isEmpty()) {
-      return;
+      return List.of();
     }
+    BatchResponse response = sendBatch(userId, buildMessages(fcmTokens, title, body, data));
+    logFailures(userId, response.getResponses());
+    devices.removeAll(
+        findTokensFailedWith(fcmTokens, response.getResponses(), code -> isStaleToken(code)));
+    return findTokensFailedWith(fcmTokens, response.getResponses(), code -> isTransient(code));
+  }
+
+  static boolean isStaleToken(MessagingErrorCode code) {
+    return code != null && STALE_TOKEN_ERRORS.contains(code);
+  }
+
+  // No FCM error code means the call never got an FCM answer (network down, token endpoint
+  // unreachable): the SDK reports that per device instead of failing the batch.
+  static boolean isTransient(MessagingErrorCode code) {
+    return code == null || TRANSIENT_ERRORS.contains(code);
+  }
+
+  // A retry targets the devices that failed before, minus any removed meanwhile.
+  List<String> findTargetTokens(Long userId, List<String> onlyFcmTokens) {
+    List<String> registered = devices.findFcmTokensOf(userId);
+    if (onlyFcmTokens == null) {
+      return registered;
+    }
+    return registered.stream().filter(token -> onlyFcmTokens.contains(token)).toList();
+  }
+
+  BatchResponse sendBatch(Long userId, List<Message> messages) {
     try {
-      BatchResponse response = messaging.sendEach(buildMessages(fcmTokens, title, body, data));
-      logFailures(userId, response.getResponses());
-      devices.removeAll(findStaleTokens(fcmTokens, response.getResponses()));
-    } catch (FirebaseMessagingException ex) {
-      log.error("Failed to send push notification to user {}.", userId, ex);
+      return messaging.sendEach(messages);
+    } catch (FirebaseMessagingException batchFailure) {
+      throw new PushDeliveryException(userId, batchFailure);
     }
   }
 
@@ -96,15 +137,25 @@ public class PushNotificationService {
     }
   }
 
-  List<String> findStaleTokens(List<String> fcmTokens, List<SendResponse> responses) {
-    List<String> stale = new ArrayList<>();
+  List<String> findTokensFailedWith(
+      List<String> fcmTokens,
+      List<SendResponse> responses,
+      Predicate<MessagingErrorCode> matchesError) {
+    List<String> failed = new ArrayList<>();
     for (int index = 0; index < responses.size(); index++) {
       SendResponse response = responses.get(index);
       if (!response.isSuccessful()
-          && STALE_TOKEN_ERRORS.contains(response.getException().getMessagingErrorCode())) {
-        stale.add(fcmTokens.get(index));
+          && matchesError.test(response.getException().getMessagingErrorCode())) {
+        failed.add(fcmTokens.get(index));
       }
     }
-    return stale;
+    return failed;
+  }
+
+  public static class PushDeliveryException extends RuntimeException {
+
+    PushDeliveryException(Long userId, FirebaseMessagingException cause) {
+      super("FCM rejected the whole push batch for user " + userId, cause);
+    }
   }
 }

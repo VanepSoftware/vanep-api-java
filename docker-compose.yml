@@ -1,3 +1,58 @@
+# A API (vanep) e o worker de jobs (vanep-worker) são a mesma imagem com o mesmo .env;
+# as âncoras abaixo garantem que um não divirja do outro quando alguém mexer em só um.
+x-vanep-app: &vanep-app
+  build:
+    context: .
+    dockerfile: Dockerfile
+  # Dev builda localmente (vanep-api:local). Produção usa a imagem que o CD publica
+  # no GHCR: VANEP_IMAGE no .env do servidor + `docker compose up --no-build`.
+  image: ${VANEP_IMAGE:-vanep-api:local}
+  restart: unless-stopped
+  env_file: .env
+  volumes:
+    # Mantém a JWK de dev entre recriações do container. Em produção a chave vem de
+    # VANEP_OAUTH_JWK_PRIVATE_KEY e este volume fica sem uso.
+    - vanep-oauth-dev-key:/app/.dev
+    # Logs da aplicação no host: todo deploy recria o container, e sem este mount o
+    # arquivo de log seria apagado junto. Em dev cai em ./logs; no servidor o .env
+    # aponta VANEP_LOG_DIR para /var/lib/vanep/logs (dono 1500:1500, igual à mídia).
+    - ${VANEP_LOG_DIR:-./logs}:/app/logs
+    # Os binários moram no host. Sem este mount, todo deploy recria o container e
+    # apaga CNH e documento de todos os motoristas — que não se regeram.
+    # O `:?` derruba o compose com mensagem clara se a variável faltar, do mesmo
+    # jeito que a aplicação se recusa a subir sem raiz de storage configurada.
+    - ${MEDIA_STORAGE_ROOT:?defina MEDIA_STORAGE_ROOT no .env}:/var/lib/vanep/media
+    # Conta de serviço do Firebase, só leitura. Sem a variável, monta /dev/null no lugar
+    # para o compose não exigir um arquivo que o ambiente não tem.
+    - ${FIREBASE_CREDENTIALS_PATH:-/dev/null}:/run/secrets/firebase-credentials.json:ro
+  # Rotação do log do Docker (stdout/stderr). Sem limite, o json-file cresce até
+  # encher o disco da VPS.
+  logging:
+    driver: json-file
+    options:
+      max-size: "20m"
+      max-file: "5"
+  depends_on:
+    postgres:
+      condition: service_healthy
+
+x-vanep-environment: &vanep-environment
+  # Dev usa o profile "docker". Produção define SPRING_PROFILES_ACTIVE=docker,prod
+  # no .env do servidor (ativa application-prod: cookie secure, swagger off, etc.).
+  # NÃO fixe "docker,prod" aqui: quebraria o login local (cookie.secure exige HTTPS).
+  SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-docker}
+  POSTGRES_HOST: postgres
+  # Mail vem do .env (env_file). Sem MAIL_HOST definido, o profile docker usa
+  # mailpit como default (dev). Em produção, defina MAIL_* no .env (SMTP real).
+  JAVA_OPTS: "${JAVA_OPTS:--XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0}"
+  # Dentro do container o caminho é sempre este. MEDIA_STORAGE_ROOT no .env é o
+  # caminho NO HOST, que muda por ambiente (em dev pode ser até caminho Windows).
+  MEDIA_STORAGE_ROOT: /var/lib/vanep/media
+  # Mesmo esquema da mídia: no .env fica o caminho NO HOST, e aqui o caminho do arquivo
+  # montado. Sem FIREBASE_CREDENTIALS_PATH no .env, a variável chega vazia e o push fica
+  # desligado em vez de derrubar a subida.
+  FIREBASE_CREDENTIALS_PATH: ${FIREBASE_CREDENTIALS_PATH:+/run/secrets/firebase-credentials.json}
+
 services:
   postgres:
     image: postgres:17-alpine
@@ -29,61 +84,41 @@ services:
       - "127.0.0.1:${MAILPIT_UI_PORT:-8025}:8025"
 
   vanep:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    # Dev builda localmente (vanep-api:local). Produção usa a imagem que o CD publica
-    # no GHCR: VANEP_IMAGE no .env do servidor + `docker compose up --no-build`.
-    image: ${VANEP_IMAGE:-vanep-api:local}
-    restart: unless-stopped
-    env_file: .env
+    <<: *vanep-app
     ports:
       # Em produção a API só é alcançada pelo cloudflared, que roda no host. Publicar
       # em 0.0.0.0 deixaria a porta aberta no IP público, contornando a Cloudflare e
       # entregando o header de IP real a qualquer cliente direto.
       - "${APP_BIND_ADDRESS:-127.0.0.1}:${APP_PORT}:8080"
     environment:
-      # Dev usa o profile "docker". Produção define SPRING_PROFILES_ACTIVE=docker,prod
-      # no .env do servidor (ativa application-prod: cookie secure, swagger off, etc.).
-      # NÃO fixe "docker,prod" aqui: quebraria o login local (cookie.secure exige HTTPS).
-      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-docker}
-      POSTGRES_HOST: postgres
-      # Mail vem do .env (env_file). Sem MAIL_HOST definido, o profile docker usa
-      # mailpit como default (dev). Em produção, defina MAIL_* no .env (SMTP real).
-      JAVA_OPTS: "${JAVA_OPTS:--XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0}"
-      # Dentro do container o caminho é sempre este. MEDIA_STORAGE_ROOT no .env é o
-      # caminho NO HOST, que muda por ambiente (em dev pode ser até caminho Windows).
-      MEDIA_STORAGE_ROOT: /var/lib/vanep/media
-      # Mesmo esquema da mídia: no .env fica o caminho NO HOST, e aqui o caminho do arquivo
-      # montado. Sem FIREBASE_CREDENTIALS_PATH no .env, a variável chega vazia e o push fica
-      # desligado em vez de derrubar a subida.
-      FIREBASE_CREDENTIALS_PATH: ${FIREBASE_CREDENTIALS_PATH:+/run/secrets/firebase-credentials.json}
-    volumes:
-      # Mantém a JWK de dev entre recriações do container. Em produção a chave vem de
-      # VANEP_OAUTH_JWK_PRIVATE_KEY e este volume fica sem uso.
-      - vanep-oauth-dev-key:/app/.dev
-      # Logs da aplicação no host: todo deploy recria o container, e sem este mount o
-      # arquivo de log seria apagado junto. Em dev cai em ./logs; no servidor o .env
-      # aponta VANEP_LOG_DIR para /var/lib/vanep/logs (dono 1500:1500, igual à mídia).
-      - ${VANEP_LOG_DIR:-./logs}:/app/logs
-      # Os binários moram no host. Sem este mount, todo deploy recria o container e
-      # apaga CNH e documento de todos os motoristas — que não se regeram.
-      # O `:?` derruba o compose com mensagem clara se a variável faltar, do mesmo
-      # jeito que a aplicação se recusa a subir sem raiz de storage configurada.
-      - ${MEDIA_STORAGE_ROOT:?defina MEDIA_STORAGE_ROOT no .env}:/var/lib/vanep/media
-      # Conta de serviço do Firebase, só leitura. Sem a variável, monta /dev/null no lugar
-      # para o compose não exigir um arquivo que o ambiente não tem.
-      - ${FIREBASE_CREDENTIALS_PATH:-/dev/null}:/run/secrets/firebase-credentials.json:ro
-    # Rotação do log do Docker (stdout/stderr). Sem limite, o json-file cresce até
-    # encher o disco da VPS.
-    logging:
-      driver: json-file
-      options:
-        max-size: "20m"
-        max-file: "5"
-    depends_on:
-      postgres:
-        condition: service_healthy
+      <<: *vanep-environment
+      # Papel do serviço, não do ambiente: quem processa jobs é o vanep-worker. Fica
+      # aqui, e não no .env, porque o .env é o mesmo para os dois serviços.
+      WORKER_ENABLED: "false"
+
+  # Worker da fila de jobs (tabela jobs no Postgres). Não publica porta. Sem Supervisor:
+  # o restart do Docker já reinicia o processo.
+  vanep-worker:
+    <<: *vanep-app
+    # O Spring espera o lote em andamento por até 30 s no shutdown
+    # (spring.lifecycle.timeout-per-shutdown-phase); o default de 10 s do Docker o mataria
+    # no meio a cada deploy.
+    stop_grace_period: 45s
+    environment:
+      <<: *vanep-environment
+      # Sem limite de memória no container, cada JVM dimensiona o heap pela RAM do host
+      # inteiro: API e worker a 75% cada estouram a VPS no boot do deploy (o kernel mata um
+      # deles). A carga do worker é pequena; o teto dele fica em 25%.
+      JAVA_OPTS: "${WORKER_JAVA_OPTS:--XX:+UseContainerSupport -XX:MaxRAMPercentage=25.0}"
+      WORKER_ENABLED: "true"
+      # A varredura de prazos não tem lock distribuído, e os seeders correriam junto com
+      # os da API no mesmo boot: tudo isso roda só na API.
+      EXPIRY_SWEEP_ENABLED: "false"
+      VANEP_SEED_ENABLED: "false"
+      VANEP_GEOGRAPHIC_DATA_SEED_ENABLED: "false"
+      # Arquivo próprio no mesmo diretório de logs: dois processos rotacionando o mesmo
+      # arquivo corrompem o log.
+      LOGGING_FILE_NAME: /app/logs/vanep-worker.log
 
 volumes:
   vanep-postgres-data:

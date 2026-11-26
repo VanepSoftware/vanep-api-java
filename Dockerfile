@@ -6,11 +6,22 @@ COPY .mvn .mvn
 COPY mvnw pom.xml ./
 COPY src src
 
+# Extract Spring Boot layers so the dependency tree is its own image layer.
+# A commit that does not change pom.xml then only republishes the thin
+# application jar. Directory mtimes are pinned: BuildKit hashes them into the
+# layer, and a fresh extract would otherwise bust the dependency cache.
 RUN chmod +x mvnw \
-	&& ./mvnw -B package -DskipTests
-
-RUN mkdir /out \
-	&& cp "$(ls target/*.jar | grep -v '\.original$' | head -n1)" /out/app.jar
+	&& ./mvnw -B package -DskipTests \
+	&& jar="$(find target -maxdepth 1 -type f -name '*.jar' ! -name '*.original' -print -quit)" \
+	&& java -Djarmode=tools -jar "$jar" extract --layers --destination /out \
+	&& appjar="$(find /out/application -maxdepth 1 -type f -name '*.jar' -print -quit)" \
+	&& if [ "$appjar" != /out/application/app.jar ]; then mv "$appjar" /out/application/app.jar; fi \
+	&& for dir in /out/snapshot-dependencies /out/spring-boot-loader; do \
+		if [ -z "$(find "$dir" -mindepth 1 -print -quit)" ]; then \
+			touch "$dir/.keep"; \
+		fi; \
+	done \
+	&& find /out -exec touch -d "1980-02-01T00:00:00Z" {} +
 
 FROM eclipse-temurin:25-jre-jammy
 
@@ -45,11 +56,18 @@ RUN mkdir -p /app/logs && chown -R spring:spring /app/logs
 
 USER spring:spring
 
-COPY --from=builder /out/app.jar app.jar
+# Least volatile first. Only the last layer changes on an application-only commit.
+COPY --from=builder /out/dependencies/ ./
+COPY --from=builder /out/spring-boot-loader/ ./
+COPY --from=builder /out/snapshot-dependencies/ ./
+COPY --from=builder /out/application/ ./
 
 EXPOSE 8080
 
 ENV SPRING_PROFILES_ACTIVE=docker
 ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0"
 
+# Shell form so JAVA_OPTS from the environment is expanded. Compose sets a
+# smaller heap on vanep-worker than on the API; an exec-form entrypoint would
+# ignore that override.
 ENTRYPOINT ["sh", "-c", "exec java $JAVA_OPTS -jar /app/app.jar"]

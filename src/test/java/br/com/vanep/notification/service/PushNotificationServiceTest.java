@@ -1,6 +1,7 @@
 package br.com.vanep.notification.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -51,7 +52,7 @@ class PushNotificationServiceTest {
     BatchResponse delivered = batch(success(), success());
     when(messaging.sendEach(any())).thenReturn(delivered);
 
-    service.sendToUser(7L, "Nova mensagem de Maria", "Toque para abrir a conversa.", DATA);
+    service.sendToUser(7L, "Nova mensagem de Maria", "Toque para abrir a conversa.", DATA, null);
 
     verify(messaging).sendEach(sent.capture());
     assertThat(sent.getValue()).hasSize(2);
@@ -68,37 +69,69 @@ class PushNotificationServiceTest {
   }
 
   @Test
-  void removesTheTokensFcmReportsAsUnregisteredOrInvalid() throws Exception {
-    when(devices.findFcmTokensOf(7L)).thenReturn(List.of("ok", "gone", "malformed", "busy"));
+  void removesStaleTokensAndReturnsOnlyTheTransientFailuresForRetry() throws Exception {
+    when(devices.findFcmTokensOf(7L))
+        .thenReturn(List.of("ok", "gone", "malformed", "busy", "broken", "mismatch"));
     BatchResponse partial =
         batch(
             success(),
             failure(MessagingErrorCode.UNREGISTERED),
             failure(MessagingErrorCode.INVALID_ARGUMENT),
-            failure(MessagingErrorCode.UNAVAILABLE));
+            failure(MessagingErrorCode.UNAVAILABLE),
+            failure(MessagingErrorCode.INTERNAL),
+            failure(MessagingErrorCode.SENDER_ID_MISMATCH));
     when(messaging.sendEach(any())).thenReturn(partial);
 
-    service.sendToUser(7L, "title", "body", DATA);
+    List<String> retry = service.sendToUser(7L, "title", "body", DATA, null);
 
     verify(devices).removeAll(List.of("gone", "malformed"));
+    assertThat(retry).containsExactly("busy", "broken");
+  }
+
+  @Test
+  void aDeviceFailureWithoutAnFcmErrorCodeIsRetried() throws Exception {
+    when(devices.findFcmTokensOf(7L)).thenReturn(List.of("offline"));
+    BatchResponse networkDown = batch(failure(null));
+    when(messaging.sendEach(any())).thenReturn(networkDown);
+
+    List<String> retry = service.sendToUser(7L, "title", "body", DATA, null);
+
+    assertThat(retry).containsExactly("offline");
+    verify(devices).removeAll(List.of());
+  }
+
+  @Test
+  void aRetrySendsOnlyToTheListedDevicesThatAreStillRegistered() throws Exception {
+    when(devices.findFcmTokensOf(7L)).thenReturn(List.of("fcm-1", "fcm-2", "fcm-3"));
+    BatchResponse delivered = batch(success());
+    when(messaging.sendEach(any())).thenReturn(delivered);
+
+    List<String> retry =
+        service.sendToUser(7L, "title", "body", DATA, List.of("fcm-2", "removed-meanwhile"));
+
+    verify(messaging).sendEach(sent.capture());
+    assertThat(sent.getValue()).hasSize(1);
+    assertThat(toJson(sent.getValue().getFirst())).contains("\"token\":\"fcm-2\"");
+    assertThat(retry).isEmpty();
   }
 
   @Test
   void aUserWithoutDevicesGetsNothingSent() {
     when(devices.findFcmTokensOf(7L)).thenReturn(List.of());
 
-    service.sendToUser(7L, "title", "body", DATA);
+    List<String> retry = service.sendToUser(7L, "title", "body", DATA, null);
 
     verifyNoInteractions(messaging);
+    assertThat(retry).isEmpty();
   }
 
   @Test
-  void aFailedBatchIsLoggedWithoutThrowingOrRemovingTokens() throws Exception {
+  void aFailedBatchThrowsSoTheJobIsRetriedAndRemovesNoTokens() throws Exception {
     when(devices.findFcmTokensOf(7L)).thenReturn(List.of("fcm-1"));
     when(messaging.sendEach(any())).thenThrow(mock(FirebaseMessagingException.class));
 
-    service.sendToUser(7L, "title", "body", DATA);
-
+    assertThatThrownBy(() -> service.sendToUser(7L, "title", "body", DATA, null))
+        .isInstanceOf(PushNotificationService.PushDeliveryException.class);
     verify(devices, never()).removeAll(any());
   }
 
@@ -106,7 +139,7 @@ class PushNotificationServiceTest {
   void withoutCredentialsPushIsDisabledAndNothingIsLookedUp() {
     PushNotificationService disabled = new PushNotificationService(providerOf(null), devices);
 
-    disabled.sendToUser(7L, "title", "body", DATA);
+    disabled.sendToUser(7L, "title", "body", DATA, null);
 
     assertThat(disabled.isEnabled()).isFalse();
     verifyNoInteractions(devices);
