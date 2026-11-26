@@ -1,5 +1,6 @@
 package br.com.vanep.address.dto;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 
 public record AddressResponseDTO(
@@ -12,5 +13,7 @@ public record AddressResponseDTO(
     String cityToken,
     String cityName,
     String stateUf,
+    BigDecimal cityLatitude,
+    BigDecimal cityLongitude,
     boolean active,
     Instant createdAt) {}

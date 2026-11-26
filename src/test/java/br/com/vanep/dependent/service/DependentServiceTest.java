@@ -174,6 +174,8 @@ class DependentServiceTest {
         "city-campinas",
         "Campinas",
         "SP",
+        null,
+        null,
         true,
         null);
   }
@@ -709,6 +711,8 @@ class DependentServiceTest {
         "city-brasilia",
         "Brasília",
         "DF",
+        null,
+        null,
         true,
         null);
   }

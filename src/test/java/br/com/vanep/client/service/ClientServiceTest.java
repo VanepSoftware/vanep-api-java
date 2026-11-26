@@ -78,6 +78,8 @@ class ClientServiceTest {
         "city-campinas",
         "Campinas",
         "SP",
+        null,
+        null,
         true,
         null);
   }

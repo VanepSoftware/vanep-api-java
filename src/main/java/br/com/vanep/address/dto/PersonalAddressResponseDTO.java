@@ -1,5 +1,7 @@
 package br.com.vanep.address.dto;
 
+import java.math.BigDecimal;
+
 public record PersonalAddressResponseDTO(
     String token,
     String street,
@@ -10,4 +12,6 @@ public record PersonalAddressResponseDTO(
     String cityName,
     String cityToken,
     String stateUf,
+    BigDecimal cityLatitude,
+    BigDecimal cityLongitude,
     String countryIsoCode) {}

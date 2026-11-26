@@ -9,6 +9,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,6 +38,8 @@ public class CitySeeder {
 
   public void seed() {
     JsonNode dump = readDump();
+    Map<String, IbgeCityCoordinateCatalog.Coordinate> coordinates =
+        IbgeCityCoordinateCatalog.load();
     Set<String> existingIbgeCodes = new HashSet<>(cities.findAllIbgeCodes());
     int created = 0;
     for (JsonNode municipality : dump) {
@@ -65,6 +68,13 @@ public class CitySeeder {
       city.setIbgeCode(ibgeCode);
       city.setName(name);
       city.setState(state);
+      IbgeCityCoordinateCatalog.Coordinate coordinate = coordinates.get(ibgeCode);
+      if (coordinate == null) {
+        throw new IllegalStateException(
+            "Seed: no coordinate for IBGE municipality %s.".formatted(ibgeCode));
+      }
+      city.setLatitude(coordinate.latitude());
+      city.setLongitude(coordinate.longitude());
       cities.save(city);
       existingIbgeCodes.add(ibgeCode);
       created++;
