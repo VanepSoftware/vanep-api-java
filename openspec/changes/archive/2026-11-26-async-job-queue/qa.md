@@ -5,15 +5,11 @@ Constitution rule 55. Everything runs against throwaway infrastructure, never th
 ## How to run
 
 ```bash
-# Local stack: disposable Postgres + API (worker off) + separate worker process
-scripts/qa/async-job-queue/local-env.sh start disabled      # or: unreachable (every push fails)
-BASE_URL=http://localhost:8084 QA_DB_CONTAINER=vanep-van106-qa-db \
-  QA_STATE_DIR=$TMPDIR/vanep-van106 QA_FCM_MODE=disabled scripts/qa/async-job-queue/qa.sh
-scripts/qa/async-job-queue/local-env.sh stop
-
 # Compose topology (isolated project van106qa, own .env and volume; tears down on exit)
 ./mvnw -DskipTests package && scripts/qa/async-job-queue/compose-qa.sh
 ```
+
+The local runs below (`qa.sh` against a disposable Postgres, API and worker processes) were executed during development; those scripts were not kept in the repository.
 
 ## Results
 
