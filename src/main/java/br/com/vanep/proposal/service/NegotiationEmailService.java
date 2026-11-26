@@ -56,7 +56,7 @@ public class NegotiationEmailService {
   }
 
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-  @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
   public void sendRequestSent(ServiceRequestEvent.Sent event) {
     ServiceRequestDriverResponseDTO request =
         requests.findForDriver(event.driverUid(), event.requestToken());
@@ -75,7 +75,7 @@ public class NegotiationEmailService {
   }
 
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-  @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
   public void sendRequestDeclined(ServiceRequestEvent.Declined event) {
     ServiceRequestClientResponseDTO request =
         requests.findForClient(event.clientUid(), event.requestToken());
@@ -90,7 +90,7 @@ public class NegotiationEmailService {
   }
 
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-  @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
   public void sendProposalSent(ProposalEvent.Sent event) {
     ProposalResponseDTO proposal =
         proposals.findForClient(event.clientUid(), event.proposalToken());
@@ -110,7 +110,7 @@ public class NegotiationEmailService {
   }
 
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-  @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
   public void sendAdjustmentRequested(ProposalEvent.AdjustmentRequested event) {
     ProposalResponseDTO proposal =
         proposals.findForDriver(event.driverUid(), event.proposalToken());
@@ -127,7 +127,7 @@ public class NegotiationEmailService {
   }
 
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-  @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
   public void sendProposalAccepted(ProposalEvent.Accepted event) {
     ProposalResponseDTO proposal =
         proposals.findForDriver(event.driverUid(), event.proposalToken());
@@ -140,7 +140,7 @@ public class NegotiationEmailService {
   }
 
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-  @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
   public void sendProposalDeclined(ProposalEvent.Declined event) {
     ProposalResponseDTO proposal =
         proposals.findForDriver(event.driverUid(), event.proposalToken());

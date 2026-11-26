@@ -22,6 +22,27 @@ class JobTypeTest {
   }
 
   @Test
+  void anEmailHasASingleAttemptInTheQueue() {
+    assertThat(JobType.SEND_EMAIL.maxAttempts()).isOne();
+  }
+
+  @Test
+  void anEmailIsReplayedAfter15MinutesThen1HourThen6HoursAndNoMore() {
+    assertThat(JobType.SEND_EMAIL.replayDelayAfter(0)).contains(Duration.ofMinutes(15));
+    assertThat(JobType.SEND_EMAIL.replayDelayAfter(1)).contains(Duration.ofHours(1));
+    assertThat(JobType.SEND_EMAIL.replayDelayAfter(2)).contains(Duration.ofHours(6));
+    assertThat(JobType.SEND_EMAIL.replayDelayAfter(3)).isEmpty();
+  }
+
+  @Test
+  void aPushIsReplayedEveryTwoHoursFiveTimes() {
+    for (int failedReplays = 0; failedReplays < 5; failedReplays++) {
+      assertThat(JobType.SEND_PUSH.replayDelayAfter(failedReplays)).contains(Duration.ofHours(2));
+    }
+    assertThat(JobType.SEND_PUSH.replayDelayAfter(5)).isEmpty();
+  }
+
+  @Test
   void thePushGetsFiveAttempts() {
     assertThat(JobType.SEND_PUSH.maxAttempts()).isEqualTo(5);
   }

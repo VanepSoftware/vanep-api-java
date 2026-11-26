@@ -4,9 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 import br.com.vanep.auth.mail.MailService;
 import br.com.vanep.driver.DriverApprovalStatus;
@@ -86,7 +86,6 @@ class DocumentNotificationServiceTest {
     admin.setVerified(true);
     admin.setTermsAcceptedAt(Instant.now());
     users.save(admin);
-    when(mailService.send(anyString(), any(), anyString(), any())).thenReturn(true);
   }
 
   @Test
@@ -161,8 +160,10 @@ class DocumentNotificationServiceTest {
   }
 
   @Test
-  void aFailedSendIsLoggedAndLeavesNotifiedAtEmpty() {
-    when(mailService.send(anyString(), any(), anyString(), any())).thenReturn(false);
+  void anEmailThatCannotBeQueuedIsLoggedAndLeavesNotifiedAtEmpty() {
+    doThrow(new IllegalStateException("queue down"))
+        .when(mailService)
+        .send(anyString(), any(), anyString(), any());
     VehicleDocumentModel crlv =
         withFile(
             fixtures.createVehicleDocument(
