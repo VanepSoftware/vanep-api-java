@@ -12,6 +12,7 @@ import br.com.vanep.job.repository.FailedJobRepository;
 import br.com.vanep.job.repository.JobRepository;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -69,7 +70,7 @@ class JobServiceTest {
 
   @Test
   void aDelayedJobKeepsItsRunAtAndIsNotClaimedEarly() {
-    Instant later = Instant.now().plus(Duration.ofHours(1));
+    Instant later = Instant.now().plus(Duration.ofHours(1)).truncatedTo(ChronoUnit.MICROS);
     transaction.executeWithoutResult(
         status -> service.enqueue(JobType.SEND_PUSH, new Payload("n-1", null), later));
 
