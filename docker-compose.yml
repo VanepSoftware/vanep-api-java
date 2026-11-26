@@ -55,7 +55,7 @@ x-vanep-environment: &vanep-environment
 
 services:
   postgres:
-    image: postgres:17-alpine
+    image: postgres:18-alpine
     restart: unless-stopped
     env_file: .env
     ports:
