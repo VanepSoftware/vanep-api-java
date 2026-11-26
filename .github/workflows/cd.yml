@@ -100,7 +100,8 @@ jobs:
             trap 'docker logout ghcr.io >/dev/null 2>&1 || true' EXIT
 
             export VANEP_IMAGE="$IMAGE_NAME:$DEPLOY_SHA"
-            docker compose pull vanep
+            # API e worker usam a mesma imagem: o segundo nome não baixa nada de novo.
+            docker compose pull vanep vanep-worker
             docker tag "$VANEP_IMAGE" "$IMAGE_NAME:latest"
             docker compose up -d --no-build
             docker image prune -af --filter "until=168h"
@@ -108,11 +109,13 @@ jobs:
             # Health check: /login é público; espera até ~5 min pela subida do Spring
             # (na VPS o boot passa de 2 min). Aborta antes se o container cair.
             APP_PORT=$(grep -E '^APP_PORT=' .env | cut -d= -f2)
+            API_UP=false
             for i in $(seq 1 60); do
               STATUS=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:${APP_PORT:-8080}/login" || true)
               if [ "$STATUS" -ge 200 ] && [ "$STATUS" -lt 400 ]; then
-                echo "Deploy de $DEPLOY_SHA concluído — API respondendo com status $STATUS (após ~$((i * 5))s)"
-                exit 0
+                echo "API respondendo com status $STATUS (após ~$((i * 5))s)"
+                API_UP=true
+                break
               fi
               STATE=$(docker inspect -f '{{.State.Status}} {{.RestartCount}}' "$(docker compose ps -aq vanep)" 2>/dev/null || true)
               case "$STATE" in
@@ -122,6 +125,32 @@ jobs:
               sleep 5
             done
 
-            echo "API não respondeu após o deploy (último status: $STATUS)"
-            docker compose logs --tail=100 vanep
+            if [ "$API_UP" != true ]; then
+              echo "API não respondeu após o deploy (último status: $STATUS)"
+              docker compose logs --tail=100 vanep
+              exit 1
+            fi
+
+            # O worker não tem porta: está de pé quando o container roda sem reinícios e
+            # o Spring loga a linha de partida do JobWorker. Sobe junto com a API, então
+            # costuma já estar pronto aqui; a janela cobre um boot mais lento.
+            for i in $(seq 1 60); do
+              STATE=$(docker inspect -f '{{.State.Status}} {{.RestartCount}}' "$(docker compose ps -aq vanep-worker)" 2>/dev/null || true)
+              case "$STATE" in
+                "running 0") ;;
+                *)
+                  echo "Container do worker não está saudável (estado: ${STATE:-desconhecido})"
+                  docker compose logs --tail=100 vanep-worker
+                  exit 1
+                  ;;
+              esac
+              if docker compose logs vanep-worker 2>/dev/null | grep -q "Job worker started"; then
+                echo "Deploy de $DEPLOY_SHA concluído — API e worker no ar"
+                exit 0
+              fi
+              sleep 5
+            done
+
+            echo "Worker não confirmou a partida após o deploy"
+            docker compose logs --tail=100 vanep-worker
             exit 1

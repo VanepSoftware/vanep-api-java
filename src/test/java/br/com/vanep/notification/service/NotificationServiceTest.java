@@ -7,8 +7,11 @@ import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import br.com.vanep.job.enums.JobType;
+import br.com.vanep.job.service.JobService;
 import br.com.vanep.notification.dto.NotificationResponseDTO;
 import br.com.vanep.notification.enums.NotificationType;
+import br.com.vanep.notification.handler.SendPushJobHandler;
 import br.com.vanep.notification.model.NotificationModel;
 import br.com.vanep.notification.repository.NotificationRepository;
 import br.com.vanep.user.model.UserModel;
@@ -18,6 +21,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -37,7 +41,7 @@ class NotificationServiceTest {
   private static final Instant NOW = Instant.parse("2026-11-22T12:00:00Z");
 
   @Mock private NotificationRepository notifications;
-  @Mock private PushNotificationService push;
+  @Mock private JobService jobs;
   @Mock private UserService users;
   @Captor private ArgumentCaptor<NotificationModel> saved;
 
@@ -45,11 +49,11 @@ class NotificationServiceTest {
 
   @BeforeEach
   void setUp() {
-    service = new NotificationService(notifications, push, users, Clock.fixed(NOW, ZoneOffset.UTC));
+    service = new NotificationService(notifications, jobs, users, Clock.fixed(NOW, ZoneOffset.UTC));
   }
 
   @Test
-  void storesTheNotificationThenPushesItWithItsToken() {
+  void storesTheNotificationThenEnqueuesItsPush() {
     when(notifications.save(any()))
         .thenAnswer(
             call -> {
@@ -65,21 +69,9 @@ class NotificationServiceTest {
         "Toque para ver.",
         Map.of("proposalToken", "prop-1"));
 
-    InOrder order = inOrder(notifications, push);
+    InOrder order = inOrder(notifications, jobs);
     order.verify(notifications).save(saved.capture());
-    order
-        .verify(push)
-        .sendToUser(
-            7L,
-            "Nova proposta",
-            "Toque para ver.",
-            Map.of(
-                "type",
-                "PROPOSAL_RECEIVED",
-                "notificationToken",
-                "n-1",
-                "proposalToken",
-                "prop-1"));
+    order.verify(jobs).enqueue(JobType.SEND_PUSH, new SendPushJobHandler.Payload("n-1", null));
     NotificationModel notification = saved.getValue();
     assertThat(notification.getUserId()).isEqualTo(7L);
     assertThat(notification.getType()).isEqualTo(NotificationType.PROPOSAL_RECEIVED);
@@ -87,6 +79,23 @@ class NotificationServiceTest {
     assertThat(notification.getBody()).isEqualTo("Toque para ver.");
     assertThat(notification.getData()).containsExactly(Map.entry("proposalToken", "prop-1"));
     assertThat(notification.getReadAt()).isNull();
+  }
+
+  @Test
+  void thePushDataCarriesTheTypeAndTheNotificationToken() {
+    NotificationModel stored = notification("n-1", NotificationType.CHAT_MESSAGE);
+
+    assertThat(service.pushData(stored))
+        .containsExactlyInAnyOrderEntriesOf(
+            Map.of("type", "CHAT_MESSAGE", "notificationToken", "n-1", "conversationToken", "c-1"));
+  }
+
+  @Test
+  void findsANotificationByToken() {
+    NotificationModel stored = notification("n-1", NotificationType.CHAT_MESSAGE);
+    when(notifications.findByToken("n-1")).thenReturn(Optional.of(stored));
+
+    assertThat(service.findByToken("n-1")).containsSame(stored);
   }
 
   @Test
