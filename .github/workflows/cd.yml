@@ -72,7 +72,7 @@ jobs:
     permissions:
       packages: read
     steps:
-      - name: Deploy na VPS via SSH
+      - name: Pull da imagem na VPS
         uses: appleboy/ssh-action@v1
         env:
           IMAGE_NAME: ${{ needs.build.outputs.image }}
@@ -84,7 +84,9 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           envs: DEPLOY_SHA,IMAGE_NAME,GHCR_USER,GHCR_TOKEN
-          command_timeout: 15m
+          # Três tentativas de 10 min, mais o backoff e o git fetch, cabem aqui.
+          # O boot e os health checks não dividem mais este relógio.
+          command_timeout: 40m
           script: |
             set -e
             cd /home/vanep/vanep-projects/vanep-api-java
@@ -101,8 +103,29 @@ jobs:
 
             export VANEP_IMAGE="$IMAGE_NAME:$DEPLOY_SHA"
             # API e worker usam a mesma imagem: o segundo nome não baixa nada de novo.
-            docker compose pull vanep vanep-worker
+            # Um pull travado é interrompido e tentado de novo; camada já baixada fica no cache.
+            bash scripts/cd/pull-with-retry.sh
             docker tag "$VANEP_IMAGE" "$IMAGE_NAME:latest"
+
+      - name: Sobe API e worker e confere a saúde
+        uses: appleboy/ssh-action@v1
+        env:
+          IMAGE_NAME: ${{ needs.build.outputs.image }}
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          envs: DEPLOY_SHA,IMAGE_NAME
+          # O pull já terminou. Estes 15 min cobrem o up e as duas janelas de saúde
+          # (até 5 min cada). Na VPS de 1 vCPU o boot dos dois leva cerca de 2–3 min.
+          command_timeout: 15m
+          script: |
+            set -e
+            cd /home/vanep/vanep-projects/vanep-api-java
+            test "$(git rev-parse HEAD)" = "$DEPLOY_SHA" || { echo "Worktree não está em $DEPLOY_SHA — deploy abortado"; exit 1; }
+
+            export VANEP_IMAGE="$IMAGE_NAME:$DEPLOY_SHA"
             docker compose up -d --no-build
             docker image prune -af --filter "until=168h"
 
