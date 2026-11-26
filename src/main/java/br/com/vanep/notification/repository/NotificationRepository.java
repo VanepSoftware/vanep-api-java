@@ -21,6 +21,8 @@ public interface NotificationRepository extends JpaRepository<NotificationModel,
 
   long countByUserIdAndReadAtIsNull(Long userId);
 
+  Optional<NotificationModel> findByToken(String token);
+
   @Query(
       """
       select users.token from NotificationModel notification, UserModel users
