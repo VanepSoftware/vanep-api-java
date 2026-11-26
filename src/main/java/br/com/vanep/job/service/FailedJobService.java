@@ -29,6 +29,7 @@ public class FailedJobService {
 
   @Transactional(propagation = Propagation.MANDATORY)
   public void recordFailure(JobModel job, int attempts, String exception, boolean permanent) {
+    Instant now = clock.instant();
     FailedJobModel failed =
         failedJobs
             .findByToken(job.getToken())
@@ -42,8 +43,21 @@ public class FailedJobService {
     failed.setAttempts(attempts);
     failed.setException(exception);
     failed.setPermanent(failed.isPermanent() || permanent);
-    failed.setFailedAt(clock.instant());
+    failed.setFailedAt(now);
+    failed.setRetryAt(nextRetryAt(job, failed, now));
     failedJobs.save(failed);
+  }
+
+  // The delay grows with each failed replay; a permanent failure, an unknown type or an exhausted
+  // schedule leaves retry_at null, and the row stays in failed_jobs for manual analysis.
+  static Instant nextRetryAt(JobModel job, FailedJobModel failed, Instant now) {
+    if (failed.isPermanent()) {
+      return null;
+    }
+    return job.findJobType()
+        .flatMap(type -> type.replayDelayAfter(failed.getTries()))
+        .map(now::plus)
+        .orElse(null);
   }
 
   FailedJobModel newFailedJob(JobModel job) {
@@ -61,14 +75,15 @@ public class FailedJobService {
   // Only feeds the queue: the normal worker runs the replayed jobs at its own pace, one attempt
   // each, so a large backlog of failures never turns into a burst of work.
   @Transactional
-  public int replayFailedJobs(int batchSize, int maxTries) {
+  public int replayFailedJobs(int batchSize) {
     Instant now = clock.instant();
-    List<FailedJobModel> replayable = failedJobs.findReplayable(maxTries, Limit.of(batchSize));
-    for (FailedJobModel failed : replayable) {
+    List<FailedJobModel> due = failedJobs.findDueForRetry(now, Limit.of(batchSize));
+    for (FailedJobModel failed : due) {
       jobs.save(replayJob(failed, now));
       failed.setLastTriedAt(now);
+      failed.setRetryAt(null);
     }
-    return replayable.size();
+    return due.size();
   }
 
   JobModel replayJob(FailedJobModel failed, Instant now) {

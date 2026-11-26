@@ -51,4 +51,9 @@ public class FailedJobModel {
 
   @Column(name = "last_tried_at")
   private Instant lastTriedAt;
+
+  // When the replayer sends the row back to the queue; null while it is queued, and for good
+  // once it failed permanently or ran out of replays.
+  @Column(name = "retry_at")
+  private Instant retryAt;
 }

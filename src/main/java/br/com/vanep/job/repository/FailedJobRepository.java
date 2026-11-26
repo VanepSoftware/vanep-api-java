@@ -3,6 +3,7 @@ package br.com.vanep.job.repository;
 import br.com.vanep.job.model.FailedJobModel;
 import jakarta.persistence.LockModeType;
 import jakarta.persistence.QueryHint;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Limit;
@@ -22,11 +23,11 @@ public interface FailedJobRepository extends JpaRepository<FailedJobModel, Long>
   @Query(
       """
       select failed from FailedJobModel failed
-      where failed.permanent = false and failed.tries < :maxTries
+      where failed.retryAt <= :now
         and not exists (select job.id from JobModel job where job.token = failed.token)
-      order by failed.lastTriedAt asc nulls first, failed.id
+      order by failed.retryAt, failed.id
       """)
-  List<FailedJobModel> findReplayable(int maxTries, Limit limit);
+  List<FailedJobModel> findDueForRetry(Instant now, Limit limit);
 
   @Modifying
   @Query("delete from FailedJobModel failed where failed.token = :token")

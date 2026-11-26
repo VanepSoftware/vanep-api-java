@@ -32,8 +32,7 @@ class JobWorkerSwitchTest {
           .withPropertyValues(
               "vanep.worker.batch-size=20",
               "vanep.worker.lock-timeout=PT5M",
-              "vanep.worker.replay.batch-size=20",
-              "vanep.worker.replay.max-tries=5");
+              "vanep.worker.replay.batch-size=20");
 
   @Test
   void withTheWorkerOffNothingClaimsOrReplaysJobs() {
@@ -58,11 +57,11 @@ class JobWorkerSwitchTest {
   }
 
   @Test
-  void theReplayerUsesItsBatchSizeAndTryLimit() {
+  void theReplayerUsesItsBatchSize() {
     FailedJobService failedJobs = mock(FailedJobService.class);
 
-    new FailedJobReplayer(failedJobs, 20, 5).replayFailedJobs();
+    new FailedJobReplayer(failedJobs, 20).replayFailedJobs();
 
-    verify(failedJobs).replayFailedJobs(20, 5);
+    verify(failedJobs).replayFailedJobs(20);
   }
 }

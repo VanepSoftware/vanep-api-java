@@ -68,32 +68,31 @@ class JobRepositoryTest {
   }
 
   @Test
-  void replaysOnlyRetryableRowsWithoutAQueuedJobLeastRecentlyTriedFirst() {
-    FailedJobModel neverTried = failedJobs.save(failed("never", 0, false, null));
-    FailedJobModel triedLongAgo =
-        failedJobs.save(failed("long-ago", 1, false, NOW.minusSeconds(7200)));
-    failedJobs.save(failed("recent", 1, false, NOW.minusSeconds(60)));
-    failedJobs.save(failed("permanent", 0, true, null));
-    failedJobs.save(failed("exhausted", 5, false, null));
-    failedJobs.save(failed("queued", 0, false, null));
+  void findsRowsDueForRetryWithoutAQueuedJobEarliestFirst() {
+    FailedJobModel dueLongAgo = failedJobs.save(failed("long-ago", NOW.minusSeconds(7200)));
+    FailedJobModel dueNow = failedJobs.save(failed("now", NOW));
+    failedJobs.save(failed("recent", NOW.minusSeconds(60)));
+    failedJobs.save(failed("future", NOW.plusSeconds(60)));
+    failedJobs.save(failed("no-retry", null));
+    failedJobs.save(failed("queued", NOW.minusSeconds(9000)));
     JobModel queued = job(JobStatus.PENDING, NOW);
     queued.setToken("queued");
     jobs.save(queued);
 
-    List<String> replayable =
+    List<String> due =
         transaction.execute(
             status ->
-                failedJobs.findReplayable(5, Limit.of(2)).stream()
+                failedJobs.findDueForRetry(NOW, Limit.of(10)).stream()
                     .map(failed -> failed.getToken())
                     .toList());
 
-    assertThat(replayable).containsExactly(neverTried.getToken(), triedLongAgo.getToken());
+    assertThat(due).containsExactly(dueLongAgo.getToken(), "recent", dueNow.getToken());
   }
 
   @Test
   void deletesAFailedJobByToken() {
-    failedJobs.save(failed("gone", 0, false, null));
-    failedJobs.save(failed("kept", 0, false, null));
+    failedJobs.save(failed("gone", null));
+    failedJobs.save(failed("kept", null));
 
     int deleted = transaction.execute(status -> failedJobs.deleteByToken("gone"));
 
@@ -125,18 +124,15 @@ class JobRepositoryTest {
     return job;
   }
 
-  private static FailedJobModel failed(
-      String token, int tries, boolean permanent, Instant lastTriedAt) {
+  private static FailedJobModel failed(String token, Instant retryAt) {
     FailedJobModel failed = new FailedJobModel();
     failed.setToken(token);
     failed.setType(JobType.SEND_PUSH.name());
     failed.setPayload(Map.of());
     failed.setAttempts(5);
-    failed.setTries(tries);
-    failed.setPermanent(permanent);
     failed.setException("boom");
     failed.setFailedAt(NOW.minusSeconds(3600));
-    failed.setLastTriedAt(lastTriedAt);
+    failed.setRetryAt(retryAt);
     return failed;
   }
 }

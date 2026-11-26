@@ -35,7 +35,7 @@ public class DriverNotificationService {
   }
 
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-  @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
   public void sendApproval(DriverReviewEvent.Approved event) {
     drivers
         .findByToken(event.driverToken())
@@ -44,7 +44,7 @@ public class DriverNotificationService {
   }
 
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-  @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
   public void sendRejection(DriverReviewEvent.Rejected event) {
     drivers
         .findByToken(event.driverToken())
