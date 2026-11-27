@@ -13,7 +13,7 @@ import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
 import br.com.vanep.user.service.UserService;
-import java.time.Instant;
+import java.time.Clock;
 import java.util.List;
 import java.util.stream.Stream;
 import org.springframework.context.MessageSource;
@@ -33,6 +33,7 @@ public class AssistantLinkService {
   private final AssistantMapper mapper;
   private final MessageSource messages;
   private final AssistantInviteRepository inviteRepository;
+  private final Clock clock;
 
   public AssistantLinkService(
       AssistantRepository assistantRepository,
@@ -41,7 +42,8 @@ public class AssistantLinkService {
       UserService userService,
       AssistantMapper mapper,
       MessageSource messages,
-      AssistantInviteRepository inviteRepository) {
+      AssistantInviteRepository inviteRepository,
+      Clock clock) {
     this.assistantRepository = assistantRepository;
     this.driverRepository = driverRepository;
     this.userRepository = userRepository;
@@ -49,6 +51,7 @@ public class AssistantLinkService {
     this.mapper = mapper;
     this.messages = messages;
     this.inviteRepository = inviteRepository;
+    this.clock = clock;
   }
 
   private String message(String key) {
@@ -69,7 +72,7 @@ public class AssistantLinkService {
     Stream<AssistantListItemResponseDTO> pending =
         inviteRepository
             .findByDriverIdAndStatusAndExpiresAtAfterOrderByCreatedAtDesc(
-                driver.getId(), AssistantInviteStatus.PENDING, Instant.now())
+                driver.getId(), AssistantInviteStatus.PENDING, clock.instant())
             .stream()
             .map(mapper::toPendingListItem);
     return Stream.concat(linked, pending).toList();
