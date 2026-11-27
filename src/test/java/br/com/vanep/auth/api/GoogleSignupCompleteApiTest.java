@@ -90,7 +90,7 @@ class GoogleSignupCompleteApiTest {
     mockMvc
         .perform(complete(issuedTicket(), "DRIVER", VALID_CPF, null))
         .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.code").value("validation_error"));
+        .andExpect(jsonPath("$.code").value("validation.failed"));
 
     assertThat(users.count()).isZero();
   }
@@ -102,7 +102,7 @@ class GoogleSignupCompleteApiTest {
     mockMvc
         .perform(complete(ticket, "ADMIN", VALID_CPF, null))
         .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.code").value("validation_error"));
+        .andExpect(jsonPath("$.code").value("validation.failed"));
 
     assertThat(users.count()).isZero();
     mockMvc.perform(complete(ticket, "CLIENT", VALID_CPF, null)).andExpect(status().isCreated());
@@ -113,14 +113,14 @@ class GoogleSignupCompleteApiTest {
     mockMvc
         .perform(complete("never-issued", "CLIENT", VALID_CPF, null))
         .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.code").value("invalid_signup_ticket"));
+        .andExpect(jsonPath("$.code").value("auth.error.invalid_signup_ticket"));
 
     String ticket = issuedTicket();
     mockMvc.perform(complete(ticket, "CLIENT", VALID_CPF, null)).andExpect(status().isCreated());
     mockMvc
         .perform(complete(ticket, "CLIENT", "52998224725", null))
         .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.code").value("invalid_signup_ticket"));
+        .andExpect(jsonPath("$.code").value("auth.error.invalid_signup_ticket"));
 
     assertThat(users.count()).isEqualTo(1);
   }
@@ -133,7 +133,7 @@ class GoogleSignupCompleteApiTest {
     mockMvc
         .perform(complete(ticket, "CLIENT", VALID_CPF, null))
         .andExpect(status().isConflict())
-        .andExpect(jsonPath("$.code").value("email_duplicate"));
+        .andExpect(jsonPath("$.code").value("auth.signup.email.duplicate"));
 
     assertThat(users.count()).isEqualTo(1);
   }
@@ -146,7 +146,7 @@ class GoogleSignupCompleteApiTest {
     mockMvc
         .perform(complete(ticket, "CLIENT", "390.533.447-05", null))
         .andExpect(status().isConflict())
-        .andExpect(jsonPath("$.code").value("document_duplicate"));
+        .andExpect(jsonPath("$.code").value("auth.signup.document.duplicate"));
 
     assertThat(users.findByEmail(EMAIL)).isEmpty();
   }

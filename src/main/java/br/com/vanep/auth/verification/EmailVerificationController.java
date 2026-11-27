@@ -1,6 +1,6 @@
 package br.com.vanep.auth.verification;
 
-import br.com.vanep.user.exception.ProfileEmailDuplicateException;
+import br.com.vanep.shared.error.ApiProblemException;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -24,8 +24,11 @@ public class EmailVerificationController {
       }
       model.addAttribute("invalid", true);
       return "verify-email";
-    } catch (ProfileEmailDuplicateException ex) {
-      return "redirect:/login?email_taken";
+    } catch (ApiProblemException ex) {
+      if ("auth.signup.email.duplicate".equals(ex.getCode())) {
+        return "redirect:/login?email_taken";
+      }
+      throw ex;
     }
   }
 

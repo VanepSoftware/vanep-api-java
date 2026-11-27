@@ -3,9 +3,9 @@ package br.com.vanep.auth.api;
 import br.com.vanep.auth.dto.EmailRequestDTO;
 import br.com.vanep.auth.dto.EmailVerifyRequestDTO;
 import br.com.vanep.auth.dto.PasswordResetRequestDTO;
-import br.com.vanep.auth.exception.InvalidAuthCodeException;
 import br.com.vanep.auth.password.PasswordResetService;
 import br.com.vanep.auth.verification.EmailVerificationService;
+import br.com.vanep.shared.error.ApiProblemException;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -31,7 +31,7 @@ public class EmailCodeApiController {
   @ResponseStatus(HttpStatus.NO_CONTENT)
   public void verifyEmail(@Valid @RequestBody EmailVerifyRequestDTO request) {
     if (!emailVerification.verifyByCode(request.email(), request.code())) {
-      throw new InvalidAuthCodeException();
+      throw ApiProblemException.badRequest("auth.error.invalid_code");
     }
   }
 
@@ -52,7 +52,7 @@ public class EmailCodeApiController {
   @ResponseStatus(HttpStatus.NO_CONTENT)
   public void resetPassword(@Valid @RequestBody PasswordResetRequestDTO request) {
     if (!passwordReset.resetByCode(request.email(), request.code(), request.newPassword())) {
-      throw new InvalidAuthCodeException();
+      throw ApiProblemException.badRequest("auth.error.invalid_code");
     }
   }
 }

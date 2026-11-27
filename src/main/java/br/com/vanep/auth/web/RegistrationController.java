@@ -1,7 +1,7 @@
 package br.com.vanep.auth.web;
 
-import br.com.vanep.auth.exception.SignupDuplicateException;
 import br.com.vanep.auth.mapper.SignupFormMapper;
+import br.com.vanep.shared.error.ApiProblemException;
 import jakarta.validation.Valid;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
@@ -99,11 +99,15 @@ public class RegistrationController {
   String saveRegistration(Runnable registration, BindingResult bindingResult, String formView) {
     try {
       registration.run();
-    } catch (SignupDuplicateException duplicate) {
+    } catch (ApiProblemException duplicate) {
+      Object field = duplicate.getBody().getProperties().get("field");
+      if (!(field instanceof String fieldName)) {
+        throw duplicate;
+      }
       bindingResult.rejectValue(
-          duplicate.getField(),
+          fieldName,
           "duplicate",
-          messages.getMessage(duplicate.getMessageKey(), null, LocaleContextHolder.getLocale()));
+          messages.getMessage(duplicate.getCode(), null, LocaleContextHolder.getLocale()));
       return formView;
     }
     return "redirect:/login?registered";

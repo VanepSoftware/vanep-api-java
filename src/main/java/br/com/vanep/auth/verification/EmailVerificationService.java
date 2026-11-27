@@ -7,7 +7,7 @@ import br.com.vanep.auth.token.AuthCodeIssuePolicy;
 import br.com.vanep.auth.token.SecureCodes;
 import br.com.vanep.auth.token.SecureTokens;
 import br.com.vanep.auth.verification.model.EmailVerificationTokenModel;
-import br.com.vanep.user.exception.ProfileEmailDuplicateException;
+import br.com.vanep.shared.error.ApiProblemException;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
 import java.time.Duration;
@@ -193,7 +193,7 @@ public class EmailVerificationService {
 
   void promotePendingEmail(UserModel user, String pending, Instant now) {
     if (users.existsByEmail(pending)) {
-      throw new ProfileEmailDuplicateException(message("auth.signup.email.duplicate"));
+      throw ApiProblemException.conflict("auth.signup.email.duplicate").with("field", "email");
     }
     try {
       user.setEmail(pending);
@@ -202,7 +202,7 @@ public class EmailVerificationService {
       user.setVerified(true);
       users.saveAndFlush(user);
     } catch (DataIntegrityViolationException ex) {
-      throw new ProfileEmailDuplicateException(message("auth.signup.email.duplicate"));
+      throw ApiProblemException.conflict("auth.signup.email.duplicate").with("field", "email");
     }
   }
 

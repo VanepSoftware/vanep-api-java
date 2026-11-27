@@ -1,10 +1,10 @@
 package br.com.vanep.auth.signup;
 
 import br.com.vanep.auth.dto.GoogleSignupCompleteRequestDTO;
-import br.com.vanep.auth.exception.InvalidSignupTicketException;
 import br.com.vanep.auth.oauth.OAuthAccountService;
 import br.com.vanep.auth.signup.model.SignupTicketModel;
 import br.com.vanep.auth.web.RegistrationService;
+import br.com.vanep.shared.error.ApiProblemException;
 import br.com.vanep.shared.validation.CpfValidator;
 import br.com.vanep.user.model.UserModel;
 import org.springframework.stereotype.Service;
@@ -32,7 +32,7 @@ public class GoogleSignupService {
     SignupTicketModel ticket =
         signupTickets
             .consume(request.getSignupTicket())
-            .orElseThrow(InvalidSignupTicketException::new);
+            .orElseThrow(() -> ApiProblemException.badRequest("auth.error.invalid_signup_ticket"));
 
     request.setDocument(CpfValidator.normalize(request.getDocument()));
     registrationService.rejectDuplicates(ticket.getEmail(), request.getDocument());
