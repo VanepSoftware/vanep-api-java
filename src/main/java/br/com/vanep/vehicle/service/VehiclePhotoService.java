@@ -3,28 +3,22 @@ package br.com.vanep.vehicle.service;
 import br.com.vanep.media.enums.MediaSlot;
 import br.com.vanep.media.model.MediaFileModel;
 import br.com.vanep.media.service.MediaFileService;
+import br.com.vanep.shared.error.ApiProblemException;
 import br.com.vanep.vehicle.model.VehicleModel;
 import br.com.vanep.vehicle.repository.VehicleRepository;
-import org.springframework.context.MessageSource;
-import org.springframework.context.i18n.LocaleContextHolder;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class VehiclePhotoService {
 
   private final VehicleRepository vehicles;
   private final MediaFileService media;
-  private final MessageSource messages;
 
-  public VehiclePhotoService(
-      VehicleRepository vehicles, MediaFileService media, MessageSource messages) {
+  public VehiclePhotoService(VehicleRepository vehicles, MediaFileService media) {
     this.vehicles = vehicles;
     this.media = media;
-    this.messages = messages;
   }
 
   @Transactional
@@ -44,7 +38,7 @@ public class VehiclePhotoService {
   public MediaFileModel require(String token, MediaSlot slot) {
     MediaFileModel photo = read(require(token), slot);
     if (photo == null) {
-      throw new ResponseStatusException(HttpStatus.NOT_FOUND, message("media.not_found"));
+      throw ApiProblemException.notFound("media.not_found");
     }
     return photo;
   }
@@ -68,11 +62,6 @@ public class VehiclePhotoService {
   private VehicleModel require(String token) {
     return vehicles
         .findByToken(token)
-        .orElseThrow(
-            () -> new ResponseStatusException(HttpStatus.NOT_FOUND, message("vehicle.not_found")));
-  }
-
-  private String message(String key) {
-    return messages.getMessage(key, null, LocaleContextHolder.getLocale());
+        .orElseThrow(() -> ApiProblemException.notFound("vehicle.not_found"));
   }
 }

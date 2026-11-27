@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -41,12 +40,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.context.MessageSource;
 import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.mock.web.MockMultipartFile;
-import org.springframework.web.server.ResponseStatusException;
 
 @ExtendWith(MockitoExtension.class)
 class DriverCnhServiceTest {
@@ -58,7 +55,6 @@ class DriverCnhServiceTest {
   @Mock private DocumentSubmissionRules submissionRules;
   @Mock private DriverCnhMapper mapper;
   @Mock private MediaFileService media;
-  @Mock private MessageSource messages;
 
   @InjectMocks private DriverCnhService service;
 
@@ -70,9 +66,6 @@ class DriverCnhServiceTest {
 
   @BeforeEach
   void setUp() {
-    lenient()
-        .when(messages.getMessage(any(), any(), any()))
-        .thenAnswer(invocation -> invocation.getArgument(0));
     user = new UserModel();
     user.setId(1L);
     user.setType(UserType.DRIVER);
@@ -251,12 +244,11 @@ class DriverCnhServiceTest {
     when(cnhRepository.findByToken("cnh-123")).thenReturn(Optional.of(active));
 
     assertThatThrownBy(() -> service.restore("cnh-123", true))
-        .isInstanceOf(ResponseStatusException.class)
-        .satisfies(
-            e -> {
-              ResponseStatusException ex = (ResponseStatusException) e;
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
               assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
-              assertThat(ex.getReason()).contains("driver_cnh.already_active");
+              assertThat(ex.getCode()).isEqualTo("driver_cnh.already_active");
             });
 
     verify(cnhRepository, never()).restoreByToken(any());

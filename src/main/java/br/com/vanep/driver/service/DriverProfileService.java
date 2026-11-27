@@ -4,14 +4,11 @@ import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.dto.DriverProfileResponseDTO;
 import br.com.vanep.driver.mapper.DriverMapper;
 import br.com.vanep.driver.model.DriverModel;
+import br.com.vanep.shared.error.ApiProblemException;
 import br.com.vanep.vehicle.repository.VehicleRepository;
 import java.util.List;
-import org.springframework.context.MessageSource;
-import org.springframework.context.i18n.LocaleContextHolder;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class DriverProfileService {
@@ -20,19 +17,16 @@ public class DriverProfileService {
   private final VehicleRepository vehicles;
   private final DriverSearchService searchService;
   private final DriverMapper mapper;
-  private final MessageSource messages;
 
   public DriverProfileService(
       DriverRepository drivers,
       VehicleRepository vehicles,
       DriverSearchService searchService,
-      DriverMapper mapper,
-      MessageSource messages) {
+      DriverMapper mapper) {
     this.drivers = drivers;
     this.vehicles = vehicles;
     this.searchService = searchService;
     this.mapper = mapper;
-    this.messages = messages;
   }
 
   // A driver the search would not show is not found here either, so the profile never
@@ -42,12 +36,7 @@ public class DriverProfileService {
     DriverModel driver =
         drivers
             .findSearchableByToken(token)
-            .orElseThrow(
-                () ->
-                    new ResponseStatusException(
-                        HttpStatus.NOT_FOUND,
-                        messages.getMessage(
-                            "driver.not_found", null, LocaleContextHolder.getLocale())));
+            .orElseThrow(() -> ApiProblemException.notFound("driver.not_found"));
 
     List<String> serviceAreas =
         searchService

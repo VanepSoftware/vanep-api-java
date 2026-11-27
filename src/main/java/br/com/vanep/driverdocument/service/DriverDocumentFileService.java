@@ -7,13 +7,10 @@ import br.com.vanep.media.model.MediaFileModel;
 import br.com.vanep.media.service.MediaFileService;
 import br.com.vanep.shared.document.service.DocumentReviewService;
 import br.com.vanep.shared.document.service.DocumentSubmissionRules;
-import org.springframework.context.MessageSource;
-import org.springframework.context.i18n.LocaleContextHolder;
-import org.springframework.http.HttpStatus;
+import br.com.vanep.shared.error.ApiProblemException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class DriverDocumentFileService {
@@ -23,21 +20,18 @@ public class DriverDocumentFileService {
   private final MediaFileService media;
   private final DocumentReviewService reviewService;
   private final DocumentSubmissionRules submissionRules;
-  private final MessageSource messages;
 
   public DriverDocumentFileService(
       DriverDocumentService documentService,
       DriverDocumentRepository documents,
       MediaFileService media,
       DocumentReviewService reviewService,
-      DocumentSubmissionRules submissionRules,
-      MessageSource messages) {
+      DocumentSubmissionRules submissionRules) {
     this.documentService = documentService;
     this.documents = documents;
     this.media = media;
     this.reviewService = reviewService;
     this.submissionRules = submissionRules;
-    this.messages = messages;
   }
 
   @Transactional
@@ -60,12 +54,8 @@ public class DriverDocumentFileService {
   public MediaFileModel requireFile(String token) {
     MediaFileModel file = documentService.requireByToken(token).getFile();
     if (file == null) {
-      throw new ResponseStatusException(HttpStatus.NOT_FOUND, message("media.not_found"));
+      throw ApiProblemException.notFound("media.not_found");
     }
     return file;
-  }
-
-  private String message(String key) {
-    return messages.getMessage(key, null, LocaleContextHolder.getLocale());
   }
 }

@@ -15,12 +15,8 @@ import br.com.vanep.vehicle.model.VehicleModel;
 import br.com.vanep.vehicle.repository.VehicleRepository;
 import java.util.List;
 import java.util.Locale;
-import org.springframework.context.MessageSource;
-import org.springframework.context.i18n.LocaleContextHolder;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class VehicleService {
@@ -31,7 +27,6 @@ public class VehicleService {
   private final UserRepository userRepository;
   private final UserService userService;
   private final VehicleMapper mapper;
-  private final MessageSource messages;
 
   public VehicleService(
       VehicleRepository vehicleRepository,
@@ -39,19 +34,13 @@ public class VehicleService {
       DriverRepository driverRepository,
       UserRepository userRepository,
       UserService userService,
-      VehicleMapper mapper,
-      MessageSource messages) {
+      VehicleMapper mapper) {
     this.vehicleRepository = vehicleRepository;
     this.unlinkedPassengers = unlinkedPassengers;
     this.driverRepository = driverRepository;
     this.userRepository = userRepository;
     this.userService = userService;
     this.mapper = mapper;
-    this.messages = messages;
-  }
-
-  private String message(String key) {
-    return messages.getMessage(key, null, LocaleContextHolder.getLocale());
   }
 
   @Transactional
@@ -59,10 +48,7 @@ public class VehicleService {
     UserModel caller =
         userRepository
             .findByEmail(callerEmail)
-            .orElseThrow(
-                () ->
-                    new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, message("user.account.not_found")));
+            .orElseThrow(() -> ApiProblemException.notFound("user.account.not_found"));
 
     DriverModel driver;
     if (caller.getType() == UserType.ADMIN
@@ -71,18 +57,12 @@ public class VehicleService {
       driver =
           driverRepository
               .findByToken(request.driverToken())
-              .orElseThrow(
-                  () ->
-                      new ResponseStatusException(
-                          HttpStatus.NOT_FOUND, message("vehicle.driver.not_found")));
+              .orElseThrow(() -> ApiProblemException.notFound("vehicle.driver.not_found"));
     } else {
       driver =
           driverRepository
               .findByUserId(caller.getId())
-              .orElseThrow(
-                  () ->
-                      new ResponseStatusException(
-                          HttpStatus.NOT_FOUND, message("user.driver_profile.not_found")));
+              .orElseThrow(() -> ApiProblemException.notFound("user.driver_profile.not_found"));
     }
 
     return createFor(driver, request);
@@ -122,20 +102,14 @@ public class VehicleService {
     UserModel user = userService.requireByTokenAndType(callerUid, UserType.DRIVER);
     return driverRepository
         .findByUserId(user.getId())
-        .orElseThrow(
-            () ->
-                new ResponseStatusException(
-                    HttpStatus.NOT_FOUND, message("user.driver_profile.not_found")));
+        .orElseThrow(() -> ApiProblemException.notFound("user.driver_profile.not_found"));
   }
 
   public List<VehicleResponseDTO> findAll(String callerEmail) {
     UserModel caller =
         userRepository
             .findByEmail(callerEmail)
-            .orElseThrow(
-                () ->
-                    new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, message("user.account.not_found")));
+            .orElseThrow(() -> ApiProblemException.notFound("user.account.not_found"));
 
     List<VehicleModel> vehicles;
     if (caller.getType() == UserType.ADMIN) {
@@ -144,10 +118,7 @@ public class VehicleService {
       DriverModel driver =
           driverRepository
               .findByUserId(caller.getId())
-              .orElseThrow(
-                  () ->
-                      new ResponseStatusException(
-                          HttpStatus.NOT_FOUND, message("user.driver_profile.not_found")));
+              .orElseThrow(() -> ApiProblemException.notFound("user.driver_profile.not_found"));
       vehicles = vehicleRepository.findByDriverId(driver.getId());
     }
     return vehicles.stream().map(mapper::toResponse).toList();
@@ -193,17 +164,16 @@ public class VehicleService {
     }
 
     if (vehicleRepository.findByToken(token).isPresent()) {
-      throw new ResponseStatusException(HttpStatus.CONFLICT, message("vehicle.already_active"));
+      throw ApiProblemException.conflict("vehicle.already_active");
     }
 
-    throw new ResponseStatusException(HttpStatus.NOT_FOUND, message("vehicle.not_found"));
+    throw ApiProblemException.notFound("vehicle.not_found");
   }
 
   private VehicleModel requireByToken(String token) {
     return vehicleRepository
         .findByToken(token)
-        .orElseThrow(
-            () -> new ResponseStatusException(HttpStatus.NOT_FOUND, message("vehicle.not_found")));
+        .orElseThrow(() -> ApiProblemException.notFound("vehicle.not_found"));
   }
 
   // A plate is stored in one spelling so "ABC-1D23" and "abc1d23" are the same van.

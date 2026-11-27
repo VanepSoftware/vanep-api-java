@@ -65,7 +65,6 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
-import org.springframework.web.server.ResponseStatusException;
 
 @ExtendWith(MockitoExtension.class)
 class DriverOnboardingServiceTest {
@@ -587,11 +586,14 @@ class DriverOnboardingServiceTest {
         .thenReturn(List.of(rejected));
 
     assertThatThrownBy(() -> service.submitOnboarding("user-token-10"))
-        .isInstanceOf(ResponseStatusException.class)
-        .satisfies(
-            e ->
-                assertThat(((ResponseStatusException) e).getReason())
-                    .contains("driver.onboarding.cnh_rejected"));
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
+              assertThat(ex.getCode()).isEqualTo("driver.onboarding.incomplete");
+              assertThat(ex.getBody().getProperties().get("missingSteps"))
+                  .isEqualTo(List.of("driver.onboarding.cnh_rejected"));
+            });
   }
 
   @Test
@@ -616,11 +618,14 @@ class DriverOnboardingServiceTest {
         .thenReturn(List.of(cnh("B", SchoolTransportCredentialService.today().plusYears(2))));
 
     assertThatThrownBy(() -> service.submitOnboarding("user-token-10"))
-        .isInstanceOf(ResponseStatusException.class)
-        .satisfies(
-            e ->
-                assertThat(((ResponseStatusException) e).getReason())
-                    .contains("driver.onboarding.cnh_category"));
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
+              assertThat(ex.getCode()).isEqualTo("driver.onboarding.incomplete");
+              assertThat(ex.getBody().getProperties().get("missingSteps"))
+                  .isEqualTo(List.of("driver.onboarding.cnh_category"));
+            });
     assertThat(driver.getApprovalStatus()).isEqualTo(DriverApprovalStatus.PENDING);
   }
 
@@ -637,9 +642,14 @@ class DriverOnboardingServiceTest {
                 vehicleDocument(van, VehicleDocumentType.VEHICLE_INSPECTION, true)));
 
     assertThatThrownBy(() -> service.submitOnboarding("user-token-10"))
-        .isInstanceOf(ResponseStatusException.class)
-        .extracting(e -> ((ResponseStatusException) e).getStatusCode())
-        .isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
+              assertThat(ex.getCode()).isEqualTo("driver.onboarding.incomplete");
+              assertThat(ex.getBody().getProperties().get("missingSteps"))
+                  .isEqualTo(List.of("driver.onboarding.documents_missing"));
+            });
 
     verify(messages)
         .getMessage(
@@ -773,15 +783,21 @@ class DriverOnboardingServiceTest {
     when(driverRepository.findByUserId(10L)).thenReturn(Optional.of(driver));
 
     assertThatThrownBy(() -> service.submitOnboarding("user-token-10"))
-        .isInstanceOf(ResponseStatusException.class)
-        .extracting(e -> ((ResponseStatusException) e).getStatusCode())
-        .isEqualTo(HttpStatus.BAD_REQUEST);
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+              assertThat(ex.getCode()).isEqualTo("driver.onboarding.already_submitted");
+            });
 
     driver.setApprovalStatus(DriverApprovalStatus.APPROVED);
     assertThatThrownBy(() -> service.submitOnboarding("user-token-10"))
-        .isInstanceOf(ResponseStatusException.class)
-        .extracting(e -> ((ResponseStatusException) e).getStatusCode())
-        .isEqualTo(HttpStatus.BAD_REQUEST);
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+              assertThat(ex.getCode()).isEqualTo("driver.onboarding.already_submitted");
+            });
   }
 
   @Test
@@ -798,12 +814,13 @@ class DriverOnboardingServiceTest {
         .thenReturn(completeDriverDocuments());
 
     assertThatThrownBy(() -> service.submitOnboarding("user-token-10"))
-        .isInstanceOf(ResponseStatusException.class)
-        .satisfies(
-            e -> {
-              ResponseStatusException ex = (ResponseStatusException) e;
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
               assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
-              assertThat(ex.getReason()).contains("driver.onboarding.vehicle_required");
+              assertThat(ex.getCode()).isEqualTo("driver.onboarding.incomplete");
+              assertThat(ex.getBody().getProperties().get("missingSteps"))
+                  .isEqualTo(List.of("driver.onboarding.vehicle_required"));
             });
 
     assertThat(driver.getApprovalStatus()).isEqualTo(DriverApprovalStatus.PENDING);
@@ -823,12 +840,12 @@ class DriverOnboardingServiceTest {
         .thenReturn(completeDriverDocuments());
 
     assertThatThrownBy(() -> service.submitOnboarding("user-token-10"))
-        .isInstanceOf(ResponseStatusException.class)
-        .satisfies(
-            e -> {
-              ResponseStatusException ex = (ResponseStatusException) e;
-              assertThat(ex.getReason()).contains("driver.onboarding.vehicle_required");
-              assertThat(ex.getReason()).doesNotContain("driver.onboarding.documents_missing");
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
+              assertThat(ex.getCode()).isEqualTo("driver.onboarding.incomplete");
+              assertThat(ex.getBody().getProperties().get("missingSteps"))
+                  .isEqualTo(List.of("driver.onboarding.vehicle_required"));
             });
   }
 
@@ -844,12 +861,13 @@ class DriverOnboardingServiceTest {
         .thenReturn(List.of(expired));
 
     assertThatThrownBy(() -> service.submitOnboarding("user-token-10"))
-        .isInstanceOf(ResponseStatusException.class)
-        .satisfies(
-            e -> {
-              ResponseStatusException ex = (ResponseStatusException) e;
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
               assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
-              assertThat(ex.getReason()).contains("driver.onboarding.cnh_expired");
+              assertThat(ex.getCode()).isEqualTo("driver.onboarding.incomplete");
+              assertThat(ex.getBody().getProperties().get("missingSteps"))
+                  .isEqualTo(List.of("driver.onboarding.cnh_expired"));
             });
   }
 
@@ -863,12 +881,13 @@ class DriverOnboardingServiceTest {
         .thenReturn(List.of());
 
     assertThatThrownBy(() -> service.submitOnboarding("user-token-10"))
-        .isInstanceOf(ResponseStatusException.class)
-        .satisfies(
-            e -> {
-              ResponseStatusException ex = (ResponseStatusException) e;
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
               assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
-              assertThat(ex.getReason()).contains("driver.onboarding.documents_missing");
+              assertThat(ex.getCode()).isEqualTo("driver.onboarding.incomplete");
+              assertThat(ex.getBody().getProperties().get("missingSteps"))
+                  .isEqualTo(List.of("driver.onboarding.documents_missing"));
             });
     assertThat(driver.getApprovalStatus()).isEqualTo(DriverApprovalStatus.PENDING);
   }
@@ -910,12 +929,13 @@ class DriverOnboardingServiceTest {
                 vehicleDocument(van, VehicleDocumentType.SCHOOL_VEHICLE_AUTHORIZATION, true)));
 
     assertThatThrownBy(() -> service.submitOnboarding("user-token-10"))
-        .isInstanceOf(ResponseStatusException.class)
-        .satisfies(
-            e -> {
-              ResponseStatusException ex = (ResponseStatusException) e;
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
               assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
-              assertThat(ex.getReason()).contains("driver.onboarding.documents_missing");
+              assertThat(ex.getCode()).isEqualTo("driver.onboarding.incomplete");
+              assertThat(ex.getBody().getProperties().get("missingSteps"))
+                  .isEqualTo(List.of("driver.onboarding.documents_missing"));
             });
   }
 
@@ -1027,9 +1047,12 @@ class DriverOnboardingServiceTest {
     when(driverRepository.findByTokenForUpdate("unknown")).thenReturn(Optional.empty());
 
     assertThatThrownBy(() -> service.approve("unknown", "admin-uid"))
-        .isInstanceOf(ResponseStatusException.class)
-        .extracting(e -> ((ResponseStatusException) e).getStatusCode())
-        .isEqualTo(HttpStatus.NOT_FOUND);
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+              assertThat(ex.getCode()).isEqualTo("driver.not_found");
+            });
   }
 
   @Test
@@ -1179,9 +1202,12 @@ class DriverOnboardingServiceTest {
     DriverRejectionRequestDTO request =
         new DriverRejectionRequestDTO(DriverRejectionReason.OTHER, "Motivo qualquer");
     assertThatThrownBy(() -> service.reject("unknown", request, "admin-uid"))
-        .isInstanceOf(ResponseStatusException.class)
-        .extracting(e -> ((ResponseStatusException) e).getStatusCode())
-        .isEqualTo(HttpStatus.NOT_FOUND);
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+              assertThat(ex.getCode()).isEqualTo("driver.not_found");
+            });
   }
 
   @Test

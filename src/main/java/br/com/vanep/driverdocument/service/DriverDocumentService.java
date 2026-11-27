@@ -16,19 +16,16 @@ import br.com.vanep.shared.document.dto.DocumentStatusUpdateRequestDTO;
 import br.com.vanep.shared.document.enums.DocumentStatus;
 import br.com.vanep.shared.document.service.DocumentReviewService;
 import br.com.vanep.shared.document.service.DocumentSubmissionRules;
+import br.com.vanep.shared.error.ApiProblemException;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.service.UserService;
 import java.util.List;
-import org.springframework.context.MessageSource;
-import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class DriverDocumentService {
@@ -40,7 +37,6 @@ public class DriverDocumentService {
   private final DocumentSubmissionRules submissionRules;
   private final DriverDocumentMapper mapper;
   private final MediaFileService media;
-  private final MessageSource messages;
 
   public DriverDocumentService(
       DriverDocumentRepository driverDocumentRepository,
@@ -49,8 +45,7 @@ public class DriverDocumentService {
       DocumentReviewService reviewService,
       DocumentSubmissionRules submissionRules,
       DriverDocumentMapper mapper,
-      MediaFileService media,
-      MessageSource messages) {
+      MediaFileService media) {
     this.driverDocumentRepository = driverDocumentRepository;
     this.driverRepository = driverRepository;
     this.userService = userService;
@@ -58,11 +53,6 @@ public class DriverDocumentService {
     this.submissionRules = submissionRules;
     this.mapper = mapper;
     this.media = media;
-    this.messages = messages;
-  }
-
-  private String message(String key) {
-    return messages.getMessage(key, null, LocaleContextHolder.getLocale());
   }
 
   @Transactional
@@ -76,18 +66,12 @@ public class DriverDocumentService {
       driver =
           driverRepository
               .findByToken(request.driverToken())
-              .orElseThrow(
-                  () ->
-                      new ResponseStatusException(
-                          HttpStatus.NOT_FOUND, message("driver_document.driver.not_found")));
+              .orElseThrow(() -> ApiProblemException.notFound("driver_document.driver.not_found"));
     } else {
       driver =
           driverRepository
               .findByUserId(caller.getId())
-              .orElseThrow(
-                  () ->
-                      new ResponseStatusException(
-                          HttpStatus.NOT_FOUND, message("user.driver_profile.not_found")));
+              .orElseThrow(() -> ApiProblemException.notFound("user.driver_profile.not_found"));
     }
 
     DriverDocumentModel document = new DriverDocumentModel();
@@ -117,19 +101,14 @@ public class DriverDocumentService {
             driverRepository
                 .findByToken(driverToken)
                 .orElseThrow(
-                    () ->
-                        new ResponseStatusException(
-                            HttpStatus.NOT_FOUND, message("driver_document.driver.not_found")));
+                    () -> ApiProblemException.notFound("driver_document.driver.not_found"));
         targetDriverId = driver.getId();
       }
     } else {
       DriverModel driver =
           driverRepository
               .findByUserId(caller.getId())
-              .orElseThrow(
-                  () ->
-                      new ResponseStatusException(
-                          HttpStatus.NOT_FOUND, message("user.driver_profile.not_found")));
+              .orElseThrow(() -> ApiProblemException.notFound("user.driver_profile.not_found"));
       targetDriverId = driver.getId();
     }
 
@@ -195,11 +174,10 @@ public class DriverDocumentService {
     }
 
     if (driverDocumentRepository.findByToken(token).isPresent()) {
-      throw new ResponseStatusException(
-          HttpStatus.CONFLICT, message("driver_document.already_active"));
+      throw ApiProblemException.conflict("driver_document.already_active");
     }
 
-    throw new ResponseStatusException(HttpStatus.NOT_FOUND, message("driver_document.not_found"));
+    throw ApiProblemException.notFound("driver_document.not_found");
   }
 
   void acceptAsNewSubmission(DriverDocumentModel document, DriverDocumentType type) {
@@ -248,9 +226,6 @@ public class DriverDocumentService {
   DriverDocumentModel requireByToken(String token) {
     return driverDocumentRepository
         .findByToken(token)
-        .orElseThrow(
-            () ->
-                new ResponseStatusException(
-                    HttpStatus.NOT_FOUND, message("driver_document.not_found")));
+        .orElseThrow(() -> ApiProblemException.notFound("driver_document.not_found"));
   }
 }

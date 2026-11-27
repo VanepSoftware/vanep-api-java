@@ -9,6 +9,7 @@ import br.com.vanep.shared.document.dto.DocumentStatusUpdateRequestDTO;
 import br.com.vanep.shared.document.enums.DocumentStatus;
 import br.com.vanep.shared.document.service.DocumentReviewService;
 import br.com.vanep.shared.document.service.DocumentSubmissionRules;
+import br.com.vanep.shared.error.ApiProblemException;
 import br.com.vanep.vehicle.model.VehicleModel;
 import br.com.vanep.vehicle.repository.VehicleRepository;
 import br.com.vanep.vehicledocument.dto.VehicleDocumentRequestDTO;
@@ -18,15 +19,11 @@ import br.com.vanep.vehicledocument.mapper.VehicleDocumentMapper;
 import br.com.vanep.vehicledocument.model.VehicleDocumentModel;
 import br.com.vanep.vehicledocument.repository.VehicleDocumentRepository;
 import java.util.List;
-import org.springframework.context.MessageSource;
-import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class VehicleDocumentService {
@@ -38,7 +35,6 @@ public class VehicleDocumentService {
   private final DocumentSubmissionRules submissionRules;
   private final VehicleDocumentMapper mapper;
   private final MediaFileService media;
-  private final MessageSource messages;
 
   public VehicleDocumentService(
       VehicleDocumentRepository documents,
@@ -47,8 +43,7 @@ public class VehicleDocumentService {
       DocumentReviewService reviewService,
       DocumentSubmissionRules submissionRules,
       VehicleDocumentMapper mapper,
-      MediaFileService media,
-      MessageSource messages) {
+      MediaFileService media) {
     this.documents = documents;
     this.vehicles = vehicles;
     this.drivers = drivers;
@@ -56,7 +51,6 @@ public class VehicleDocumentService {
     this.submissionRules = submissionRules;
     this.mapper = mapper;
     this.media = media;
-    this.messages = messages;
   }
 
   @Transactional
@@ -139,19 +133,15 @@ public class VehicleDocumentService {
       return mapper.toResponse(restored);
     }
     if (documents.findByToken(token).isPresent()) {
-      throw new ResponseStatusException(
-          HttpStatus.CONFLICT, message("vehicle_document.already_active"));
+      throw ApiProblemException.conflict("vehicle_document.already_active");
     }
-    throw new ResponseStatusException(HttpStatus.NOT_FOUND, message("vehicle_document.not_found"));
+    throw ApiProblemException.notFound("vehicle_document.not_found");
   }
 
   VehicleDocumentModel requireByToken(String token) {
     return documents
         .findByToken(token)
-        .orElseThrow(
-            () ->
-                new ResponseStatusException(
-                    HttpStatus.NOT_FOUND, message("vehicle_document.not_found")));
+        .orElseThrow(() -> ApiProblemException.notFound("vehicle_document.not_found"));
   }
 
   void acceptAsNewSubmission(VehicleDocumentModel document, VehicleDocumentType type) {
@@ -200,11 +190,6 @@ public class VehicleDocumentService {
   private VehicleModel requireVehicle(String vehicleToken) {
     return vehicles
         .findByToken(vehicleToken)
-        .orElseThrow(
-            () -> new ResponseStatusException(HttpStatus.NOT_FOUND, message("vehicle.not_found")));
-  }
-
-  private String message(String key) {
-    return messages.getMessage(key, null, LocaleContextHolder.getLocale());
+        .orElseThrow(() -> ApiProblemException.notFound("vehicle.not_found"));
   }
 }

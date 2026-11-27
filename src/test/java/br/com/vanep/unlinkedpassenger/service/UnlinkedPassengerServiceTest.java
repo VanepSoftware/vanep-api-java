@@ -33,6 +33,7 @@ import br.com.vanep.school.repository.SchoolRepository;
 import br.com.vanep.shared.enums.OperationShift;
 import br.com.vanep.shared.enums.RouteLeg;
 import br.com.vanep.shared.enums.SchoolShift;
+import br.com.vanep.shared.error.ApiProblemException;
 import br.com.vanep.state.model.StateModel;
 import br.com.vanep.unlinkedpassenger.dto.UnlinkedPassengerCreateRequestDTO;
 import br.com.vanep.unlinkedpassenger.dto.UnlinkedPassengerFamilyDTO;
@@ -102,7 +103,7 @@ class UnlinkedPassengerServiceTest {
             schools,
             addresses,
             new ScheduleService(scheduleRepository, new ScheduleSlotPolicy(), messages),
-            new OwnVehicleService(vehicles, messages),
+            new OwnVehicleService(vehicles),
             invites,
             families,
             new UnlinkedPassengerMapper(new AddressMapper(), new ScheduleMapper()),
@@ -446,10 +447,10 @@ class UnlinkedPassengerServiceTest {
               vanToken);
       assertThatThrownBy(() -> service.create(CALLER, request))
           .isInstanceOfSatisfying(
-              ResponseStatusException.class,
+              ApiProblemException.class,
               exception -> {
                 assertThat(exception.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
-                assertThat(exception.getReason()).isEqualTo("unlinked_passenger.vehicle.not_owned");
+                assertThat(exception.getCode()).isEqualTo("unlinked_passenger.vehicle.not_owned");
               });
     }
     verify(passengers, never()).save(any());
