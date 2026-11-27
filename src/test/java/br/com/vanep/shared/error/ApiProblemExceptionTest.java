@@ -1,5 +1,6 @@
 package br.com.vanep.shared.error;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -8,8 +9,10 @@ import br.com.vanep.config.ApiErrorAdvice;
 import br.com.vanep.config.ValidationProblemDetailsFactory;
 import br.com.vanep.driverdocument.model.DriverDocumentModel;
 import br.com.vanep.media.model.MediaFileModel;
+import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.support.ResourceBundleMessageSource;
@@ -35,8 +38,7 @@ class ApiProblemExceptionTest {
     messages.setBasename("messages");
     messages.setDefaultEncoding("UTF-8");
     messages.setFallbackToSystemLocale(false);
-    ApiErrorAdvice advice = new ApiErrorAdvice(new ValidationProblemDetailsFactory());
-    advice.setMessageSource(messages);
+    ApiErrorAdvice advice = new ApiErrorAdvice(new ValidationProblemDetailsFactory(), messages);
     mockMvc =
         MockMvcBuilders.standaloneSetup(new ProblemFixtureController())
             .setControllerAdvice(advice)
@@ -75,12 +77,12 @@ class ApiProblemExceptionTest {
   }
 
   @Test
-  void anOldResponseStatusExceptionKeepsTheResponseOfToday() throws Exception {
+  void responseStatusExceptionKeepsDetailAndReceivesGenericCode() throws Exception {
     mockMvc
         .perform(get("/__test/problem/legacy").locale(PT_BR))
         .andExpect(status().isNotFound())
         .andExpect(jsonPath("$.detail").value("Not here"))
-        .andExpect(jsonPath("$.code").doesNotExist());
+        .andExpect(jsonPath("$.code").value("request.route_not_found"));
   }
 
   @Test
@@ -107,6 +109,57 @@ class ApiProblemExceptionTest {
         .andExpect(status().isContentTooLarge())
         .andExpect(jsonPath("$.code").value("media.file.too_large"))
         .andExpect(jsonPath("$.detail").value("O arquivo é maior que o permitido."));
+  }
+
+  @Test
+  void factoriesSetStatusCodeKeyAndDetailMessageCode() {
+    ApiProblemException conflict = ApiProblemException.conflict("service_request.open_exists");
+    assertThat(conflict.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+    assertThat(conflict.getCode()).isEqualTo("service_request.open_exists");
+    assertThat(conflict.getMessageKey()).isEqualTo("service_request.open_exists");
+    assertThat(conflict.getDetailMessageCode()).isEqualTo("service_request.open_exists");
+    assertThat(conflict.getBody().getProperties())
+        .containsEntry("code", "service_request.open_exists");
+
+    assertThat(ApiProblemException.badRequest("a").getStatusCode())
+        .isEqualTo(HttpStatus.BAD_REQUEST);
+    assertThat(ApiProblemException.unauthorized("b").getStatusCode())
+        .isEqualTo(HttpStatus.UNAUTHORIZED);
+    assertThat(ApiProblemException.forbidden("c").getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+    assertThat(ApiProblemException.notFound("d").getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+    assertThat(ApiProblemException.unprocessable("e").getStatusCode())
+        .isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
+    assertThat(ApiProblemException.tooManyRequests("f").getStatusCode())
+        .isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
+    assertThat(ApiProblemException.serviceUnavailable("g").getStatusCode())
+        .isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
+  }
+
+  @Test
+  void supportsMessageArgumentsAndExtraProperties() {
+    Instant retryAfter = Instant.parse("2026-11-24T12:00:00Z");
+    RuntimeException cause = new IllegalStateException("root");
+
+    ApiProblemException exception =
+        ApiProblemException.conflict("user.profile.name.cooldown", 30)
+            .with("field", "name")
+            .with("ignored", null)
+            .withAll(Map.of("retryAfter", retryAfter));
+
+    assertThat(exception.getDetailMessageArguments()).containsExactly(30);
+    assertThat(exception.getMessage()).isEqualTo("409 CONFLICT user.profile.name.cooldown");
+    assertThat(exception.getBody().getProperties())
+        .containsEntry("code", "user.profile.name.cooldown")
+        .containsEntry("field", "name")
+        .containsEntry("retryAfter", retryAfter)
+        .doesNotContainKey("ignored");
+
+    ApiProblemException withCause =
+        ApiProblemException.of(HttpStatus.BAD_GATEWAY, "request.error", cause, "x");
+    assertThat(withCause.getCause()).isSameAs(cause);
+    assertThat(withCause.getStatusCode()).isEqualTo(HttpStatus.BAD_GATEWAY);
+    assertThat(withCause.getCode()).isEqualTo("request.error");
+    assertThat(withCause.getDetailMessageArguments()).containsExactly("x");
   }
 
   @RestController

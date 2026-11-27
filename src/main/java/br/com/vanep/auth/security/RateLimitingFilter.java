@@ -1,11 +1,13 @@
 package br.com.vanep.auth.security;
 
+import br.com.vanep.shared.error.ApiProblemResponseWriter;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.Set;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
@@ -25,13 +27,20 @@ public class RateLimitingFilter extends OncePerRequestFilter {
           "/verify-email/resend",
           "/oauth2/token");
 
-  private final RateLimiter rateLimiter;
+  private static final String LIMITED_PATH_PREFIX = "/api/auth/";
 
-  public RateLimitingFilter(RateLimiter rateLimiter) {
+  private final RateLimiter rateLimiter;
+  private final ApiProblemResponseWriter problemWriter;
+
+  @Autowired
+  public RateLimitingFilter(RateLimiter rateLimiter, ApiProblemResponseWriter problemWriter) {
     this.rateLimiter = rateLimiter;
+    this.problemWriter = problemWriter;
   }
 
-  private static final String LIMITED_PATH_PREFIX = "/api/auth/";
+  RateLimitingFilter(RateLimiter rateLimiter) {
+    this(rateLimiter, null);
+  }
 
   @Override
   protected boolean shouldNotFilter(HttpServletRequest request) {
@@ -50,6 +59,11 @@ public class RateLimitingFilter extends OncePerRequestFilter {
     // proxy configured in server.tomcat.remoteip may rewrite getRemoteAddr().
     String key = request.getRemoteAddr() + "|" + request.getRequestURI();
     if (!rateLimiter.tryAcquire(key)) {
+      if (problemWriter != null && request.getRequestURI().startsWith("/api/")) {
+        problemWriter.write(
+            request, response, HttpStatus.TOO_MANY_REQUESTS, "request.rate_limited");
+        return;
+      }
       response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
       response.setContentType("text/plain;charset=UTF-8");
       response.getWriter().write("Muitas tentativas. Tente novamente em instantes.");

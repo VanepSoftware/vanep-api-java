@@ -1,5 +1,6 @@
 package br.com.vanep.config;
 
+import jakarta.validation.ConstraintViolation;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -14,6 +15,8 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 
 @Component
 public class ValidationProblemDetailsFactory {
+
+  public static final String CODE = "validation.failed";
 
   private static final Set<String> REQUIRED_CONSTRAINTS = Set.of("NotBlank", "NotEmpty", "NotNull");
 
@@ -31,6 +34,7 @@ public class ValidationProblemDetailsFactory {
     ValidationError selected = errors.getFirst();
     ProblemDetail problem =
         ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, selected.message());
+    problem.setProperty("code", CODE);
     if (selected.field() != null) {
       problem.setProperty("field", selected.field());
     }
@@ -42,13 +46,26 @@ public class ValidationProblemDetailsFactory {
     String field = error instanceof FieldError fieldError ? fieldError.getField() : null;
     String message =
         error.getDefaultMessage() != null ? error.getDefaultMessage() : error.getCode();
-    return new ValidationError(field, message, error.getCode());
+    return new ValidationError(field, extractCode(error), message, error.getCode());
   }
 
-  private record ValidationError(String field, String message, String constraint) {
+  private static String extractCode(ObjectError error) {
+    if (error.contains(ConstraintViolation.class)) {
+      String template = error.unwrap(ConstraintViolation.class).getMessageTemplate();
+      if (template != null && template.startsWith("{") && template.endsWith("}")) {
+        String key = template.substring(1, template.length() - 1);
+        if (!key.startsWith("jakarta.validation.") && !key.startsWith("org.hibernate.validator.")) {
+          return key;
+        }
+      }
+    }
+    return CODE;
+  }
+
+  private record ValidationError(String field, String code, String message, String constraint) {
 
     int priority() {
-      return REQUIRED_CONSTRAINTS.contains(constraint) ? 0 : 1;
+      return constraint != null && REQUIRED_CONSTRAINTS.contains(constraint) ? 0 : 1;
     }
 
     Map<String, String> response() {
@@ -56,6 +73,7 @@ public class ValidationProblemDetailsFactory {
       if (field != null) {
         response.put("field", field);
       }
+      response.put("code", code);
       response.put("message", message);
       return response;
     }

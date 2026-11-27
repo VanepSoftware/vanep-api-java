@@ -30,13 +30,13 @@ Phase 0 (Constitution + OpenSpec + Client Inventory)
 - [x] 0.3 Create `openspec/changes/api-error-contract/` (`proposal.md`, `design.md`, `specs/api-error-contract/spec.md`, `tasks.md`).
 
 ### Phase 1
-- [ ] 1.1 Write failing unit/slice tests for `ApiProblemException`, `MessagesParityTest`, `ApiErrorAdvice` (`code` on Spring errors, `@PreAuthorize` 403, safe `500`), `ValidationProblemDetailsFactory` (`validation.failed` + item `code`), `SecurityConfig` (`401`/`403` `ProblemDetail`), and `RateLimitingFilter` (`429` `ProblemDetail` on `/api/**`).
-- [ ] 1.2 Remove duplicate `driver_service_area.areas.too_many` key and add generic error keys to `messages.properties` and `messages_pt_BR.properties`.
-- [ ] 1.3 Implement `br.com.vanep.shared.error.ApiProblemException` and `ApiProblemResponseWriter`.
-- [ ] 1.4 Update `ValidationProblemDetailsFactory` to emit `code: validation.failed` and per-item `code`.
-- [ ] 1.5 Update `ApiErrorAdvice` to guarantee `code` and pt-BR `detail` on Spring MVC exceptions, handle `AccessDeniedException` as `403 auth.forbidden`, and handle `Exception` as `500 internal.error`.
-- [ ] 1.6 Implement `ApiAuthenticationEntryPoint` (`401`) and `ApiAccessDeniedHandler` (`403`) in `SecurityConfig` and update `RateLimitingFilter` (`429` `ProblemDetail` on `/api/**`).
-- [ ] 1.7 Run `make lint` and `./mvnw verify -B`.
+- [x] 1.1 Write failing unit/slice tests for `ApiProblemException`, `MessagesParityTest`, `ApiErrorAdvice` (`code` on Spring errors, `@PreAuthorize` 403, safe `500`), `ValidationProblemDetailsFactory` (`validation.failed` + item `code`), `SecurityConfig` (`401`/`403` `ProblemDetail`), and `RateLimitingFilter` (`429` `ProblemDetail` on `/api/**`).
+- [x] 1.2 Remove duplicate `driver_service_area.areas.too_many` key and add generic error keys to `messages.properties` and `messages_pt_BR.properties`.
+- [x] 1.3 Implement `br.com.vanep.shared.error.ApiProblemException` and `ApiProblemResponseWriter`.
+- [x] 1.4 Update `ValidationProblemDetailsFactory` to emit `code: validation.failed` and per-item `code`.
+- [x] 1.5 Update `ApiErrorAdvice` to guarantee `code` and pt-BR `detail` on Spring MVC exceptions, handle `AccessDeniedException` as `403 auth.forbidden`, and handle `Exception` as `500 internal.error`.
+- [x] 1.6 Implement `ApiAuthenticationEntryPoint` (`401`) and `ApiAccessDeniedHandler` (`403`) in `SecurityConfig` and update `RateLimitingFilter` (`429` `ProblemDetail` on `/api/**`).
+- [x] 1.7 Run `make lint` and `./mvnw verify -B`.
 
 ### Later Phases (tracked for upcoming PRs)
 - [ ] 2..N Migrate domain services, advices (`LocationErrorAdvice`, `CepLookupErrorAdvice`), manual `setProperty("code", ...)` sites, and DTO validation `{key}` messages by area.
