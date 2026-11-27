@@ -4,6 +4,7 @@ import br.com.vanep.driver.DriverApprovalStatus;
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.shared.enums.OperationShift;
+import br.com.vanep.shared.error.ApiProblemException;
 import br.com.vanep.trip.dto.TripCreateRequestDTO;
 import br.com.vanep.trip.dto.TripResponseDTO;
 import br.com.vanep.trip.dto.TripUpdateRequestDTO;
@@ -20,15 +21,11 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
-import org.springframework.context.MessageSource;
-import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class TripService {
@@ -42,7 +39,6 @@ public class TripService {
   private final TripTransitionPolicy transitions;
   private final TripCoherencePolicy coherence;
   private final WorkWindowPolicy workWindow;
-  private final MessageSource messages;
 
   public TripService(
       TripRepository trips,
@@ -51,8 +47,7 @@ public class TripService {
       TripMapper mapper,
       TripTransitionPolicy transitions,
       TripCoherencePolicy coherence,
-      WorkWindowPolicy workWindow,
-      MessageSource messages) {
+      WorkWindowPolicy workWindow) {
     this.trips = trips;
     this.drivers = drivers;
     this.users = users;
@@ -60,7 +55,6 @@ public class TripService {
     this.transitions = transitions;
     this.coherence = coherence;
     this.workWindow = workWindow;
-    this.messages = messages;
   }
 
   @Transactional
@@ -256,24 +250,20 @@ public class TripService {
             .findByUserId(user.getId())
             .orElseThrow(() -> notFound("user.driver_profile.not_found"));
     if (driver.getApprovalStatus() != DriverApprovalStatus.APPROVED) {
-      throw new ResponseStatusException(HttpStatus.FORBIDDEN, message("driver.not_approved"));
+      throw ApiProblemException.forbidden("driver.not_approved");
     }
     return driver;
   }
 
-  private ResponseStatusException conflict(String key) {
-    return new ResponseStatusException(HttpStatus.CONFLICT, message(key));
+  private ApiProblemException conflict(String key) {
+    return ApiProblemException.conflict(key);
   }
 
-  private ResponseStatusException notFound(String key) {
-    return new ResponseStatusException(HttpStatus.NOT_FOUND, message(key));
+  private ApiProblemException notFound(String key) {
+    return ApiProblemException.notFound(key);
   }
 
-  private ResponseStatusException badRequest(String key) {
-    return new ResponseStatusException(HttpStatus.BAD_REQUEST, message(key));
-  }
-
-  private String message(String key) {
-    return messages.getMessage(key, null, LocaleContextHolder.getLocale());
+  private ApiProblemException badRequest(String key) {
+    return ApiProblemException.badRequest(key);
   }
 }

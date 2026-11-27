@@ -25,6 +25,7 @@ import br.com.vanep.schedule.model.ScheduleSlotModel;
 import br.com.vanep.schedule.service.ScheduleService;
 import br.com.vanep.school.model.SchoolModel;
 import br.com.vanep.school.repository.SchoolRepository;
+import br.com.vanep.shared.error.ApiProblemException;
 import br.com.vanep.trip.service.TripService;
 import br.com.vanep.unlinkedpassenger.service.UnlinkedPassengerService;
 import java.time.LocalDate;
@@ -35,15 +36,11 @@ import java.util.Objects;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.context.MessageSource;
-import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class ContractService {
@@ -61,7 +58,6 @@ public class ContractService {
   private final ContractMapper mapper;
   private final UnlinkedPassengerService unlinkedPassengers;
   private final ApplicationEventPublisher events;
-  private final MessageSource messages;
 
   public ContractService(
       ContractRepository contracts,
@@ -76,8 +72,7 @@ public class ContractService {
       LinkStatusPolicy linkStatusPolicy,
       ContractMapper mapper,
       UnlinkedPassengerService unlinkedPassengers,
-      ApplicationEventPublisher events,
-      MessageSource messages) {
+      ApplicationEventPublisher events) {
     this.contracts = contracts;
     this.items = items;
     this.links = links;
@@ -91,7 +86,6 @@ public class ContractService {
     this.mapper = mapper;
     this.unlinkedPassengers = unlinkedPassengers;
     this.events = events;
-    this.messages = messages;
   }
 
   @Transactional
@@ -376,23 +370,19 @@ public class ContractService {
     return links.findByToken(token).orElseThrow(() -> notFound("client_driver.not_found"));
   }
 
-  ResponseStatusException conflict(String key) {
-    return new ResponseStatusException(HttpStatus.CONFLICT, message(key));
+  ApiProblemException conflict(String key) {
+    return ApiProblemException.conflict(key);
   }
 
-  ResponseStatusException notFound(String key) {
-    return new ResponseStatusException(HttpStatus.NOT_FOUND, message(key));
+  ApiProblemException notFound(String key) {
+    return ApiProblemException.notFound(key);
   }
 
-  ResponseStatusException badRequest(String key) {
-    return new ResponseStatusException(HttpStatus.BAD_REQUEST, message(key));
+  ApiProblemException badRequest(String key) {
+    return ApiProblemException.badRequest(key);
   }
 
-  ResponseStatusException unprocessableEntity(String key) {
-    return new ResponseStatusException(HttpStatus.UNPROCESSABLE_CONTENT, message(key));
-  }
-
-  String message(String key) {
-    return messages.getMessage(key, null, LocaleContextHolder.getLocale());
+  ApiProblemException unprocessableEntity(String key) {
+    return ApiProblemException.unprocessable(key);
   }
 }

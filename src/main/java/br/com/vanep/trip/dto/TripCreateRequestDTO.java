@@ -8,9 +8,9 @@ import java.time.Instant;
 import java.time.LocalDate;
 
 public record TripCreateRequestDTO(
-    @NotBlank String driverToken,
-    @NotNull LocalDate serviceDate,
-    @NotNull OperationShift shift,
+    @NotBlank(message = "{trip.driver_token.required}") String driverToken,
+    @NotNull(message = "{trip.service_date.required}") LocalDate serviceDate,
+    @NotNull(message = "{trip.shift.required}") OperationShift shift,
     TripStatus status,
     Instant startedAt,
     Instant finishedAt) {}

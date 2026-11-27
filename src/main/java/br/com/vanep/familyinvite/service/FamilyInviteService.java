@@ -19,6 +19,7 @@ import br.com.vanep.familyinvite.model.FamilyInviteModel;
 import br.com.vanep.familyinvite.repository.FamilyInviteRepository;
 import br.com.vanep.familymatch.model.FamilyMatchModel;
 import br.com.vanep.familymatch.service.FamilyMatchService;
+import br.com.vanep.shared.error.ApiProblemException;
 import br.com.vanep.unlinkedpassenger.model.UnlinkedPassengerModel;
 import br.com.vanep.unlinkedpassenger.repository.UnlinkedPassengerRepository;
 import br.com.vanep.unlinkedpassenger.service.UnlinkedPassengerService;
@@ -29,13 +30,9 @@ import java.time.Instant;
 import java.util.Optional;
 import java.util.function.Supplier;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.MessageSource;
-import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class FamilyInviteService {
@@ -51,7 +48,6 @@ public class FamilyInviteService {
   private final ClientDriverService links;
   private final FamilyMatchService matchService;
   private final FamilyInviteCodeGenerator codeGenerator;
-  private final MessageSource messages;
   private final String inviteBaseUrl;
 
   public FamilyInviteService(
@@ -66,7 +62,6 @@ public class FamilyInviteService {
       ClientDriverService links,
       FamilyMatchService matchService,
       FamilyInviteCodeGenerator codeGenerator,
-      MessageSource messages,
       @Value("${vanep.app.invite-base-url}") String inviteBaseUrl) {
     this.invites = invites;
     this.passengers = passengers;
@@ -79,7 +74,6 @@ public class FamilyInviteService {
     this.links = links;
     this.matchService = matchService;
     this.codeGenerator = codeGenerator;
-    this.messages = messages;
     this.inviteBaseUrl = inviteBaseUrl;
   }
 
@@ -188,46 +182,30 @@ public class FamilyInviteService {
   FamilyInviteModel requireInvite(String code) {
     return invites
         .findByCode(code)
-        .orElseThrow(
-            () ->
-                new ResponseStatusException(
-                    HttpStatus.NOT_FOUND, message("family_invite.not_found")));
+        .orElseThrow(() -> ApiProblemException.notFound("family_invite.not_found"));
   }
 
   DriverModel requireDriverOf(FamilyInviteModel invite) {
     return drivers
         .findById(invite.getDriverId())
-        .orElseThrow(
-            () ->
-                new ResponseStatusException(
-                    HttpStatus.NOT_FOUND, message("family_invite.not_found")));
+        .orElseThrow(() -> ApiProblemException.notFound("family_invite.not_found"));
   }
 
   ClientModel requireCallerClient(String callerUid) {
     UserModel caller = users.requireByTokenAndType(callerUid, UserType.CLIENT);
     return clients
         .findByUserId(caller.getId())
-        .orElseThrow(
-            () ->
-                new ResponseStatusException(
-                    HttpStatus.NOT_FOUND, message("client.profile.not_found")));
+        .orElseThrow(() -> ApiProblemException.notFound("client.profile.not_found"));
   }
 
   DependentModel requireOwnDependent(ClientModel client, String dependentToken) {
     return dependents
         .findByToken(dependentToken)
         .filter(dependent -> dependent.getClientId().equals(client.getId()))
-        .orElseThrow(
-            () ->
-                new ResponseStatusException(
-                    HttpStatus.NOT_FOUND, message("family_invite.dependent.not_found")));
+        .orElseThrow(() -> ApiProblemException.notFound("family_invite.dependent.not_found"));
   }
 
-  ResponseStatusException conflict(String key) {
-    return new ResponseStatusException(HttpStatus.CONFLICT, message(key));
-  }
-
-  String message(String key) {
-    return messages.getMessage(key, null, LocaleContextHolder.getLocale());
+  ApiProblemException conflict(String key) {
+    return ApiProblemException.conflict(key);
   }
 }

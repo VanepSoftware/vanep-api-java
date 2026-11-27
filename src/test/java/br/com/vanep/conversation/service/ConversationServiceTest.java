@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.entry;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -22,6 +21,7 @@ import br.com.vanep.conversation.repository.ConversationMessageRepository;
 import br.com.vanep.conversation.repository.ConversationRepository;
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
+import br.com.vanep.shared.error.ApiProblemException;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.service.UserService;
@@ -38,9 +38,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.context.MessageSource;
 import org.springframework.http.HttpStatus;
-import org.springframework.web.server.ResponseStatusException;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -52,7 +50,6 @@ class ConversationServiceTest {
   @Mock private DriverRepository drivers;
   @Mock private UserService users;
   @Mock private ApplicationEventPublisher events;
-  @Mock private MessageSource messageSource;
 
   private ConversationService service;
   private ClientModel maria;
@@ -63,16 +60,7 @@ class ConversationServiceTest {
   void setUp() {
     service =
         new ConversationService(
-            conversations,
-            messages,
-            clients,
-            drivers,
-            users,
-            new ConversationMapper(),
-            events,
-            messageSource);
-    when(messageSource.getMessage(anyString(), any(), any()))
-        .thenAnswer(call -> call.getArgument(0));
+            conversations, messages, clients, drivers, users, new ConversationMapper(), events);
 
     maria = new ClientModel();
     maria.setId(1L);
@@ -240,8 +228,11 @@ class ConversationServiceTest {
                 service.sendMessage(
                     "maria-uid", "unknown", new ConversationMessageCreateRequestDTO("Oi")))
         .isInstanceOfSatisfying(
-            ResponseStatusException.class,
-            error -> assertThat(error.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND));
+            ApiProblemException.class,
+            error -> {
+              assertThat(error.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+              assertThat(error.getCode()).isEqualTo("conversation.not_found");
+            });
     verify(events, never()).publishEvent(any());
   }
 

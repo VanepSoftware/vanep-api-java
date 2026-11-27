@@ -9,6 +9,7 @@ import br.com.vanep.schedule.service.ScheduleService;
 import br.com.vanep.school.model.SchoolModel;
 import br.com.vanep.school.repository.SchoolRepository;
 import br.com.vanep.shared.enums.SchoolShift;
+import br.com.vanep.shared.error.ApiProblemException;
 import br.com.vanep.unlinkedpassenger.dto.UnlinkedPassengerCreateRequestDTO;
 import br.com.vanep.unlinkedpassenger.dto.UnlinkedPassengerFamilyDTO;
 import br.com.vanep.unlinkedpassenger.dto.UnlinkedPassengerResponseDTO;
@@ -23,13 +24,9 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import org.openapitools.jackson.nullable.JsonNullable;
-import org.springframework.context.MessageSource;
-import org.springframework.context.i18n.LocaleContextHolder;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
-import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class UnlinkedPassengerService {
@@ -43,7 +40,6 @@ public class UnlinkedPassengerService {
   private final FamilyInviteRepository invites;
   private final UnlinkedPassengerFamilyService families;
   private final UnlinkedPassengerMapper mapper;
-  private final MessageSource messages;
 
   public UnlinkedPassengerService(
       UnlinkedPassengerRepository passengers,
@@ -54,8 +50,7 @@ public class UnlinkedPassengerService {
       OwnVehicleService ownVehicles,
       FamilyInviteRepository invites,
       UnlinkedPassengerFamilyService families,
-      UnlinkedPassengerMapper mapper,
-      MessageSource messages) {
+      UnlinkedPassengerMapper mapper) {
     this.passengers = passengers;
     this.drivers = drivers;
     this.schools = schools;
@@ -65,7 +60,6 @@ public class UnlinkedPassengerService {
     this.invites = invites;
     this.families = families;
     this.mapper = mapper;
-    this.messages = messages;
   }
 
   @Transactional(readOnly = true)
@@ -220,30 +214,20 @@ public class UnlinkedPassengerService {
   public UnlinkedPassengerModel requireOwnPassenger(String callerUid, String token) {
     return passengers
         .findByTokenAndDriverId(token, requireDriver(callerUid).getId())
-        .orElseThrow(
-            () ->
-                new ResponseStatusException(
-                    HttpStatus.NOT_FOUND, message("unlinked_passenger.not_found")));
+        .orElseThrow(() -> ApiProblemException.notFound("unlinked_passenger.not_found"));
   }
 
   SchoolModel requireSchool(String schoolToken) {
     return schools
         .findByToken(schoolToken)
-        .orElseThrow(
-            () ->
-                new ResponseStatusException(
-                    HttpStatus.NOT_FOUND, message("unlinked_passenger.school.not_found")));
+        .orElseThrow(() -> ApiProblemException.notFound("unlinked_passenger.school.not_found"));
   }
 
   DriverModel requireDriver(String callerUid) {
     return drivers.requireCallerDriver(callerUid);
   }
 
-  ResponseStatusException badRequest(String key) {
-    return new ResponseStatusException(HttpStatus.BAD_REQUEST, message(key));
-  }
-
-  String message(String key) {
-    return messages.getMessage(key, null, LocaleContextHolder.getLocale());
+  ApiProblemException badRequest(String key) {
+    return ApiProblemException.badRequest(key);
   }
 }

@@ -13,9 +13,10 @@ public record UnlinkedPassengerCreateRequestDTO(
     @NotBlank(message = "{unlinked_passenger.name.required}")
         @Size(max = 255, message = "{unlinked_passenger.name.too_long}")
         String name,
-    @NotBlank String schoolToken,
-    @NotNull SchoolShift schoolShift,
-    @NotNull @Valid DependentAddressRequestDTO address,
+    @NotBlank(message = "{unlinked_passenger.school_token.required}") String schoolToken,
+    @NotNull(message = "{unlinked_passenger.school_shift.required}") SchoolShift schoolShift,
+    @NotNull(message = "{unlinked_passenger.address.required}") @Valid
+        DependentAddressRequestDTO address,
     @Size(max = 500, message = "{unlinked_passenger.notes.too_long}") String notes,
     List<@Valid ScheduleSlotRequestDTO> slots,
     String vehicleToken) {}

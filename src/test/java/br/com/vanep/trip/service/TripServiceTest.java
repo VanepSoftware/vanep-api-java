@@ -3,7 +3,6 @@ package br.com.vanep.trip.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -12,6 +11,7 @@ import br.com.vanep.driver.DriverApprovalStatus;
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.shared.enums.OperationShift;
+import br.com.vanep.shared.error.ApiProblemException;
 import br.com.vanep.trip.dto.TripResponseDTO;
 import br.com.vanep.trip.enums.TripCoherenceViolation;
 import br.com.vanep.trip.enums.TripStatus;
@@ -32,9 +32,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
-import org.springframework.context.MessageSource;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.web.server.ResponseStatusException;
+import org.springframework.http.HttpStatus;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -45,7 +44,6 @@ class TripServiceTest {
   @Mock private TripRepository trips;
   @Mock private DriverRepository drivers;
   @Mock private UserService users;
-  @Mock private MessageSource messages;
 
   private TripService service;
   private DriverModel driver;
@@ -60,8 +58,7 @@ class TripServiceTest {
             new TripMapper(),
             new TripTransitionPolicy(),
             new TripCoherencePolicy(),
-            new WorkWindowPolicy(),
-            messages);
+            new WorkWindowPolicy());
 
     UserModel user = new UserModel();
     user.setId(1L);
@@ -74,7 +71,6 @@ class TripServiceTest {
 
     when(users.requireByTokenAndType(CALLER, UserType.DRIVER)).thenReturn(user);
     when(drivers.findByUserId(1L)).thenReturn(Optional.of(driver));
-    when(messages.getMessage(anyString(), any(), any())).thenReturn("mensagem");
     when(trips.save(any(TripModel.class))).thenAnswer(call -> call.getArgument(0));
     when(trips.saveAndFlush(any(TripModel.class))).thenAnswer(call -> call.getArgument(0));
   }
@@ -120,7 +116,12 @@ class TripServiceTest {
         .thenReturn(Optional.of(storedTrip(TripStatus.COMPLETED)));
 
     assertThatThrownBy(() -> service.startToday(CALLER, OperationShift.MORNING))
-        .isInstanceOf(ResponseStatusException.class);
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            error -> {
+              assertThat(error.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+              assertThat(error.getCode()).isEqualTo("trip.already_completed");
+            });
   }
 
   @Test
@@ -144,7 +145,12 @@ class TripServiceTest {
         .thenReturn(Optional.empty());
 
     assertThatThrownBy(() -> service.finishToday(CALLER, OperationShift.MORNING))
-        .isInstanceOf(ResponseStatusException.class);
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            error -> {
+              assertThat(error.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+              assertThat(error.getCode()).isEqualTo("trip.not_started");
+            });
   }
 
   @Test
@@ -165,7 +171,12 @@ class TripServiceTest {
     driver.setApprovalStatus(DriverApprovalStatus.PENDING);
 
     assertThatThrownBy(() -> service.startToday(CALLER, OperationShift.MORNING))
-        .isInstanceOf(ResponseStatusException.class);
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            error -> {
+              assertThat(error.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+              assertThat(error.getCode()).isEqualTo("driver.not_approved");
+            });
     verify(trips, never()).saveAndFlush(any(TripModel.class));
   }
 

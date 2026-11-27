@@ -14,6 +14,7 @@ import br.com.vanep.conversation.repository.ConversationMessageRepository;
 import br.com.vanep.conversation.repository.ConversationRepository;
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
+import br.com.vanep.shared.error.ApiProblemException;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.service.UserService;
 import java.time.Instant;
@@ -23,15 +24,11 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.context.MessageSource;
-import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class ConversationService {
@@ -45,7 +42,6 @@ public class ConversationService {
   private final UserService users;
   private final ConversationMapper mapper;
   private final ApplicationEventPublisher events;
-  private final MessageSource messageSource;
 
   public ConversationService(
       ConversationRepository conversations,
@@ -54,8 +50,7 @@ public class ConversationService {
       DriverRepository drivers,
       UserService users,
       ConversationMapper mapper,
-      ApplicationEventPublisher events,
-      MessageSource messageSource) {
+      ApplicationEventPublisher events) {
     this.conversations = conversations;
     this.messages = messages;
     this.clients = clients;
@@ -63,7 +58,6 @@ public class ConversationService {
     this.users = users;
     this.mapper = mapper;
     this.events = events;
-    this.messageSource = messageSource;
   }
 
   // Concurrent requests of the pair already serialize on its link, so this insert never races.
@@ -162,8 +156,7 @@ public class ConversationService {
     return conversations.findByToken(token).orElseThrow(() -> notFound("conversation.not_found"));
   }
 
-  ResponseStatusException notFound(String key) {
-    return new ResponseStatusException(
-        HttpStatus.NOT_FOUND, messageSource.getMessage(key, null, LocaleContextHolder.getLocale()));
+  ApiProblemException notFound(String key) {
+    return ApiProblemException.notFound(key);
   }
 }

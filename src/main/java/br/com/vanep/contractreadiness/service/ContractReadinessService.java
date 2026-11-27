@@ -9,6 +9,7 @@ import br.com.vanep.dependent.model.DependentModel;
 import br.com.vanep.dependent.model.DependentSchoolDayModel;
 import br.com.vanep.dependent.repository.DependentRepository;
 import br.com.vanep.dependent.repository.DependentSchoolDayRepository;
+import br.com.vanep.shared.error.ApiProblemException;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.service.UserService;
@@ -16,12 +17,8 @@ import java.time.DayOfWeek;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
-import org.springframework.context.MessageSource;
-import org.springframework.context.i18n.LocaleContextHolder;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class ContractReadinessService {
@@ -31,21 +28,18 @@ public class ContractReadinessService {
   private final DependentRepository dependents;
   private final DependentSchoolDayRepository schoolDays;
   private final ContractReadinessPolicy policy;
-  private final MessageSource messages;
 
   public ContractReadinessService(
       UserService users,
       ClientRepository clients,
       DependentRepository dependents,
       DependentSchoolDayRepository schoolDays,
-      ContractReadinessPolicy policy,
-      MessageSource messages) {
+      ContractReadinessPolicy policy) {
     this.users = users;
     this.clients = clients;
     this.dependents = dependents;
     this.schoolDays = schoolDays;
     this.policy = policy;
-    this.messages = messages;
   }
 
   @Transactional(readOnly = true)
@@ -120,8 +114,7 @@ public class ContractReadinessService {
     return tokens.stream().map(token -> byToken.get(token)).toList();
   }
 
-  private ResponseStatusException notFound(String key) {
-    return new ResponseStatusException(
-        HttpStatus.NOT_FOUND, messages.getMessage(key, null, LocaleContextHolder.getLocale()));
+  private ApiProblemException notFound(String key) {
+    return ApiProblemException.notFound(key);
   }
 }

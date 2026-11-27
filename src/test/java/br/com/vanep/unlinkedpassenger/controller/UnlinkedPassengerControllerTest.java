@@ -288,9 +288,11 @@ class UnlinkedPassengerControllerTest {
     mockMvc
         .perform(postJson(BASE, request).with(as(carlosUid)))
         .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("validation.failed"))
         .andExpect(jsonPath("$.detail").value(message("unlinked_passenger.name.required")))
         .andExpect(jsonPath("$.field").value("name"))
         .andExpect(jsonPath("$.errors[0].field").value("name"))
+        .andExpect(jsonPath("$.errors[0].code").value("unlinked_passenger.name.required"))
         .andExpect(
             jsonPath("$.errors[0].message").value(message("unlinked_passenger.name.required")));
   }

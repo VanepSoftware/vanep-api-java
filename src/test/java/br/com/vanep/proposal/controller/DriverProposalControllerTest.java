@@ -208,6 +208,7 @@ class DriverProposalControllerTest {
             postJson(chainOf(requestToken), bodyFor(van.getToken(), lucas, marina))
                 .with(as(carlosUser)))
         .andExpect(status().isUnprocessableContent())
+        .andExpect(jsonPath("$.code").value("proposal.items.mismatch"))
         .andExpect(jsonPath("$.detail").value(message("proposal.items.mismatch")));
     assertThat(proposalStatuses()).isEmpty();
   }

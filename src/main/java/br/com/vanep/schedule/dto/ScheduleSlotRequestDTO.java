@@ -7,7 +7,7 @@ import java.time.DayOfWeek;
 import java.time.LocalTime;
 
 public record ScheduleSlotRequestDTO(
-    @NotNull DayOfWeek weekday,
-    @NotNull RouteLeg leg,
-    @NotNull OperationShift shift,
-    @NotNull LocalTime pickupTime) {}
+    @NotNull(message = "{schedule.slot.weekday.required}") DayOfWeek weekday,
+    @NotNull(message = "{schedule.slot.leg.required}") RouteLeg leg,
+    @NotNull(message = "{schedule.slot.shift.required}") OperationShift shift,
+    @NotNull(message = "{schedule.slot.pickup_time.required}") LocalTime pickupTime) {}

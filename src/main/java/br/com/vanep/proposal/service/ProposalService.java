@@ -28,6 +28,7 @@ import br.com.vanep.servicerequest.enums.ServiceRequestStatus;
 import br.com.vanep.servicerequest.model.ServiceRequestModel;
 import br.com.vanep.servicerequest.repository.ServiceRequestRepository;
 import br.com.vanep.servicerequest.service.ServiceRequestService;
+import br.com.vanep.shared.error.ApiProblemException;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.service.UserService;
@@ -46,16 +47,12 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.context.MessageSource;
-import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Limit;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.util.StringUtils;
-import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class ProposalService {
@@ -81,7 +78,6 @@ public class ProposalService {
   private final ProposalMapper mapper;
   private final TransactionTemplate transactions;
   private final ApplicationEventPublisher events;
-  private final MessageSource messages;
 
   public ProposalService(
       ProposalRepository proposals,
@@ -100,8 +96,7 @@ public class ProposalService {
       ProposalSlotsPolicy slotsPolicy,
       ProposalMapper mapper,
       TransactionTemplate transactions,
-      ApplicationEventPublisher events,
-      MessageSource messages) {
+      ApplicationEventPublisher events) {
     this.proposals = proposals;
     this.adjustments = adjustments;
     this.requests = requests;
@@ -119,7 +114,6 @@ public class ProposalService {
     this.mapper = mapper;
     this.transactions = transactions;
     this.events = events;
-    this.messages = messages;
   }
 
   @Transactional
@@ -284,7 +278,7 @@ public class ProposalService {
               closeAndReopenRequest(
                   proposals.findById(id).orElseThrow(), ProposalStatus.EXPIRED, now));
       return true;
-    } catch (ResponseStatusException changedMeanwhile) {
+    } catch (ApiProblemException changedMeanwhile) {
       log.debug("Proposal {} changed before it expired; skipped.", id);
       return false;
     } catch (RuntimeException unexpected) {
@@ -544,20 +538,16 @@ public class ProposalService {
         .orElseThrow(() -> notFound("proposal.not_found"));
   }
 
-  ResponseStatusException notFound(String key) {
-    return new ResponseStatusException(HttpStatus.NOT_FOUND, message(key));
+  ApiProblemException notFound(String key) {
+    return ApiProblemException.notFound(key);
   }
 
-  ResponseStatusException conflict(String key) {
-    return new ResponseStatusException(HttpStatus.CONFLICT, message(key));
+  ApiProblemException conflict(String key) {
+    return ApiProblemException.conflict(key);
   }
 
-  ResponseStatusException unprocessableContent(String key) {
-    return new ResponseStatusException(HttpStatus.UNPROCESSABLE_CONTENT, message(key));
-  }
-
-  String message(String key) {
-    return messages.getMessage(key, null, LocaleContextHolder.getLocale());
+  ApiProblemException unprocessableContent(String key) {
+    return ApiProblemException.unprocessable(key);
   }
 
   record Related(

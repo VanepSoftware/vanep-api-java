@@ -7,18 +7,15 @@ import br.com.vanep.familyinvite.model.FamilyInviteModel;
 import br.com.vanep.familymatch.enums.FamilyMatchStatus;
 import br.com.vanep.familymatch.model.FamilyMatchModel;
 import br.com.vanep.familymatch.repository.FamilyMatchRepository;
+import br.com.vanep.shared.error.ApiProblemException;
 import br.com.vanep.unlinkedpassenger.dto.UnlinkedPassengerResponseDTO;
 import br.com.vanep.unlinkedpassenger.model.UnlinkedPassengerModel;
 import br.com.vanep.unlinkedpassenger.repository.UnlinkedPassengerRepository;
 import br.com.vanep.unlinkedpassenger.service.UnlinkedPassengerService;
 import java.time.Instant;
 import java.util.Optional;
-import org.springframework.context.MessageSource;
-import org.springframework.context.i18n.LocaleContextHolder;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class FamilyMatchService {
@@ -29,7 +26,6 @@ public class FamilyMatchService {
   private final DependentRepository dependents;
   private final ContractItemRepository contractItems;
   private final FamilyMatchCandidatePolicy candidatePolicy;
-  private final MessageSource messages;
 
   public FamilyMatchService(
       FamilyMatchRepository matches,
@@ -37,15 +33,13 @@ public class FamilyMatchService {
       UnlinkedPassengerService passengerService,
       DependentRepository dependents,
       ContractItemRepository contractItems,
-      FamilyMatchCandidatePolicy candidatePolicy,
-      MessageSource messages) {
+      FamilyMatchCandidatePolicy candidatePolicy) {
     this.matches = matches;
     this.passengers = passengers;
     this.passengerService = passengerService;
     this.dependents = dependents;
     this.contractItems = contractItems;
     this.candidatePolicy = candidatePolicy;
-    this.messages = messages;
   }
 
   @Transactional
@@ -68,11 +62,9 @@ public class FamilyMatchService {
     UnlinkedPassengerModel passenger =
         passengers
             .findById(invite.getUnlinkedPassengerId())
-            .orElseThrow(
-                () -> new ResponseStatusException(HttpStatus.NOT_FOUND, notFoundMessage()));
+            .orElseThrow(() -> ApiProblemException.notFound("family_invite.not_found"));
     if (passenger.getDependentId() != null) {
-      throw new ResponseStatusException(
-          HttpStatus.CONFLICT, message("family_invite.already_linked"));
+      throw ApiProblemException.conflict("family_invite.already_linked");
     }
     return Optional.of(passenger);
   }
@@ -89,8 +81,7 @@ public class FamilyMatchService {
       if (invite.isGroupInvite()) {
         return Optional.empty();
       }
-      throw new ResponseStatusException(
-          HttpStatus.CONFLICT, message("family_match.already_pending"));
+      throw ApiProblemException.conflict("family_match.already_pending");
     }
     FamilyMatchModel match = new FamilyMatchModel();
     match.setUnlinkedPassengerId(passenger.getId());
@@ -113,8 +104,7 @@ public class FamilyMatchService {
         || contractItems.countActiveForDriverAndDependent(
                 passenger.getDriver().getId(), dependent.getId())
             > 0) {
-      throw new ResponseStatusException(
-          HttpStatus.CONFLICT, message("family_match.dependent_already_linked"));
+      throw ApiProblemException.conflict("family_match.dependent_already_linked");
     }
     respond(match, FamilyMatchStatus.CONFIRMED);
     passenger.setDependentId(dependent.getId());
@@ -142,15 +132,7 @@ public class FamilyMatchService {
     }
   }
 
-  ResponseStatusException notPending() {
-    return new ResponseStatusException(HttpStatus.CONFLICT, message("family_match.not_pending"));
-  }
-
-  String notFoundMessage() {
-    return message("family_invite.not_found");
-  }
-
-  String message(String key) {
-    return messages.getMessage(key, null, LocaleContextHolder.getLocale());
+  ApiProblemException notPending() {
+    return ApiProblemException.conflict("family_match.not_pending");
   }
 }

@@ -3,4 +3,5 @@ package br.com.vanep.trip.dto;
 import br.com.vanep.shared.enums.OperationShift;
 import jakarta.validation.constraints.NotNull;
 
-public record TripStartRequestDTO(@NotNull OperationShift shift) {}
+public record TripStartRequestDTO(
+    @NotNull(message = "{trip.shift.required}") OperationShift shift) {}

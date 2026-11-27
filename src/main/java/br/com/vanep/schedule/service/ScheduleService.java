@@ -5,26 +5,20 @@ import br.com.vanep.schedule.enums.ScheduleSlotViolation;
 import br.com.vanep.schedule.model.ScheduleModel;
 import br.com.vanep.schedule.model.ScheduleSlotModel;
 import br.com.vanep.schedule.repository.ScheduleRepository;
+import br.com.vanep.shared.error.ApiProblemException;
 import java.util.List;
-import org.springframework.context.MessageSource;
-import org.springframework.context.i18n.LocaleContextHolder;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class ScheduleService {
 
   private final ScheduleRepository schedules;
   private final ScheduleSlotPolicy slotPolicy;
-  private final MessageSource messages;
 
-  public ScheduleService(
-      ScheduleRepository schedules, ScheduleSlotPolicy slotPolicy, MessageSource messages) {
+  public ScheduleService(ScheduleRepository schedules, ScheduleSlotPolicy slotPolicy) {
     this.schedules = schedules;
     this.slotPolicy = slotPolicy;
-    this.messages = messages;
   }
 
   @Transactional
@@ -51,10 +45,7 @@ public class ScheduleService {
         .validate(slots)
         .ifPresent(
             violation -> {
-              throw new ResponseStatusException(
-                  HttpStatus.BAD_REQUEST,
-                  messages.getMessage(
-                      messageKey(violation), null, LocaleContextHolder.getLocale()));
+              throw ApiProblemException.badRequest(messageKey(violation));
             });
   }
 

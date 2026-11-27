@@ -47,6 +47,7 @@ import br.com.vanep.school.model.SchoolModel;
 import br.com.vanep.school.repository.SchoolRepository;
 import br.com.vanep.shared.enums.OperationShift;
 import br.com.vanep.shared.enums.RouteLeg;
+import br.com.vanep.shared.error.ApiProblemException;
 import br.com.vanep.shared.mapper.InstallmentMapper;
 import br.com.vanep.trip.service.TripService;
 import br.com.vanep.unlinkedpassenger.service.UnlinkedPassengerService;
@@ -68,9 +69,8 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.openapitools.jackson.nullable.JsonNullable;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.context.MessageSource;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.web.server.ResponseStatusException;
+import org.springframework.http.HttpStatus;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -86,7 +86,6 @@ class ContractServiceTest {
   @Mock private SchoolRepository schools;
   @Mock private AddressRepository addresses;
   @Mock private ScheduleRepository scheduleRepository;
-  @Mock private MessageSource messages;
   @Mock private UnlinkedPassengerService unlinkedPassengers;
   @Mock private ApplicationEventPublisher events;
 
@@ -100,7 +99,6 @@ class ContractServiceTest {
 
   @BeforeEach
   void setUp() {
-    when(messages.getMessage(anyString(), any(), any())).thenAnswer(call -> call.getArgument(0));
     when(contracts.save(any())).thenAnswer(call -> call.getArgument(0));
     when(contracts.saveAndFlush(any())).thenAnswer(call -> call.getArgument(0));
     when(links.updateStatusUnlessBlocked(anyLong(), anyString())).thenReturn(1);
@@ -110,7 +108,7 @@ class ContractServiceTest {
     when(items.findByContractIdIn(any())).thenReturn(List.of());
 
     ScheduleService scheduleService =
-        new ScheduleService(scheduleRepository, new ScheduleSlotPolicy(), messages);
+        new ScheduleService(scheduleRepository, new ScheduleSlotPolicy());
     service =
         new ContractService(
             contracts,
@@ -125,8 +123,7 @@ class ContractServiceTest {
             new LinkStatusPolicy(),
             new ContractMapper(new ScheduleMapper(), new InstallmentMapper()),
             unlinkedPassengers,
-            events,
-            messages);
+            events);
 
     campinas = new CityModel();
     campinas.setToken("campinas");
@@ -211,7 +208,7 @@ class ContractServiceTest {
         .thenReturn(Optional.of(new ContractModel()));
 
     assertThatThrownBy(() -> service.create(createRequest(item("lucas", outbound()))))
-        .isInstanceOf(ResponseStatusException.class);
+        .isInstanceOf(ApiProblemException.class);
 
     verify(events, never()).publishEvent(any());
   }
@@ -600,9 +597,13 @@ class ContractServiceTest {
 
   private void assertRefused(Runnable call, String status, String messageKey) {
     assertThatThrownBy(() -> call.run())
-        .isInstanceOf(ResponseStatusException.class)
-        .hasMessageContaining(status)
-        .hasMessageContaining(messageKey);
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            error -> {
+              assertThat(error.getStatusCode())
+                  .isEqualTo(HttpStatus.valueOf(Integer.parseInt(status)));
+              assertThat(error.getCode()).isEqualTo(messageKey);
+            });
   }
 
   private ContractCreateRequestDTO createRequest(ContractItemRequestDTO... contractItems) {

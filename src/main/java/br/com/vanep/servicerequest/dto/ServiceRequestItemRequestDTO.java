@@ -7,6 +7,9 @@ import jakarta.validation.constraints.NotNull;
 import java.util.List;
 
 public record ServiceRequestItemRequestDTO(
-    @NotBlank String dependentToken,
+    @NotBlank(message = "{service_request.dependent_token.required}") String dependentToken,
     @NotEmpty(message = "{service_request.days.required}")
-        List<@NotNull @Valid ServiceRequestDayRequestDTO> days) {}
+        List<
+                @NotNull(message = "{service_request.day.item.required}") @Valid
+                ServiceRequestDayRequestDTO>
+            days) {}

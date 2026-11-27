@@ -38,6 +38,7 @@ import br.com.vanep.servicerequest.model.ServiceRequestItemModel;
 import br.com.vanep.servicerequest.model.ServiceRequestModel;
 import br.com.vanep.servicerequest.repository.ServiceRequestRepository;
 import br.com.vanep.shared.enums.SchoolShift;
+import br.com.vanep.shared.error.ApiProblemException;
 import br.com.vanep.trip.service.TripService;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
@@ -58,18 +59,14 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.context.MessageSource;
-import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Limit;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.util.StringUtils;
-import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class ServiceRequestService {
@@ -101,7 +98,6 @@ public class ServiceRequestService {
   private final ProposalMapper proposalMapper;
   private final TransactionTemplate transactions;
   private final ApplicationEventPublisher events;
-  private final MessageSource messages;
 
   public ServiceRequestService(
       ServiceRequestRepository requests,
@@ -122,8 +118,7 @@ public class ServiceRequestService {
       ServiceRequestMapper mapper,
       ProposalMapper proposalMapper,
       TransactionTemplate transactions,
-      ApplicationEventPublisher events,
-      MessageSource messages) {
+      ApplicationEventPublisher events) {
     this.requests = requests;
     this.proposals = proposals;
     this.linkService = linkService;
@@ -143,7 +138,6 @@ public class ServiceRequestService {
     this.proposalMapper = proposalMapper;
     this.transactions = transactions;
     this.events = events;
-    this.messages = messages;
   }
 
   @Transactional
@@ -621,23 +615,19 @@ public class ServiceRequestService {
         .orElseThrow(() -> notFound("service_request.not_found"));
   }
 
-  ResponseStatusException badRequest(String key) {
-    return new ResponseStatusException(HttpStatus.BAD_REQUEST, message(key));
+  ApiProblemException badRequest(String key) {
+    return ApiProblemException.badRequest(key);
   }
 
-  ResponseStatusException notFound(String key) {
-    return new ResponseStatusException(HttpStatus.NOT_FOUND, message(key));
+  ApiProblemException notFound(String key) {
+    return ApiProblemException.notFound(key);
   }
 
-  ResponseStatusException conflict(String key) {
-    return new ResponseStatusException(HttpStatus.CONFLICT, message(key));
+  ApiProblemException conflict(String key) {
+    return ApiProblemException.conflict(key);
   }
 
-  ResponseStatusException unprocessableContent(String key) {
-    return new ResponseStatusException(HttpStatus.UNPROCESSABLE_CONTENT, message(key));
-  }
-
-  String message(String key) {
-    return messages.getMessage(key, null, LocaleContextHolder.getLocale());
+  ApiProblemException unprocessableContent(String key) {
+    return ApiProblemException.unprocessable(key);
   }
 }
