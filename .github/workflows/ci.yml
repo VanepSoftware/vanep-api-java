@@ -89,6 +89,10 @@ jobs:
         if: needs.changes.outputs.code == 'true'
         run: bash scripts/cd/pull-with-retry.test.sh
 
+      - name: Contrato de erros RFC 9457 (sem ResponseStatusException nem advices duplicados)
+        if: needs.changes.outputs.code == 'true'
+        run: bash scripts/check-error-contract.sh
+
       - name: Set up JDK 25
         if: needs.changes.outputs.code == 'true'
         uses: actions/setup-java@v4
