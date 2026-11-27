@@ -3,6 +3,7 @@ package br.com.vanep.media.web;
 import br.com.vanep.media.model.MediaFileModel;
 import br.com.vanep.media.service.MediaFileService;
 import br.com.vanep.media.storage.StorageService;
+import br.com.vanep.shared.error.ApiProblemException;
 import java.io.InputStream;
 import java.net.URI;
 import java.time.Duration;
@@ -14,7 +15,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
-import org.springframework.web.server.ResponseStatusException;
 
 // The one place the storage migration touches: every owner route delegates here.
 @Component
@@ -37,7 +37,7 @@ public class MediaResponder {
   public ResponseEntity<InputStreamResource> respond(
       MediaFileModel media, String requestedVersion) {
     if (media == null) {
-      throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+      throw ApiProblemException.notFound("media.not_found");
     }
 
     Optional<URI> signed = storage.signedUrl(media.getObjectKey(), SIGNED_URL_TTL);

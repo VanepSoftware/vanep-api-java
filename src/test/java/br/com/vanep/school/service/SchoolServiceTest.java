@@ -21,6 +21,7 @@ import br.com.vanep.school.dto.SchoolUpdateRequestDTO;
 import br.com.vanep.school.mapper.SchoolMapper;
 import br.com.vanep.school.model.SchoolModel;
 import br.com.vanep.school.repository.SchoolRepository;
+import br.com.vanep.shared.error.ApiProblemException;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -31,11 +32,9 @@ import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.openapitools.jackson.nullable.JsonNullable;
-import org.springframework.context.MessageSource;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
-import org.springframework.web.server.ResponseStatusException;
 
 @ExtendWith(MockitoExtension.class)
 class SchoolServiceTest {
@@ -45,14 +44,12 @@ class SchoolServiceTest {
   @Mock private SchoolRepository repository;
   @Mock private SchoolMapper mapper;
   @Mock private AddressService addressService;
-  @Mock private MessageSource messages;
 
   private SchoolService service;
 
   @BeforeEach
   void setUp() {
-    service = new SchoolService(repository, mapper, addressService, messages);
-    lenient().when(messages.getMessage(any(), any(), any())).thenAnswer(inv -> inv.getArgument(0));
+    service = new SchoolService(repository, mapper, addressService);
     lenient().when(addressService.toResponsesByIds(any())).thenReturn(Map.of());
     lenient().when(addressService.toResponseOrNull(nullable(Long.class))).thenReturn(null);
   }
@@ -128,8 +125,12 @@ class SchoolServiceTest {
     when(repository.findByToken("missing")).thenReturn(Optional.empty());
 
     assertThatThrownBy(() -> service.findByToken("missing"))
-        .isInstanceOf(ResponseStatusException.class)
-        .hasMessageContaining("404");
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+              assertThat(ex.getCode()).isEqualTo("school.not_found");
+            });
   }
 
   @Test
@@ -216,9 +217,12 @@ class SchoolServiceTest {
     when(repository.findByToken(TOKEN)).thenReturn(Optional.of(school));
 
     assertThatThrownBy(() -> service.update(TOKEN, nameOnly("")))
-        .isInstanceOf(ResponseStatusException.class)
-        .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
-        .isEqualTo(HttpStatus.BAD_REQUEST);
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+              assertThat(ex.getCode()).isEqualTo("school.name.blank");
+            });
     assertThat(school.getName()).isEqualTo("Escola Teste");
     verify(repository, never()).save(any(SchoolModel.class));
   }
@@ -229,9 +233,12 @@ class SchoolServiceTest {
     when(repository.findByToken(TOKEN)).thenReturn(Optional.of(school));
 
     assertThatThrownBy(() -> service.update(TOKEN, nameOnly(null)))
-        .isInstanceOf(ResponseStatusException.class)
-        .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
-        .isEqualTo(HttpStatus.BAD_REQUEST);
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+              assertThat(ex.getCode()).isEqualTo("school.name.blank");
+            });
   }
 
   @Test
@@ -252,8 +259,12 @@ class SchoolServiceTest {
     when(repository.findByToken("missing")).thenReturn(Optional.empty());
 
     assertThatThrownBy(() -> service.update("missing", nameOnly("x")))
-        .isInstanceOf(ResponseStatusException.class)
-        .hasMessageContaining("404");
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+              assertThat(ex.getCode()).isEqualTo("school.not_found");
+            });
   }
 
   @Test
@@ -273,8 +284,12 @@ class SchoolServiceTest {
     when(repository.findByToken("missing")).thenReturn(Optional.empty());
 
     assertThatThrownBy(() -> service.delete("missing"))
-        .isInstanceOf(ResponseStatusException.class)
-        .hasMessageContaining("404");
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+              assertThat(ex.getCode()).isEqualTo("school.not_found");
+            });
   }
 
   @Test
@@ -299,8 +314,12 @@ class SchoolServiceTest {
     when(repository.findByToken(TOKEN)).thenReturn(Optional.of(school));
 
     assertThatThrownBy(() -> service.restore(TOKEN))
-        .isInstanceOf(ResponseStatusException.class)
-        .hasMessageContaining("409");
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+              assertThat(ex.getCode()).isEqualTo("school.already_active");
+            });
     verify(repository, never()).restoreByToken(eq(TOKEN));
   }
 
@@ -310,7 +329,11 @@ class SchoolServiceTest {
     when(repository.findByToken("missing")).thenReturn(Optional.empty());
 
     assertThatThrownBy(() -> service.restore("missing"))
-        .isInstanceOf(ResponseStatusException.class)
-        .hasMessageContaining("404");
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+              assertThat(ex.getCode()).isEqualTo("school.not_found");
+            });
   }
 }

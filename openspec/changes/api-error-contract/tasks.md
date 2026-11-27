@@ -62,6 +62,12 @@ Phase 0 (Constitution + OpenSpec + Client Inventory)
 - [x] 5.3 Update unit, integration, and controller tests for `ApiProblemException` and `$.code` / `$.errors[0].code`.
 - [x] 5.4 Run `make lint` and `./mvnw verify -B`.
 
+### Phase 6 (Catalog, Roles, Users, Media, SecurityHelper, SsoLogout)
+- [x] 6.1 Replace literal/missing Bean Validation messages with `{key}` across `RoleCreateRequestDTO`, `RoleUpdateRequestDTO`, `RolePermissionCreateRequestDTO`, `RolePermissionUpdateRequestDTO`, `SchoolResolveRequestDTO`, and `@PermissionsInRegistry`, adding EN/pt-BR keys to `messages*.properties`.
+- [x] 6.2 Migrate `CountryService`, `StateService`, `CityService`, `SchoolService`, `SchoolResolveService`, `RoleService`, `RolePermissionService`, `UserService`, `MediaFileService`, `MediaResponder`, `SecurityHelper`, and `SsoLogoutController` to `ApiProblemException`.
+- [x] 6.3 Update unit and controller tests for `ApiProblemException` and `$.code`.
+- [x] 6.4 Run `make lint` and `./mvnw verify -B`.
+
 ### Later Phases (tracked for upcoming PRs)
 - [ ] 5..N Migrate remaining domain services (negotiation/contracts/trips/family, catalog/admin/media/web) and DTO validation `{key}` messages by area.
 - [ ] M1 Update `vanep-mobile` mappers to decide strictly by `code` (including dual-format `auth`/`profile`).

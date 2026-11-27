@@ -288,6 +288,7 @@ class SchoolControllerTest {
                 .content(
                     "{\"name\":\"Escola Sem Match\",\"address\":" + placeAddressJson("100") + "}"))
         .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("location.city.unmatched"))
         .andExpect(
             jsonPath("$.detail")
                 .value(
@@ -312,6 +313,7 @@ class SchoolControllerTest {
                 .content(
                     "{\"name\":\"Escola Sem Rua\",\"address\":" + placeAddressJson("100") + "}"))
         .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("location.address.street_required"))
         .andExpect(
             jsonPath("$.detail")
                 .value("Escolha um endereço mais específico: este local não tem logradouro."));

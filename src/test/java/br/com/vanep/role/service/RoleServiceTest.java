@@ -14,6 +14,7 @@ import br.com.vanep.role.model.RoleModel;
 import br.com.vanep.role.repository.RoleRepository;
 import br.com.vanep.rolepermission.model.RolePermissionModel;
 import br.com.vanep.rolepermission.repository.RolePermissionRepository;
+import br.com.vanep.shared.error.ApiProblemException;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -24,7 +25,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
-import org.springframework.web.server.ResponseStatusException;
+import org.springframework.http.HttpStatus;
 
 @ExtendWith(MockitoExtension.class)
 class RoleServiceTest {
@@ -76,8 +77,12 @@ class RoleServiceTest {
     when(repository.findByToken("missing")).thenReturn(Optional.empty());
 
     assertThatThrownBy(() -> service.findByToken("missing"))
-        .isInstanceOf(ResponseStatusException.class)
-        .hasMessageContaining("404");
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+              assertThat(ex.getCode()).isEqualTo("role.not_found");
+            });
   }
 
   @Test
@@ -118,8 +123,12 @@ class RoleServiceTest {
     when(rolePermissions.findByToken("missing-bundle")).thenReturn(Optional.empty());
 
     assertThatThrownBy(() -> service.create(req))
-        .isInstanceOf(ResponseStatusException.class)
-        .hasMessageContaining("404");
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+              assertThat(ex.getCode()).isEqualTo("role_permission.not_found");
+            });
   }
 
   @Test
@@ -143,8 +152,12 @@ class RoleServiceTest {
     when(repository.findByToken("missing")).thenReturn(Optional.empty());
 
     assertThatThrownBy(() -> service.update("missing", new RoleUpdateRequestDTO("x", "y", null)))
-        .isInstanceOf(ResponseStatusException.class)
-        .hasMessageContaining("404");
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+              assertThat(ex.getCode()).isEqualTo("role.not_found");
+            });
   }
 
   @Test
@@ -162,8 +175,12 @@ class RoleServiceTest {
     when(repository.findByToken("missing")).thenReturn(Optional.empty());
 
     assertThatThrownBy(() -> service.delete("missing"))
-        .isInstanceOf(ResponseStatusException.class)
-        .hasMessageContaining("404");
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+              assertThat(ex.getCode()).isEqualTo("role.not_found");
+            });
   }
 
   @Test
@@ -185,7 +202,11 @@ class RoleServiceTest {
     when(repository.findDeletedByToken("missing")).thenReturn(Optional.empty());
 
     assertThatThrownBy(() -> service.restore("missing"))
-        .isInstanceOf(ResponseStatusException.class)
-        .hasMessageContaining("404");
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+              assertThat(ex.getCode()).isEqualTo("role.not_found");
+            });
   }
 }

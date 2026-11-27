@@ -8,12 +8,11 @@ import br.com.vanep.role.model.RoleModel;
 import br.com.vanep.role.repository.RoleRepository;
 import br.com.vanep.rolepermission.model.RolePermissionModel;
 import br.com.vanep.rolepermission.repository.RolePermissionRepository;
+import br.com.vanep.shared.error.ApiProblemException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class RoleService {
@@ -66,7 +65,7 @@ public class RoleService {
   public RoleResponseDTO restore(String token) {
     roles
         .findDeletedByToken(token)
-        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Role not found."));
+        .orElseThrow(() -> ApiProblemException.notFound("role.not_found"));
     roles.restore(token);
     return mapper.toResponse(requireByToken(token));
   }
@@ -74,7 +73,7 @@ public class RoleService {
   private RoleModel requireByToken(String token) {
     return roles
         .findByToken(token)
-        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Role not found."));
+        .orElseThrow(() -> ApiProblemException.notFound("role.not_found"));
   }
 
   private RolePermissionModel resolveRolePermission(String token) {
@@ -83,7 +82,6 @@ public class RoleService {
     }
     return rolePermissions
         .findByToken(token)
-        .orElseThrow(
-            () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Role permission not found."));
+        .orElseThrow(() -> ApiProblemException.notFound("role_permission.not_found"));
   }
 }

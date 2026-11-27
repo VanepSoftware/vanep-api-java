@@ -7,5 +7,8 @@ import jakarta.validation.constraints.Size;
 import java.util.List;
 
 public record RolePermissionCreateRequestDTO(
-    @NotBlank @Size(max = 64) String name,
-    @NotEmpty @PermissionsInRegistry List<String> permissions) {}
+    @NotBlank(message = "{role_permission.name.required}")
+        @Size(max = 64, message = "{role_permission.name.too_long}")
+        String name,
+    @NotEmpty(message = "{role_permission.permissions.required}") @PermissionsInRegistry
+        List<String> permissions) {}

@@ -4,10 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 import br.com.vanep.auth.verification.EmailVerificationTokenRepository;
+import br.com.vanep.shared.error.ApiProblemException;
 import br.com.vanep.user.dto.UserMeResponseDTO;
 import br.com.vanep.user.enums.Gender;
 import br.com.vanep.user.enums.UserType;
@@ -23,15 +23,13 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.context.MessageSource;
-import org.springframework.web.server.ResponseStatusException;
+import org.springframework.http.HttpStatus;
 
 @ExtendWith(MockitoExtension.class)
 class UserServiceTest {
   private static final int COOLDOWN_DAYS = 30;
 
   @Mock private UserRepository users;
-  @Mock private MessageSource messages;
   @Mock private EmailVerificationTokenRepository verificationTokens;
   @Mock private OnboardingService onboardingService;
 
@@ -42,17 +40,9 @@ class UserServiceTest {
     service =
         new UserService(
             users,
-            messages,
             verificationTokens,
             new UserProfileChangePolicy(COOLDOWN_DAYS),
             onboardingService);
-    lenient()
-        .when(
-            messages.getMessage(
-                org.mockito.ArgumentMatchers.anyString(),
-                org.mockito.ArgumentMatchers.isNull(),
-                org.mockito.ArgumentMatchers.any()))
-        .thenAnswer(invocation -> invocation.getArgument(0));
   }
 
   @Test
@@ -68,9 +58,12 @@ class UserServiceTest {
     when(users.findByToken("missing")).thenReturn(Optional.empty());
 
     assertThatThrownBy(() -> service.requireByToken("missing"))
-        .isInstanceOf(ResponseStatusException.class)
-        .extracting(ex -> ((ResponseStatusException) ex).getStatusCode().value())
-        .isEqualTo(404);
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+              assertThat(ex.getCode()).isEqualTo("user.account.not_found");
+            });
   }
 
   @Test
@@ -87,9 +80,12 @@ class UserServiceTest {
     when(users.findByToken("uid-1")).thenReturn(Optional.of(user));
 
     assertThatThrownBy(() -> service.requireByTokenAndType("uid-1", UserType.DRIVER))
-        .isInstanceOf(ResponseStatusException.class)
-        .extracting(ex -> ((ResponseStatusException) ex).getStatusCode().value())
-        .isEqualTo(403);
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+              assertThat(ex.getCode()).isEqualTo("user.type.forbidden");
+            });
   }
 
   @Test

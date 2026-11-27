@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -13,6 +12,7 @@ import br.com.vanep.city.mapper.CityMapper;
 import br.com.vanep.city.model.CityModel;
 import br.com.vanep.city.repository.CityRepository;
 import br.com.vanep.country.model.CountryModel;
+import br.com.vanep.shared.error.ApiProblemException;
 import br.com.vanep.state.model.StateModel;
 import br.com.vanep.state.repository.StateRepository;
 import java.util.List;
@@ -22,24 +22,21 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.context.MessageSource;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
-import org.springframework.web.server.ResponseStatusException;
 
 @ExtendWith(MockitoExtension.class)
 class CityServiceTest {
   @Mock private CityRepository cityRepository;
   @Mock private StateRepository stateRepository;
   @Mock private CityMapper mapper;
-  @Mock private MessageSource messages;
 
   private CityService service;
 
   @BeforeEach
   void setUp() {
-    service = new CityService(cityRepository, stateRepository, mapper, messages);
+    service = new CityService(cityRepository, stateRepository, mapper);
   }
 
   private StateModel stateSp() {
@@ -113,23 +110,26 @@ class CityServiceTest {
 
   @Test
   void findByUfThrows400WhenUfIsMissing() {
-    when(messages.getMessage(eq("city.uf.required"), isNull(), any())).thenReturn("uf required");
-
     assertThatThrownBy(() -> service.findByUf(null, null, Pageable.unpaged()))
-        .isInstanceOf(ResponseStatusException.class)
-        .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
-        .isEqualTo(HttpStatus.BAD_REQUEST);
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+              assertThat(ex.getCode()).isEqualTo("city.uf.required");
+            });
   }
 
   @Test
   void findByUfThrows404WhenUfIsUnknown() {
     when(stateRepository.findByUf("XX")).thenReturn(Optional.empty());
-    when(messages.getMessage(eq("state.uf.not_found"), isNull(), any())).thenReturn("unknown uf");
 
     assertThatThrownBy(() -> service.findByUf("XX", null, Pageable.unpaged()))
-        .isInstanceOf(ResponseStatusException.class)
-        .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
-        .isEqualTo(HttpStatus.NOT_FOUND);
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+              assertThat(ex.getCode()).isEqualTo("state.uf.not_found");
+            });
   }
 
   @Test
@@ -166,7 +166,11 @@ class CityServiceTest {
     when(cityRepository.findByToken("missing")).thenReturn(Optional.empty());
 
     assertThatThrownBy(() -> service.findByToken("missing"))
-        .isInstanceOf(ResponseStatusException.class)
-        .hasMessageContaining("404");
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+              assertThat(ex.getCode()).isEqualTo("city.not_found");
+            });
   }
 }

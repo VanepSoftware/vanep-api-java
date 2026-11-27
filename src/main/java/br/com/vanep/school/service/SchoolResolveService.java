@@ -10,15 +10,12 @@ import br.com.vanep.places.dto.PlaceDetailsResponseDTO;
 import br.com.vanep.school.dto.SchoolResolveRequestDTO;
 import br.com.vanep.school.model.SchoolModel;
 import br.com.vanep.school.repository.SchoolRepository;
+import br.com.vanep.shared.error.ApiProblemException;
 import java.util.Optional;
 import java.util.Set;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.context.MessageSource;
-import org.springframework.context.i18n.LocaleContextHolder;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class SchoolResolveService {
@@ -30,21 +27,18 @@ public class SchoolResolveService {
   private final SchoolRepository schools;
   private final AddressService addresses;
   private final RateLimiter rateLimiter;
-  private final MessageSource messages;
 
   public SchoolResolveService(
       PlacesClient places,
       LocationResolverService resolver,
       SchoolRepository schools,
       AddressService addresses,
-      @Qualifier("placesRateLimiter") RateLimiter rateLimiter,
-      MessageSource messages) {
+      @Qualifier("placesRateLimiter") RateLimiter rateLimiter) {
     this.places = places;
     this.resolver = resolver;
     this.schools = schools;
     this.addresses = addresses;
     this.rateLimiter = rateLimiter;
-    this.messages = messages;
   }
 
   public record Resolution(SchoolModel school, AddressResponseDTO address, boolean created) {}
@@ -58,8 +52,7 @@ public class SchoolResolveService {
     }
 
     if (!tryAcquireLookup(callerUid)) {
-      throw new ResponseStatusException(
-          HttpStatus.TOO_MANY_REQUESTS, message("location.place.rate_limited"));
+      throw ApiProblemException.tooManyRequests("location.place.rate_limited");
     }
 
     PlaceDetailsResponseDTO details =
@@ -102,8 +95,7 @@ public class SchoolResolveService {
 
   private void requireSchool(PlaceDetailsResponseDTO details) {
     if (details.types().stream().noneMatch(SCHOOL_TYPES::contains)) {
-      throw new ResponseStatusException(
-          HttpStatus.BAD_REQUEST, message("school.place.not_a_school"));
+      throw ApiProblemException.badRequest("school.place.not_a_school");
     }
   }
 
@@ -123,9 +115,5 @@ public class SchoolResolveService {
       return displayName;
     }
     return details.formattedAddress();
-  }
-
-  private String message(String key) {
-    return messages.getMessage(key, null, LocaleContextHolder.getLocale());
   }
 }

@@ -1,6 +1,7 @@
 package br.com.vanep.user.service;
 
 import br.com.vanep.auth.verification.EmailVerificationTokenRepository;
+import br.com.vanep.shared.error.ApiProblemException;
 import br.com.vanep.user.dto.UserMeResponseDTO;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
@@ -8,35 +9,24 @@ import br.com.vanep.user.policy.UserProfileChangePolicy;
 import br.com.vanep.user.repository.UserRepository;
 import java.time.Instant;
 import java.util.Optional;
-import org.springframework.context.MessageSource;
-import org.springframework.context.i18n.LocaleContextHolder;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class UserService {
   private final UserRepository users;
-  private final MessageSource messages;
   private final EmailVerificationTokenRepository verificationTokens;
   private final UserProfileChangePolicy profileChangePolicy;
   private final OnboardingService onboardingService;
 
   public UserService(
       UserRepository users,
-      MessageSource messages,
       EmailVerificationTokenRepository verificationTokens,
       UserProfileChangePolicy profileChangePolicy,
       OnboardingService onboardingService) {
     this.users = users;
-    this.messages = messages;
     this.verificationTokens = verificationTokens;
     this.profileChangePolicy = profileChangePolicy;
     this.onboardingService = onboardingService;
-  }
-
-  private String message(String key) {
-    return messages.getMessage(key, null, LocaleContextHolder.getLocale());
   }
 
   public UserMeResponseDTO getMe(String uid) {
@@ -46,16 +36,13 @@ public class UserService {
   public UserModel requireByToken(String uid) {
     return users
         .findByToken(uid)
-        .orElseThrow(
-            () ->
-                new ResponseStatusException(
-                    HttpStatus.NOT_FOUND, message("user.account.not_found")));
+        .orElseThrow(() -> ApiProblemException.notFound("user.account.not_found"));
   }
 
   public UserModel requireByTokenAndType(String uid, UserType expected) {
     UserModel user = requireByToken(uid);
     if (user.getType() != expected) {
-      throw new ResponseStatusException(HttpStatus.FORBIDDEN, message("user.type.forbidden"));
+      throw ApiProblemException.forbidden("user.type.forbidden");
     }
     return user;
   }

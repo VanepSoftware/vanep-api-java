@@ -12,7 +12,7 @@ import java.lang.annotation.Target;
 @Constraint(validatedBy = PermissionsInRegistryValidator.class)
 public @interface PermissionsInRegistry {
 
-  String message() default "Permissões inválidas: contém valores fora do catálogo permitido.";
+  String message() default "{role_permission.permissions.invalid}";
 
   Class<?>[] groups() default {};
 
