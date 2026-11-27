@@ -38,9 +38,20 @@ Phase 0 (Constitution + OpenSpec + Client Inventory)
 - [x] 1.6 Implement `ApiAuthenticationEntryPoint` (`401`) and `ApiAccessDeniedHandler` (`403`) in `SecurityConfig` and update `RateLimitingFilter` (`429` `ProblemDetail` on `/api/**`).
 - [x] 1.7 Run `make lint` and `./mvnw verify -B`.
 
+### Phase 2 (Driver, CNH, Documents, Vehicles)
+- [x] 2.1 Replace literal Bean Validation strings with `{key}` messages in `DriverCnhDataCorrectionRequestDTO`, `DriverCnhStatusUpdateRequestDTO`, and `VehicleRequestDTO`, adding missing English/pt-BR pairs to `messages*.properties`.
+- [x] 2.2 Migrate all services in `driver`, `drivercnh`, `driverdocument`, `vehicledocument`, `schooltransportcredential`, and `vehicle` to `ApiProblemException` (`driver.onboarding.incomplete` carries `missingSteps`).
+- [x] 2.3 Update unit and controller tests for the migrated services/DTOs (`ApiProblemException` + `$.code` + `$.errors[0].code`).
+- [x] 2.4 Run `make lint` and `./mvnw verify -B`.
+
+### Phase 3 (Client, Dependent, Address, CEP, Location)
+- [x] 3.1 Add `{key}` Bean Validation messages to `ClientUpdateRequestDTO`, `DependentSchoolDayRequestDTO`, and `DependentSchoolDaysRequestDTO`, plus missing `client.*` / `dependent.*` keys to `messages*.properties`.
+- [x] 3.2 Migrate `ClientService`, `ClientPhotoService`, `DependentService`, `AddressService`, `PersonalAddressService`, `AddressPlaceResolverService`, `AddressCatalogResolverService`, and `CepLookupService` to `ApiProblemException`.
+- [x] 3.3 Consolidate `CepLookupErrorAdvice` and `LocationErrorAdvice` (plus `UnsupportedStateException`) into `ApiErrorAdvice` and remove the redundant `@RestControllerAdvice` classes.
+- [x] 3.4 Update unit and controller tests and run `make lint` and `./mvnw verify -B`.
+
 ### Later Phases (tracked for upcoming PRs)
-- [ ] 2..N Migrate domain services, advices (`LocationErrorAdvice`, `CepLookupErrorAdvice`), manual `setProperty("code", ...)` sites, and DTO validation `{key}` messages by area.
-  - [x] Phase 2: `driver`, `drivercnh`, `driverdocument`, `vehicledocument`, `schooltransportcredential`, `vehicle`.
+- [ ] 4..N Migrate remaining domain services (`assistant`, `clientdriver`, ratings, service areas, negotiation/contracts/trips, catalog/admin/media) and DTO validation `{key}` messages by area.
 - [ ] M1 Update `vanep-mobile` mappers to decide strictly by `code` (including dual-format `auth`/`profile`).
 - [ ] A1 Update `vanep-frontend` admin pages to use a unified `ApiProblem` parser and `code`.
 - [ ] N+1 Migrate `auth` and `profile` exceptions to `ApiProblemException` and remove legacy envelopes/advices.

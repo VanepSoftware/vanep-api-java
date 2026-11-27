@@ -5,4 +5,5 @@ import jakarta.validation.constraints.NotNull;
 import java.time.DayOfWeek;
 
 public record DependentSchoolDayRequestDTO(
-    @NotNull DayOfWeek weekday, @NotNull SchoolShift schoolShift) {}
+    @NotNull(message = "{dependent.school_days.weekday.required}") DayOfWeek weekday,
+    @NotNull(message = "{dependent.school_days.school_shift.required}") SchoolShift schoolShift) {}

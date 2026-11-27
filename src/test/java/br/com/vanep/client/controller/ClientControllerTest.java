@@ -252,7 +252,8 @@ class ClientControllerTest {
   void getByTokenReturns404WhenMissing() throws Exception {
     mockMvc
         .perform(get("/api/clients/doesnotexist").with(adminJwt()))
-        .andExpect(status().isNotFound());
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.code").value("client.profile.not_found"));
   }
 
   @Test
@@ -388,7 +389,8 @@ class ClientControllerTest {
   void deleteReturns404WhenMissing() throws Exception {
     mockMvc
         .perform(delete("/api/clients/doesnotexist").with(adminJwt()))
-        .andExpect(status().isNotFound());
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.code").value("client.profile.not_found"));
   }
 
   @Test

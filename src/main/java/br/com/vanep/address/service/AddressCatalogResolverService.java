@@ -3,20 +3,15 @@ package br.com.vanep.address.service;
 import br.com.vanep.address.model.AddressModel;
 import br.com.vanep.city.model.CityModel;
 import br.com.vanep.city.repository.CityRepository;
-import org.springframework.context.MessageSource;
-import org.springframework.context.i18n.LocaleContextHolder;
-import org.springframework.http.HttpStatus;
+import br.com.vanep.shared.error.ApiProblemException;
 import org.springframework.stereotype.Service;
-import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class AddressCatalogResolverService {
   private final CityRepository cities;
-  private final MessageSource messages;
 
-  public AddressCatalogResolverService(CityRepository cities, MessageSource messages) {
+  public AddressCatalogResolverService(CityRepository cities) {
     this.cities = cities;
-    this.messages = messages;
   }
 
   public void applyCity(
@@ -39,18 +34,9 @@ public class AddressCatalogResolverService {
   }
 
   private CityModel requireCityByToken(String cityToken) {
-    return cities.findByToken(cityToken).orElseThrow(() -> notFound("city.not_found"));
-  }
-
-  private ResponseStatusException notFound(String key) {
-    ResponseStatusException exception =
-        new ResponseStatusException(HttpStatus.NOT_FOUND, message(key));
-    exception.getBody().setProperty("code", key);
-    return exception;
-  }
-
-  private String message(String key) {
-    return messages.getMessage(key, null, LocaleContextHolder.getLocale());
+    return cities
+        .findByToken(cityToken)
+        .orElseThrow(() -> ApiProblemException.notFound("city.not_found"));
   }
 
   private static String blankToNull(String value) {

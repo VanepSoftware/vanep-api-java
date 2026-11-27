@@ -3,7 +3,6 @@ package br.com.vanep.client.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 import br.com.vanep.address.dto.AddressResponseDTO;
@@ -14,6 +13,7 @@ import br.com.vanep.client.dto.ClientUpdateRequestDTO;
 import br.com.vanep.client.mapper.ClientMapper;
 import br.com.vanep.client.model.ClientModel;
 import br.com.vanep.client.repository.ClientRepository;
+import br.com.vanep.shared.error.ApiProblemException;
 import br.com.vanep.user.dto.UserMeResponseDTO;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
@@ -28,7 +28,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.openapitools.jackson.nullable.JsonNullable;
-import org.springframework.context.MessageSource;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -40,15 +39,13 @@ class ClientServiceTest {
   @Mock private ClientMapper mapper;
   @Mock private UserService userService;
   @Mock private AddressService addressService;
-  @Mock private MessageSource messages;
   @Mock private UserRepository users;
 
   private ClientService service;
 
   @BeforeEach
   void setUp() {
-    service = new ClientService(repository, users, mapper, userService, addressService, messages);
-    lenient().when(messages.getMessage(any(), any(), any())).thenAnswer(inv -> inv.getArgument(0));
+    service = new ClientService(repository, users, mapper, userService, addressService);
   }
 
   private ClientModel clientWithToken(String token) {
@@ -150,9 +147,12 @@ class ClientServiceTest {
     when(repository.findByToken("missing")).thenReturn(Optional.empty());
 
     assertThatThrownBy(() -> service.findByToken("missing"))
-        .isInstanceOf(ResponseStatusException.class)
-        .extracting(ex -> ((ResponseStatusException) ex).getStatusCode().value())
-        .isEqualTo(404);
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+              assertThat(ex.getCode()).isEqualTo("client.profile.not_found");
+            });
   }
 
   @Test
@@ -180,9 +180,12 @@ class ClientServiceTest {
     when(repository.findByToken("missing")).thenReturn(Optional.empty());
 
     assertThatThrownBy(() -> service.update("missing", updateWith(null, null, null)))
-        .isInstanceOf(ResponseStatusException.class)
-        .extracting(ex -> ((ResponseStatusException) ex).getStatusCode().value())
-        .isEqualTo(404);
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+              assertThat(ex.getCode()).isEqualTo("client.profile.not_found");
+            });
   }
 
   @Test
@@ -190,9 +193,12 @@ class ClientServiceTest {
     when(repository.findByToken("missing")).thenReturn(Optional.empty());
 
     assertThatThrownBy(() -> service.delete("missing"))
-        .isInstanceOf(ResponseStatusException.class)
-        .extracting(ex -> ((ResponseStatusException) ex).getStatusCode().value())
-        .isEqualTo(404);
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+              assertThat(ex.getCode()).isEqualTo("client.profile.not_found");
+            });
   }
 
   @Test
@@ -285,8 +291,12 @@ class ClientServiceTest {
     when(repository.findByToken("tok")).thenReturn(Optional.of(client));
 
     assertThatThrownBy(() -> service.update("tok", updateWith(JsonNullable.of("  "), null, null)))
-        .isInstanceOf(ResponseStatusException.class)
-        .hasMessageContaining("400");
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+              assertThat(ex.getCode()).isEqualTo("client.name.required");
+            });
   }
 
   @Test
@@ -295,8 +305,12 @@ class ClientServiceTest {
     when(repository.findByToken("tok")).thenReturn(Optional.of(client));
 
     assertThatThrownBy(() -> service.update("tok", updateWith(JsonNullable.of(null), null, null)))
-        .isInstanceOf(ResponseStatusException.class)
-        .hasMessageContaining("400");
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+              assertThat(ex.getCode()).isEqualTo("client.name.required");
+            });
   }
 
   @Test
@@ -305,8 +319,12 @@ class ClientServiceTest {
     when(repository.findByToken("tok")).thenReturn(Optional.of(client));
 
     assertThatThrownBy(() -> service.update("tok", updateWith(null, null, JsonNullable.of(null))))
-        .isInstanceOf(ResponseStatusException.class)
-        .hasMessageContaining("400");
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+              assertThat(ex.getCode()).isEqualTo("client.active.required");
+            });
   }
 
   @Test
@@ -318,8 +336,12 @@ class ClientServiceTest {
     assertThatThrownBy(
             () ->
                 service.update("tok", updateWith(null, JsonNullable.of("ocupado@vanep.com"), null)))
-        .isInstanceOf(ResponseStatusException.class)
-        .hasMessageContaining("409");
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+              assertThat(ex.getCode()).isEqualTo("client.email.duplicate");
+            });
   }
 
   @Test

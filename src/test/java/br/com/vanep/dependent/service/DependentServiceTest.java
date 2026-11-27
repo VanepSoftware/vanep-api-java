@@ -34,6 +34,7 @@ import br.com.vanep.dependent.repository.DependentSchoolDayRepository;
 import br.com.vanep.school.model.SchoolModel;
 import br.com.vanep.school.repository.SchoolRepository;
 import br.com.vanep.shared.enums.SchoolShift;
+import br.com.vanep.shared.error.ApiProblemException;
 import br.com.vanep.user.enums.Gender;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
@@ -51,10 +52,8 @@ import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.openapitools.jackson.nullable.JsonNullable;
-import org.springframework.context.MessageSource;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.web.server.ResponseStatusException;
 
 @ExtendWith(MockitoExtension.class)
 class DependentServiceTest {
@@ -73,7 +72,6 @@ class DependentServiceTest {
   @Mock private UserRepository users;
   @Mock private DependentMapper mapper;
   @Mock private AddressService addressService;
-  @Mock private MessageSource messages;
 
   @Captor private ArgumentCaptor<List<DependentSchoolDayModel>> savedDays;
 
@@ -83,8 +81,7 @@ class DependentServiceTest {
   void setUp() {
     service =
         new DependentService(
-            dependents, schoolDays, clients, schools, users, mapper, addressService, messages);
-    lenient().when(messages.getMessage(any(), any(), any())).thenAnswer(inv -> inv.getArgument(0));
+            dependents, schoolDays, clients, schools, users, mapper, addressService);
   }
 
   private Jwt clientJwt() {
@@ -341,9 +338,12 @@ class DependentServiceTest {
     when(schools.findByToken("missing-tok")).thenReturn(Optional.empty());
 
     assertThatThrownBy(() -> service.create(clientJwt(), dto))
-        .isInstanceOf(ResponseStatusException.class)
-        .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
-        .isEqualTo(HttpStatus.NOT_FOUND);
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+              assertThat(ex.getCode()).isEqualTo("school.not_found");
+            });
     verify(dependents, never()).save(any());
   }
 
@@ -358,9 +358,12 @@ class DependentServiceTest {
     when(mapper.toModel(dto, CLIENT_ID)).thenReturn(model);
 
     assertThatThrownBy(() -> service.create(clientJwt(), dto))
-        .isInstanceOf(ResponseStatusException.class)
-        .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
-        .isEqualTo(HttpStatus.BAD_REQUEST);
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+              assertThat(ex.getCode()).isEqualTo("dependent.school_token.blank");
+            });
     verify(schools, never()).findByToken(any());
     verify(dependents, never()).save(any());
   }
@@ -595,9 +598,12 @@ class DependentServiceTest {
 
     assertThatThrownBy(
             () -> service.update(clientJwt(), TOKEN, schoolOnly(JsonNullable.of("missing-tok"))))
-        .isInstanceOf(ResponseStatusException.class)
-        .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
-        .isEqualTo(HttpStatus.NOT_FOUND);
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+              assertThat(ex.getCode()).isEqualTo("school.not_found");
+            });
     verify(dependents, never()).save(any());
   }
 
@@ -610,9 +616,12 @@ class DependentServiceTest {
     when(dependents.lockByToken(TOKEN)).thenReturn(Optional.of(model));
 
     assertThatThrownBy(() -> service.update(clientJwt(), TOKEN, schoolOnly(JsonNullable.of(""))))
-        .isInstanceOf(ResponseStatusException.class)
-        .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
-        .isEqualTo(HttpStatus.BAD_REQUEST);
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+              assertThat(ex.getCode()).isEqualTo("dependent.school_token.blank");
+            });
     assertThat(model.getSchoolId()).isEqualTo(SCHOOL_ID);
     verify(dependents, never()).save(any());
   }
@@ -721,9 +730,12 @@ class DependentServiceTest {
     when(dependents.lockByToken(TOKEN)).thenReturn(Optional.of(model));
 
     assertThatThrownBy(() -> service.update(clientJwt(), TOKEN, nameOnly("")))
-        .isInstanceOf(ResponseStatusException.class)
-        .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
-        .isEqualTo(HttpStatus.BAD_REQUEST);
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+              assertThat(ex.getCode()).isEqualTo("dependent.name.blank");
+            });
     assertThat(model.getName()).isEqualTo("Kid");
     verify(dependents, never()).save(any());
   }
@@ -736,9 +748,12 @@ class DependentServiceTest {
     when(dependents.lockByToken(TOKEN)).thenReturn(Optional.of(model));
 
     assertThatThrownBy(() -> service.update(clientJwt(), TOKEN, nameOnly(null)))
-        .isInstanceOf(ResponseStatusException.class)
-        .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
-        .isEqualTo(HttpStatus.BAD_REQUEST);
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+              assertThat(ex.getCode()).isEqualTo("dependent.name.blank");
+            });
   }
 
   @Test
@@ -764,9 +779,12 @@ class DependentServiceTest {
                         JsonNullable.of(null),
                         JsonNullable.undefined(),
                         JsonNullable.undefined())))
-        .isInstanceOf(ResponseStatusException.class)
-        .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
-        .isEqualTo(HttpStatus.BAD_REQUEST);
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+              assertThat(ex.getCode()).isEqualTo("dependent.field.null");
+            });
     assertThat(model.isDefaultDependent()).isTrue();
   }
 
@@ -826,9 +844,12 @@ class DependentServiceTest {
                         JsonNullable.undefined(),
                         JsonNullable.undefined(),
                         JsonNullable.undefined())))
-        .isInstanceOf(ResponseStatusException.class)
-        .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
-        .isEqualTo(HttpStatus.CONFLICT);
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+              assertThat(ex.getCode()).isEqualTo("dependent.document.duplicate");
+            });
     assertThat(model.getDocument()).isEqualTo("22222222222");
     verify(dependents, never()).save(any());
   }
@@ -883,9 +904,12 @@ class DependentServiceTest {
     when(dependents.findByToken(TOKEN)).thenReturn(Optional.of(othersDependent));
 
     assertThatThrownBy(() -> service.findSchoolDays(clientJwt(), TOKEN))
-        .isInstanceOf(ResponseStatusException.class)
-        .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
-        .isEqualTo(HttpStatus.FORBIDDEN);
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+              assertThat(ex.getCode()).isEqualTo("dependent.forbidden");
+            });
     verifyNoInteractions(schoolDays);
   }
 
@@ -944,10 +968,10 @@ class DependentServiceTest {
                         new DependentSchoolDayRequestDTO(DayOfWeek.MONDAY, SchoolShift.MORNING),
                         new DependentSchoolDayRequestDTO(DayOfWeek.MONDAY, SchoolShift.FULLTIME))))
         .isInstanceOfSatisfying(
-            ResponseStatusException.class,
+            ApiProblemException.class,
             e -> {
               assertThat(e.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-              assertThat(e.getReason()).isEqualTo("dependent.school_days.weekday_duplicate");
+              assertThat(e.getCode()).isEqualTo("dependent.school_days.weekday_duplicate");
             });
     verifyNoInteractions(schoolDays);
   }
@@ -966,9 +990,12 @@ class DependentServiceTest {
                     TOKEN,
                     schoolDaysRequest(
                         new DependentSchoolDayRequestDTO(DayOfWeek.MONDAY, SchoolShift.MORNING))))
-        .isInstanceOf(ResponseStatusException.class)
-        .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
-        .isEqualTo(HttpStatus.FORBIDDEN);
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+              assertThat(ex.getCode()).isEqualTo("dependent.forbidden");
+            });
     verifyNoInteractions(schoolDays);
   }
 
@@ -983,9 +1010,12 @@ class DependentServiceTest {
                     "ghost",
                     schoolDaysRequest(
                         new DependentSchoolDayRequestDTO(DayOfWeek.MONDAY, SchoolShift.MORNING))))
-        .isInstanceOf(ResponseStatusException.class)
-        .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
-        .isEqualTo(HttpStatus.NOT_FOUND);
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+              assertThat(ex.getCode()).isEqualTo("dependent.not_found");
+            });
     verifyNoInteractions(schoolDays);
   }
 
@@ -1118,10 +1148,10 @@ class DependentServiceTest {
   private void assertLocked(Runnable call, String key) {
     assertThatThrownBy(() -> call.run())
         .isInstanceOfSatisfying(
-            ResponseStatusException.class,
+            ApiProblemException.class,
             e -> {
               assertThat(e.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
-              assertThat(e.getReason()).isEqualTo(key);
+              assertThat(e.getCode()).isEqualTo(key);
               assertThat(e.getBody().getProperties()).containsEntry("code", key);
             });
   }
