@@ -7,8 +7,6 @@ import br.com.vanep.auth.dto.AssistantSignupRequestDTO;
 import br.com.vanep.auth.dto.ClientSignupRequestDTO;
 import br.com.vanep.auth.dto.DriverSignupFields;
 import br.com.vanep.auth.dto.DriverSignupRequestDTO;
-import br.com.vanep.auth.enums.AuthErrorCode;
-import br.com.vanep.auth.exception.SignupDuplicateException;
 import br.com.vanep.auth.security.UserPasswordService;
 import br.com.vanep.auth.verification.EmailVerificationService;
 import br.com.vanep.client.model.ClientModel;
@@ -18,6 +16,7 @@ import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.role.RoleName;
 import br.com.vanep.role.repository.RoleRepository;
+import br.com.vanep.shared.error.ApiProblemException;
 import br.com.vanep.shared.validation.CpfValidator;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
@@ -126,12 +125,11 @@ public class RegistrationService {
 
   public void rejectDuplicates(String email, String normalizedDocument) {
     if (email != null && users.existsByEmail(email)) {
-      throw new SignupDuplicateException(
-          "email", "auth.signup.email.duplicate", AuthErrorCode.EMAIL_DUPLICATE);
+      throw ApiProblemException.conflict("auth.signup.email.duplicate").with("field", "email");
     }
     if (!normalizedDocument.isEmpty() && users.existsByDocument(normalizedDocument)) {
-      throw new SignupDuplicateException(
-          "document", "auth.signup.document.duplicate", AuthErrorCode.DOCUMENT_DUPLICATE);
+      throw ApiProblemException.conflict("auth.signup.document.duplicate")
+          .with("field", "document");
     }
   }
 }

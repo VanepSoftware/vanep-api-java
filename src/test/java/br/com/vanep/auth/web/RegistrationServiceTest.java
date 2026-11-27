@@ -14,7 +14,6 @@ import br.com.vanep.assistant.repository.AssistantRepository;
 import br.com.vanep.auth.dto.AssistantSignupRequestDTO;
 import br.com.vanep.auth.dto.ClientSignupRequestDTO;
 import br.com.vanep.auth.dto.DriverSignupRequestDTO;
-import br.com.vanep.auth.exception.SignupDuplicateException;
 import br.com.vanep.auth.security.UserPasswordEncoder;
 import br.com.vanep.auth.security.UserPasswordService;
 import br.com.vanep.auth.verification.EmailVerificationService;
@@ -26,6 +25,7 @@ import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.role.RoleName;
 import br.com.vanep.role.model.RoleModel;
 import br.com.vanep.role.repository.RoleRepository;
+import br.com.vanep.shared.error.ApiProblemException;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
@@ -173,9 +173,12 @@ class RegistrationServiceTest {
     when(users.existsByEmail("ana@vanep.com")).thenReturn(true);
 
     assertThatThrownBy(() -> service.registerClient(clientRequest()))
-        .isInstanceOf(SignupDuplicateException.class)
-        .extracting("field", "messageKey")
-        .containsExactly("email", "auth.signup.email.duplicate");
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            error -> {
+              assertThat(error.getCode()).isEqualTo("auth.signup.email.duplicate");
+              assertThat(error.getBody().getProperties()).containsEntry("field", "email");
+            });
 
     verify(users, never()).save(any(UserModel.class));
     verify(clients, never()).save(any(ClientModel.class));
@@ -189,9 +192,12 @@ class RegistrationServiceTest {
     when(users.existsByDocument("39053344705")).thenReturn(true);
 
     assertThatThrownBy(() -> service.registerClient(request))
-        .isInstanceOf(SignupDuplicateException.class)
-        .extracting("field", "messageKey")
-        .containsExactly("document", "auth.signup.document.duplicate");
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            error -> {
+              assertThat(error.getCode()).isEqualTo("auth.signup.document.duplicate");
+              assertThat(error.getBody().getProperties()).containsEntry("field", "document");
+            });
 
     verify(users, never()).save(any(UserModel.class));
   }

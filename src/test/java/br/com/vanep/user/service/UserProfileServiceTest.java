@@ -9,16 +9,13 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import br.com.vanep.auth.verification.EmailVerificationService;
+import br.com.vanep.shared.error.ApiProblemException;
 import br.com.vanep.user.UserProfileFieldLimits;
 import br.com.vanep.user.dto.UserEmailChangeRequestDTO;
 import br.com.vanep.user.dto.UserMeResponseDTO;
 import br.com.vanep.user.dto.UserProfileUpdateRequestDTO;
 import br.com.vanep.user.enums.Gender;
-import br.com.vanep.user.enums.ProfileErrorCode;
 import br.com.vanep.user.enums.UserType;
-import br.com.vanep.user.exception.ProfileBadRequestException;
-import br.com.vanep.user.exception.ProfileCooldownException;
-import br.com.vanep.user.exception.ProfileEmailDuplicateException;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.policy.UserProfileChangePolicy;
 import br.com.vanep.user.repository.UserRepository;
@@ -33,14 +30,12 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.openapitools.jackson.nullable.JsonNullable;
-import org.springframework.context.MessageSource;
 import org.springframework.http.HttpStatus;
 
 @ExtendWith(MockitoExtension.class)
 class UserProfileServiceTest {
   @Mock private UserService userService;
   @Mock private UserRepository users;
-  @Mock private MessageSource messages;
   @Mock private EmailVerificationService emailVerification;
 
   private UserProfileChangePolicy policy;
@@ -49,8 +44,7 @@ class UserProfileServiceTest {
   @BeforeEach
   void setUp() {
     policy = new UserProfileChangePolicy(30);
-    service = new UserProfileService(userService, users, policy, messages, emailVerification);
-    lenient().when(messages.getMessage(any(), any(), any())).thenAnswer(inv -> inv.getArgument(0));
+    service = new UserProfileService(userService, users, policy, emailVerification);
     lenient().when(users.save(any(UserModel.class))).thenAnswer(inv -> inv.getArgument(0));
     lenient()
         .when(userService.toMeResponse(any(UserModel.class)))
@@ -104,13 +98,12 @@ class UserProfileServiceTest {
             JsonNullable.of(null), JsonNullable.undefined(), JsonNullable.undefined());
 
     assertThatThrownBy(() -> service.patchMe("uid-1", request))
-        .isInstanceOf(ProfileBadRequestException.class)
-        .satisfies(
-            ex -> {
-              ProfileBadRequestException error = (ProfileBadRequestException) ex;
-              assertThat(error.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
-              assertThat(error.getCode()).isEqualTo(ProfileErrorCode.FIELD_NULL);
-              assertThat(error.getField()).isEqualTo("name");
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            error -> {
+              assertThat(error.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+              assertThat(error.getCode()).isEqualTo("user.profile.field.null");
+              assertThat(error.getBody().getProperties()).containsEntry("field", "name");
             });
     verify(users, never()).save(any());
   }
@@ -125,13 +118,12 @@ class UserProfileServiceTest {
             JsonNullable.undefined(), JsonNullable.of(null), JsonNullable.undefined());
 
     assertThatThrownBy(() -> service.patchMe("uid-1", request))
-        .isInstanceOf(ProfileBadRequestException.class)
-        .satisfies(
-            ex -> {
-              ProfileBadRequestException error = (ProfileBadRequestException) ex;
-              assertThat(error.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
-              assertThat(error.getCode()).isEqualTo(ProfileErrorCode.FIELD_NULL);
-              assertThat(error.getField()).isEqualTo("phone");
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            error -> {
+              assertThat(error.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+              assertThat(error.getCode()).isEqualTo("user.profile.field.null");
+              assertThat(error.getBody().getProperties()).containsEntry("field", "phone");
             });
   }
 
@@ -186,13 +178,12 @@ class UserProfileServiceTest {
             JsonNullable.undefined(), JsonNullable.of(""), JsonNullable.undefined());
 
     assertThatThrownBy(() -> service.patchMe("uid-1", request))
-        .isInstanceOf(ProfileBadRequestException.class)
-        .satisfies(
-            ex -> {
-              ProfileBadRequestException error = (ProfileBadRequestException) ex;
-              assertThat(error.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
-              assertThat(error.getCode()).isEqualTo(ProfileErrorCode.PHONE_BLANK);
-              assertThat(error.getField()).isEqualTo("phone");
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            error -> {
+              assertThat(error.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+              assertThat(error.getCode()).isEqualTo("user.profile.phone.blank");
+              assertThat(error.getBody().getProperties()).containsEntry("field", "phone");
             });
     assertThat(user.getPhone()).isEqualTo("11999999999");
     verify(users, never()).save(any());
@@ -209,13 +200,12 @@ class UserProfileServiceTest {
             JsonNullable.of(tooLong), JsonNullable.undefined(), JsonNullable.undefined());
 
     assertThatThrownBy(() -> service.patchMe("uid-1", request))
-        .isInstanceOf(ProfileBadRequestException.class)
-        .satisfies(
-            ex -> {
-              ProfileBadRequestException error = (ProfileBadRequestException) ex;
-              assertThat(error.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
-              assertThat(error.getCode()).isEqualTo(ProfileErrorCode.NAME_TOO_LONG);
-              assertThat(error.getField()).isEqualTo("name");
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            error -> {
+              assertThat(error.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+              assertThat(error.getCode()).isEqualTo("user.profile.name.too_long");
+              assertThat(error.getBody().getProperties()).containsEntry("field", "name");
             });
     verify(users, never()).save(any());
   }
@@ -231,13 +221,12 @@ class UserProfileServiceTest {
             JsonNullable.undefined(), JsonNullable.of(tooLong), JsonNullable.undefined());
 
     assertThatThrownBy(() -> service.patchMe("uid-1", request))
-        .isInstanceOf(ProfileBadRequestException.class)
-        .satisfies(
-            ex -> {
-              ProfileBadRequestException error = (ProfileBadRequestException) ex;
-              assertThat(error.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
-              assertThat(error.getCode()).isEqualTo(ProfileErrorCode.PHONE_TOO_LONG);
-              assertThat(error.getField()).isEqualTo("phone");
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            error -> {
+              assertThat(error.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+              assertThat(error.getCode()).isEqualTo("user.profile.phone.too_long");
+              assertThat(error.getBody().getProperties()).containsEntry("field", "phone");
             });
     verify(users, never()).save(any());
   }
@@ -254,14 +243,14 @@ class UserProfileServiceTest {
             JsonNullable.of("New Name"), JsonNullable.undefined(), JsonNullable.undefined());
 
     assertThatThrownBy(() -> service.patchMe("uid-1", request))
-        .isInstanceOf(ProfileCooldownException.class)
-        .satisfies(
-            ex -> {
-              ProfileCooldownException pce = (ProfileCooldownException) ex;
-              assertThat(pce.getCode()).isEqualTo(ProfileErrorCode.COOLDOWN);
-              assertThat(pce.getField()).isEqualTo("name");
-              assertThat(pce.getRetryAfter()).isEqualTo(lastChange.plus(30, ChronoUnit.DAYS));
-              assertThat(pce.getMessage()).isEqualTo("user.profile.name.cooldown");
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            error -> {
+              assertThat(error.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+              assertThat(error.getCode()).isEqualTo("user.profile.name.cooldown");
+              assertThat(error.getBody().getProperties()).containsEntry("field", "name");
+              assertThat(error.getBody().getProperties())
+                  .containsEntry("retryAfter", lastChange.plus(30, ChronoUnit.DAYS));
             });
     assertThat(user.getName()).isEqualTo("Test User");
     verify(users, never()).save(any());
@@ -378,14 +367,13 @@ class UserProfileServiceTest {
             () ->
                 service.requestEmailChange(
                     "uid-1", new UserEmailChangeRequestDTO("taken@vanep.com")))
-        .isInstanceOf(ProfileEmailDuplicateException.class)
-        .satisfies(
-            ex -> {
-              ProfileEmailDuplicateException pe = (ProfileEmailDuplicateException) ex;
-              assertThat(pe.getCode()).isEqualTo(ProfileErrorCode.EMAIL_DUPLICATE);
-              assertThat(pe.getField()).isEqualTo("email");
-              assertThat(pe.getRetryAfter()).isNull();
-              assertThat(pe.getMessage()).isEqualTo("auth.signup.email.duplicate");
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            error -> {
+              assertThat(error.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+              assertThat(error.getCode()).isEqualTo("auth.signup.email.duplicate");
+              assertThat(error.getBody().getProperties()).containsEntry("field", "email");
+              assertThat(error.getBody().getProperties()).doesNotContainKey("retryAfter");
             });
     assertThat(user.getPendingEmail()).isNull();
     verify(emailVerification, never()).startVerification(any());
@@ -400,13 +388,12 @@ class UserProfileServiceTest {
             () ->
                 service.requestEmailChange(
                     "uid-1", new UserEmailChangeRequestDTO("test@vanep.com")))
-        .isInstanceOf(ProfileBadRequestException.class)
-        .satisfies(
-            ex -> {
-              ProfileBadRequestException error = (ProfileBadRequestException) ex;
-              assertThat(error.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
-              assertThat(error.getCode()).isEqualTo(ProfileErrorCode.EMAIL_SAME);
-              assertThat(error.getField()).isEqualTo("email");
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            error -> {
+              assertThat(error.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+              assertThat(error.getCode()).isEqualTo("user.profile.email.same");
+              assertThat(error.getBody().getProperties()).containsEntry("field", "email");
             });
     verify(users, never()).existsByEmail(any());
     verify(emailVerification, never()).startVerification(any());
@@ -423,14 +410,14 @@ class UserProfileServiceTest {
     assertThatThrownBy(
             () ->
                 service.requestEmailChange("uid-1", new UserEmailChangeRequestDTO("new@vanep.com")))
-        .isInstanceOf(ProfileCooldownException.class)
-        .satisfies(
-            ex -> {
-              ProfileCooldownException pce = (ProfileCooldownException) ex;
-              assertThat(pce.getCode()).isEqualTo(ProfileErrorCode.COOLDOWN);
-              assertThat(pce.getField()).isEqualTo("email");
-              assertThat(pce.getRetryAfter()).isEqualTo(lastChange.plus(30, ChronoUnit.DAYS));
-              assertThat(pce.getMessage()).isEqualTo("user.profile.email.cooldown");
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            error -> {
+              assertThat(error.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+              assertThat(error.getCode()).isEqualTo("user.profile.email.cooldown");
+              assertThat(error.getBody().getProperties()).containsEntry("field", "email");
+              assertThat(error.getBody().getProperties())
+                  .containsEntry("retryAfter", lastChange.plus(30, ChronoUnit.DAYS));
             });
     assertThat(user.getPendingEmail()).isNull();
     verify(emailVerification, never()).startVerification(any());
@@ -447,14 +434,13 @@ class UserProfileServiceTest {
     assertThatThrownBy(
             () ->
                 service.requestEmailChange("uid-1", new UserEmailChangeRequestDTO("new@vanep.com")))
-        .isInstanceOf(ProfileCooldownException.class)
-        .satisfies(
-            ex -> {
-              ProfileCooldownException pce = (ProfileCooldownException) ex;
-              assertThat(pce.getCode()).isEqualTo(ProfileErrorCode.COOLDOWN);
-              assertThat(pce.getField()).isEqualTo("email");
-              assertThat(pce.getRetryAfter()).isEqualTo(retryAfter);
-              assertThat(pce.getMessage()).isEqualTo("user.profile.email.resend.cooldown");
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            error -> {
+              assertThat(error.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+              assertThat(error.getCode()).isEqualTo("user.profile.email.resend.cooldown");
+              assertThat(error.getBody().getProperties()).containsEntry("field", "email");
+              assertThat(error.getBody().getProperties()).containsEntry("retryAfter", retryAfter);
             });
     assertThat(user.getPendingEmail()).isNull();
     verify(users, never()).save(any(UserModel.class));

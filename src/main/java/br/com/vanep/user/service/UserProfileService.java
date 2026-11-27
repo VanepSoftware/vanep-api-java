@@ -1,22 +1,18 @@
 package br.com.vanep.user.service;
 
 import br.com.vanep.auth.verification.EmailVerificationService;
+import br.com.vanep.shared.error.ApiProblemException;
 import br.com.vanep.user.UserProfileFieldLimits;
 import br.com.vanep.user.dto.UserEmailChangeRequestDTO;
 import br.com.vanep.user.dto.UserMeResponseDTO;
 import br.com.vanep.user.dto.UserProfileUpdateRequestDTO;
 import br.com.vanep.user.enums.Gender;
-import br.com.vanep.user.exception.ProfileBadRequestException;
-import br.com.vanep.user.exception.ProfileCooldownException;
-import br.com.vanep.user.exception.ProfileEmailDuplicateException;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.policy.UserProfileChangePolicy;
 import br.com.vanep.user.repository.UserRepository;
 import java.time.Instant;
 import java.util.Objects;
 import org.openapitools.jackson.nullable.JsonNullable;
-import org.springframework.context.MessageSource;
-import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,28 +22,17 @@ public class UserProfileService {
   private final UserService userService;
   private final UserRepository users;
   private final UserProfileChangePolicy policy;
-  private final MessageSource messages;
   private final EmailVerificationService emailVerification;
 
   public UserProfileService(
       UserService userService,
       UserRepository users,
       UserProfileChangePolicy policy,
-      MessageSource messages,
       EmailVerificationService emailVerification) {
     this.userService = userService;
     this.users = users;
     this.policy = policy;
-    this.messages = messages;
     this.emailVerification = emailVerification;
-  }
-
-  private String message(String key) {
-    return messages.getMessage(key, null, LocaleContextHolder.getLocale());
-  }
-
-  private String message(String key, Object... args) {
-    return messages.getMessage(key, args, LocaleContextHolder.getLocale());
   }
 
   public UserMeResponseDTO patchMe(String uid, UserProfileUpdateRequestDTO request) {
@@ -71,10 +56,10 @@ public class UserProfileService {
     String newEmail = request.email();
 
     if (Objects.equals(newEmail, user.getEmail())) {
-      throw ProfileBadRequestException.emailSame(message("user.profile.email.same"));
+      throw ApiProblemException.badRequest("user.profile.email.same").with("field", "email");
     }
     if (users.existsByEmail(newEmail)) {
-      throw new ProfileEmailDuplicateException(message("auth.signup.email.duplicate"));
+      throw ApiProblemException.conflict("auth.signup.email.duplicate").with("field", "email");
     }
 
     Instant now = Instant.now();
@@ -93,8 +78,9 @@ public class UserProfileService {
     String name = nameField.get();
     rejectIfNull(name, "name");
     if (name.length() > UserProfileFieldLimits.NAME_MAX) {
-      throw ProfileBadRequestException.nameTooLong(
-          message("user.profile.name.too_long", UserProfileFieldLimits.NAME_MAX));
+      throw ApiProblemException.badRequest(
+              "user.profile.name.too_long", UserProfileFieldLimits.NAME_MAX)
+          .with("field", "name");
     }
     if (Objects.equals(name, user.getName())) {
       return false;
@@ -112,11 +98,12 @@ public class UserProfileService {
     String phone = phoneField.get();
     rejectIfNull(phone, "phone");
     if (phone.isBlank()) {
-      throw ProfileBadRequestException.phoneBlank(message("user.profile.phone.blank"));
+      throw ApiProblemException.badRequest("user.profile.phone.blank").with("field", "phone");
     }
     if (phone.length() > UserProfileFieldLimits.PHONE_MAX) {
-      throw ProfileBadRequestException.phoneTooLong(
-          message("user.profile.phone.too_long", UserProfileFieldLimits.PHONE_MAX));
+      throw ApiProblemException.badRequest(
+              "user.profile.phone.too_long", UserProfileFieldLimits.PHONE_MAX)
+          .with("field", "phone");
     }
     if (Objects.equals(phone, user.getPhone())) {
       return false;
@@ -141,7 +128,7 @@ public class UserProfileService {
 
   void rejectIfNull(Object value, String field) {
     if (value == null) {
-      throw ProfileBadRequestException.fieldNull(message("user.profile.field.null"), field);
+      throw ApiProblemException.badRequest("user.profile.field.null").with("field", field);
     }
   }
 
@@ -154,8 +141,9 @@ public class UserProfileService {
         .issueRetryAfter(user)
         .ifPresent(
             retryAfter -> {
-              throw new ProfileCooldownException(
-                  message("user.profile.email.resend.cooldown"), "email", retryAfter);
+              throw ApiProblemException.conflict("user.profile.email.resend.cooldown")
+                  .with("field", "email")
+                  .with("retryAfter", retryAfter);
             });
   }
 
@@ -164,7 +152,9 @@ public class UserProfileService {
         .retryAfter(lastChangeAt, now)
         .ifPresent(
             retryAfter -> {
-              throw new ProfileCooldownException(message(messageKey), field, retryAfter);
+              throw ApiProblemException.conflict(messageKey)
+                  .with("field", field)
+                  .with("retryAfter", retryAfter);
             });
   }
 }

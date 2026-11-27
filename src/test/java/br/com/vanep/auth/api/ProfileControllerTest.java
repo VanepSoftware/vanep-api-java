@@ -158,9 +158,9 @@ class ProfileControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"phone\":\"\"}"))
         .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.code").value("phone_blank"))
+        .andExpect(jsonPath("$.code").value("user.profile.phone.blank"))
         .andExpect(jsonPath("$.field").value("phone"))
-        .andExpect(jsonPath("$.message").value(notNullValue()))
+        .andExpect(jsonPath("$.detail").value(notNullValue()))
         .andExpect(jsonPath("$.retryAfter").doesNotExist());
 
     UserModel reloaded = users.findByToken(uid).orElseThrow();
@@ -183,9 +183,9 @@ class ProfileControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"name\":\"Blocked Name\"}"))
         .andExpect(status().isConflict())
-        .andExpect(jsonPath("$.code").value("cooldown"))
+        .andExpect(jsonPath("$.code").value("user.profile.name.cooldown"))
         .andExpect(jsonPath("$.field").value("name"))
-        .andExpect(jsonPath("$.message").value(notNullValue()))
+        .andExpect(jsonPath("$.detail").value(notNullValue()))
         .andExpect(jsonPath("$.retryAfter").value(notNullValue()));
 
     UserModel reloaded = users.findByToken(uid).orElseThrow();
@@ -287,9 +287,9 @@ class ProfileControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"email\":\"taken@vanep.com\"}"))
         .andExpect(status().isConflict())
-        .andExpect(jsonPath("$.code").value("email_duplicate"))
+        .andExpect(jsonPath("$.code").value("auth.signup.email.duplicate"))
         .andExpect(jsonPath("$.field").value("email"))
-        .andExpect(jsonPath("$.message").value(notNullValue()))
+        .andExpect(jsonPath("$.detail").value(notNullValue()))
         .andExpect(jsonPath("$.retryAfter").doesNotExist());
 
     UserModel reloaded = users.findByToken(uid).orElseThrow();
@@ -306,9 +306,9 @@ class ProfileControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"email\":\"" + EMAIL + "\"}"))
         .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.code").value("email_same"))
+        .andExpect(jsonPath("$.code").value("user.profile.email.same"))
         .andExpect(jsonPath("$.field").value("email"))
-        .andExpect(jsonPath("$.message").value(notNullValue()))
+        .andExpect(jsonPath("$.detail").value(notNullValue()))
         .andExpect(jsonPath("$.retryAfter").doesNotExist());
   }
 
@@ -322,8 +322,9 @@ class ProfileControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"email\":\"" + tooLong + "\"}"))
         .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.code").value("email_too_long"))
+        .andExpect(jsonPath("$.code").value("validation.failed"))
         .andExpect(jsonPath("$.field").value("email"))
+        .andExpect(jsonPath("$.errors[?(@.code == 'user.profile.email.too_long')]").exists())
         .andExpect(jsonPath("$.retryAfter").doesNotExist());
   }
 
@@ -337,7 +338,7 @@ class ProfileControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"name\":\"" + tooLong + "\"}"))
         .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.code").value("name_too_long"))
+        .andExpect(jsonPath("$.code").value("user.profile.name.too_long"))
         .andExpect(jsonPath("$.field").value("name"))
         .andExpect(jsonPath("$.retryAfter").doesNotExist());
   }
@@ -352,7 +353,7 @@ class ProfileControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"phone\":\"" + tooLong + "\"}"))
         .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.code").value("phone_too_long"))
+        .andExpect(jsonPath("$.code").value("user.profile.phone.too_long"))
         .andExpect(jsonPath("$.field").value("phone"))
         .andExpect(jsonPath("$.retryAfter").doesNotExist());
   }
@@ -366,8 +367,9 @@ class ProfileControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"email\":\"\"}"))
         .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.code").value("email_required"))
+        .andExpect(jsonPath("$.code").value("validation.failed"))
         .andExpect(jsonPath("$.field").value("email"))
+        .andExpect(jsonPath("$.errors[0].code").value("user.profile.email.required"))
         .andExpect(jsonPath("$.retryAfter").doesNotExist());
   }
 
@@ -380,8 +382,9 @@ class ProfileControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"email\":\"not-an-email\"}"))
         .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.code").value("email_invalid"))
+        .andExpect(jsonPath("$.code").value("validation.failed"))
         .andExpect(jsonPath("$.field").value("email"))
+        .andExpect(jsonPath("$.errors[0].code").value("user.profile.email.invalid"))
         .andExpect(jsonPath("$.retryAfter").doesNotExist());
   }
 
@@ -476,7 +479,7 @@ class ProfileControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"email\":\"second@vanep.com\"}"))
         .andExpect(status().isConflict())
-        .andExpect(jsonPath("$.code").value("cooldown"))
+        .andExpect(jsonPath("$.code").value("user.profile.email.resend.cooldown"))
         .andExpect(jsonPath("$.field").value("email"))
         .andExpect(jsonPath("$.retryAfter").value(notNullValue()));
 
@@ -508,7 +511,7 @@ class ProfileControllerTest {
   }
 
   @Test
-  void profileValidationErrorsKeepTheirOwnEnvelope() throws Exception {
+  void profileValidationErrorsUseUnifiedProblemDetail() throws Exception {
     mockMvc
         .perform(
             post("/api/user/me/email-change")
@@ -516,7 +519,9 @@ class ProfileControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"email\":\"not-an-email\"}"))
         .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("validation.failed"))
         .andExpect(jsonPath("$.field").value("email"))
-        .andExpect(jsonPath("$.errors").doesNotExist());
+        .andExpect(jsonPath("$.errors[0].field").value("email"))
+        .andExpect(jsonPath("$.errors[0].code").value("user.profile.email.invalid"));
   }
 }

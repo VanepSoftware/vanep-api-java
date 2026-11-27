@@ -10,7 +10,8 @@ import lombok.Setter;
 @Setter
 public class ResetPasswordForm {
 
-  @NotBlank private String token;
+  @NotBlank(message = "{auth.password.reset.token.required}")
+  private String token;
 
   @NotBlank(message = "{auth.signup.password.required}")
   @Size(min = 8, message = "{auth.password.reset.min}")

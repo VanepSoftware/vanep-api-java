@@ -86,7 +86,7 @@ class EmailCodeApiControllerTest {
     for (int attempt = 0; attempt < 5; attempt++) {
       submitCode("000000")
           .andExpect(status().isBadRequest())
-          .andExpect(jsonPath("$.code").value("invalid_code"));
+          .andExpect(jsonPath("$.code").value("auth.error.invalid_code"));
     }
 
     submitCode(CODE).andExpect(status().isBadRequest());
@@ -112,7 +112,7 @@ class EmailCodeApiControllerTest {
     mockMvc
         .perform(verifyRequest("nobody@vanep.com", CODE))
         .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.code").value("invalid_code"));
+        .andExpect(jsonPath("$.code").value("auth.error.invalid_code"));
 
     UserModel verified = persistUser(true);
     persistVerificationCode(verified, CODE, Duration.ofHours(24));
@@ -190,7 +190,7 @@ class EmailCodeApiControllerTest {
     mockMvc
         .perform(resetRequest(EMAIL, CODE, "Abc-123"))
         .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.code").value("validation_error"))
+        .andExpect(jsonPath("$.code").value("validation.failed"))
         .andExpect(jsonPath("$.errors[?(@.field == 'newPassword')]").exists());
 
     mockMvc.perform(resetRequest(EMAIL, CODE, "Abc-1234")).andExpect(status().isNoContent());
@@ -204,7 +204,7 @@ class EmailCodeApiControllerTest {
     mockMvc
         .perform(resetRequest(EMAIL, CODE, "alllowercase"))
         .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.code").value("validation_error"))
+        .andExpect(jsonPath("$.code").value("validation.failed"))
         .andExpect(jsonPath("$.errors[?(@.field == 'newPassword')]").exists());
 
     mockMvc
@@ -223,12 +223,12 @@ class EmailCodeApiControllerTest {
     mockMvc
         .perform(resetRequest(EMAIL, "000000", "Brand-new-password1"))
         .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.code").value("invalid_code"));
+        .andExpect(jsonPath("$.code").value("auth.error.invalid_code"));
 
     mockMvc
         .perform(resetRequest("nobody@vanep.com", CODE, "Brand-new-password1"))
         .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.code").value("invalid_code"));
+        .andExpect(jsonPath("$.code").value("auth.error.invalid_code"));
   }
 
   private org.springframework.test.web.servlet.ResultActions submitCode(String code)

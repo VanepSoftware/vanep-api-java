@@ -128,7 +128,7 @@ class SignupApiControllerTest {
                      "document":"11111111111","acceptTerms":true}
                     """))
         .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.code").value("validation_error"))
+        .andExpect(jsonPath("$.code").value("validation.failed"))
         .andExpect(jsonPath("$.errors[?(@.field == 'name')]").exists())
         .andExpect(
             jsonPath("$.errors[?(@.field == 'document')].message")
@@ -149,7 +149,7 @@ class SignupApiControllerTest {
                      "document":"52998224725","acceptTerms":true}
                     """))
         .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.code").value("validation_error"))
+        .andExpect(jsonPath("$.code").value("validation.failed"))
         .andExpect(
             jsonPath("$.errors[?(@.field == 'password')].message")
                 .value(
@@ -172,7 +172,7 @@ class SignupApiControllerTest {
                      "document":"52998224725","acceptTerms":true}
                     """))
         .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.code").value("validation_error"))
+        .andExpect(jsonPath("$.code").value("validation.failed"))
         .andExpect(jsonPath("$.errors[?(@.field == 'basePrice')]").exists());
 
     assertThat(users.count()).isZero();
@@ -208,7 +208,7 @@ class SignupApiControllerTest {
                      "document":"11144477735","acceptTerms":true}
                     """))
         .andExpect(status().isConflict())
-        .andExpect(jsonPath("$.code").value("email_duplicate"));
+        .andExpect(jsonPath("$.code").value("auth.signup.email.duplicate"));
 
     mockMvc
         .perform(
@@ -220,7 +220,7 @@ class SignupApiControllerTest {
                      "document":"529.982.247-25","acceptTerms":true}
                     """))
         .andExpect(status().isConflict())
-        .andExpect(jsonPath("$.code").value("document_duplicate"));
+        .andExpect(jsonPath("$.code").value("auth.signup.document.duplicate"));
 
     assertThat(users.count()).isEqualTo(1);
   }
