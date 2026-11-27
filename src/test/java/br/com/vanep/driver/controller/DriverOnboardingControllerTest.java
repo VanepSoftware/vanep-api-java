@@ -306,7 +306,9 @@ class DriverOnboardingControllerTest {
             post("/api/drivers/me/submit-onboarding")
                 .with(driverJwt(driverUserUid))
                 .contentType(MediaType.APPLICATION_JSON))
-        .andExpect(status().isUnprocessableContent());
+        .andExpect(status().isUnprocessableContent())
+        .andExpect(jsonPath("$.code").value("driver.onboarding.incomplete"))
+        .andExpect(jsonPath("$.missingSteps").isArray());
   }
 
   @Test
@@ -336,7 +338,8 @@ class DriverOnboardingControllerTest {
             post("/api/drivers/me/submit-onboarding")
                 .with(driverJwt(driverUserUid))
                 .contentType(MediaType.APPLICATION_JSON))
-        .andExpect(status().isBadRequest());
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("driver.onboarding.already_submitted"));
   }
 
   @Test

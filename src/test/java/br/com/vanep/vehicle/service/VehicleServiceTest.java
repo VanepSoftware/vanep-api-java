@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
-import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -27,9 +26,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.context.MessageSource;
 import org.springframework.http.HttpStatus;
-import org.springframework.web.server.ResponseStatusException;
 
 @ExtendWith(MockitoExtension.class)
 class VehicleServiceTest {
@@ -39,7 +36,6 @@ class VehicleServiceTest {
   @Mock private DriverRepository driverRepository;
   @Mock private UserRepository userRepository;
   @Mock private VehicleMapper mapper;
-  @Mock private MessageSource messages;
 
   @InjectMocks private VehicleService service;
 
@@ -49,9 +45,6 @@ class VehicleServiceTest {
 
   @BeforeEach
   void setUp() {
-    lenient()
-        .when(messages.getMessage(any(), any(), any()))
-        .thenAnswer(invocation -> invocation.getArgument(0));
     user = new UserModel();
     user.setId(1L);
     user.setType(UserType.DRIVER);
@@ -142,12 +135,11 @@ class VehicleServiceTest {
     when(vehicleRepository.findByToken("veh-123")).thenReturn(Optional.of(activeVehicle));
 
     assertThatThrownBy(() -> service.restore("veh-123"))
-        .isInstanceOf(ResponseStatusException.class)
-        .satisfies(
-            e -> {
-              ResponseStatusException ex = (ResponseStatusException) e;
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
               assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
-              assertThat(ex.getReason()).contains("vehicle.already_active");
+              assertThat(ex.getCode()).isEqualTo("vehicle.already_active");
             });
 
     verify(vehicleRepository, never()).restoreByToken(any());

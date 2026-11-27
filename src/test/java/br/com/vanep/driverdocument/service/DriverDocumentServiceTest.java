@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -27,6 +26,7 @@ import br.com.vanep.shared.document.enums.ReviewMethod;
 import br.com.vanep.shared.document.model.DocumentReview;
 import br.com.vanep.shared.document.service.DocumentReviewService;
 import br.com.vanep.shared.document.service.DocumentSubmissionRules;
+import br.com.vanep.shared.error.ApiProblemException;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.service.UserService;
@@ -38,10 +38,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.context.MessageSource;
 import org.springframework.http.HttpStatus;
 import org.springframework.mock.web.MockMultipartFile;
-import org.springframework.web.server.ResponseStatusException;
 
 @ExtendWith(MockitoExtension.class)
 class DriverDocumentServiceTest {
@@ -53,7 +51,6 @@ class DriverDocumentServiceTest {
   @Mock private DocumentSubmissionRules submissionRules;
   @Mock private DriverDocumentMapper mapper;
   @Mock private MediaFileService media;
-  @Mock private MessageSource messages;
 
   @InjectMocks private DriverDocumentService service;
 
@@ -63,9 +60,6 @@ class DriverDocumentServiceTest {
 
   @BeforeEach
   void setUp() {
-    lenient()
-        .when(messages.getMessage(any(), any(), any()))
-        .thenAnswer(invocation -> invocation.getArgument(0));
 
     user = new UserModel();
     user.setId(1L);
@@ -88,15 +82,14 @@ class DriverDocumentServiceTest {
   @Test
   void createThrowsNotFoundWhenUserNotFound() {
     when(userService.requireByToken("unknown-uid"))
-        .thenThrow(new ResponseStatusException(HttpStatus.NOT_FOUND, "user.account.not_found"));
+        .thenThrow(ApiProblemException.notFound("user.account.not_found"));
 
     assertThatThrownBy(() -> service.create(request, "unknown-uid"))
-        .isInstanceOf(ResponseStatusException.class)
-        .satisfies(
-            e -> {
-              ResponseStatusException ex = (ResponseStatusException) e;
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
               assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
-              assertThat(ex.getReason()).contains("user.account.not_found");
+              assertThat(ex.getCode()).isEqualTo("user.account.not_found");
             });
 
     verify(driverDocumentRepository, never()).save(any(DriverDocumentModel.class));
@@ -175,12 +168,11 @@ class DriverDocumentServiceTest {
     when(driverDocumentRepository.findByToken("doc-123")).thenReturn(Optional.of(active));
 
     assertThatThrownBy(() -> service.restore("doc-123"))
-        .isInstanceOf(ResponseStatusException.class)
-        .satisfies(
-            e -> {
-              ResponseStatusException ex = (ResponseStatusException) e;
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
               assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
-              assertThat(ex.getReason()).contains("driver_document.already_active");
+              assertThat(ex.getCode()).isEqualTo("driver_document.already_active");
             });
 
     verify(driverDocumentRepository, never()).restoreByToken(any());

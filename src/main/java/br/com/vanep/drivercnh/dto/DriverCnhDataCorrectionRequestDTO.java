@@ -6,14 +6,15 @@ import java.time.LocalDate;
 import java.util.Locale;
 
 public record DriverCnhDataCorrectionRequestDTO(
-    @Pattern(regexp = "^\\d{9,11}$", message = "Número de registro da CNH inválido.")
+    @Pattern(regexp = "^\\d{9,11}$", message = "{driver_cnh.registration_number.invalid}")
         String registrationNumber,
     @Pattern(regexp = "^(D|E|AD|AE)$", message = "{driver_cnh.category.invalid}") String category,
     LocalDate issueDate,
     LocalDate validUntil,
     LocalDate firstLicenseDate,
     String securityNumber,
-    @Pattern(regexp = "^[A-Z]{2}$", message = "UF emissora inválida.") String issuingState,
+    @Pattern(regexp = "^[A-Z]{2}$", message = "{driver_cnh.issuing_state.invalid}")
+        String issuingState,
     @NotNull(message = "{document.review.version.required}") Long version) {
 
   public DriverCnhDataCorrectionRequestDTO {

@@ -6,13 +6,10 @@ import br.com.vanep.media.enums.MediaSlot;
 import br.com.vanep.media.model.MediaFileModel;
 import br.com.vanep.media.service.MediaFileService;
 import br.com.vanep.shared.document.service.DocumentSubmissionRules;
-import org.springframework.context.MessageSource;
-import org.springframework.context.i18n.LocaleContextHolder;
-import org.springframework.http.HttpStatus;
+import br.com.vanep.shared.error.ApiProblemException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class DriverCnhFileService {
@@ -20,17 +17,12 @@ public class DriverCnhFileService {
   private final DriverCnhRepository cnhs;
   private final MediaFileService media;
   private final DocumentSubmissionRules submissionRules;
-  private final MessageSource messages;
 
   public DriverCnhFileService(
-      DriverCnhRepository cnhs,
-      MediaFileService media,
-      DocumentSubmissionRules submissionRules,
-      MessageSource messages) {
+      DriverCnhRepository cnhs, MediaFileService media, DocumentSubmissionRules submissionRules) {
     this.cnhs = cnhs;
     this.media = media;
     this.submissionRules = submissionRules;
-    this.messages = messages;
   }
 
   @Transactional
@@ -52,19 +44,13 @@ public class DriverCnhFileService {
   public MediaFileModel requireFile(String token) {
     MediaFileModel file = require(token).getFile();
     if (file == null) {
-      throw new ResponseStatusException(HttpStatus.NOT_FOUND, message("media.not_found"));
+      throw ApiProblemException.notFound("media.not_found");
     }
     return file;
   }
 
   private DriverCnhModel require(String token) {
     return cnhs.findByToken(token)
-        .orElseThrow(
-            () ->
-                new ResponseStatusException(HttpStatus.NOT_FOUND, message("driver_cnh.not_found")));
-  }
-
-  private String message(String key) {
-    return messages.getMessage(key, null, LocaleContextHolder.getLocale());
+        .orElseThrow(() -> ApiProblemException.notFound("driver_cnh.not_found"));
   }
 }

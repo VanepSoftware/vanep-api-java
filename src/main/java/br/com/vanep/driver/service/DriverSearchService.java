@@ -12,6 +12,7 @@ import br.com.vanep.location.dto.ResolvedLocationChainDTO;
 import br.com.vanep.location.service.LocationResolverService;
 import br.com.vanep.media.web.MediaUrl;
 import br.com.vanep.places.client.PlacesClient;
+import br.com.vanep.shared.error.ApiProblemException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -19,16 +20,12 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.context.MessageSource;
-import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class DriverSearchService {
@@ -38,7 +35,6 @@ public class DriverSearchService {
   private final DistrictRepository districts;
   private final DriverRepository drivers;
   private final RateLimiter rateLimiter;
-  private final MessageSource messages;
 
   public DriverSearchService(
       PlacesClient places,
@@ -46,23 +42,20 @@ public class DriverSearchService {
       DriverServiceAreaRepository areas,
       DistrictRepository districts,
       DriverRepository drivers,
-      @Qualifier("placesRateLimiter") RateLimiter rateLimiter,
-      MessageSource messages) {
+      @Qualifier("placesRateLimiter") RateLimiter rateLimiter) {
     this.places = places;
     this.resolver = resolver;
     this.areas = areas;
     this.districts = districts;
     this.drivers = drivers;
     this.rateLimiter = rateLimiter;
-    this.messages = messages;
   }
 
   @Transactional(readOnly = true)
   public Page<DriverSearchResponseDTO> search(
       String callerUid, String placeId, String sessionToken, Pageable pageable) {
     if (!rateLimiter.tryAcquire("driver-search:" + callerUid)) {
-      throw new ResponseStatusException(
-          HttpStatus.TOO_MANY_REQUESTS, message("location.place.rate_limited"));
+      throw ApiProblemException.tooManyRequests("location.place.rate_limited");
     }
 
     Optional<ResolvedLocationChainDTO> anchor =
@@ -213,9 +206,5 @@ public class DriverSearchService {
         driver.getExperienceYears(),
         driver.isAvailable(),
         areaNamesByDriver.getOrDefault(driver.getId(), List.of()));
-  }
-
-  private String message(String key) {
-    return messages.getMessage(key, null, LocaleContextHolder.getLocale());
   }
 }

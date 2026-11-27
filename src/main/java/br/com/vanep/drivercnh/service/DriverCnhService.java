@@ -24,14 +24,10 @@ import br.com.vanep.user.repository.UserRepository;
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.util.List;
-import org.springframework.context.MessageSource;
-import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class DriverCnhService {
@@ -53,7 +49,6 @@ public class DriverCnhService {
   private final DocumentSubmissionRules submissionRules;
   private final DriverCnhMapper mapper;
   private final MediaFileService media;
-  private final MessageSource messages;
 
   public DriverCnhService(
       DriverCnhRepository cnhRepository,
@@ -62,8 +57,7 @@ public class DriverCnhService {
       DocumentReviewService reviewService,
       DocumentSubmissionRules submissionRules,
       DriverCnhMapper mapper,
-      MediaFileService media,
-      MessageSource messages) {
+      MediaFileService media) {
     this.cnhRepository = cnhRepository;
     this.driverRepository = driverRepository;
     this.userRepository = userRepository;
@@ -71,11 +65,6 @@ public class DriverCnhService {
     this.submissionRules = submissionRules;
     this.mapper = mapper;
     this.media = media;
-    this.messages = messages;
-  }
-
-  private String message(String key) {
-    return messages.getMessage(key, null, LocaleContextHolder.getLocale());
   }
 
   @Transactional
@@ -83,10 +72,7 @@ public class DriverCnhService {
     UserModel caller =
         userRepository
             .findByEmail(callerEmail)
-            .orElseThrow(
-                () ->
-                    new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, message("user.account.not_found")));
+            .orElseThrow(() -> ApiProblemException.notFound("user.account.not_found"));
 
     DriverModel driver;
     if (caller.getType() == UserType.ADMIN
@@ -95,18 +81,12 @@ public class DriverCnhService {
       driver =
           driverRepository
               .findByToken(request.driverToken())
-              .orElseThrow(
-                  () ->
-                      new ResponseStatusException(
-                          HttpStatus.NOT_FOUND, message("driver_cnh.driver.not_found")));
+              .orElseThrow(() -> ApiProblemException.notFound("driver_cnh.driver.not_found"));
     } else {
       driver =
           driverRepository
               .findByUserId(caller.getId())
-              .orElseThrow(
-                  () ->
-                      new ResponseStatusException(
-                          HttpStatus.NOT_FOUND, message("user.driver_profile.not_found")));
+              .orElseThrow(() -> ApiProblemException.notFound("user.driver_profile.not_found"));
     }
 
     DriverCnhModel cnh = new DriverCnhModel();
@@ -124,10 +104,7 @@ public class DriverCnhService {
     UserModel caller =
         userRepository
             .findByEmail(callerEmail)
-            .orElseThrow(
-                () ->
-                    new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, message("user.account.not_found")));
+            .orElseThrow(() -> ApiProblemException.notFound("user.account.not_found"));
 
     List<DriverCnhModel> cnhs;
     if (caller.getType() == UserType.ADMIN) {
@@ -136,10 +113,7 @@ public class DriverCnhService {
       DriverModel driver =
           driverRepository
               .findByUserId(caller.getId())
-              .orElseThrow(
-                  () ->
-                      new ResponseStatusException(
-                          HttpStatus.NOT_FOUND, message("user.driver_profile.not_found")));
+              .orElseThrow(() -> ApiProblemException.notFound("user.driver_profile.not_found"));
       cnhs = cnhRepository.findByDriverIdAndSupersededAtIsNull(driver.getId());
     }
     return cnhs.stream().map(mapper::toResponse).toList();
@@ -221,10 +195,10 @@ public class DriverCnhService {
     }
 
     if (cnhRepository.findByToken(token).isPresent()) {
-      throw new ResponseStatusException(HttpStatus.CONFLICT, message("driver_cnh.already_active"));
+      throw ApiProblemException.conflict("driver_cnh.already_active");
     }
 
-    throw new ResponseStatusException(HttpStatus.NOT_FOUND, message("driver_cnh.not_found"));
+    throw ApiProblemException.notFound("driver_cnh.not_found");
   }
 
   void requireNumberOfNoOtherDriver(String registrationNumber, DriverModel driver) {
@@ -309,8 +283,6 @@ public class DriverCnhService {
   private DriverCnhModel requireByToken(String token) {
     return cnhRepository
         .findByToken(token)
-        .orElseThrow(
-            () ->
-                new ResponseStatusException(HttpStatus.NOT_FOUND, message("driver_cnh.not_found")));
+        .orElseThrow(() -> ApiProblemException.notFound("driver_cnh.not_found"));
   }
 }

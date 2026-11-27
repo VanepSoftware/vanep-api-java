@@ -47,10 +47,8 @@ import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class DriverOnboardingService {
@@ -138,8 +136,7 @@ public class DriverOnboardingService {
 
     if (driver.getApprovalStatus() == DriverApprovalStatus.UNDER_REVIEW
         || driver.getApprovalStatus() == DriverApprovalStatus.APPROVED) {
-      throw new ResponseStatusException(
-          HttpStatus.BAD_REQUEST, message("driver.onboarding.already_submitted"));
+      throw ApiProblemException.badRequest("driver.onboarding.already_submitted");
     }
 
     DriverOnboardingStepDTO profileStep = evaluateProfileStep(driver, user);
@@ -150,28 +147,35 @@ public class DriverOnboardingService {
     DriverOnboardingStepDTO cnhStep = evaluateCnhStep(compliance);
     DriverOnboardingDocumentsStepDTO documentsStep = evaluateDocumentsStep(input, compliance);
 
+    List<String> missingSteps = new ArrayList<>();
     List<String> errors = new ArrayList<>();
     if (!profileStep.completed()) {
+      missingSteps.add("driver.onboarding.profile_incomplete");
       errors.add(message("driver.onboarding.profile_incomplete"));
     }
     if (!vehicleStep.completed()) {
+      missingSteps.add("driver.onboarding.vehicle_required");
       errors.add(message("driver.onboarding.vehicle_required"));
     }
     if (!cnhStep.completed()) {
+      String cnhStepKey;
       if (cnhStep.pendingItems().contains("cnh_rejected")) {
-        errors.add(message("driver.onboarding.cnh_rejected"));
+        cnhStepKey = "driver.onboarding.cnh_rejected";
       } else if (cnhStep.pendingItems().contains("cnh_expired")) {
-        errors.add(message("driver.onboarding.cnh_expired"));
+        cnhStepKey = "driver.onboarding.cnh_expired";
       } else if (cnhStep.pendingItems().contains("cnh_category")) {
-        errors.add(message("driver.onboarding.cnh_category"));
+        cnhStepKey = "driver.onboarding.cnh_category";
       } else if (cnhStep.pendingItems().contains("cnh_file")) {
-        errors.add(message("driver.onboarding.cnh_file"));
+        cnhStepKey = "driver.onboarding.cnh_file";
       } else {
-        errors.add(message("driver.onboarding.cnh_required"));
+        cnhStepKey = "driver.onboarding.cnh_required";
       }
+      missingSteps.add(cnhStepKey);
+      errors.add(message(cnhStepKey));
     }
     String missingDocuments = describeMissingDocuments(documentsStep);
     if (!documentsStep.completed() && !missingDocuments.isEmpty()) {
+      missingSteps.add("driver.onboarding.documents_missing");
       errors.add(
           messages.getMessage(
               "driver.onboarding.documents_missing",
@@ -179,9 +183,10 @@ public class DriverOnboardingService {
               LocaleContextHolder.getLocale()));
     }
 
-    if (!errors.isEmpty()) {
-      throw new ResponseStatusException(
-          HttpStatus.UNPROCESSABLE_CONTENT, String.join("; ", errors));
+    if (!missingSteps.isEmpty()) {
+      throw ApiProblemException.unprocessable("driver.onboarding.incomplete")
+          .with("missingSteps", missingSteps)
+          .with("details", errors);
     }
 
     driver.setApprovalStatus(DriverApprovalStatus.UNDER_REVIEW);
@@ -400,9 +405,7 @@ public class DriverOnboardingService {
     DriverModel driver =
         driverRepository
             .findByTokenForUpdate(driverToken)
-            .orElseThrow(
-                () ->
-                    new ResponseStatusException(HttpStatus.NOT_FOUND, message("driver.not_found")));
+            .orElseThrow(() -> ApiProblemException.notFound("driver.not_found"));
     if (driver.getApprovalStatus() != DriverApprovalStatus.UNDER_REVIEW) {
       throw ApiProblemException.badRequest("driver.onboarding.not_under_review");
     }
@@ -412,9 +415,6 @@ public class DriverOnboardingService {
   private DriverModel requireDriverByUserId(Long userId) {
     return driverRepository
         .findByUserId(userId)
-        .orElseThrow(
-            () ->
-                new ResponseStatusException(
-                    HttpStatus.NOT_FOUND, message("user.driver_profile.not_found")));
+        .orElseThrow(() -> ApiProblemException.notFound("user.driver_profile.not_found"));
   }
 }

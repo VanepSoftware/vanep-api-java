@@ -8,16 +8,16 @@ import jakarta.validation.constraints.Pattern;
 
 public record VehicleRequestDTO(
     String driverToken,
-    @NotBlank(message = "A placa do veículo é obrigatória.")
-        @Pattern(regexp = "^[A-Z]{3}-?\\d[A-Z0-9]\\d{2}$", message = "Placa em formato inválido.")
+    @NotBlank(message = "{vehicle.plate.required}")
+        @Pattern(regexp = "^[A-Z]{3}-?\\d[A-Z0-9]\\d{2}$", message = "{vehicle.plate.invalid}")
         String plate,
-    @NotBlank(message = "A marca do veículo é obrigatória.") String brand,
-    @NotBlank(message = "O modelo do veículo é obrigatório.") String model,
-    @NotNull(message = "O ano do veículo é obrigatório.")
-        @Min(value = 1900, message = "Ano inválido.")
-        @Max(value = 2100, message = "Ano inválido.")
+    @NotBlank(message = "{vehicle.brand.required}") String brand,
+    @NotBlank(message = "{vehicle.model.required}") String model,
+    @NotNull(message = "{vehicle.manufacture_year.required}")
+        @Min(value = 1900, message = "{vehicle.manufacture_year.invalid}")
+        @Max(value = 2100, message = "{vehicle.manufacture_year.invalid}")
         Integer manufactureYear,
-    @NotBlank(message = "A cor do veículo é obrigatória.") String color,
-    @NotNull(message = "A capacidade de assentos é obrigatória.")
-        @Min(value = 1, message = "A capacidade deve ser de pelo menos 1 assento.")
+    @NotBlank(message = "{vehicle.color.required}") String color,
+    @NotNull(message = "{vehicle.capacity.required}")
+        @Min(value = 1, message = "{vehicle.capacity.min}")
         Integer capacity) {}

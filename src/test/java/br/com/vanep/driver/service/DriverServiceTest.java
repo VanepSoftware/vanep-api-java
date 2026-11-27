@@ -3,8 +3,6 @@ package br.com.vanep.driver.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -17,6 +15,7 @@ import br.com.vanep.driver.dto.DriverUpdateRequestDTO;
 import br.com.vanep.driver.mapper.DriverMapper;
 import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.driverrating.repository.DriverRatingRepository;
+import br.com.vanep.shared.error.ApiProblemException;
 import br.com.vanep.user.dto.UserMeResponseDTO;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
@@ -30,10 +29,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.context.MessageSource;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
-import org.springframework.web.server.ResponseStatusException;
+import org.springframework.http.HttpStatus;
 
 @ExtendWith(MockitoExtension.class)
 class DriverServiceTest {
@@ -41,16 +39,12 @@ class DriverServiceTest {
   @Mock private DriverMapper mapper;
   @Mock private UserService userService;
   @Mock private DriverRatingRepository ratings;
-  @Mock private MessageSource messages;
 
   private DriverService service;
 
   @BeforeEach
   void setUp() {
-    service = new DriverService(repository, mapper, userService, ratings, messages);
-    lenient()
-        .when(messages.getMessage(anyString(), any(), any()))
-        .thenAnswer(inv -> inv.getArgument(0));
+    service = new DriverService(repository, mapper, userService, ratings);
   }
 
   private DriverModel driverWithToken(String token) {
@@ -101,11 +95,14 @@ class DriverServiceTest {
   @Test
   void findByTokenThrows404WhenNotFound() {
     when(repository.findByToken("missing")).thenReturn(Optional.empty());
-    when(messages.getMessage(anyString(), any(), any())).thenReturn("Not found");
 
     assertThatThrownBy(() -> service.findByToken("missing"))
-        .isInstanceOf(ResponseStatusException.class)
-        .hasMessageContaining("404");
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+              assertThat(ex.getCode()).isEqualTo("driver.not_found");
+            });
   }
 
   @Test
@@ -194,22 +191,28 @@ class DriverServiceTest {
     DriverModel driver = driverWithToken("tok");
     when(repository.existsDeletedByToken("tok")).thenReturn(false);
     when(repository.findByToken("tok")).thenReturn(Optional.of(driver));
-    when(messages.getMessage(anyString(), any(), any())).thenReturn("Already active");
 
     assertThatThrownBy(() -> service.restore("tok"))
-        .isInstanceOf(ResponseStatusException.class)
-        .hasMessageContaining("409");
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+              assertThat(ex.getCode()).isEqualTo("driver.already_active");
+            });
   }
 
   @Test
   void restoreThrowsNotFoundWhenDriverDoesNotExist() {
     when(repository.existsDeletedByToken("tok")).thenReturn(false);
     when(repository.findByToken("tok")).thenReturn(Optional.empty());
-    when(messages.getMessage(anyString(), any(), any())).thenReturn("Not found");
 
     assertThatThrownBy(() -> service.restore("tok"))
-        .isInstanceOf(ResponseStatusException.class)
-        .hasMessageContaining("404");
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+              assertThat(ex.getCode()).isEqualTo("driver.not_found");
+            });
   }
 
   @Test
@@ -243,8 +246,12 @@ class DriverServiceTest {
     assertThatThrownBy(
             () ->
                 service.updateMyAvailability("owner-uid", new DriverAvailabilityRequestDTO(false)))
-        .isInstanceOf(ResponseStatusException.class)
-        .hasMessageContaining("404");
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+              assertThat(ex.getCode()).isEqualTo("user.driver_profile.not_found");
+            });
   }
 
   @Test

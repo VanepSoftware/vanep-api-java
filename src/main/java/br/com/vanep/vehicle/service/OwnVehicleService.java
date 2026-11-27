@@ -1,24 +1,19 @@
 package br.com.vanep.vehicle.service;
 
 import br.com.vanep.driver.model.DriverModel;
+import br.com.vanep.shared.error.ApiProblemException;
 import br.com.vanep.vehicle.model.VehicleModel;
 import br.com.vanep.vehicle.repository.VehicleRepository;
-import org.springframework.context.MessageSource;
-import org.springframework.context.i18n.LocaleContextHolder;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class OwnVehicleService {
 
   private final VehicleRepository vehicles;
-  private final MessageSource messages;
 
-  public OwnVehicleService(VehicleRepository vehicles, MessageSource messages) {
+  public OwnVehicleService(VehicleRepository vehicles) {
     this.vehicles = vehicles;
-    this.messages = messages;
   }
 
   @Transactional(readOnly = true)
@@ -49,16 +44,10 @@ public class OwnVehicleService {
     return vehicle;
   }
 
-  private ResponseStatusException vehicleError(boolean forWrite) {
+  private ApiProblemException vehicleError(boolean forWrite) {
     if (forWrite) {
-      return new ResponseStatusException(
-          HttpStatus.UNPROCESSABLE_CONTENT,
-          messages.getMessage(
-              "unlinked_passenger.vehicle.not_owned", null, LocaleContextHolder.getLocale()));
+      return ApiProblemException.unprocessable("unlinked_passenger.vehicle.not_owned");
     }
-    return new ResponseStatusException(
-        HttpStatus.NOT_FOUND,
-        messages.getMessage(
-            "driver_student.vehicle.not_found", null, LocaleContextHolder.getLocale()));
+    return ApiProblemException.notFound("driver_student.vehicle.not_found");
   }
 }

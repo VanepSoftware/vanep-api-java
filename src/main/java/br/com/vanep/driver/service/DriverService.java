@@ -8,17 +8,14 @@ import br.com.vanep.driver.dto.DriverUpdateRequestDTO;
 import br.com.vanep.driver.mapper.DriverMapper;
 import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.driverrating.repository.DriverRatingRepository;
+import br.com.vanep.shared.error.ApiProblemException;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.service.UserService;
-import org.springframework.context.MessageSource;
-import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class DriverService {
@@ -26,23 +23,16 @@ public class DriverService {
   private final DriverMapper mapper;
   private final UserService userService;
   private final DriverRatingRepository ratings;
-  private final MessageSource messages;
 
   public DriverService(
       DriverRepository driverRepository,
       DriverMapper mapper,
       UserService userService,
-      DriverRatingRepository ratings,
-      MessageSource messages) {
+      DriverRatingRepository ratings) {
     this.driverRepository = driverRepository;
     this.mapper = mapper;
     this.userService = userService;
     this.ratings = ratings;
-    this.messages = messages;
-  }
-
-  private String message(String key) {
-    return messages.getMessage(key, null, LocaleContextHolder.getLocale());
   }
 
   @Transactional(readOnly = true)
@@ -101,10 +91,10 @@ public class DriverService {
     }
 
     if (driverRepository.findByToken(token).isPresent()) {
-      throw new ResponseStatusException(HttpStatus.CONFLICT, message("driver.already_active"));
+      throw ApiProblemException.conflict("driver.already_active");
     }
 
-    throw new ResponseStatusException(HttpStatus.NOT_FOUND, message("driver.not_found"));
+    throw ApiProblemException.notFound("driver.not_found");
   }
 
   private void applyUpdate(DriverModel driver, DriverUpdateRequestDTO request) {
@@ -122,16 +112,12 @@ public class DriverService {
   private DriverModel requireByUserId(Long userId) {
     return driverRepository
         .findByUserId(userId)
-        .orElseThrow(
-            () ->
-                new ResponseStatusException(
-                    HttpStatus.NOT_FOUND, message("user.driver_profile.not_found")));
+        .orElseThrow(() -> ApiProblemException.notFound("user.driver_profile.not_found"));
   }
 
   private DriverModel requireByToken(String token) {
     return driverRepository
         .findByToken(token)
-        .orElseThrow(
-            () -> new ResponseStatusException(HttpStatus.NOT_FOUND, message("driver.not_found")));
+        .orElseThrow(() -> ApiProblemException.notFound("driver.not_found"));
   }
 }

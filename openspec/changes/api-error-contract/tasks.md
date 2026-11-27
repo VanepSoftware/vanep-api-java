@@ -40,6 +40,7 @@ Phase 0 (Constitution + OpenSpec + Client Inventory)
 
 ### Later Phases (tracked for upcoming PRs)
 - [ ] 2..N Migrate domain services, advices (`LocationErrorAdvice`, `CepLookupErrorAdvice`), manual `setProperty("code", ...)` sites, and DTO validation `{key}` messages by area.
+  - [x] Phase 2: `driver`, `drivercnh`, `driverdocument`, `vehicledocument`, `schooltransportcredential`, `vehicle`.
 - [ ] M1 Update `vanep-mobile` mappers to decide strictly by `code` (including dual-format `auth`/`profile`).
 - [ ] A1 Update `vanep-frontend` admin pages to use a unified `ApiProblem` parser and `code`.
 - [ ] N+1 Migrate `auth` and `profile` exceptions to `ApiProblemException` and remove legacy envelopes/advices.
