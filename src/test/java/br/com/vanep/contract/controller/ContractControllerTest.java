@@ -307,10 +307,12 @@ class ContractControllerTest {
     mockMvc
         .perform(postContract(request, adminJwt()))
         .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("validation.failed"))
         .andExpect(jsonPath("$.detail").value(message(key)))
         .andExpect(jsonPath("$.field").value(field))
         .andExpect(jsonPath("$.errors.length()").value(1))
         .andExpect(jsonPath("$.errors[0].field").value(field))
+        .andExpect(jsonPath("$.errors[0].code").value(key))
         .andExpect(jsonPath("$.errors[0].message").value(message(key)));
   }
 

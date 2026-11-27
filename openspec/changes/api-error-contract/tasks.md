@@ -56,6 +56,12 @@ Phase 0 (Constitution + OpenSpec + Client Inventory)
 - [x] 4.3 Update unit and controller tests for `ApiProblemException` and `$.code` / `$.errors[0].code`.
 - [x] 4.4 Run `make lint` and `./mvnw verify -B`.
 
+### Phase 5 (Negotiation, Contracts, Trips, Schedule, UnlinkedPassengers, Family)
+- [x] 5.1 Replace missing Bean Validation messages with `{key}` across 13 DTOs in `servicerequest`, `proposal`, `contract`, `conversation`, `trip`, `schedule`, and `unlinkedpassenger`, adding EN/pt-BR keys to `messages*.properties`.
+- [x] 5.2 Migrate all 10 services (`ServiceRequestService`, `ProposalService`, `ContractService`, `ContractReadinessService`, `ConversationService`, `TripService`, `ScheduleService`, `UnlinkedPassengerService`, `FamilyInviteService`, `FamilyMatchService`) to `ApiProblemException`.
+- [x] 5.3 Update unit, integration, and controller tests for `ApiProblemException` and `$.code` / `$.errors[0].code`.
+- [x] 5.4 Run `make lint` and `./mvnw verify -B`.
+
 ### Later Phases (tracked for upcoming PRs)
 - [ ] 5..N Migrate remaining domain services (negotiation/contracts/trips/family, catalog/admin/media/web) and DTO validation `{key}` messages by area.
 - [ ] M1 Update `vanep-mobile` mappers to decide strictly by `code` (including dual-format `auth`/`profile`).

@@ -8,6 +8,6 @@ import jakarta.validation.constraints.NotNull;
 import java.util.List;
 
 public record ProposalItemRequestDTO(
-    @NotBlank String dependentToken,
+    @NotBlank(message = "{proposal.dependent_token.required}") String dependentToken,
     @NotEmpty(message = "{schedule.slots.required}")
-        List<@NotNull @Valid ScheduleSlotRequestDTO> slots) {}
+        List<@NotNull(message = "{schedule.slot.required}") @Valid ScheduleSlotRequestDTO> slots) {}

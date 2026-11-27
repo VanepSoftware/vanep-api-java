@@ -57,6 +57,7 @@ import br.com.vanep.servicerequest.model.ServiceRequestItemModel;
 import br.com.vanep.servicerequest.model.ServiceRequestModel;
 import br.com.vanep.servicerequest.repository.ServiceRequestRepository;
 import br.com.vanep.shared.enums.SchoolShift;
+import br.com.vanep.shared.error.ApiProblemException;
 import br.com.vanep.shared.mapper.InstallmentMapper;
 import br.com.vanep.state.model.StateModel;
 import br.com.vanep.user.enums.UserType;
@@ -86,7 +87,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.context.MessageSource;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Limit;
 import org.springframework.data.domain.Page;
@@ -96,7 +96,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
-import org.springframework.web.server.ResponseStatusException;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -126,7 +125,6 @@ class ServiceRequestServiceTest {
   @Mock private AddressRepository addresses;
   @Mock private TransactionTemplate transactions;
   @Mock private ApplicationEventPublisher events;
-  @Mock private MessageSource messages;
 
   @Captor private ArgumentCaptor<ServiceRequestModel> savedRequest;
 
@@ -162,9 +160,7 @@ class ServiceRequestServiceTest {
             new ProposalMapper(
                 new ScheduleMapper(), new ServiceRequestMapper(), new InstallmentMapper()),
             transactions,
-            events,
-            messages);
-    when(messages.getMessage(anyString(), any(), any())).thenAnswer(call -> call.getArgument(0));
+            events);
     when(transactions.execute(any()))
         .thenAnswer(call -> call.<TransactionCallback<?>>getArgument(0).doInTransaction(null));
 
@@ -540,7 +536,7 @@ class ServiceRequestServiceTest {
   @Test
   void aCallerOfTheWrongTypeIsForbiddenAndNothingIsRead() {
     when(users.requireByTokenAndType(CARLOS_UID, UserType.CLIENT))
-        .thenThrow(new ResponseStatusException(HttpStatus.FORBIDDEN, "user.type.forbidden"));
+        .thenThrow(ApiProblemException.forbidden("user.type.forbidden"));
 
     assertRefused(
         () -> service.send(CARLOS_UID, request(item("lucas", mondayRoundTrip()))),
@@ -980,10 +976,10 @@ class ServiceRequestServiceTest {
   private void assertRefused(Runnable call, HttpStatus status, String key) {
     assertThatThrownBy(() -> call.run())
         .isInstanceOfSatisfying(
-            ResponseStatusException.class,
+            ApiProblemException.class,
             e -> {
               assertThat(e.getStatusCode()).isEqualTo(status);
-              assertThat(e.getReason()).isEqualTo(key);
+              assertThat(e.getCode()).isEqualTo(key);
             });
   }
 

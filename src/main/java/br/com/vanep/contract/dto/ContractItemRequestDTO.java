@@ -6,4 +6,5 @@ import jakarta.validation.constraints.NotBlank;
 import java.util.List;
 
 public record ContractItemRequestDTO(
-    @NotBlank String dependentToken, List<@Valid ScheduleSlotRequestDTO> slots) {}
+    @NotBlank(message = "{contract.dependent_token.required}") String dependentToken,
+    List<@Valid ScheduleSlotRequestDTO> slots) {}

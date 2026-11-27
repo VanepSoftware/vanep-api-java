@@ -3,7 +3,6 @@ package br.com.vanep.unlinkedpassenger.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
@@ -63,9 +62,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.openapitools.jackson.nullable.JsonNullable;
-import org.springframework.context.MessageSource;
 import org.springframework.http.HttpStatus;
-import org.springframework.web.server.ResponseStatusException;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -78,7 +75,6 @@ class UnlinkedPassengerServiceTest {
   @Mock private SchoolRepository schools;
   @Mock private AddressService addresses;
   @Mock private ScheduleRepository scheduleRepository;
-  @Mock private MessageSource messages;
   @Mock private VehicleRepository vehicles;
   @Mock private FamilyInviteRepository invites;
   @Mock private UnlinkedPassengerFamilyService families;
@@ -92,7 +88,6 @@ class UnlinkedPassengerServiceTest {
 
   @BeforeEach
   void setUp() {
-    when(messages.getMessage(anyString(), any(), any())).thenAnswer(call -> call.getArgument(0));
     when(passengers.save(any())).thenAnswer(call -> call.getArgument(0));
     when(scheduleRepository.save(any())).thenAnswer(call -> call.getArgument(0));
 
@@ -102,12 +97,11 @@ class UnlinkedPassengerServiceTest {
             drivers,
             schools,
             addresses,
-            new ScheduleService(scheduleRepository, new ScheduleSlotPolicy(), messages),
+            new ScheduleService(scheduleRepository, new ScheduleSlotPolicy()),
             new OwnVehicleService(vehicles),
             invites,
             families,
-            new UnlinkedPassengerMapper(new AddressMapper(), new ScheduleMapper()),
-            messages);
+            new UnlinkedPassengerMapper(new AddressMapper(), new ScheduleMapper()));
     when(families.findFamily(any())).thenReturn(UnlinkedPassengerFamilyDTO.NONE);
     when(families.findFamilies(any())).thenReturn(new HashMap<>());
 
@@ -171,11 +165,11 @@ class UnlinkedPassengerServiceTest {
   @Test
   void aCallerThatIsNotADriverIsForbidden() {
     when(drivers.requireCallerDriver("maria-uid"))
-        .thenThrow(new ResponseStatusException(HttpStatus.FORBIDDEN, "user.type.forbidden"));
+        .thenThrow(ApiProblemException.forbidden("user.type.forbidden"));
 
     assertThatThrownBy(() -> service.create("maria-uid", createRequest()))
         .isInstanceOfSatisfying(
-            ResponseStatusException.class,
+            ApiProblemException.class,
             exception -> assertThat(exception.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN));
     verify(passengers, never()).save(any());
   }
@@ -194,10 +188,10 @@ class UnlinkedPassengerServiceTest {
 
     assertThatThrownBy(() -> service.create(CALLER, request))
         .isInstanceOfSatisfying(
-            ResponseStatusException.class,
+            ApiProblemException.class,
             exception -> {
               assertThat(exception.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
-              assertThat(exception.getReason()).isEqualTo("unlinked_passenger.school.not_found");
+              assertThat(exception.getCode()).isEqualTo("unlinked_passenger.school.not_found");
             });
     verify(passengers, never()).save(any());
   }
@@ -216,10 +210,10 @@ class UnlinkedPassengerServiceTest {
 
     assertThatThrownBy(() -> service.create(CALLER, request))
         .isInstanceOfSatisfying(
-            ResponseStatusException.class,
+            ApiProblemException.class,
             exception -> {
               assertThat(exception.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-              assertThat(exception.getReason()).isEqualTo("schedule.slots.required");
+              assertThat(exception.getCode()).isEqualTo("schedule.slots.required");
             });
     verifyNoInteractions(addresses);
     verify(passengers, never()).save(any());
@@ -248,10 +242,10 @@ class UnlinkedPassengerServiceTest {
 
     assertThatThrownBy(() -> service.findMineByToken(CALLER, "someone-else"))
         .isInstanceOfSatisfying(
-            ResponseStatusException.class,
+            ApiProblemException.class,
             exception -> {
               assertThat(exception.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
-              assertThat(exception.getReason()).isEqualTo("unlinked_passenger.not_found");
+              assertThat(exception.getCode()).isEqualTo("unlinked_passenger.not_found");
             });
   }
 
@@ -497,7 +491,12 @@ class UnlinkedPassengerServiceTest {
     when(passengers.findByTokenAndDriverId("someone-else", 2L)).thenReturn(Optional.empty());
 
     assertThatThrownBy(() -> service.delete(CALLER, "someone-else"))
-        .isInstanceOf(ResponseStatusException.class);
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            exception -> {
+              assertThat(exception.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+              assertThat(exception.getCode()).isEqualTo("unlinked_passenger.not_found");
+            });
     verify(passengers, never()).delete(any());
     verifyNoInteractions(addresses);
   }
@@ -505,10 +504,10 @@ class UnlinkedPassengerServiceTest {
   void assertBadRequest(UnlinkedPassengerUpdateRequestDTO request, String key) {
     assertThatThrownBy(() -> service.update(CALLER, "lucas", request))
         .isInstanceOfSatisfying(
-            ResponseStatusException.class,
+            ApiProblemException.class,
             exception -> {
               assertThat(exception.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-              assertThat(exception.getReason()).isEqualTo(key);
+              assertThat(exception.getCode()).isEqualTo(key);
             });
   }
 

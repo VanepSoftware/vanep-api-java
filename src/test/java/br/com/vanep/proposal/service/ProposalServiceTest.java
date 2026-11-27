@@ -6,7 +6,6 @@ import static org.assertj.core.api.Assertions.within;
 import static org.assertj.core.groups.Tuple.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
@@ -62,6 +61,7 @@ import br.com.vanep.servicerequest.service.ServiceRequestService;
 import br.com.vanep.shared.enums.OperationShift;
 import br.com.vanep.shared.enums.RouteLeg;
 import br.com.vanep.shared.enums.SchoolShift;
+import br.com.vanep.shared.error.ApiProblemException;
 import br.com.vanep.shared.mapper.InstallmentMapper;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
@@ -90,13 +90,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.context.MessageSource;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Limit;
 import org.springframework.http.HttpStatus;
 import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionTemplate;
-import org.springframework.web.server.ResponseStatusException;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -119,7 +117,6 @@ class ProposalServiceTest {
   @Mock private ScheduleRepository scheduleRepository;
   @Mock private TransactionTemplate transactions;
   @Mock private ApplicationEventPublisher events;
-  @Mock private MessageSource messages;
 
   @Captor private ArgumentCaptor<ProposalModel> savedProposal;
   @Captor private ArgumentCaptor<ProposalAdjustmentModel> savedAdjustment;
@@ -149,16 +146,14 @@ class ProposalServiceTest {
             schoolDays,
             addresses,
             vehicles,
-            new ScheduleService(scheduleRepository, new ScheduleSlotPolicy(), messages),
+            new ScheduleService(scheduleRepository, new ScheduleSlotPolicy()),
             new ContractTermsPolicy(),
             new ProposalAcceptancePolicy(),
             new ProposalSlotsPolicy(),
             new ProposalMapper(
                 new ScheduleMapper(), new ServiceRequestMapper(), new InstallmentMapper()),
             transactions,
-            events,
-            messages);
-    when(messages.getMessage(anyString(), any(), any())).thenAnswer(call -> call.getArgument(0));
+            events);
     doAnswer(
             call -> {
               call.<Consumer<TransactionStatus>>getArgument(0).accept(null);
@@ -404,7 +399,7 @@ class ProposalServiceTest {
   @Test
   void aCallerOfTheWrongTypeCannotSend() {
     when(users.requireByTokenAndType(ANA_UID, UserType.DRIVER))
-        .thenThrow(new ResponseStatusException(HttpStatus.FORBIDDEN, "user.type.forbidden"));
+        .thenThrow(ApiProblemException.forbidden("user.type.forbidden"));
 
     expectRefusal(
         () -> service.send(ANA_UID, "request", validBody()),
@@ -611,10 +606,10 @@ class ProposalServiceTest {
 
     assertThatThrownBy(() -> service.send(CARLOS_UID, "request", validBody()))
         .isInstanceOfSatisfying(
-            ResponseStatusException.class,
+            ApiProblemException.class,
             error -> {
               assertThat(error.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
-              assertThat(error.getReason()).isEqualTo("proposal.sent_conflict");
+              assertThat(error.getCode()).isEqualTo("proposal.sent_conflict");
             });
   }
 
@@ -717,8 +712,8 @@ class ProposalServiceTest {
 
     assertThatThrownBy(() -> service.accept(ANA_UID, "sent"))
         .isInstanceOfSatisfying(
-            ResponseStatusException.class,
-            error -> assertThat(error.getReason()).isEqualTo("proposal.not_current"));
+            ApiProblemException.class,
+            error -> assertThat(error.getCode()).isEqualTo("proposal.not_current"));
   }
 
   @Test
@@ -869,7 +864,7 @@ class ProposalServiceTest {
   @Test
   void aDriverIsForbiddenBeforeTheAdjustmentIsChecked() {
     when(users.requireByTokenAndType(CARLOS_UID, UserType.CLIENT))
-        .thenThrow(new ResponseStatusException(HttpStatus.FORBIDDEN, "user.type.forbidden"));
+        .thenThrow(ApiProblemException.forbidden("user.type.forbidden"));
 
     expectRefusal(
         () ->
@@ -1034,10 +1029,10 @@ class ProposalServiceTest {
   private void expectRefusal(Runnable call, HttpStatus status, String key) {
     assertThatThrownBy(call::run)
         .isInstanceOfSatisfying(
-            ResponseStatusException.class,
+            ApiProblemException.class,
             error -> {
               assertThat(error.getStatusCode()).isEqualTo(status);
-              assertThat(error.getReason()).isEqualTo(key);
+              assertThat(error.getCode()).isEqualTo(key);
             });
     verify(proposals, never()).saveAndFlush(any());
     verify(adjustments, never()).save(any());

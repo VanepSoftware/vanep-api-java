@@ -17,6 +17,7 @@ import br.com.vanep.contract.repository.ContractRepository;
 import br.com.vanep.dependent.model.DependentModel;
 import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.servicerequest.controller.ServiceRequestControllerFixtures;
+import br.com.vanep.shared.error.ApiProblemException;
 import br.com.vanep.user.model.UserModel;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -27,7 +28,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.MessageSource;
-import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
@@ -35,7 +35,6 @@ import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
-import org.springframework.web.server.ResponseStatusException;
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -118,14 +117,10 @@ class ClientDriverBlockControllerTest {
 
     assertThatThrownBy(() -> fixtures.sendRequest(ana, carlos, lucas))
         .isInstanceOfSatisfying(
-            ResponseStatusException.class,
+            ApiProblemException.class,
             e -> {
               assertThat(e.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
-              // Called outside a request, the service speaks the thread's locale, not the API's.
-              assertThat(e.getReason())
-                  .isEqualTo(
-                      messages.getMessage(
-                          "service_request.link.blocked", null, LocaleContextHolder.getLocale()));
+              assertThat(e.getCode()).isEqualTo("service_request.link.blocked");
             });
   }
 

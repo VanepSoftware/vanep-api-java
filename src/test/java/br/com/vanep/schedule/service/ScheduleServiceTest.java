@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.groups.Tuple.tuple;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -16,6 +15,7 @@ import br.com.vanep.schedule.model.ScheduleSlotModel;
 import br.com.vanep.schedule.repository.ScheduleRepository;
 import br.com.vanep.shared.enums.OperationShift;
 import br.com.vanep.shared.enums.RouteLeg;
+import br.com.vanep.shared.error.ApiProblemException;
 import java.time.DayOfWeek;
 import java.time.LocalTime;
 import java.util.List;
@@ -27,8 +27,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
-import org.springframework.context.MessageSource;
-import org.springframework.web.server.ResponseStatusException;
+import org.springframework.http.HttpStatus;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -42,15 +41,13 @@ class ScheduleServiceTest {
           DayOfWeek.MONDAY, RouteLeg.RETURN, OperationShift.AFTERNOON, LocalTime.of(17, 0));
 
   @Mock private ScheduleRepository schedules;
-  @Mock private MessageSource messages;
 
   private ScheduleService service;
 
   @BeforeEach
   void setUp() {
-    when(messages.getMessage(anyString(), any(), any())).thenAnswer(call -> call.getArgument(0));
     when(schedules.save(any())).thenAnswer(call -> call.getArgument(0));
-    service = new ScheduleService(schedules, new ScheduleSlotPolicy(), messages);
+    service = new ScheduleService(schedules, new ScheduleSlotPolicy());
   }
 
   @Test
@@ -83,9 +80,12 @@ class ScheduleServiceTest {
   @Test
   void aScheduleRefusedByThePolicyIsNotSaved() {
     assertThatThrownBy(() -> service.create(List.of(MONDAY_OUTBOUND, MONDAY_OUTBOUND)))
-        .isInstanceOf(ResponseStatusException.class)
-        .hasMessageContaining("400")
-        .hasMessageContaining("schedule.slot.duplicate");
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            error -> {
+              assertThat(error.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+              assertThat(error.getCode()).isEqualTo("schedule.slot.duplicate");
+            });
 
     verify(schedules, never()).save(any());
   }
@@ -93,9 +93,12 @@ class ScheduleServiceTest {
   @Test
   void anEmptyScheduleIsRefused() {
     assertThatThrownBy(() -> service.create(List.of()))
-        .isInstanceOf(ResponseStatusException.class)
-        .hasMessageContaining("400")
-        .hasMessageContaining("schedule.slots.required");
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            error -> {
+              assertThat(error.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+              assertThat(error.getCode()).isEqualTo("schedule.slots.required");
+            });
   }
 
   @Test
@@ -121,8 +124,12 @@ class ScheduleServiceTest {
     List<ScheduleSlotModel> current = List.copyOf(schedule.getSlots());
 
     assertThatThrownBy(() -> service.replace(schedule, List.of()))
-        .isInstanceOf(ResponseStatusException.class)
-        .hasMessageContaining("schedule.slots.required");
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            error -> {
+              assertThat(error.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+              assertThat(error.getCode()).isEqualTo("schedule.slots.required");
+            });
 
     assertThat(schedule.getSlots()).containsExactlyElementsOf(current);
     verify(schedules, never()).save(any());

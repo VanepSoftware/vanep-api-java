@@ -5,4 +5,8 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
 public record ConversationMessageCreateRequestDTO(
-    @NotBlank @Size(max = ConversationMessageModel.BODY_MAX_LENGTH) String body) {}
+    @NotBlank(message = "{conversation.message.body.required}")
+        @Size(
+            max = ConversationMessageModel.BODY_MAX_LENGTH,
+            message = "{conversation.message.body.too_long}")
+        String body) {}

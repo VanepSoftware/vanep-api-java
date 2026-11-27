@@ -2,7 +2,6 @@ package br.com.vanep.contractreadiness.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -19,6 +18,7 @@ import br.com.vanep.dependent.model.DependentSchoolDayModel;
 import br.com.vanep.dependent.repository.DependentRepository;
 import br.com.vanep.dependent.repository.DependentSchoolDayRepository;
 import br.com.vanep.shared.enums.SchoolShift;
+import br.com.vanep.shared.error.ApiProblemException;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.service.UserService;
@@ -31,9 +31,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.context.MessageSource;
 import org.springframework.http.HttpStatus;
-import org.springframework.web.server.ResponseStatusException;
 
 @ExtendWith(MockitoExtension.class)
 class ContractReadinessServiceTest {
@@ -44,7 +42,6 @@ class ContractReadinessServiceTest {
   @Mock private ClientRepository clients;
   @Mock private DependentRepository dependents;
   @Mock private DependentSchoolDayRepository schoolDays;
-  @Mock private MessageSource messages;
 
   private ContractReadinessService service;
   private UserModel ana;
@@ -53,10 +50,7 @@ class ContractReadinessServiceTest {
   void setUp() {
     service =
         new ContractReadinessService(
-            users, clients, dependents, schoolDays, new ContractReadinessPolicy(), messages);
-    lenient()
-        .when(messages.getMessage(any(), any(), any()))
-        .thenAnswer(call -> call.getArgument(0));
+            users, clients, dependents, schoolDays, new ContractReadinessPolicy());
     ana = new UserModel();
     ana.setId(1L);
     ana.setDocument("11144477735");
@@ -135,21 +129,27 @@ class ContractReadinessServiceTest {
         .thenReturn(List.of(dependent(21L, "lucas", null, null, null)));
 
     assertThatThrownBy(() -> service.findReadiness(CALLER, List.of("lucas", "other")))
-        .isInstanceOf(ResponseStatusException.class)
-        .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
-        .isEqualTo(HttpStatus.NOT_FOUND);
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+              assertThat(ex.getCode()).isEqualTo("dependent.not_found");
+            });
     verifyNoInteractions(schoolDays);
   }
 
   @Test
   void onlyAClientCanAskForTheReadiness() {
     when(users.requireByTokenAndType("driver-uid", UserType.CLIENT))
-        .thenThrow(new ResponseStatusException(HttpStatus.FORBIDDEN, "user.type.forbidden"));
+        .thenThrow(ApiProblemException.forbidden("user.type.forbidden"));
 
     assertThatThrownBy(() -> service.findReadiness("driver-uid", List.of("lucas")))
-        .isInstanceOf(ResponseStatusException.class)
-        .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
-        .isEqualTo(HttpStatus.FORBIDDEN);
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+              assertThat(ex.getCode()).isEqualTo("user.type.forbidden");
+            });
     verify(users).requireByTokenAndType("driver-uid", UserType.CLIENT);
     verifyNoInteractions(dependents);
   }

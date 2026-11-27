@@ -296,6 +296,7 @@ class ClientServiceRequestControllerTest {
     mockMvc
         .perform(postJson(BASE, createBody(carlos.getToken(), List.of(item))).with(as(anaUser)))
         .andExpect(status().isUnprocessableContent())
+        .andExpect(jsonPath("$.code").value("service_request.day.no_school"))
         .andExpect(jsonPath("$.detail").value(message("service_request.day.no_school")));
     assertThat(countRequests()).isZero();
   }

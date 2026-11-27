@@ -21,6 +21,7 @@ import br.com.vanep.proposal.enums.ProposalAdjustmentField;
 import br.com.vanep.servicerequest.controller.ServiceRequestControllerFixtures;
 import br.com.vanep.servicerequest.dto.ServiceRequestDeclineRequestDTO;
 import br.com.vanep.servicerequest.service.ServiceRequestService;
+import br.com.vanep.shared.error.ApiProblemException;
 import br.com.vanep.vehicle.model.VehicleModel;
 import java.sql.Timestamp;
 import java.time.Instant;
@@ -41,7 +42,6 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.context.jdbc.Sql;
-import org.springframework.web.server.ResponseStatusException;
 import org.thymeleaf.context.Context;
 import org.thymeleaf.spring6.SpringTemplateEngine;
 
@@ -194,7 +194,7 @@ class NegotiationEmailServiceTest {
     clearInvocations(mail);
 
     assertThatThrownBy(() -> fixtures.sendRequest(ana, carlos, lucas))
-        .isInstanceOf(ResponseStatusException.class);
+        .isInstanceOf(ApiProblemException.class);
 
     verify(mail, never()).send(any(), any(), any(), any());
   }
