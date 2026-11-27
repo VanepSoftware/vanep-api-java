@@ -31,7 +31,6 @@ import org.openapitools.jackson.nullable.JsonNullable;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
-import org.springframework.web.server.ResponseStatusException;
 
 @ExtendWith(MockitoExtension.class)
 class ClientServiceTest {
@@ -204,12 +203,15 @@ class ClientServiceTest {
   @Test
   void getMyProfileThrows403WhenUserTypeMismatch() {
     when(userService.requireByTokenAndType("driver-uid", UserType.CLIENT))
-        .thenThrow(new ResponseStatusException(HttpStatus.FORBIDDEN, "forbidden"));
+        .thenThrow(ApiProblemException.forbidden("user.type.forbidden"));
 
     assertThatThrownBy(() -> service.getMyProfile("driver-uid"))
-        .isInstanceOf(ResponseStatusException.class)
-        .extracting(ex -> ((ResponseStatusException) ex).getStatusCode().value())
-        .isEqualTo(403);
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+              assertThat(ex.getCode()).isEqualTo("user.type.forbidden");
+            });
   }
 
   @Test

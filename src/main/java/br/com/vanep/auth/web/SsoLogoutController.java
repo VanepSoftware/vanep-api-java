@@ -1,15 +1,14 @@
 package br.com.vanep.auth.web;
 
+import br.com.vanep.shared.error.ApiProblemException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpStatus;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.server.ResponseStatusException;
 
 @Controller
 public class SsoLogoutController {
@@ -44,6 +43,6 @@ public class SsoLogoutController {
       }
     }
 
-    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "No valid redirect URI");
+    throw ApiProblemException.badRequest("auth.sso_logout.redirect_uri_invalid");
   }
 }

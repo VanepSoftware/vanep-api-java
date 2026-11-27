@@ -8,37 +8,25 @@ import br.com.vanep.school.dto.SchoolUpdateRequestDTO;
 import br.com.vanep.school.mapper.SchoolMapper;
 import br.com.vanep.school.model.SchoolModel;
 import br.com.vanep.school.repository.SchoolRepository;
+import br.com.vanep.shared.error.ApiProblemException;
 import java.util.Objects;
 import org.openapitools.jackson.nullable.JsonNullable;
-import org.springframework.context.MessageSource;
-import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class SchoolService {
   private final SchoolRepository schoolRepository;
   private final SchoolMapper mapper;
   private final AddressService addressService;
-  private final MessageSource messages;
 
   public SchoolService(
-      SchoolRepository schoolRepository,
-      SchoolMapper mapper,
-      AddressService addressService,
-      MessageSource messages) {
+      SchoolRepository schoolRepository, SchoolMapper mapper, AddressService addressService) {
     this.schoolRepository = schoolRepository;
     this.mapper = mapper;
     this.addressService = addressService;
-    this.messages = messages;
-  }
-
-  private String message(String key) {
-    return messages.getMessage(key, null, LocaleContextHolder.getLocale());
   }
 
   public Page<SchoolResponseDTO> findAll(Pageable pageable) {
@@ -100,10 +88,10 @@ public class SchoolService {
     }
 
     if (schoolRepository.findByToken(token).isPresent()) {
-      throw new ResponseStatusException(HttpStatus.CONFLICT, message("school.already_active"));
+      throw ApiProblemException.conflict("school.already_active");
     }
 
-    throw new ResponseStatusException(HttpStatus.NOT_FOUND, message("school.not_found"));
+    throw ApiProblemException.notFound("school.not_found");
   }
 
   private void applyRequest(SchoolModel school, SchoolRequestDTO request) {
@@ -128,7 +116,7 @@ public class SchoolService {
     }
     String name = nameField.get();
     if (name == null || name.isBlank()) {
-      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, message("school.name.blank"));
+      throw ApiProblemException.badRequest("school.name.blank");
     }
     school.setName(name);
   }
@@ -140,14 +128,12 @@ public class SchoolService {
   private SchoolModel requireByToken(String token) {
     return schoolRepository
         .findByToken(token)
-        .orElseThrow(
-            () -> new ResponseStatusException(HttpStatus.NOT_FOUND, message("school.not_found")));
+        .orElseThrow(() -> ApiProblemException.notFound("school.not_found"));
   }
 
   private SchoolModel requireById(Long id) {
     return schoolRepository
         .findById(id)
-        .orElseThrow(
-            () -> new ResponseStatusException(HttpStatus.NOT_FOUND, message("school.not_found")));
+        .orElseThrow(() -> ApiProblemException.notFound("school.not_found"));
   }
 }

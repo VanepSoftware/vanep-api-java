@@ -5,41 +5,31 @@ import br.com.vanep.country.dto.CountryResponseDTO;
 import br.com.vanep.country.mapper.CountryMapper;
 import br.com.vanep.country.model.CountryModel;
 import br.com.vanep.country.repository.CountryRepository;
+import br.com.vanep.shared.error.ApiProblemException;
 import java.util.List;
-import org.springframework.context.MessageSource;
-import org.springframework.context.i18n.LocaleContextHolder;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class CountryService {
 
   private final CountryRepository countryRepository;
   private final CountryMapper mapper;
-  private final MessageSource messages;
 
-  public CountryService(
-      CountryRepository countryRepository, CountryMapper mapper, MessageSource messages) {
+  public CountryService(CountryRepository countryRepository, CountryMapper mapper) {
     this.countryRepository = countryRepository;
     this.mapper = mapper;
-    this.messages = messages;
-  }
-
-  private String message(String key) {
-    return messages.getMessage(key, null, LocaleContextHolder.getLocale());
   }
 
   @Transactional
   public CountryResponseDTO create(CountryRequestDTO request) {
     if (countryRepository.existsByName(request.name())) {
-      throw new ResponseStatusException(HttpStatus.CONFLICT, message("country.name.duplicate"));
+      throw ApiProblemException.conflict("country.name.duplicate");
     }
 
     String isoCodeUpper = request.isoCode().toUpperCase();
     if (countryRepository.existsByIsoCode(isoCodeUpper)) {
-      throw new ResponseStatusException(HttpStatus.CONFLICT, message("country.iso_code.duplicate"));
+      throw ApiProblemException.conflict("country.iso_code.duplicate");
     }
 
     CountryModel country = new CountryModel();
@@ -67,13 +57,13 @@ public class CountryService {
 
     if (!country.getName().equalsIgnoreCase(request.name())
         && countryRepository.existsByName(request.name())) {
-      throw new ResponseStatusException(HttpStatus.CONFLICT, message("country.name.duplicate"));
+      throw ApiProblemException.conflict("country.name.duplicate");
     }
 
     String isoCodeUpper = request.isoCode().toUpperCase();
     if (!country.getIsoCode().equalsIgnoreCase(isoCodeUpper)
         && countryRepository.existsByIsoCode(isoCodeUpper)) {
-      throw new ResponseStatusException(HttpStatus.CONFLICT, message("country.iso_code.duplicate"));
+      throw ApiProblemException.conflict("country.iso_code.duplicate");
     }
 
     country.setName(request.name());
@@ -99,16 +89,15 @@ public class CountryService {
     }
 
     if (countryRepository.findByToken(token).isPresent()) {
-      throw new ResponseStatusException(HttpStatus.CONFLICT, message("country.already_active"));
+      throw ApiProblemException.conflict("country.already_active");
     }
 
-    throw new ResponseStatusException(HttpStatus.NOT_FOUND, message("country.not_found"));
+    throw ApiProblemException.notFound("country.not_found");
   }
 
   private CountryModel requireByToken(String token) {
     return countryRepository
         .findByToken(token)
-        .orElseThrow(
-            () -> new ResponseStatusException(HttpStatus.NOT_FOUND, message("country.not_found")));
+        .orElseThrow(() -> ApiProblemException.notFound("country.not_found"));
   }
 }

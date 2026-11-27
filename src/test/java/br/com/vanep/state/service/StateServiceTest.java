@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 import br.com.vanep.country.model.CountryModel;
+import br.com.vanep.shared.error.ApiProblemException;
 import br.com.vanep.state.dto.StateResponseDTO;
 import br.com.vanep.state.mapper.StateMapper;
 import br.com.vanep.state.model.StateModel;
@@ -17,23 +18,21 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.context.MessageSource;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
-import org.springframework.web.server.ResponseStatusException;
+import org.springframework.http.HttpStatus;
 
 @ExtendWith(MockitoExtension.class)
 class StateServiceTest {
 
   @Mock private StateRepository repository;
   @Mock private StateMapper mapper;
-  @Mock private MessageSource messages;
 
   private StateService service;
 
   @BeforeEach
   void setUp() {
-    service = new StateService(repository, mapper, messages);
+    service = new StateService(repository, mapper);
   }
 
   private StateModel stateWithToken(String token) {
@@ -76,7 +75,11 @@ class StateServiceTest {
     when(repository.findByToken("missing")).thenReturn(Optional.empty());
 
     assertThatThrownBy(() -> service.findByToken("missing"))
-        .isInstanceOf(ResponseStatusException.class)
-        .hasMessageContaining("404");
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+              assertThat(ex.getCode()).isEqualTo("state.not_found");
+            });
   }
 }

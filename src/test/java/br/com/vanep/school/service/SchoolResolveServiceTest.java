@@ -20,14 +20,14 @@ import br.com.vanep.places.dto.PlaceDetailsResponseDTO;
 import br.com.vanep.school.dto.SchoolResolveRequestDTO;
 import br.com.vanep.school.model.SchoolModel;
 import br.com.vanep.school.repository.SchoolRepository;
+import br.com.vanep.shared.error.ApiProblemException;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentMatchers;
-import org.springframework.context.support.StaticMessageSource;
-import org.springframework.web.server.ResponseStatusException;
+import org.springframework.http.HttpStatus;
 
 class SchoolResolveServiceTest {
   private final PlacesClient places = mock(PlacesClient.class);
@@ -36,10 +36,8 @@ class SchoolResolveServiceTest {
   private final AddressService addresses = mock(AddressService.class);
 
   private SchoolResolveService serviceWithLimit(int capacity) {
-    StaticMessageSource messages = new StaticMessageSource();
-    messages.setUseCodeAsDefaultMessage(true);
     return new SchoolResolveService(
-        places, resolver, schools, addresses, new RateLimiter(true, capacity, 60), messages);
+        places, resolver, schools, addresses, new RateLimiter(true, capacity, 60));
   }
 
   private SchoolResolveRequestDTO request(String placeId) {
@@ -67,8 +65,12 @@ class SchoolResolveServiceTest {
         .isInstanceOf(IllegalStateException.class);
 
     assertThatThrownBy(() -> service.resolve("user-1", request("escola-2")))
-        .isInstanceOf(ResponseStatusException.class)
-        .hasMessageContaining("429");
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
+              assertThat(ex.getCode()).isEqualTo("location.place.rate_limited");
+            });
 
     verify(places, never()).findPlaceDetailsWithName("escola-2", null);
   }
@@ -99,8 +101,12 @@ class SchoolResolveServiceTest {
                 null));
 
     assertThatThrownBy(() -> service.resolve("user-1", request("shopping")))
-        .isInstanceOf(ResponseStatusException.class)
-        .hasMessageContaining("400");
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+              assertThat(ex.getCode()).isEqualTo("school.place.not_a_school");
+            });
 
     verifyNoInteractions(resolver);
   }

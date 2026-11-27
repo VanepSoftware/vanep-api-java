@@ -12,13 +12,10 @@ import java.io.InputStream;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.context.MessageSource;
-import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class MediaFileService {
@@ -28,7 +25,6 @@ public class MediaFileService {
   private final MediaFileRepository repository;
   private final StorageService storage;
   private final MimeTypeDetector mimeTypeDetector;
-  private final MessageSource messages;
   private final ApplicationEventPublisher events;
   private final long maxPhotoBytes;
   private final long maxDocumentBytes;
@@ -37,7 +33,6 @@ public class MediaFileService {
       MediaFileRepository repository,
       StorageService storage,
       MimeTypeDetector mimeTypeDetector,
-      MessageSource messages,
       ApplicationEventPublisher events,
       @Value("${vanep.media.max-photo-size-mb}") long maxPhotoSizeMb,
       @Value("${vanep.media.max-document-size-mb}") long maxDocumentSizeMb,
@@ -46,7 +41,6 @@ public class MediaFileService {
     this.repository = repository;
     this.storage = storage;
     this.mimeTypeDetector = mimeTypeDetector;
-    this.messages = messages;
     this.events = events;
     this.maxPhotoBytes = maxPhotoSizeMb * BYTES_IN_MB;
     this.maxDocumentBytes = maxDocumentSizeMb * BYTES_IN_MB;
@@ -150,15 +144,11 @@ public class MediaFileService {
     return UUID.randomUUID().toString().replace("-", "").substring(0, 25);
   }
 
-  private ResponseStatusException badRequest(String key) {
-    return new ResponseStatusException(HttpStatus.BAD_REQUEST, message(key));
+  private ApiProblemException badRequest(String key) {
+    return ApiProblemException.badRequest(key);
   }
 
   public static ApiProblemException tooLarge() {
-    return new ApiProblemException(HttpStatus.CONTENT_TOO_LARGE, "media.file.too_large");
-  }
-
-  private String message(String key) {
-    return messages.getMessage(key, null, LocaleContextHolder.getLocale());
+    return ApiProblemException.of(HttpStatus.CONTENT_TOO_LARGE, "media.file.too_large");
   }
 }

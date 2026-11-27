@@ -12,6 +12,7 @@ import br.com.vanep.rolepermission.dto.RolePermissionUpdateRequestDTO;
 import br.com.vanep.rolepermission.mapper.RolePermissionMapper;
 import br.com.vanep.rolepermission.model.RolePermissionModel;
 import br.com.vanep.rolepermission.repository.RolePermissionRepository;
+import br.com.vanep.shared.error.ApiProblemException;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -19,23 +20,21 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.context.MessageSource;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
-import org.springframework.web.server.ResponseStatusException;
+import org.springframework.http.HttpStatus;
 
 @ExtendWith(MockitoExtension.class)
 class RolePermissionServiceTest {
 
   @Mock private RolePermissionRepository repository;
   @Mock private RolePermissionMapper mapper;
-  @Mock private MessageSource messages;
 
   private RolePermissionService service;
 
   @BeforeEach
   void setUp() {
-    service = new RolePermissionService(repository, mapper, messages);
+    service = new RolePermissionService(repository, mapper);
   }
 
   private RolePermissionModel bundleWithToken(String token) {
@@ -75,8 +74,12 @@ class RolePermissionServiceTest {
     when(repository.findByToken("missing")).thenReturn(Optional.empty());
 
     assertThatThrownBy(() -> service.findByToken("missing"))
-        .isInstanceOf(ResponseStatusException.class)
-        .hasMessageContaining("404");
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+              assertThat(ex.getCode()).isEqualTo("role_permission.not_found");
+            });
   }
 
   @Test
@@ -103,8 +106,12 @@ class RolePermissionServiceTest {
     when(repository.existsByName("ADMIN")).thenReturn(true);
 
     assertThatThrownBy(() -> service.create(req))
-        .isInstanceOf(ResponseStatusException.class)
-        .hasMessageContaining("400");
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+              assertThat(ex.getCode()).isEqualTo("role_permission.name.duplicate");
+            });
     verify(repository, org.mockito.Mockito.never()).save(any());
   }
 
@@ -137,8 +144,12 @@ class RolePermissionServiceTest {
             () ->
                 service.update(
                     "tok", new RolePermissionUpdateRequestDTO("Other", List.of("list_roles"))))
-        .isInstanceOf(ResponseStatusException.class)
-        .hasMessageContaining("400");
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+              assertThat(ex.getCode()).isEqualTo("role_permission.name.duplicate");
+            });
   }
 
   @Test
@@ -149,8 +160,12 @@ class RolePermissionServiceTest {
             () ->
                 service.update(
                     "missing", new RolePermissionUpdateRequestDTO("x", List.of("list_roles"))))
-        .isInstanceOf(ResponseStatusException.class)
-        .hasMessageContaining("404");
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+              assertThat(ex.getCode()).isEqualTo("role_permission.not_found");
+            });
   }
 
   @Test
@@ -168,7 +183,11 @@ class RolePermissionServiceTest {
     when(repository.findByToken("missing")).thenReturn(Optional.empty());
 
     assertThatThrownBy(() -> service.delete("missing"))
-        .isInstanceOf(ResponseStatusException.class)
-        .hasMessageContaining("404");
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+              assertThat(ex.getCode()).isEqualTo("role_permission.not_found");
+            });
   }
 }

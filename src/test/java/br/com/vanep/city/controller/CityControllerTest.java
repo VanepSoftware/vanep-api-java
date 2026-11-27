@@ -139,6 +139,7 @@ class CityControllerTest {
     mockMvc
         .perform(get("/api/cities").with(authenticatedClientJwt()))
         .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("city.uf.required"))
         .andExpect(jsonPath("$.detail").value(message("city.uf.required")));
   }
 
@@ -147,6 +148,7 @@ class CityControllerTest {
     mockMvc
         .perform(get("/api/cities").param("uf", "XX").with(authenticatedClientJwt()))
         .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.code").value("state.uf.not_found"))
         .andExpect(jsonPath("$.detail").value(message("state.uf.not_found")));
   }
 

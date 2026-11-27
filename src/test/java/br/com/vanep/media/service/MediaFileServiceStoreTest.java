@@ -16,6 +16,7 @@ import br.com.vanep.media.enums.StorageProvider;
 import br.com.vanep.media.model.MediaFileModel;
 import br.com.vanep.media.repository.MediaFileRepository;
 import br.com.vanep.media.storage.StorageService;
+import br.com.vanep.shared.error.ApiProblemException;
 import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -25,7 +26,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.jdbc.Sql;
-import org.springframework.web.server.ResponseStatusException;
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -64,8 +64,11 @@ class MediaFileServiceStoreTest {
     assertThatThrownBy(
             () -> media.store(MediaSlot.DRIVER_DOCUMENT_FILE, "owner", new byte[0], "empty.pdf"))
         .isInstanceOfSatisfying(
-            ResponseStatusException.class,
-            error -> assertThat(error.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST));
+            ApiProblemException.class,
+            error -> {
+              assertThat(error.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+              assertThat(error.getCode()).isEqualTo("media.file.required");
+            });
     verify(storage, never()).upload(anyString(), any(), anyString(), anyLong());
   }
 
@@ -73,8 +76,11 @@ class MediaFileServiceStoreTest {
   void contentOfATypeTheSlotDoesNotTakeIsRefused() {
     assertThatThrownBy(() -> media.store(MediaSlot.DRIVER_PHOTO, "owner", PDF, "photo.pdf"))
         .isInstanceOfSatisfying(
-            ResponseStatusException.class,
-            error -> assertThat(error.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST));
+            ApiProblemException.class,
+            error -> {
+              assertThat(error.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+              assertThat(error.getCode()).isEqualTo("media.mime.not_allowed");
+            });
     verify(storage, never()).upload(anyString(), any(), anyString(), anyLong());
   }
 }

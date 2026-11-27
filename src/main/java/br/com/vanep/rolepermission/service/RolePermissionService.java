@@ -6,31 +6,21 @@ import br.com.vanep.rolepermission.dto.RolePermissionUpdateRequestDTO;
 import br.com.vanep.rolepermission.mapper.RolePermissionMapper;
 import br.com.vanep.rolepermission.model.RolePermissionModel;
 import br.com.vanep.rolepermission.repository.RolePermissionRepository;
-import org.springframework.context.MessageSource;
-import org.springframework.context.i18n.LocaleContextHolder;
+import br.com.vanep.shared.error.ApiProblemException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class RolePermissionService {
 
   private final RolePermissionRepository bundles;
   private final RolePermissionMapper mapper;
-  private final MessageSource messages;
 
-  public RolePermissionService(
-      RolePermissionRepository bundles, RolePermissionMapper mapper, MessageSource messages) {
+  public RolePermissionService(RolePermissionRepository bundles, RolePermissionMapper mapper) {
     this.bundles = bundles;
     this.mapper = mapper;
-    this.messages = messages;
-  }
-
-  private String message(String key) {
-    return messages.getMessage(key, null, LocaleContextHolder.getLocale());
   }
 
   public Page<RolePermissionResponseDTO> findAll(Pageable pageable) {
@@ -44,8 +34,7 @@ public class RolePermissionService {
   @Transactional
   public RolePermissionResponseDTO create(RolePermissionCreateRequestDTO request) {
     if (bundles.existsByName(request.name())) {
-      throw new ResponseStatusException(
-          HttpStatus.BAD_REQUEST, message("role_permission.name.duplicate"));
+      throw ApiProblemException.badRequest("role_permission.name.duplicate");
     }
     RolePermissionModel bundle = new RolePermissionModel();
     bundle.setName(request.name());
@@ -57,8 +46,7 @@ public class RolePermissionService {
   public RolePermissionResponseDTO update(String token, RolePermissionUpdateRequestDTO request) {
     RolePermissionModel bundle = requireByToken(token);
     if (bundles.existsByNameAndTokenNot(request.name(), token)) {
-      throw new ResponseStatusException(
-          HttpStatus.BAD_REQUEST, message("role_permission.name.duplicate"));
+      throw ApiProblemException.badRequest("role_permission.name.duplicate");
     }
     bundle.setName(request.name());
     bundle.setPermissions(request.permissions());
@@ -73,9 +61,6 @@ public class RolePermissionService {
   private RolePermissionModel requireByToken(String token) {
     return bundles
         .findByToken(token)
-        .orElseThrow(
-            () ->
-                new ResponseStatusException(
-                    HttpStatus.NOT_FOUND, message("role_permission.not_found")));
+        .orElseThrow(() -> ApiProblemException.notFound("role_permission.not_found"));
   }
 }

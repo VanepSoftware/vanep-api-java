@@ -4,4 +4,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
 public record RoleCreateRequestDTO(
-    @NotBlank @Size(max = 64) String name, String description, String rolePermissionToken) {}
+    @NotBlank(message = "{role.name.required}") @Size(max = 64, message = "{role.name.too_long}")
+        String name,
+    String description,
+    String rolePermissionToken) {}
