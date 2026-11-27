@@ -60,20 +60,20 @@ echo '|---|---|---|---|'
 
 request POST /api/contracts "$ADMIN" '{"dueDay":31}'
 expect G1 'global response exposes resolved contract error' 400 \
-  '.status == 400 and .detail != "Invalid request content." and (.errors | any(.field == "dueDay" and .message == "O dia de vencimento deve ser de 1 a 28."))'
+  '.status == 400 and .code == "validation.failed" and .detail != "Invalid request content." and (.errors | any(.field == "dueDay" and .code == "contract.due_day.invalid" and .message == "O dia de vencimento deve ser de 1 a 28."))'
 
 request PATCH "/api/dependent/$DEPENDENT" "$CLIENT" \
   '{"address":{"cityToken":"","street":"Rua QA","zipCode":"123"}}'
 expect G2 'nested validation keeps the full field path' 400 \
-  '.status == 400 and (.errors | any(.field == "address.zipCode" and .message == "CEP em formato inválido (8 dígitos)."))'
+  '.status == 400 and .code == "validation.failed" and (.errors | any(.field == "address.zipCode" and .code == "dependent_address.zip_code.invalid" and .message == "CEP em formato inválido (8 dígitos)."))'
 
 request POST /api/user/me/email-change "$CLIENT" '{"email":""}'
-expect P1 'profile e-mail envelope is preserved' 400 \
-  '.code == "email_required" and .field == "email" and (.status | not) and (.errors | not)'
+expect P1 'profile e-mail validation emits unified ProblemDetail' 400 \
+  '.status == 400 and .code == "validation.failed" and .field == "email" and (.errors | any(.field == "email" and .code == "user.profile.email.required"))'
 
 request POST /api/auth/email/verify '' '{"email":"","code":""}'
-expect A1 'auth envelope wins on the shared controller' 400 \
-  '.code == "validation_error" and (.errors | any(.field == "email")) and (.errors | any(.field == "code")) and (.status | not)'
+expect A1 'auth validation emits unified ProblemDetail' 400 \
+  '.status == 400 and .code == "validation.failed" and (.errors | any(.field == "email" and .code == "auth.signup.email.required")) and (.errors | any(.field == "code" and .code == "auth.code.required"))'
 
 echo
 echo "Result: $PASSED/4 passed"

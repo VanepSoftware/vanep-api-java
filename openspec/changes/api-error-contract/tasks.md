@@ -72,5 +72,5 @@ Phase 0 (Constitution + OpenSpec + Client Inventory)
 - [ ] M1 Update `vanep-mobile` mappers to decide strictly by `code` (including dual-format `auth`/`profile`).
 - [ ] A1 Update `vanep-frontend` admin pages to use a unified `ApiProblem` parser and `code`.
 - [x] N+1 Migrate `auth` and `profile` exceptions to `ApiProblemException` and remove legacy envelopes/advices (branch `feat(VAN-89)/phase-7/error-contract-from-api`; merge only after `M1` is in staging).
-- [ ] N+2 Add `scripts/check-error-contract.sh` + `Makefile` target + `.github/workflows/ci.yml` check, DTO validation key audit test, and Rule 55 QA script.
+- [x] N+2 Add `scripts/check-error-contract.sh` + `Makefile` target + `.github/workflows/ci.yml` check, DTO validation key audit test, and Rule 55 QA script.
 - [ ] M2 Remove legacy `auth`/`profile` envelope readers in `vanep-mobile`.
