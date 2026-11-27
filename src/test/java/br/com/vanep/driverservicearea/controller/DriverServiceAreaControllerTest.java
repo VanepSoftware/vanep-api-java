@@ -238,7 +238,9 @@ class DriverServiceAreaControllerTest {
                 .with(as(driverUid))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(tooMany))
-        .andExpect(status().isBadRequest());
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("validation.failed"))
+        .andExpect(jsonPath("$.errors[0].code").value("driver_service_area.areas.too_many"));
 
     BDDMockito.then(places).shouldHaveNoInteractions();
   }
@@ -282,7 +284,8 @@ class DriverServiceAreaControllerTest {
                 .with(as(driverUid))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body("brasilia-inteira")))
-        .andExpect(status().isBadRequest());
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("driver_service_area.district_required"));
 
     assertThat(areas.count()).isZero();
   }
@@ -398,7 +401,9 @@ class DriverServiceAreaControllerTest {
                 .with(as(driverUid))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"areas\":[]}"))
-        .andExpect(status().isBadRequest());
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("validation.failed"))
+        .andExpect(jsonPath("$.errors[0].code").value("driver_service_area.areas.required"));
   }
 
   @Test

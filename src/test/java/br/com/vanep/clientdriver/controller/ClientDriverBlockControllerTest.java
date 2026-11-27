@@ -136,6 +136,7 @@ class ClientDriverBlockControllerTest {
     mockMvc
         .perform(post(block()).with(as(anaUser)))
         .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("client_driver.already_blocked"))
         .andExpect(jsonPath("$.detail").value(message("client_driver.already_blocked")));
     assertThat(linkRow()).containsEntry("blocked_by", carlosUser.getId());
   }
@@ -147,6 +148,7 @@ class ClientDriverBlockControllerTest {
     mockMvc
         .perform(post(block()).with(as(anaUser)))
         .andExpect(status().isUnprocessableContent())
+        .andExpect(jsonPath("$.code").value("client_driver.block.has_contract"))
         .andExpect(jsonPath("$.detail").value(message("client_driver.block.has_contract")));
     assertThat(linkRow()).containsEntry("status", "PENDING");
     assertThat(requestStatus()).isEqualTo("OPEN");
@@ -182,6 +184,7 @@ class ClientDriverBlockControllerTest {
     mockMvc
         .perform(post(unblock()).with(as(anaUser)))
         .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value("client_driver.unblock.not_blocker"))
         .andExpect(jsonPath("$.detail").value(message("client_driver.unblock.not_blocker")));
     assertThat(linkRow()).containsEntry("status", "BLOCKED");
   }
@@ -191,6 +194,7 @@ class ClientDriverBlockControllerTest {
     mockMvc
         .perform(post(unblock()).with(as(anaUser)))
         .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("client_driver.not_blocked"))
         .andExpect(jsonPath("$.detail").value(message("client_driver.not_blocked")));
   }
 

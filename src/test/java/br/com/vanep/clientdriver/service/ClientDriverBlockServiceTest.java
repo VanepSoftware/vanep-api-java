@@ -3,7 +3,6 @@ package br.com.vanep.clientdriver.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
@@ -25,6 +24,7 @@ import br.com.vanep.driver.model.DriverModel;
 import br.com.vanep.proposal.enums.ProposalStatus;
 import br.com.vanep.servicerequest.enums.ServiceRequestStatus;
 import br.com.vanep.servicerequest.service.ServiceRequestService;
+import br.com.vanep.shared.error.ApiProblemException;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.service.UserService;
@@ -41,9 +41,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
-import org.springframework.context.MessageSource;
 import org.springframework.http.HttpStatus;
-import org.springframework.web.server.ResponseStatusException;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -56,7 +54,6 @@ class ClientDriverBlockServiceTest {
   @Mock private ContractRepository contracts;
   @Mock private ServiceRequestService requests;
   @Mock private UserService users;
-  @Mock private MessageSource messages;
 
   private ClientDriverBlockService service;
   private UserModel mariaUser;
@@ -67,14 +64,7 @@ class ClientDriverBlockServiceTest {
   void setUp() {
     service =
         new ClientDriverBlockService(
-            links,
-            contracts,
-            requests,
-            users,
-            new LinkStatusPolicy(),
-            new ClientDriverMapper(),
-            messages);
-    when(messages.getMessage(anyString(), any(), any())).thenAnswer(call -> call.getArgument(0));
+            links, contracts, requests, users, new LinkStatusPolicy(), new ClientDriverMapper());
 
     mariaUser = user(1L, "Maria", UserType.CLIENT);
     carlosUser = user(2L, "Carlos", UserType.DRIVER);
@@ -264,10 +254,10 @@ class ClientDriverBlockServiceTest {
   private void assertRefused(Runnable call, HttpStatus status, String key) {
     assertThatThrownBy(() -> call.run())
         .isInstanceOfSatisfying(
-            ResponseStatusException.class,
+            ApiProblemException.class,
             e -> {
               assertThat(e.getStatusCode()).isEqualTo(status);
-              assertThat(e.getReason()).isEqualTo(key);
+              assertThat(e.getCode()).isEqualTo(key);
             });
   }
 

@@ -10,6 +10,7 @@ import br.com.vanep.driverservicearea.repository.DriverServiceAreaRepository;
 import br.com.vanep.location.dto.ResolvedLocationChainDTO;
 import br.com.vanep.location.service.LocationResolverService;
 import br.com.vanep.places.client.PlacesClient;
+import br.com.vanep.shared.error.ApiProblemException;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.service.UserService;
@@ -17,12 +18,8 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import org.springframework.context.MessageSource;
-import org.springframework.context.i18n.LocaleContextHolder;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class DriverServiceAreaService {
@@ -31,21 +28,18 @@ public class DriverServiceAreaService {
   private final DriverServiceAreaRepository areas;
   private final DriverRepository drivers;
   private final UserService users;
-  private final MessageSource messages;
 
   public DriverServiceAreaService(
       PlacesClient places,
       LocationResolverService resolver,
       DriverServiceAreaRepository areas,
       DriverRepository drivers,
-      UserService users,
-      MessageSource messages) {
+      UserService users) {
     this.places = places;
     this.resolver = resolver;
     this.areas = areas;
     this.drivers = drivers;
     this.users = users;
-    this.messages = messages;
   }
 
   @Transactional(readOnly = true)
@@ -73,8 +67,7 @@ public class DriverServiceAreaService {
       if (item.isExistingArea()) {
         DriverServiceAreaModel existing = current.get(item.areaToken());
         if (existing == null) {
-          throw new ResponseStatusException(
-              HttpStatus.BAD_REQUEST, message("driver_service_area.area_token.unknown"));
+          throw ApiProblemException.badRequest("driver_service_area.area_token.unknown");
         }
         area.setCity(existing.getCity());
         area.setDistrict(existing.getDistrict());
@@ -86,8 +79,7 @@ public class DriverServiceAreaService {
           resolver.resolveAndPersist(places.findPlaceDetails(item.placeId(), item.sessionToken()));
 
       if (!ServiceAreaGranularityPolicy.isAcceptable(chain)) {
-        throw new ResponseStatusException(
-            HttpStatus.BAD_REQUEST, message("driver_service_area.district_required"));
+        throw ApiProblemException.badRequest("driver_service_area.district_required");
       }
 
       area.setCity(chain.city());
@@ -116,10 +108,7 @@ public class DriverServiceAreaService {
     UserModel user = users.requireByTokenAndType(callerUid, UserType.DRIVER);
     return drivers
         .findByUserId(user.getId())
-        .orElseThrow(
-            () ->
-                new ResponseStatusException(
-                    HttpStatus.NOT_FOUND, message("user.driver_profile.not_found")));
+        .orElseThrow(() -> ApiProblemException.notFound("user.driver_profile.not_found"));
   }
 
   DriverServiceAreaResponseDTO toResponse(DriverServiceAreaModel area) {
@@ -132,9 +121,5 @@ public class DriverServiceAreaService {
         area.getCity().getToken(),
         area.getCity().getState().getUf(),
         district == null);
-  }
-
-  private String message(String key) {
-    return messages.getMessage(key, null, LocaleContextHolder.getLocale());
   }
 }

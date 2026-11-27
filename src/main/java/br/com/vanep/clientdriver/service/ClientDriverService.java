@@ -12,19 +12,16 @@ import br.com.vanep.clientdriver.repository.ClientDriverRepository;
 import br.com.vanep.driver.DriverApprovalStatus;
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
+import br.com.vanep.shared.error.ApiProblemException;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.service.UserService;
 import java.util.List;
-import org.springframework.context.MessageSource;
-import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class ClientDriverService {
@@ -34,21 +31,18 @@ public class ClientDriverService {
   private final DriverRepository drivers;
   private final UserService users;
   private final ClientDriverMapper mapper;
-  private final MessageSource messages;
 
   public ClientDriverService(
       ClientDriverRepository links,
       ClientRepository clients,
       DriverRepository drivers,
       UserService users,
-      ClientDriverMapper mapper,
-      MessageSource messages) {
+      ClientDriverMapper mapper) {
     this.links = links;
     this.clients = clients;
     this.drivers = drivers;
     this.users = users;
     this.mapper = mapper;
-    this.messages = messages;
   }
 
   @Transactional
@@ -56,21 +50,21 @@ public class ClientDriverService {
     ClientModel client =
         clients
             .findByToken(request.clientToken())
-            .orElseThrow(() -> notFound("client_driver.client.not_found"));
+            .orElseThrow(() -> ApiProblemException.notFound("client_driver.client.not_found"));
     DriverModel driver =
         drivers
             .findByToken(request.driverToken())
-            .orElseThrow(() -> notFound("client_driver.driver.not_found"));
+            .orElseThrow(() -> ApiProblemException.notFound("client_driver.driver.not_found"));
 
     if (driver.getApprovalStatus() != DriverApprovalStatus.APPROVED) {
-      throw unprocessableEntity("client_driver.driver.not_approved");
+      throw ApiProblemException.unprocessable("client_driver.driver.not_approved");
     }
 
     links
         .findByPair(client.getId(), driver.getId())
         .ifPresent(
             _ -> {
-              throw conflict("client_driver.duplicate_pair");
+              throw ApiProblemException.conflict("client_driver.duplicate_pair");
             });
 
     return mapper.toResponse(insertLink(newLink(client, driver, request.origin())));
@@ -104,7 +98,7 @@ public class ClientDriverService {
     try {
       return links.saveAndFlush(link);
     } catch (DataIntegrityViolationException concurrentCreation) {
-      throw conflict("client_driver.duplicate_pair");
+      throw ApiProblemException.conflict("client_driver.duplicate_pair");
     }
   }
 
@@ -136,29 +130,15 @@ public class ClientDriverService {
   @Transactional
   public ClientDriverResponseDTO restore(String token) {
     if (!links.existsDeletedByToken(token)) {
-      throw notFound("client_driver.not_found");
+      throw ApiProblemException.notFound("client_driver.not_found");
     }
     links.restoreByToken(token);
     return mapper.toResponse(requireLink(token));
   }
 
   ClientDriverModel requireLink(String token) {
-    return links.findByToken(token).orElseThrow(() -> notFound("client_driver.not_found"));
-  }
-
-  ResponseStatusException conflict(String key) {
-    return new ResponseStatusException(HttpStatus.CONFLICT, message(key));
-  }
-
-  ResponseStatusException notFound(String key) {
-    return new ResponseStatusException(HttpStatus.NOT_FOUND, message(key));
-  }
-
-  ResponseStatusException unprocessableEntity(String key) {
-    return new ResponseStatusException(HttpStatus.UNPROCESSABLE_CONTENT, message(key));
-  }
-
-  String message(String key) {
-    return messages.getMessage(key, null, LocaleContextHolder.getLocale());
+    return links
+        .findByToken(token)
+        .orElseThrow(() -> ApiProblemException.notFound("client_driver.not_found"));
   }
 }

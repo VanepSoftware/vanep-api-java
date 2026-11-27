@@ -13,19 +13,16 @@ import br.com.vanep.driverrating.dto.DriverRatingStatusResponseDTO;
 import br.com.vanep.driverrating.mapper.DriverRatingMapper;
 import br.com.vanep.driverrating.model.DriverRatingModel;
 import br.com.vanep.driverrating.repository.DriverRatingRepository;
+import br.com.vanep.shared.error.ApiProblemException;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
-import org.springframework.context.MessageSource;
-import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class DriverRatingService {
@@ -36,7 +33,6 @@ public class DriverRatingService {
   private final ClientDriverRepository linkRepository;
   private final UserRepository userRepository;
   private final DriverRatingMapper mapper;
-  private final MessageSource messages;
   private final DriverRatingEligibilityPolicy eligibility;
   private final ContractRepository contracts;
 
@@ -47,7 +43,6 @@ public class DriverRatingService {
       ClientDriverRepository linkRepository,
       UserRepository userRepository,
       DriverRatingMapper mapper,
-      MessageSource messages,
       DriverRatingEligibilityPolicy eligibility,
       ContractRepository contracts) {
     this.driverRatingRepository = driverRatingRepository;
@@ -56,13 +51,8 @@ public class DriverRatingService {
     this.linkRepository = linkRepository;
     this.userRepository = userRepository;
     this.mapper = mapper;
-    this.messages = messages;
     this.eligibility = eligibility;
     this.contracts = contracts;
-  }
-
-  private String message(String key) {
-    return messages.getMessage(key, null, LocaleContextHolder.getLocale());
   }
 
   @Transactional
@@ -71,31 +61,25 @@ public class DriverRatingService {
     DriverModel driver = requireDriver(request.driverToken());
 
     if (driver.getUser().getId().equals(client.getUser().getId())) {
-      throw new ResponseStatusException(
-          HttpStatus.BAD_REQUEST, message("driver_rating.cannot_rate_self"));
+      throw ApiProblemException.badRequest("driver_rating.cannot_rate_self");
     }
 
     ClientDriverModel link =
         linkRepository
             .findByPair(client.getId(), driver.getId())
-            .orElseThrow(
-                () ->
-                    new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, message("driver_rating.link.not_found")));
+            .orElseThrow(() -> ApiProblemException.notFound("driver_rating.link.not_found"));
 
     if (!eligibility.hasContractThatReachedActive(
         contracts.findStatusesByClientDriverId(link.getId()))) {
-      throw new ResponseStatusException(
-          HttpStatus.UNPROCESSABLE_CONTENT, message("driver_rating.link.never_contracted"));
+      throw ApiProblemException.unprocessable("driver_rating.link.never_contracted");
     }
 
     if (!eligibility.isLinkOldEnough(link.getCreatedAt(), Instant.now())) {
-      throw new ResponseStatusException(
-          HttpStatus.UNPROCESSABLE_CONTENT, message("driver_rating.link.too_recent"));
+      throw ApiProblemException.unprocessable("driver_rating.link.too_recent");
     }
 
     if (driverRatingRepository.existsByLinkId(link.getId())) {
-      throw new ResponseStatusException(HttpStatus.CONFLICT, message("driver_rating.duplicate"));
+      throw ApiProblemException.conflict("driver_rating.duplicate");
     }
 
     DriverRatingModel ratingModel = new DriverRatingModel();
@@ -156,34 +140,25 @@ public class DriverRatingService {
   private DriverRatingModel requireByToken(String token) {
     return driverRatingRepository
         .findByToken(token)
-        .orElseThrow(
-            () ->
-                new ResponseStatusException(
-                    HttpStatus.NOT_FOUND, message("driver_rating.not_found")));
+        .orElseThrow(() -> ApiProblemException.notFound("driver_rating.not_found"));
   }
 
   ClientModel requireCallerClient(String callerEmail) {
     UserModel caller =
         userRepository
             .findByEmail(callerEmail)
-            .orElseThrow(
-                () ->
-                    new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, message("user.account.not_found")));
+            .orElseThrow(() -> ApiProblemException.notFound("user.account.not_found"));
 
     return clientRepository
         .findByUserId(caller.getId())
         .orElseThrow(
-            () ->
-                new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST, message("driver_rating.client_profile.not_found")));
+            () -> ApiProblemException.badRequest("driver_rating.client_profile.not_found"));
   }
 
   DriverModel requireDriver(String driverToken) {
     return driverRepository
         .findByToken(driverToken)
-        .orElseThrow(
-            () -> new ResponseStatusException(HttpStatus.NOT_FOUND, message("driver.not_found")));
+        .orElseThrow(() -> ApiProblemException.notFound("driver.not_found"));
   }
 
   @Transactional

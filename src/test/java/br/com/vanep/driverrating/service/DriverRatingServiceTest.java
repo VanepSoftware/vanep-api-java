@@ -3,7 +3,6 @@ package br.com.vanep.driverrating.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -25,6 +24,7 @@ import br.com.vanep.driverrating.dto.DriverRatingStatusResponseDTO;
 import br.com.vanep.driverrating.mapper.DriverRatingMapper;
 import br.com.vanep.driverrating.model.DriverRatingModel;
 import br.com.vanep.driverrating.repository.DriverRatingRepository;
+import br.com.vanep.shared.error.ApiProblemException;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
 import java.math.BigDecimal;
@@ -41,10 +41,9 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.context.MessageSource;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
-import org.springframework.web.server.ResponseStatusException;
+import org.springframework.http.HttpStatus;
 
 @ExtendWith(MockitoExtension.class)
 class DriverRatingServiceTest {
@@ -55,7 +54,6 @@ class DriverRatingServiceTest {
   @Mock private ClientDriverRepository linkRepository;
   @Mock private UserRepository userRepository;
   @Mock private DriverRatingMapper mapper;
-  @Mock private MessageSource messages;
   @Mock private ContractRepository contracts;
 
   @Captor private ArgumentCaptor<DriverRatingModel> saved;
@@ -72,7 +70,6 @@ class DriverRatingServiceTest {
             linkRepository,
             userRepository,
             mapper,
-            messages,
             new DriverRatingEligibilityPolicy(new LinkRatingEligibilityPolicy()),
             contracts);
   }
@@ -224,7 +221,6 @@ class DriverRatingServiceTest {
     when(clientRepository.findByUserId(10L)).thenReturn(Optional.of(client));
     when(driverRepository.findByToken("driver-token")).thenReturn(Optional.of(driver));
     when(linkRepository.findByPair(1L, 2L)).thenReturn(Optional.empty());
-    when(messages.getMessage(anyString(), any(), any())).thenAnswer(c -> c.getArgument(0));
 
     assertThatThrownBy(
             () ->
@@ -232,9 +228,12 @@ class DriverRatingServiceTest {
                     new DriverRatingCreateRequestDTO(
                         "driver-token", BigDecimal.valueOf(5.00), "Nice"),
                     "client@vanep.com"))
-        .isInstanceOf(ResponseStatusException.class)
-        .hasMessageContaining("404")
-        .hasMessageContaining("driver_rating.link.not_found");
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+              assertThat(ex.getCode()).isEqualTo("driver_rating.link.not_found");
+            });
 
     verify(driverRatingRepository, never()).save(any());
   }
@@ -254,11 +253,14 @@ class DriverRatingServiceTest {
     when(userRepository.findByEmail("driver@vanep.com")).thenReturn(Optional.of(caller));
     when(clientRepository.findByUserId(10L)).thenReturn(Optional.of(client));
     when(driverRepository.findByToken("driver-token")).thenReturn(Optional.of(driver));
-    when(messages.getMessage(anyString(), any(), any())).thenReturn("Cannot rate self");
 
     assertThatThrownBy(() -> service.create(dto, "driver@vanep.com"))
-        .isInstanceOf(ResponseStatusException.class)
-        .hasMessageContaining("400");
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+              assertThat(ex.getCode()).isEqualTo("driver_rating.cannot_rate_self");
+            });
   }
 
   @Test
@@ -280,11 +282,14 @@ class DriverRatingServiceTest {
     when(linkRepository.findByPair(1L, 2L)).thenReturn(Optional.of(link));
     givenTheLinkHadContracts(7L, ContractStatus.ACTIVE);
     when(driverRatingRepository.existsByLinkId(7L)).thenReturn(true);
-    when(messages.getMessage(anyString(), any(), any())).thenReturn("Duplicate rating");
 
     assertThatThrownBy(() -> service.create(dto, "client@vanep.com"))
-        .isInstanceOf(ResponseStatusException.class)
-        .hasMessageContaining("409");
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+              assertThat(ex.getCode()).isEqualTo("driver_rating.duplicate");
+            });
   }
 
   @Test
@@ -339,7 +344,6 @@ class DriverRatingServiceTest {
     when(driverRepository.findByToken("driver-token")).thenReturn(Optional.of(driver));
     when(linkRepository.findByPair(1L, 2L)).thenReturn(Optional.of(link));
     givenTheLinkHadContracts(7L, contractStatus);
-    when(messages.getMessage(anyString(), any(), any())).thenAnswer(c -> c.getArgument(0));
 
     assertThatThrownBy(
             () ->
@@ -347,9 +351,12 @@ class DriverRatingServiceTest {
                     new DriverRatingCreateRequestDTO(
                         "driver-token", BigDecimal.valueOf(5.00), "Nice"),
                     "client@vanep.com"))
-        .isInstanceOf(ResponseStatusException.class)
-        .hasMessageContaining("422")
-        .hasMessageContaining("driver_rating.link.never_contracted");
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
+              assertThat(ex.getCode()).isEqualTo("driver_rating.link.never_contracted");
+            });
 
     verify(driverRatingRepository, never()).save(any());
   }
@@ -365,7 +372,6 @@ class DriverRatingServiceTest {
     when(driverRepository.findByToken("driver-token")).thenReturn(Optional.of(driver));
     when(linkRepository.findByPair(1L, 2L)).thenReturn(Optional.of(link));
     givenTheLinkHadContracts(7L);
-    when(messages.getMessage(anyString(), any(), any())).thenAnswer(c -> c.getArgument(0));
 
     assertThatThrownBy(
             () ->
@@ -373,9 +379,12 @@ class DriverRatingServiceTest {
                     new DriverRatingCreateRequestDTO(
                         "driver-token", BigDecimal.valueOf(5.00), "Nice"),
                     "client@vanep.com"))
-        .isInstanceOf(ResponseStatusException.class)
-        .hasMessageContaining("422")
-        .hasMessageContaining("driver_rating.link.never_contracted");
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
+              assertThat(ex.getCode()).isEqualTo("driver_rating.link.never_contracted");
+            });
 
     verify(driverRatingRepository, never()).save(any());
   }
@@ -508,7 +517,6 @@ class DriverRatingServiceTest {
     when(driverRepository.findByToken("driver-token")).thenReturn(Optional.of(driver));
     when(linkRepository.findByPair(1L, 2L)).thenReturn(Optional.of(link));
     givenTheLinkHadContracts(7L, ContractStatus.ACTIVE);
-    when(messages.getMessage(anyString(), any(), any())).thenAnswer(c -> c.getArgument(0));
 
     assertThatThrownBy(
             () ->
@@ -516,9 +524,12 @@ class DriverRatingServiceTest {
                     new DriverRatingCreateRequestDTO(
                         "driver-token", BigDecimal.valueOf(5.00), "Nice"),
                     "client@vanep.com"))
-        .isInstanceOf(ResponseStatusException.class)
-        .hasMessageContaining("422")
-        .hasMessageContaining("driver_rating.link.too_recent");
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
+              assertThat(ex.getCode()).isEqualTo("driver_rating.link.too_recent");
+            });
 
     verify(driverRatingRepository, never()).save(any());
   }
