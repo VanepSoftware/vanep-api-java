@@ -6,13 +6,25 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import br.com.vanep.shared.error.ApiProblemResponseWriter;
 import jakarta.servlet.FilterChain;
+import java.util.Locale;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.i18n.LocaleContextHolder;
+import org.springframework.context.support.ResourceBundleMessageSource;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
+import tools.jackson.databind.json.JsonMapper;
 
 class RateLimitingFilterTest {
+
+  @AfterEach
+  void tearDown() {
+    LocaleContextHolder.resetLocaleContext();
+  }
 
   @Test
   void skipsNonLimitedPathsAndGets() {
@@ -52,9 +64,14 @@ class RateLimitingFilterTest {
   }
 
   @Test
-  void limitsThePublicAuthApiPosts() throws Exception {
+  void limitsThePublicAuthApiPostsWithProblemDetail() throws Exception {
+    LocaleContextHolder.setLocale(Locale.of("pt", "BR"));
+    ResourceBundleMessageSource messages = new ResourceBundleMessageSource();
+    messages.setBasename("messages");
+    messages.setDefaultEncoding("UTF-8");
     RateLimiter limiter = new RateLimiter(true, 1, 60);
-    RateLimitingFilter filter = new RateLimitingFilter(limiter);
+    RateLimitingFilter filter =
+        new RateLimitingFilter(limiter, ApiProblemResponseWriter.withDefaults(messages));
     FilterChain chain = mock(FilterChain.class);
     assertThat(filter.shouldNotFilter(request("POST", "/api/auth/password/forgot"))).isFalse();
     assertThat(filter.shouldNotFilter(request("GET", "/api/auth/password/forgot"))).isTrue();
@@ -65,6 +82,13 @@ class RateLimitingFilterTest {
     filter.doFilter(request("POST", "/api/auth/password/forgot"), blocked, chain);
 
     assertThat(blocked.getStatus()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS.value());
+    assertThat(blocked.getContentType()).startsWith(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
+    var body = JsonMapper.builder().build().readTree(blocked.getContentAsString());
+    assertThat(body.get("status").asInt()).isEqualTo(429);
+    assertThat(body.get("code").asString()).isEqualTo("request.rate_limited");
+    assertThat(body.get("detail").asString())
+        .isEqualTo("Muitas tentativas. Tente novamente em instantes.");
+    assertThat(body.get("instance").asString()).isEqualTo("/api/auth/password/forgot");
   }
 
   @Test

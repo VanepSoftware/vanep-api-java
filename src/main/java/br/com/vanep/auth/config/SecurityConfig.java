@@ -12,6 +12,8 @@ import br.com.vanep.auth.oauth.grant.MobileGrantTokenIssuer;
 import br.com.vanep.auth.oauth.grant.MobilePasswordGrantAuthenticationConverter;
 import br.com.vanep.auth.oauth.grant.MobilePasswordGrantAuthenticationProvider;
 import br.com.vanep.auth.oauth.grant.MobileTokenErrorResponseHandler;
+import br.com.vanep.auth.security.ApiAccessDeniedHandler;
+import br.com.vanep.auth.security.ApiAuthenticationEntryPoint;
 import br.com.vanep.auth.security.LoginActivityService;
 import br.com.vanep.auth.security.LoginAttemptService;
 import br.com.vanep.auth.security.UserBoundPasswordAuthenticationProvider;
@@ -190,16 +192,27 @@ public class SecurityConfig {
   @Bean
   @Order(4)
   public SecurityFilterChain apiSecurityFilterChain(
-      HttpSecurity http, JwtAuthenticationConverter jwtAuthenticationConverter) throws Exception {
+      HttpSecurity http,
+      JwtAuthenticationConverter jwtAuthenticationConverter,
+      ApiAuthenticationEntryPoint apiAuthenticationEntryPoint,
+      ApiAccessDeniedHandler apiAccessDeniedHandler)
+      throws Exception {
     http.securityMatcher("/api/**")
         .authorizeHttpRequests(authorize -> authorize.anyRequest().authenticated())
         .csrf(csrf -> csrf.disable())
         .sessionManagement(
             session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+        .exceptionHandling(
+            exceptions ->
+                exceptions
+                    .authenticationEntryPoint(apiAuthenticationEntryPoint)
+                    .accessDeniedHandler(apiAccessDeniedHandler))
         .oauth2ResourceServer(
             resourceServer ->
-                resourceServer.jwt(
-                    jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter)));
+                resourceServer
+                    .authenticationEntryPoint(apiAuthenticationEntryPoint)
+                    .accessDeniedHandler(apiAccessDeniedHandler)
+                    .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter)));
 
     return http.build();
   }

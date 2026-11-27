@@ -189,13 +189,16 @@ class DriverCnhFileControllerTest {
   void anUnrelatedDriverIsRefusedWithoutReceivingAnyContent() throws Exception {
     upload(ownerJwt());
 
-    MvcResult result =
-        mockMvc
-            .perform(get(path()).with(strangerJwt()))
-            .andExpect(status().isForbidden())
-            .andReturn();
-
-    assertThat(result.getResponse().getContentAsByteArray()).isEmpty();
+    mockMvc
+        .perform(get(path()).with(strangerJwt()))
+        .andExpect(status().isForbidden())
+        .andExpect(
+            org.springframework.test.web.servlet.result.MockMvcResultMatchers.content()
+                .contentTypeCompatibleWith(
+                    org.springframework.http.MediaType.APPLICATION_PROBLEM_JSON))
+        .andExpect(
+            org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.code")
+                .value("auth.forbidden"));
   }
 
   @Test

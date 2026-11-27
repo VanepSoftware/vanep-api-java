@@ -868,7 +868,8 @@ class VehicleDocumentControllerTest {
     mockMvc
         .perform(get(filePath()).with(strangerJwt()))
         .andExpect(status().isForbidden())
-        .andExpect(content().bytes(new byte[0]));
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+        .andExpect(jsonPath("$.code").value("auth.forbidden"));
     mockMvc
         .perform(
             multipart(filePath())

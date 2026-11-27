@@ -226,9 +226,16 @@ class VehiclePhotoControllerTest {
         mockMvc
             .perform(get(path("photo-front")).with(strangerJwt()))
             .andExpect(status().isForbidden())
+            .andExpect(
+                org.springframework.test.web.servlet.result.MockMvcResultMatchers.content()
+                    .contentTypeCompatibleWith(
+                        org.springframework.http.MediaType.APPLICATION_PROBLEM_JSON))
+            .andExpect(
+                org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.code")
+                    .value("auth.forbidden"))
             .andReturn();
 
-    assertThat(result.getResponse().getContentAsByteArray()).isEmpty();
+    assertThat(result.getResponse().getContentAsByteArray()).isNotEmpty();
   }
 
   @Test
