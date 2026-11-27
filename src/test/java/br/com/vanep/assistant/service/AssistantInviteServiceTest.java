@@ -21,6 +21,7 @@ import br.com.vanep.assistant.repository.AssistantRepository;
 import br.com.vanep.auth.mail.MailService;
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
+import br.com.vanep.shared.error.ApiProblemException;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
@@ -36,7 +37,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.MessageSource;
 import org.springframework.http.HttpStatus;
-import org.springframework.web.server.ResponseStatusException;
 
 @ExtendWith(MockitoExtension.class)
 class AssistantInviteServiceTest {
@@ -163,9 +163,12 @@ class AssistantInviteServiceTest {
             () ->
                 service.createInvite(
                     "driver@vanep.com", new AssistantInviteCreateRequestDTO("client@vanep.com")))
-        .isInstanceOf(ResponseStatusException.class)
-        .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
-        .isEqualTo(HttpStatus.CONFLICT);
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+              assertThat(ex.getCode()).isEqualTo("assistant.invite.wrong_user_type");
+            });
   }
 
   @Test

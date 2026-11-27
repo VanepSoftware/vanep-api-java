@@ -170,7 +170,8 @@ class ClientDriverControllerTest {
                 .with(adminJwt())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(createBody(maria.getToken(), pendingDriver.getToken(), "CLIENT_SEARCH")))
-        .andExpect(status().isUnprocessableContent());
+        .andExpect(status().isUnprocessableContent())
+        .andExpect(jsonPath("$.code").value("client_driver.driver.not_approved"));
   }
 
   @Test
@@ -183,7 +184,8 @@ class ClientDriverControllerTest {
                 .with(adminJwt())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(createBody(maria.getToken(), carlos.getToken(), "CLIENT_SEARCH")))
-        .andExpect(status().isConflict());
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("client_driver.duplicate_pair"));
   }
 
   @Test
@@ -194,7 +196,8 @@ class ClientDriverControllerTest {
                 .with(adminJwt())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(createBody("naoexiste", carlos.getToken(), "CLIENT_SEARCH")))
-        .andExpect(status().isNotFound());
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.code").value("client_driver.client.not_found"));
   }
 
   @Test

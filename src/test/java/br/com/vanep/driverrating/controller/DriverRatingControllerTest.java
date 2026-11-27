@@ -278,6 +278,7 @@ class DriverRatingControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(ratingBody(pendingDriverToken)))
         .andExpect(status().isUnprocessableContent())
+        .andExpect(jsonPath("$.code").value("driver_rating.link.never_contracted"))
         .andExpect(jsonPath("$.detail").value(message("driver_rating.link.never_contracted")));
 
     assertThat(driverRatings.count()).isEqualTo(1);

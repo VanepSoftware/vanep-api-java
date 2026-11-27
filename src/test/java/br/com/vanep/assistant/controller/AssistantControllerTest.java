@@ -102,7 +102,8 @@ class AssistantControllerTest {
                 .with(driverJwt())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"email\":\"missing@vanep.com\"}"))
-        .andExpect(status().isNotFound());
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.code").value("assistant.invite.email_not_found"));
   }
 
   @Test
@@ -115,7 +116,8 @@ class AssistantControllerTest {
                 .with(driverJwt())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"email\":\"client@vanep.com\"}"))
-        .andExpect(status().isConflict());
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("assistant.invite.wrong_user_type"));
   }
 
   @Test
@@ -131,7 +133,8 @@ class AssistantControllerTest {
                 .with(driverJwt())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"email\":\"active@vanep.com\"}"))
-        .andExpect(status().isConflict());
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("assistant.invite.not_unlinked"));
   }
 
   @Test

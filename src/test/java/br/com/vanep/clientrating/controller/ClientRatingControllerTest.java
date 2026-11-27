@@ -298,6 +298,7 @@ class ClientRatingControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(ratingBody(pendingClientToken)))
         .andExpect(status().isUnprocessableContent())
+        .andExpect(jsonPath("$.code").value("client_rating.link.never_contracted"))
         .andExpect(jsonPath("$.detail").value(message("client_rating.link.never_contracted")));
 
     assertThat(clientRatings.count()).isEqualTo(1);

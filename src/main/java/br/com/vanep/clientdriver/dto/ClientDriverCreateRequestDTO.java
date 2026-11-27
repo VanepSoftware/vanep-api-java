@@ -5,4 +5,6 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
 public record ClientDriverCreateRequestDTO(
-    @NotBlank String clientToken, @NotBlank String driverToken, @NotNull LinkOrigin origin) {}
+    @NotBlank(message = "{client_driver.client_token.required}") String clientToken,
+    @NotBlank(message = "{client_driver.driver_token.required}") String driverToken,
+    @NotNull(message = "{client_driver.origin.required}") LinkOrigin origin) {}

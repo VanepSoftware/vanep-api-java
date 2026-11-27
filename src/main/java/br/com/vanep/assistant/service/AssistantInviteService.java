@@ -13,6 +13,7 @@ import br.com.vanep.assistant.repository.AssistantRepository;
 import br.com.vanep.auth.mail.MailService;
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
+import br.com.vanep.shared.error.ApiProblemException;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
@@ -27,7 +28,6 @@ import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class AssistantInviteService {
@@ -76,34 +76,26 @@ public class AssistantInviteService {
     UserModel user =
         userRepository
             .findByEmail(request.email())
-            .orElseThrow(
-                () ->
-                    new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, message("assistant.invite.email_not_found")));
+            .orElseThrow(() -> ApiProblemException.notFound("assistant.invite.email_not_found"));
 
     if (user.getType() != UserType.ASSISTANT) {
-      throw new ResponseStatusException(
-          HttpStatus.CONFLICT, message("assistant.invite.wrong_user_type"));
+      throw ApiProblemException.conflict("assistant.invite.wrong_user_type");
     }
 
     AssistantModel assistant =
         assistantRepository
             .findByUserId(user.getId())
-            .orElseThrow(
-                () ->
-                    new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, message("assistant.invite.email_not_found")));
+            .orElseThrow(() -> ApiProblemException.notFound("assistant.invite.email_not_found"));
 
     expireStalePendingInviteForAssistant(assistant);
 
     if (isWithinRejectionCooldown(driver.getId(), assistant.getId())) {
-      throw new ResponseStatusException(HttpStatus.CONFLICT, message("assistant.invite.cooldown"));
+      throw ApiProblemException.conflict("assistant.invite.cooldown");
     }
 
     if (assistant.getStatus() == AssistantStatus.ACTIVE
         || assistant.getStatus() == AssistantStatus.INACTIVE) {
-      throw new ResponseStatusException(
-          HttpStatus.CONFLICT, message("assistant.invite.not_unlinked"));
+      throw ApiProblemException.conflict("assistant.invite.not_unlinked");
     }
 
     if (assistant.getStatus() == AssistantStatus.PENDING) {
@@ -115,8 +107,7 @@ public class AssistantInviteService {
         expireIfStale(existing);
         if (existing.getStatus() == AssistantInviteStatus.PENDING) {
           if (!existing.getDriver().getId().equals(driver.getId())) {
-            throw new ResponseStatusException(
-                HttpStatus.CONFLICT, message("assistant.invite.not_unlinked"));
+            throw ApiProblemException.conflict("assistant.invite.not_unlinked");
           }
           cancelPendingInvite(existing, false);
         }
@@ -143,20 +134,15 @@ public class AssistantInviteService {
     AssistantInviteModel invite =
         inviteRepository
             .findByToken(inviteToken)
-            .orElseThrow(
-                () ->
-                    new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, message("assistant.invite.not_found")));
+            .orElseThrow(() -> ApiProblemException.notFound("assistant.invite.not_found"));
 
     if (!invite.getDriver().getId().equals(driver.getId())) {
-      throw new ResponseStatusException(
-          HttpStatus.FORBIDDEN, message("assistant.invite.forbidden"));
+      throw ApiProblemException.forbidden("assistant.invite.forbidden");
     }
 
     expireIfStale(invite);
     if (invite.getStatus() != AssistantInviteStatus.PENDING) {
-      throw new ResponseStatusException(
-          HttpStatus.CONFLICT, message("assistant.invite.not_pending"));
+      throw ApiProblemException.conflict("assistant.invite.not_pending");
     }
 
     cancelPendingInvite(invite, true);
@@ -225,25 +211,20 @@ public class AssistantInviteService {
 
   private AssistantInviteModel requireActionablePendingInvite(AssistantModel assistant) {
     if (assistant.getStatus() != AssistantStatus.PENDING) {
-      throw new ResponseStatusException(
-          HttpStatus.NOT_FOUND, message("assistant.invite.not_found"));
+      throw ApiProblemException.notFound("assistant.invite.not_found");
     }
 
     AssistantInviteModel invite =
         inviteRepository
             .findByAssistantIdAndStatus(assistant.getId(), AssistantInviteStatus.PENDING)
-            .orElseThrow(
-                () ->
-                    new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, message("assistant.invite.not_found")));
+            .orElseThrow(() -> ApiProblemException.notFound("assistant.invite.not_found"));
 
     expireIfStale(invite);
     if (invite.getStatus() == AssistantInviteStatus.EXPIRED) {
-      throw new ResponseStatusException(HttpStatus.GONE, message("assistant.invite.expired"));
+      throw ApiProblemException.of(HttpStatus.GONE, "assistant.invite.expired");
     }
     if (invite.getStatus() != AssistantInviteStatus.PENDING) {
-      throw new ResponseStatusException(
-          HttpStatus.CONFLICT, message("assistant.invite.not_pending"));
+      throw ApiProblemException.conflict("assistant.invite.not_pending");
     }
 
     return invite;
@@ -286,25 +267,16 @@ public class AssistantInviteService {
     UserModel user = userService.requireByTokenAndType(callerUid, UserType.ASSISTANT);
     return assistantRepository
         .findByUserId(user.getId())
-        .orElseThrow(
-            () ->
-                new ResponseStatusException(
-                    HttpStatus.NOT_FOUND, message("assistant.profile.not_found")));
+        .orElseThrow(() -> ApiProblemException.notFound("assistant.profile.not_found"));
   }
 
   private DriverModel resolveDriver(String callerEmail) {
     UserModel user =
         userRepository
             .findByEmail(callerEmail)
-            .orElseThrow(
-                () ->
-                    new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, message("user.account.not_found")));
+            .orElseThrow(() -> ApiProblemException.notFound("user.account.not_found"));
     return driverRepository
         .findByUserId(user.getId())
-        .orElseThrow(
-            () ->
-                new ResponseStatusException(
-                    HttpStatus.NOT_FOUND, message("user.driver_profile.not_found")));
+        .orElseThrow(() -> ApiProblemException.notFound("user.driver_profile.not_found"));
   }
 }

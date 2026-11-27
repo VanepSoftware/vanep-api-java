@@ -50,8 +50,14 @@ Phase 0 (Constitution + OpenSpec + Client Inventory)
 - [x] 3.3 Consolidate `CepLookupErrorAdvice` and `LocationErrorAdvice` (plus `UnsupportedStateException`) into `ApiErrorAdvice` and remove the redundant `@RestControllerAdvice` classes.
 - [x] 3.4 Update unit and controller tests and run `make lint` and `./mvnw verify -B`.
 
+### Phase 4 (Assistant, ClientDriver, Ratings, DriverServiceArea)
+- [x] 4.1 Replace literal and missing Bean Validation messages with `{key}` in `AssistantInviteCreateRequestDTO`, `ClientDriverCreateRequestDTO`, and `DriverServiceAreaRequestDTO`, adding missing keys to `messages*.properties`.
+- [x] 4.2 Migrate all 9 services (`AssistantInviteService`, `AssistantLinkService`, `AssistantPhotoService`, `AssistantProfileService`, `ClientDriverService`, `ClientDriverBlockService`, `ClientRatingService`, `DriverRatingService`, `DriverServiceAreaService`) to `ApiProblemException`.
+- [x] 4.3 Update unit and controller tests for `ApiProblemException` and `$.code` / `$.errors[0].code`.
+- [x] 4.4 Run `make lint` and `./mvnw verify -B`.
+
 ### Later Phases (tracked for upcoming PRs)
-- [ ] 4..N Migrate remaining domain services (`assistant`, `clientdriver`, ratings, service areas, negotiation/contracts/trips, catalog/admin/media) and DTO validation `{key}` messages by area.
+- [ ] 5..N Migrate remaining domain services (negotiation/contracts/trips/family, catalog/admin/media/web) and DTO validation `{key}` messages by area.
 - [ ] M1 Update `vanep-mobile` mappers to decide strictly by `code` (including dual-format `auth`/`profile`).
 - [ ] A1 Update `vanep-frontend` admin pages to use a unified `ApiProblem` parser and `code`.
 - [ ] N+1 Migrate `auth` and `profile` exceptions to `ApiProblemException` and remove legacy envelopes/advices.

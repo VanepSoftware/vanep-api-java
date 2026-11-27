@@ -13,18 +13,15 @@ import br.com.vanep.clientrating.repository.ClientRatingRepository;
 import br.com.vanep.contract.repository.ContractRepository;
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
+import br.com.vanep.shared.error.ApiProblemException;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import org.springframework.context.MessageSource;
-import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class ClientRatingService {
@@ -35,7 +32,6 @@ public class ClientRatingService {
   private final ClientDriverRepository linkRepository;
   private final UserRepository userRepository;
   private final ClientRatingMapper mapper;
-  private final MessageSource messages;
   private final LinkRatingEligibilityPolicy linkEligibility;
   private final ContractRepository contracts;
 
@@ -46,7 +42,6 @@ public class ClientRatingService {
       ClientDriverRepository linkRepository,
       UserRepository userRepository,
       ClientRatingMapper mapper,
-      MessageSource messages,
       LinkRatingEligibilityPolicy linkEligibility,
       ContractRepository contracts) {
     this.clientRatingRepository = clientRatingRepository;
@@ -55,13 +50,8 @@ public class ClientRatingService {
     this.linkRepository = linkRepository;
     this.userRepository = userRepository;
     this.mapper = mapper;
-    this.messages = messages;
     this.linkEligibility = linkEligibility;
     this.contracts = contracts;
-  }
-
-  private String message(String key) {
-    return messages.getMessage(key, null, LocaleContextHolder.getLocale());
   }
 
   @Transactional
@@ -69,47 +59,34 @@ public class ClientRatingService {
     UserModel caller =
         userRepository
             .findByEmail(callerEmail)
-            .orElseThrow(
-                () ->
-                    new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, message("user.account.not_found")));
+            .orElseThrow(() -> ApiProblemException.notFound("user.account.not_found"));
 
     DriverModel driver =
         driverRepository
             .findByUserId(caller.getId())
             .orElseThrow(
-                () ->
-                    new ResponseStatusException(
-                        HttpStatus.BAD_REQUEST, message("client_rating.driver_profile.not_found")));
+                () -> ApiProblemException.badRequest("client_rating.driver_profile.not_found"));
 
     ClientModel client =
         clientRepository
             .findByToken(request.clientToken())
-            .orElseThrow(
-                () ->
-                    new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, message("client_rating.client.not_found")));
+            .orElseThrow(() -> ApiProblemException.notFound("client_rating.client.not_found"));
 
     if (client.getUser().getId().equals(caller.getId())) {
-      throw new ResponseStatusException(
-          HttpStatus.BAD_REQUEST, message("client_rating.cannot_rate_self"));
+      throw ApiProblemException.badRequest("client_rating.cannot_rate_self");
     }
 
     ClientDriverModel link =
         linkRepository
             .findByPair(client.getId(), driver.getId())
-            .orElseThrow(
-                () ->
-                    new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, message("client_rating.link.not_found")));
+            .orElseThrow(() -> ApiProblemException.notFound("client_rating.link.not_found"));
 
     if (!linkEligibility.allowsRating(contracts.findStatusesByClientDriverId(link.getId()))) {
-      throw new ResponseStatusException(
-          HttpStatus.UNPROCESSABLE_CONTENT, message("client_rating.link.never_contracted"));
+      throw ApiProblemException.unprocessable("client_rating.link.never_contracted");
     }
 
     if (clientRatingRepository.existsByLinkId(link.getId())) {
-      throw new ResponseStatusException(HttpStatus.CONFLICT, message("client_rating.duplicate"));
+      throw ApiProblemException.conflict("client_rating.duplicate");
     }
 
     ClientRatingModel ratingModel = new ClientRatingModel();
@@ -149,10 +126,7 @@ public class ClientRatingService {
   private ClientRatingModel requireByToken(String token) {
     return clientRatingRepository
         .findByToken(token)
-        .orElseThrow(
-            () ->
-                new ResponseStatusException(
-                    HttpStatus.NOT_FOUND, message("client_rating.not_found")));
+        .orElseThrow(() -> ApiProblemException.notFound("client_rating.not_found"));
   }
 
   private void recalculateClientAverage(ClientModel client) {

@@ -21,6 +21,7 @@ import br.com.vanep.clientdriver.repository.ClientDriverRepository;
 import br.com.vanep.driver.DriverApprovalStatus;
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
+import br.com.vanep.shared.error.ApiProblemException;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.service.UserService;
@@ -38,10 +39,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
-import org.springframework.context.MessageSource;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
-import org.springframework.web.server.ResponseStatusException;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -52,7 +51,6 @@ class ClientDriverServiceTest {
   @Mock private DriverRepository drivers;
   @Mock private UserService users;
   @Mock private ClientDriverMapper mapper;
-  @Mock private MessageSource messages;
 
   @InjectMocks private ClientDriverService service;
 
@@ -63,8 +61,6 @@ class ClientDriverServiceTest {
 
   @BeforeEach
   void setUp() {
-    when(messages.getMessage(anyString(), any(), any())).thenAnswer(call -> call.getArgument(0));
-
     maria = new ClientModel();
     maria.setId(1L);
     maria.setUser(user(10L, "maria-uid", UserType.CLIENT));
@@ -137,9 +133,12 @@ class ClientDriverServiceTest {
             () ->
                 service.create(
                     new ClientDriverCreateRequestDTO("cli", "drv", LinkOrigin.CLIENT_SEARCH)))
-        .isInstanceOf(ResponseStatusException.class)
-        .hasMessageContaining("409")
-        .hasMessageContaining("client_driver.duplicate_pair");
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+              assertThat(ex.getCode()).isEqualTo("client_driver.duplicate_pair");
+            });
 
     verify(links, never()).saveAndFlush(any());
   }
@@ -153,9 +152,12 @@ class ClientDriverServiceTest {
             () ->
                 service.create(
                     new ClientDriverCreateRequestDTO("cli", "drv", LinkOrigin.CLIENT_SEARCH)))
-        .isInstanceOf(ResponseStatusException.class)
-        .hasMessageContaining("409")
-        .hasMessageContaining("client_driver.duplicate_pair");
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+              assertThat(ex.getCode()).isEqualTo("client_driver.duplicate_pair");
+            });
   }
 
   @Test
@@ -166,9 +168,12 @@ class ClientDriverServiceTest {
             () ->
                 service.create(
                     new ClientDriverCreateRequestDTO("ghost", "drv", LinkOrigin.CLIENT_SEARCH)))
-        .isInstanceOf(ResponseStatusException.class)
-        .hasMessageContaining("404")
-        .hasMessageContaining("client_driver.client.not_found");
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+              assertThat(ex.getCode()).isEqualTo("client_driver.client.not_found");
+            });
   }
 
   @Test
@@ -179,9 +184,12 @@ class ClientDriverServiceTest {
             () ->
                 service.create(
                     new ClientDriverCreateRequestDTO("cli", "ghost", LinkOrigin.CLIENT_SEARCH)))
-        .isInstanceOf(ResponseStatusException.class)
-        .hasMessageContaining("404")
-        .hasMessageContaining("client_driver.driver.not_found");
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+              assertThat(ex.getCode()).isEqualTo("client_driver.driver.not_found");
+            });
   }
 
   @Test
@@ -197,12 +205,11 @@ class ClientDriverServiceTest {
               () ->
                   service.create(
                       new ClientDriverCreateRequestDTO("cli", "drv", LinkOrigin.CLIENT_SEARCH)))
-          .isInstanceOf(ResponseStatusException.class)
-          .satisfies(
-              e -> {
-                ResponseStatusException ex = (ResponseStatusException) e;
+          .isInstanceOfSatisfying(
+              ApiProblemException.class,
+              ex -> {
                 assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
-                assertThat(ex.getReason()).isEqualTo("client_driver.driver.not_approved");
+                assertThat(ex.getCode()).isEqualTo("client_driver.driver.not_approved");
               });
     }
 
@@ -211,12 +218,11 @@ class ClientDriverServiceTest {
             () ->
                 service.create(
                     new ClientDriverCreateRequestDTO("cli", "drv", LinkOrigin.CLIENT_SEARCH)))
-        .isInstanceOf(ResponseStatusException.class)
-        .satisfies(
-            e -> {
-              ResponseStatusException ex = (ResponseStatusException) e;
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
               assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
-              assertThat(ex.getReason()).isEqualTo("client_driver.driver.not_approved");
+              assertThat(ex.getCode()).isEqualTo("client_driver.driver.not_approved");
             });
 
     verify(links, never()).saveAndFlush(any());
@@ -227,8 +233,12 @@ class ClientDriverServiceTest {
     when(links.existsDeletedByToken("lnk")).thenReturn(false);
 
     assertThatThrownBy(() -> service.restore("lnk"))
-        .isInstanceOf(ResponseStatusException.class)
-        .hasMessageContaining("404");
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+              assertThat(ex.getCode()).isEqualTo("client_driver.not_found");
+            });
 
     verify(links, never()).restoreByToken(anyString());
   }
@@ -279,9 +289,12 @@ class ClientDriverServiceTest {
     when(links.findByToken("ghost")).thenReturn(Optional.empty());
 
     assertThatThrownBy(() -> service.delete("ghost"))
-        .isInstanceOf(ResponseStatusException.class)
-        .hasMessageContaining("404")
-        .hasMessageContaining("client_driver.not_found");
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+              assertThat(ex.getCode()).isEqualTo("client_driver.not_found");
+            });
   }
 
   private UserModel user(Long id, String token, UserType type) {

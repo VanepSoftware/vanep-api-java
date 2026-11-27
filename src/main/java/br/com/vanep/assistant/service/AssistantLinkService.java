@@ -7,17 +7,14 @@ import br.com.vanep.assistant.model.AssistantModel;
 import br.com.vanep.assistant.repository.AssistantRepository;
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
+import br.com.vanep.shared.error.ApiProblemException;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
 import br.com.vanep.user.service.UserService;
 import java.util.List;
-import org.springframework.context.MessageSource;
-import org.springframework.context.i18n.LocaleContextHolder;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class AssistantLinkService {
@@ -27,25 +24,18 @@ public class AssistantLinkService {
   private final UserRepository userRepository;
   private final UserService userService;
   private final AssistantMapper mapper;
-  private final MessageSource messages;
 
   public AssistantLinkService(
       AssistantRepository assistantRepository,
       DriverRepository driverRepository,
       UserRepository userRepository,
       UserService userService,
-      AssistantMapper mapper,
-      MessageSource messages) {
+      AssistantMapper mapper) {
     this.assistantRepository = assistantRepository;
     this.driverRepository = driverRepository;
     this.userRepository = userRepository;
     this.userService = userService;
     this.mapper = mapper;
-    this.messages = messages;
-  }
-
-  private String message(String key) {
-    return messages.getMessage(key, null, LocaleContextHolder.getLocale());
   }
 
   @Transactional(readOnly = true)
@@ -64,7 +54,7 @@ public class AssistantLinkService {
   public void pause(String callerEmail, String assistantToken) {
     AssistantModel assistant = findAssistantForDriver(callerEmail, assistantToken);
     if (assistant.getStatus() != AssistantStatus.ACTIVE) {
-      throw new ResponseStatusException(HttpStatus.CONFLICT, message("assistant.link.not_active"));
+      throw ApiProblemException.conflict("assistant.link.not_active");
     }
     assistant.setStatus(AssistantStatus.INACTIVE);
     assistantRepository.save(assistant);
@@ -74,8 +64,7 @@ public class AssistantLinkService {
   public void resume(String callerEmail, String assistantToken) {
     AssistantModel assistant = findAssistantForDriver(callerEmail, assistantToken);
     if (assistant.getStatus() != AssistantStatus.INACTIVE) {
-      throw new ResponseStatusException(
-          HttpStatus.CONFLICT, message("assistant.link.not_inactive"));
+      throw ApiProblemException.conflict("assistant.link.not_inactive");
     }
     assistant.setStatus(AssistantStatus.ACTIVE);
     assistantRepository.save(assistant);
@@ -85,7 +74,7 @@ public class AssistantLinkService {
   public void revokeByDriver(String callerEmail, String assistantToken) {
     AssistantModel assistant = findAssistantForDriver(callerEmail, assistantToken);
     if (assistant.getStatus() != AssistantStatus.ACTIVE) {
-      throw new ResponseStatusException(HttpStatus.CONFLICT, message("assistant.link.not_active"));
+      throw ApiProblemException.conflict("assistant.link.not_active");
     }
     unlink(assistant);
   }
@@ -97,13 +86,10 @@ public class AssistantLinkService {
     AssistantModel assistant =
         assistantRepository
             .findByUserId(user.getId())
-            .orElseThrow(
-                () ->
-                    new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, message("assistant.profile.not_found")));
+            .orElseThrow(() -> ApiProblemException.notFound("assistant.profile.not_found"));
 
     if (assistant.getStatus() != AssistantStatus.ACTIVE) {
-      throw new ResponseStatusException(HttpStatus.CONFLICT, message("assistant.link.not_active"));
+      throw ApiProblemException.conflict("assistant.link.not_active");
     }
 
     unlink(assistant);
@@ -121,13 +107,10 @@ public class AssistantLinkService {
     AssistantModel assistant =
         assistantRepository
             .findByToken(assistantToken)
-            .orElseThrow(
-                () ->
-                    new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, message("assistant.profile.not_found")));
+            .orElseThrow(() -> ApiProblemException.notFound("assistant.profile.not_found"));
 
     if (assistant.getDriver() == null || !assistant.getDriver().getId().equals(driver.getId())) {
-      throw new ResponseStatusException(HttpStatus.FORBIDDEN, message("assistant.link.forbidden"));
+      throw ApiProblemException.forbidden("assistant.link.forbidden");
     }
 
     return assistant;
@@ -137,15 +120,9 @@ public class AssistantLinkService {
     UserModel user =
         userRepository
             .findByEmail(callerEmail)
-            .orElseThrow(
-                () ->
-                    new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, message("user.account.not_found")));
+            .orElseThrow(() -> ApiProblemException.notFound("user.account.not_found"));
     return driverRepository
         .findByUserId(user.getId())
-        .orElseThrow(
-            () ->
-                new ResponseStatusException(
-                    HttpStatus.NOT_FOUND, message("user.driver_profile.not_found")));
+        .orElseThrow(() -> ApiProblemException.notFound("user.driver_profile.not_found"));
   }
 }
