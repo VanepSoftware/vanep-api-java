@@ -1,9 +1,11 @@
 package br.com.vanep.assistant.service;
 
 import br.com.vanep.assistant.dto.AssistantListItemResponseDTO;
+import br.com.vanep.assistant.enums.AssistantInviteStatus;
 import br.com.vanep.assistant.enums.AssistantStatus;
 import br.com.vanep.assistant.mapper.AssistantMapper;
 import br.com.vanep.assistant.model.AssistantModel;
+import br.com.vanep.assistant.repository.AssistantInviteRepository;
 import br.com.vanep.assistant.repository.AssistantRepository;
 import br.com.vanep.driver.DriverRepository;
 import br.com.vanep.driver.model.DriverModel;
@@ -11,7 +13,9 @@ import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
 import br.com.vanep.user.service.UserService;
+import java.time.Clock;
 import java.util.List;
+import java.util.stream.Stream;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.HttpStatus;
@@ -28,6 +32,8 @@ public class AssistantLinkService {
   private final UserService userService;
   private final AssistantMapper mapper;
   private final MessageSource messages;
+  private final AssistantInviteRepository inviteRepository;
+  private final Clock clock;
 
   public AssistantLinkService(
       AssistantRepository assistantRepository,
@@ -35,13 +41,17 @@ public class AssistantLinkService {
       UserRepository userRepository,
       UserService userService,
       AssistantMapper mapper,
-      MessageSource messages) {
+      MessageSource messages,
+      AssistantInviteRepository inviteRepository,
+      Clock clock) {
     this.assistantRepository = assistantRepository;
     this.driverRepository = driverRepository;
     this.userRepository = userRepository;
     this.userService = userService;
     this.mapper = mapper;
     this.messages = messages;
+    this.inviteRepository = inviteRepository;
+    this.clock = clock;
   }
 
   private String message(String key) {
@@ -51,13 +61,21 @@ public class AssistantLinkService {
   @Transactional(readOnly = true)
   public List<AssistantListItemResponseDTO> listForDriver(String callerEmail) {
     DriverModel driver = resolveDriver(callerEmail);
-    return assistantRepository.findByDriverId(driver.getId()).stream()
-        .filter(
-            assistant ->
-                assistant.getStatus() == AssistantStatus.ACTIVE
-                    || assistant.getStatus() == AssistantStatus.INACTIVE)
-        .map(mapper::toListItem)
-        .toList();
+    Stream<AssistantListItemResponseDTO> linked =
+        assistantRepository.findByDriverId(driver.getId()).stream()
+            .filter(
+                assistant ->
+                    assistant.getStatus() == AssistantStatus.ACTIVE
+                        || assistant.getStatus() == AssistantStatus.INACTIVE)
+            .map(mapper::toListItem);
+    // A pending assistant has no driver yet: only the invite ties them to this driver.
+    Stream<AssistantListItemResponseDTO> pending =
+        inviteRepository
+            .findByDriverIdAndStatusAndExpiresAtAfterOrderByCreatedAtDesc(
+                driver.getId(), AssistantInviteStatus.PENDING, clock.instant())
+            .stream()
+            .map(mapper::toPendingListItem);
+    return Stream.concat(linked, pending).toList();
   }
 
   @Transactional

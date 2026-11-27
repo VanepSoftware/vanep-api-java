@@ -8,4 +8,5 @@ public record AssistantMeSummaryResponseDTO(
     String photo,
     AssistantStatus status,
     AssistantPendingInviteDTO pendingInvite,
-    UserMeResponseDTO user) {}
+    UserMeResponseDTO user,
+    long formerLinkCount) {}

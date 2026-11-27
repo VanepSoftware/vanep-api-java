@@ -16,7 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class RoutePassengerQueryService {
 
-  static final Comparator<RoutePassengerDTO> BY_PICKUP_TIME_THEN_NAME =
+  public static final Comparator<RoutePassengerDTO> BY_PICKUP_TIME_THEN_NAME =
       Comparator.comparing((RoutePassengerDTO passenger) -> passenger.pickupTime())
           .thenComparing(passenger -> passenger.name());
 
