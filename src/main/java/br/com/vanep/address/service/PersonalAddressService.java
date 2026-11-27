@@ -4,32 +4,26 @@ import br.com.vanep.address.dto.PersonalAddressRequestDTO;
 import br.com.vanep.address.dto.PersonalAddressResponseDTO;
 import br.com.vanep.address.model.AddressModel;
 import br.com.vanep.address.repository.AddressRepository;
+import br.com.vanep.shared.error.ApiProblemException;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
 import java.util.Optional;
-import org.springframework.context.MessageSource;
-import org.springframework.context.i18n.LocaleContextHolder;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class PersonalAddressService {
   private final AddressCatalogResolverService catalogResolver;
   private final AddressRepository addresses;
   private final UserRepository users;
-  private final MessageSource messages;
 
   public PersonalAddressService(
       AddressCatalogResolverService catalogResolver,
       AddressRepository addresses,
-      UserRepository users,
-      MessageSource messages) {
+      UserRepository users) {
     this.catalogResolver = catalogResolver;
     this.addresses = addresses;
     this.users = users;
-    this.messages = messages;
   }
 
   @Transactional
@@ -75,16 +69,13 @@ public class PersonalAddressService {
     return Optional.ofNullable(caller.getAddressId())
         .flatMap(addresses::findById)
         .map(this::toResponse)
-        .orElseThrow(
-            () ->
-                new ResponseStatusException(
-                    HttpStatus.NOT_FOUND, message("location.address.not_set")));
+        .orElseThrow(() -> ApiProblemException.notFound("location.address.not_set"));
   }
 
   private UserModel requireCaller(String callerUid) {
     return users
         .findByToken(callerUid)
-        .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
+        .orElseThrow(() -> ApiProblemException.unauthorized("auth.unauthenticated"));
   }
 
   PersonalAddressResponseDTO toResponse(AddressModel address) {
@@ -99,9 +90,5 @@ public class PersonalAddressService {
         address.getCity().getToken(),
         address.getCity().getState().getUf(),
         address.getCity().getState().getCountry().getIsoCode());
-  }
-
-  private String message(String key) {
-    return messages.getMessage(key, null, LocaleContextHolder.getLocale());
   }
 }

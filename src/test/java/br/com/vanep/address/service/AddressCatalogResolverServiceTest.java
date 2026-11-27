@@ -7,15 +7,14 @@ import static org.mockito.Mockito.when;
 import br.com.vanep.address.model.AddressModel;
 import br.com.vanep.city.model.CityModel;
 import br.com.vanep.city.repository.CityRepository;
+import br.com.vanep.shared.error.ApiProblemException;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.context.support.StaticMessageSource;
 import org.springframework.http.HttpStatus;
-import org.springframework.web.server.ResponseStatusException;
 
 @ExtendWith(MockitoExtension.class)
 class AddressCatalogResolverServiceTest {
@@ -25,9 +24,7 @@ class AddressCatalogResolverServiceTest {
 
   @BeforeEach
   void setUp() {
-    StaticMessageSource messages = new StaticMessageSource();
-    messages.setUseCodeAsDefaultMessage(true);
-    service = new AddressCatalogResolverService(cities, messages);
+    service = new AddressCatalogResolverService(cities);
   }
 
   private CityModel campinas() {
@@ -90,10 +87,10 @@ class AddressCatalogResolverServiceTest {
     assertThatThrownBy(
             () -> service.applyCity(address, "nope", "Rua Nova", "13015904", "99", null, null))
         .isInstanceOfSatisfying(
-            ResponseStatusException.class,
+            ApiProblemException.class,
             ex -> {
               assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
-              assertThat(ex.getReason()).isEqualTo("city.not_found");
+              assertThat(ex.getCode()).isEqualTo("city.not_found");
             });
 
     assertThat(address.getStreet()).isEqualTo("Rua Antiga");

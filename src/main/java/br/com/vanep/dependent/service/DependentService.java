@@ -18,6 +18,7 @@ import br.com.vanep.dependent.repository.DependentRepository;
 import br.com.vanep.dependent.repository.DependentSchoolDayRepository;
 import br.com.vanep.school.model.SchoolModel;
 import br.com.vanep.school.repository.SchoolRepository;
+import br.com.vanep.shared.error.ApiProblemException;
 import br.com.vanep.shared.validation.CpfValidator;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
@@ -29,14 +30,10 @@ import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.openapitools.jackson.nullable.JsonNullable;
-import org.springframework.context.MessageSource;
-import org.springframework.context.i18n.LocaleContextHolder;
-import org.springframework.http.HttpStatus;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
-import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class DependentService {
@@ -48,7 +45,6 @@ public class DependentService {
   private final UserRepository users;
   private final DependentMapper mapper;
   private final AddressService addressService;
-  private final MessageSource messages;
 
   public DependentService(
       DependentRepository dependents,
@@ -57,8 +53,7 @@ public class DependentService {
       SchoolRepository schools,
       UserRepository users,
       DependentMapper mapper,
-      AddressService addressService,
-      MessageSource messages) {
+      AddressService addressService) {
     this.dependents = dependents;
     this.schoolDays = schoolDays;
     this.clients = clients;
@@ -66,11 +61,6 @@ public class DependentService {
     this.users = users;
     this.mapper = mapper;
     this.addressService = addressService;
-    this.messages = messages;
-  }
-
-  private String message(String key) {
-    return messages.getMessage(key, null, LocaleContextHolder.getLocale());
   }
 
   @Transactional
@@ -143,15 +133,21 @@ public class DependentService {
   @Transactional
   public DependentResponseDTO restore(Jwt jwt, String token) {
     if (dependents.findByToken(token).isPresent()) {
-      throw new ResponseStatusException(HttpStatus.CONFLICT, "Dependent is already active.");
+      throw ApiProblemException.conflict("dependent.already_active");
     }
 
-    Long clientId = dependents.findClientIdOfDeletedByToken(token).orElseThrow(this::notFound);
+    Long clientId =
+        dependents
+            .findClientIdOfDeletedByToken(token)
+            .orElseThrow(() -> ApiProblemException.notFound("dependent.not_found"));
     assertOwnership(jwt, clientId);
 
     dependents.clearActiveDefaultsIfDeletedIsDefault(clientId, token);
     dependents.restoreByToken(token);
-    DependentModel restored = dependents.findByToken(token).orElseThrow(this::notFound);
+    DependentModel restored =
+        dependents
+            .findByToken(token)
+            .orElseThrow(() -> ApiProblemException.notFound("dependent.not_found"));
     return toResponse(restored);
   }
 
@@ -182,21 +178,20 @@ public class DependentService {
 
   void ensureNoOpenContract(DependentModel dependent) {
     if (dependents.existsInOpenContract(dependent.getId())) {
-      throw unprocessableContent("dependent.open_contract");
+      throw ApiProblemException.unprocessable("dependent.open_contract");
     }
   }
 
   void ensureNoOpenNegotiation(DependentModel dependent) {
     if (dependents.existsInOpenServiceRequest(dependent.getId())) {
-      throw unprocessableContent("dependent.open_negotiation");
+      throw ApiProblemException.unprocessable("dependent.open_negotiation");
     }
   }
 
   private void ensureDistinctWeekdays(List<DependentSchoolDayRequestDTO> days) {
     long distinctWeekdays = days.stream().map(day -> day.weekday()).distinct().count();
     if (distinctWeekdays < days.size()) {
-      throw new ResponseStatusException(
-          HttpStatus.BAD_REQUEST, message("dependent.school_days.weekday_duplicate"));
+      throw ApiProblemException.badRequest("dependent.school_days.weekday_duplicate");
     }
   }
 
@@ -226,7 +221,7 @@ public class DependentService {
     }
     String name = nameField.get();
     if (name == null || name.isBlank()) {
-      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, message("dependent.name.blank"));
+      throw ApiProblemException.badRequest("dependent.name.blank");
     }
     model.setName(name);
   }
@@ -258,7 +253,7 @@ public class DependentService {
     }
     Boolean value = field.get();
     if (value == null) {
-      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, message("dependent.field.null"));
+      throw ApiProblemException.badRequest("dependent.field.null");
     }
     model.setSelf(value);
   }
@@ -269,7 +264,7 @@ public class DependentService {
     }
     Boolean isDefault = isDefaultField.get();
     if (isDefault == null) {
-      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, message("dependent.field.null"));
+      throw ApiProblemException.badRequest("dependent.field.null");
     }
     if (isDefault) {
       clearOtherDefaults(model.getClientId(), model.getToken());
@@ -300,18 +295,19 @@ public class DependentService {
 
   private Long requireSchoolId(String schoolToken) {
     if (!StringUtils.hasText(schoolToken)) {
-      throw new ResponseStatusException(
-          HttpStatus.BAD_REQUEST, message("dependent.school_token.blank"));
+      throw ApiProblemException.badRequest("dependent.school_token.blank");
     }
     return schools
         .findByToken(schoolToken)
         .map(school -> school.getId())
-        .orElseThrow(
-            () -> new ResponseStatusException(HttpStatus.NOT_FOUND, message("school.not_found")));
+        .orElseThrow(() -> ApiProblemException.notFound("school.not_found"));
   }
 
   private DependentModel findActiveForAccess(Jwt jwt, String token) {
-    DependentModel model = dependents.findByToken(token).orElseThrow(this::notFound);
+    DependentModel model =
+        dependents
+            .findByToken(token)
+            .orElseThrow(() -> ApiProblemException.notFound("dependent.not_found"));
     assertOwnership(jwt, model.getClientId());
     return model;
   }
@@ -319,13 +315,18 @@ public class DependentService {
   // The row lock orders these writes against new requests and contracts for the dependent, and
   // two grid replacements against each other's inserts on the partial unique index.
   private DependentModel lockActiveForAccess(Jwt jwt, String token) {
-    DependentModel model = dependents.lockByToken(token).orElseThrow(this::notFound);
+    DependentModel model =
+        dependents
+            .lockByToken(token)
+            .orElseThrow(() -> ApiProblemException.notFound("dependent.not_found"));
     assertOwnership(jwt, model.getClientId());
     return model;
   }
 
   private DependentModel requireById(Long id) {
-    return dependents.findById(id).orElseThrow(this::notFound);
+    return dependents
+        .findById(id)
+        .orElseThrow(() -> ApiProblemException.notFound("dependent.not_found"));
   }
 
   private DependentResponseDTO toResponse(DependentModel model) {
@@ -390,7 +391,7 @@ public class DependentService {
     return clients
         .findById(clientId)
         .map(client -> client.getToken())
-        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Client not found."));
+        .orElseThrow(() -> ApiProblemException.notFound("client.not_found"));
   }
 
   private Map<Long, SchoolModel> schoolsById(List<DependentModel> models) {
@@ -467,22 +468,19 @@ public class DependentService {
             ? dependents.existsByDocument(document)
             : dependents.existsByDocumentAndTokenNot(document, excludeToken);
     if (duplicate) {
-      throw new ResponseStatusException(
-          HttpStatus.CONFLICT, message("dependent.document.duplicate"));
+      throw ApiProblemException.conflict("dependent.document.duplicate");
     }
   }
 
   private Long resolveClientIdForCreate(Jwt jwt, DependentCreateDTO dto) {
     if (isAdmin(jwt)) {
       if (!StringUtils.hasText(dto.getClientToken())) {
-        throw new ResponseStatusException(
-            HttpStatus.BAD_REQUEST, "clientToken is required for administrators.");
+        throw ApiProblemException.badRequest("dependent.client_token.required");
       }
       return clients
           .findByToken(dto.getClientToken())
           .map(client -> client.getId())
-          .orElseThrow(
-              () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Client not found."));
+          .orElseThrow(() -> ApiProblemException.notFound("client.not_found"));
     }
     return resolveClientIdForClient(jwt);
   }
@@ -492,14 +490,13 @@ public class DependentService {
     return clients
         .findByUserId(user.getId())
         .map(client -> client.getId())
-        .orElseThrow(
-            () -> new ResponseStatusException(HttpStatus.FORBIDDEN, "Client profile not found."));
+        .orElseThrow(() -> ApiProblemException.forbidden("client.profile.not_found"));
   }
 
   private UserModel requireUser(Jwt jwt) {
     return users
         .findByEmail(jwt.getSubject())
-        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Account not found."));
+        .orElseThrow(() -> ApiProblemException.notFound("user.account.not_found"));
   }
 
   private void assertOwnership(Jwt jwt, Long clientId) {
@@ -508,8 +505,7 @@ public class DependentService {
     }
     Long actorClientId = resolveClientIdForClient(jwt);
     if (!actorClientId.equals(clientId)) {
-      throw new ResponseStatusException(
-          HttpStatus.FORBIDDEN, "Not allowed to access this dependent.");
+      throw ApiProblemException.forbidden("dependent.forbidden");
     }
   }
 
@@ -519,19 +515,5 @@ public class DependentService {
       return values.stream().anyMatch(role -> "ROLE_ADMIN".equals(role.toString()));
     }
     return false;
-  }
-
-  private ResponseStatusException unprocessableContent(String key) {
-    ResponseStatusException exception =
-        new ResponseStatusException(HttpStatus.UNPROCESSABLE_CONTENT, message(key));
-    exception.getBody().setProperty("code", key);
-    return exception;
-  }
-
-  private ResponseStatusException notFound() {
-    ResponseStatusException exception =
-        new ResponseStatusException(HttpStatus.NOT_FOUND, message("dependent.not_found"));
-    exception.getBody().setProperty("code", "dependent.not_found");
-    return exception;
   }
 }

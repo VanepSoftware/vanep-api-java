@@ -1,6 +1,15 @@
 package br.com.vanep.config;
 
+import br.com.vanep.cep.exception.ViaCepLookupException;
+import br.com.vanep.cep.exception.ViaCepNotFoundException;
+import br.com.vanep.location.exception.PlaceNotResolvableException;
+import br.com.vanep.location.exception.UnknownAddressComponentException;
+import br.com.vanep.location.exception.UnmatchedCityException;
+import br.com.vanep.location.exception.UnsupportedCountryException;
+import br.com.vanep.location.exception.UnsupportedStateException;
 import br.com.vanep.media.service.MediaFileService;
+import br.com.vanep.places.exception.PlaceLookupException;
+import br.com.vanep.places.exception.PlaceNotFoundException;
 import br.com.vanep.shared.document.model.DocumentSubmission;
 import br.com.vanep.shared.error.ApiProblemException;
 import org.slf4j.Logger;
@@ -100,6 +109,64 @@ public class ApiErrorAdvice extends ResponseEntityExceptionHandler {
   public ResponseEntity<Object> handleAccessDenied(
       AccessDeniedException exception, WebRequest request) {
     return handleProblem(exception, HttpStatus.FORBIDDEN, "auth.forbidden", request);
+  }
+
+  @ExceptionHandler(ViaCepNotFoundException.class)
+  public ResponseEntity<Object> handleViaCepNotFound(
+      ViaCepNotFoundException exception, WebRequest request) {
+    return handleProblem(exception, HttpStatus.NOT_FOUND, "cep.not_found", request);
+  }
+
+  @ExceptionHandler(ViaCepLookupException.class)
+  public ResponseEntity<Object> handleViaCepLookup(
+      ViaCepLookupException exception, WebRequest request) {
+    return handleProblem(exception, HttpStatus.SERVICE_UNAVAILABLE, "cep.lookup_failed", request);
+  }
+
+  @ExceptionHandler(PlaceNotFoundException.class)
+  public ResponseEntity<Object> handlePlaceNotFound(
+      PlaceNotFoundException exception, WebRequest request) {
+    return handleProblem(exception, HttpStatus.BAD_REQUEST, "location.place.not_found", request);
+  }
+
+  @ExceptionHandler(PlaceNotResolvableException.class)
+  public ResponseEntity<Object> handlePlaceNotResolvable(
+      PlaceNotResolvableException exception, WebRequest request) {
+    return handleProblem(
+        exception, HttpStatus.BAD_REQUEST, "location.place.not_resolvable", request);
+  }
+
+  @ExceptionHandler(UnsupportedCountryException.class)
+  public ResponseEntity<Object> handleUnsupportedCountry(
+      UnsupportedCountryException exception, WebRequest request) {
+    return handleProblem(
+        exception, HttpStatus.BAD_REQUEST, "location.country.unsupported", request);
+  }
+
+  @ExceptionHandler(UnsupportedStateException.class)
+  public ResponseEntity<Object> handleUnsupportedState(
+      UnsupportedStateException exception, WebRequest request) {
+    return handleProblem(exception, HttpStatus.BAD_REQUEST, "location.state.unsupported", request);
+  }
+
+  @ExceptionHandler(UnmatchedCityException.class)
+  public ResponseEntity<Object> handleUnmatchedCity(
+      UnmatchedCityException exception, WebRequest request) {
+    return handleProblem(exception, HttpStatus.BAD_REQUEST, "location.city.unmatched", request);
+  }
+
+  @ExceptionHandler(UnknownAddressComponentException.class)
+  public ResponseEntity<Object> handleUnknownAddressComponent(
+      UnknownAddressComponentException exception, WebRequest request) {
+    return handleProblem(
+        exception, HttpStatus.BAD_REQUEST, "location.component.unknown_type", request);
+  }
+
+  @ExceptionHandler(PlaceLookupException.class)
+  public ResponseEntity<Object> handlePlaceLookup(
+      PlaceLookupException exception, WebRequest request) {
+    return handleProblem(
+        exception, HttpStatus.SERVICE_UNAVAILABLE, "location.place.lookup_failed", request);
   }
 
   @ExceptionHandler(Exception.class)

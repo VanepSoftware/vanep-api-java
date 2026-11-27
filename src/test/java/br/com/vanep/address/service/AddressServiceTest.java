@@ -23,6 +23,7 @@ import br.com.vanep.dependent.repository.DependentRepository;
 import br.com.vanep.places.dto.PlaceDetailsResponseDTO;
 import br.com.vanep.school.model.SchoolModel;
 import br.com.vanep.school.repository.SchoolRepository;
+import br.com.vanep.shared.error.ApiProblemException;
 import br.com.vanep.state.model.StateModel;
 import br.com.vanep.unlinkedpassenger.model.UnlinkedPassengerModel;
 import java.util.List;
@@ -33,9 +34,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.context.MessageSource;
 import org.springframework.http.HttpStatus;
-import org.springframework.web.server.ResponseStatusException;
 
 @ExtendWith(MockitoExtension.class)
 class AddressServiceTest {
@@ -43,7 +42,6 @@ class AddressServiceTest {
   @Mock private AddressPlaceResolverService placeResolver;
   @Mock private AddressCatalogResolverService catalogResolver;
   @Mock private AddressMapper mapper;
-  @Mock private MessageSource messages;
   @Mock private DependentRepository dependents;
   @Mock private SchoolRepository schools;
 
@@ -53,14 +51,7 @@ class AddressServiceTest {
   void setUp() {
     service =
         new AddressService(
-            addressRepository,
-            placeResolver,
-            catalogResolver,
-            mapper,
-            messages,
-            dependents,
-            schools);
-    lenient().when(messages.getMessage(any(), any(), any())).thenAnswer(inv -> inv.getArgument(0));
+            addressRepository, placeResolver, catalogResolver, mapper, dependents, schools);
     lenient().when(dependents.countByAddressId(anyLong())).thenReturn(0L);
     lenient().when(dependents.countByAddressIdAndIdNot(anyLong(), anyLong())).thenReturn(0L);
     lenient().when(schools.countByAddressId(anyLong())).thenReturn(0L);
@@ -435,7 +426,12 @@ class AddressServiceTest {
     when(schools.findById(3L)).thenReturn(Optional.of(school));
 
     assertThatThrownBy(() -> service.upsertForSchool(3L, amendRequest("340", null)))
-        .hasMessageContaining("address.place_required");
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+              assertThat(ex.getCode()).isEqualTo("address.place_required");
+            });
 
     verify(addressRepository, never()).save(any(AddressModel.class));
     verifyNoInteractions(placeResolver);
@@ -448,7 +444,12 @@ class AddressServiceTest {
 
     assertThatThrownBy(
             () -> service.upsertForSchool(3L, new AddressRequestDTO("   ", null, null, null)))
-        .hasMessageContaining("address.place_required");
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+              assertThat(ex.getCode()).isEqualTo("address.place_required");
+            });
 
     verify(addressRepository, never()).save(any(AddressModel.class));
   }
@@ -462,10 +463,10 @@ class AddressServiceTest {
 
     assertThatThrownBy(() -> service.upsertForDependent(2L, catalogRequest()))
         .isInstanceOfSatisfying(
-            ResponseStatusException.class,
+            ApiProblemException.class,
             ex -> {
               assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
-              assertThat(ex.getReason()).isEqualTo("address.already_owned");
+              assertThat(ex.getCode()).isEqualTo("address.already_owned");
             });
 
     verify(addressRepository, never()).save(any(AddressModel.class));
@@ -476,12 +477,12 @@ class AddressServiceTest {
   void upsertForDependentDoesNotPersistWhenTheCityIsUnknown() {
     DependentModel dependent = dependentWithId(2L);
     when(dependents.findById(2L)).thenReturn(Optional.of(dependent));
-    org.mockito.BDDMockito.willThrow(new ResponseStatusException(HttpStatus.NOT_FOUND, "city"))
+    org.mockito.BDDMockito.willThrow(ApiProblemException.notFound("city.not_found"))
         .given(catalogResolver)
         .applyCity(any(), any(), any(), any(), any(), any(), any());
 
     assertThatThrownBy(() -> service.upsertForDependent(2L, catalogRequest()))
-        .isInstanceOf(ResponseStatusException.class);
+        .isInstanceOf(ApiProblemException.class);
 
     verify(addressRepository, never()).save(any(AddressModel.class));
     verify(dependents, never()).save(any());
@@ -532,8 +533,11 @@ class AddressServiceTest {
 
     assertThatThrownBy(() -> service.upsertForUnlinkedPassenger(passenger, catalogRequest()))
         .isInstanceOfSatisfying(
-            ResponseStatusException.class,
-            ex -> assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.CONFLICT));
+            ApiProblemException.class,
+            ex -> {
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+              assertThat(ex.getCode()).isEqualTo("address.already_owned");
+            });
 
     verifyNoInteractions(catalogResolver);
   }

@@ -13,14 +13,14 @@ import br.com.vanep.location.service.LocationResolverService;
 import br.com.vanep.places.client.PlacesClient;
 import br.com.vanep.places.dto.AddressComponentDTO;
 import br.com.vanep.places.dto.PlaceDetailsResponseDTO;
+import br.com.vanep.shared.error.ApiProblemException;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.context.support.StaticMessageSource;
-import org.springframework.web.server.ResponseStatusException;
+import org.springframework.http.HttpStatus;
 
 @ExtendWith(MockitoExtension.class)
 class AddressPlaceResolverServiceTest {
@@ -32,9 +32,7 @@ class AddressPlaceResolverServiceTest {
 
   @BeforeEach
   void setUp() {
-    StaticMessageSource messages = new StaticMessageSource();
-    messages.setUseCodeAsDefaultMessage(true);
-    service = new AddressPlaceResolverService(places, resolver, messages);
+    service = new AddressPlaceResolverService(places, resolver);
 
     city = new CityModel();
     city.setName("Brasilia");
@@ -102,8 +100,12 @@ class AddressPlaceResolverServiceTest {
     AddressModel address = new AddressModel();
 
     assertThatThrownBy(() -> service.applyPlace(address, "place-1", null, null, null))
-        .isInstanceOf(ResponseStatusException.class)
-        .hasMessageContaining("location.address.street_required");
+        .isInstanceOfSatisfying(
+            ApiProblemException.class,
+            ex -> {
+              assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+              assertThat(ex.getCode()).isEqualTo("location.address.street_required");
+            });
 
     assertThat(address.getStreet()).isNull();
   }

@@ -11,18 +11,15 @@ import br.com.vanep.dependent.repository.DependentRepository;
 import br.com.vanep.places.dto.PlaceDetailsResponseDTO;
 import br.com.vanep.school.model.SchoolModel;
 import br.com.vanep.school.repository.SchoolRepository;
+import br.com.vanep.shared.error.ApiProblemException;
 import br.com.vanep.unlinkedpassenger.model.UnlinkedPassengerModel;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
-import org.springframework.context.MessageSource;
-import org.springframework.context.i18n.LocaleContextHolder;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class AddressService {
@@ -30,7 +27,6 @@ public class AddressService {
   private final AddressPlaceResolverService placeResolver;
   private final AddressCatalogResolverService catalogResolver;
   private final AddressMapper mapper;
-  private final MessageSource messages;
   private final DependentRepository dependents;
   private final SchoolRepository schools;
 
@@ -39,20 +35,14 @@ public class AddressService {
       AddressPlaceResolverService placeResolver,
       AddressCatalogResolverService catalogResolver,
       AddressMapper mapper,
-      MessageSource messages,
       DependentRepository dependents,
       SchoolRepository schools) {
     this.addressRepository = addressRepository;
     this.placeResolver = placeResolver;
     this.catalogResolver = catalogResolver;
     this.mapper = mapper;
-    this.messages = messages;
     this.dependents = dependents;
     this.schools = schools;
-  }
-
-  private String message(String key) {
-    return messages.getMessage(key, null, LocaleContextHolder.getLocale());
   }
 
   public AddressResponseDTO toResponseOrNull(Long addressId) {
@@ -189,10 +179,7 @@ public class AddressService {
       AddressModel address =
           addressRepository
               .findById(currentAddressId)
-              .orElseThrow(
-                  () ->
-                      new ResponseStatusException(
-                          HttpStatus.NOT_FOUND, message("address.not_found")));
+              .orElseThrow(() -> ApiProblemException.notFound("address.not_found"));
       writeToExistingAddress.accept(address);
       return mapper.toResponse(addressRepository.save(address));
     }
@@ -213,27 +200,20 @@ public class AddressService {
 
   private void rejectIfOwnedByAnotherActiveOwner(long dependentCount, long schoolCount) {
     if (dependentCount + schoolCount > 0) {
-      throw new ResponseStatusException(HttpStatus.CONFLICT, message("address.already_owned"));
+      throw ApiProblemException.conflict("address.already_owned");
     }
   }
 
   private DependentModel requireDependent(Long dependentId) {
     return dependents
         .findById(dependentId)
-        .orElseThrow(
-            () -> {
-              ResponseStatusException exception =
-                  new ResponseStatusException(HttpStatus.NOT_FOUND, message("dependent.not_found"));
-              exception.getBody().setProperty("code", "dependent.not_found");
-              return exception;
-            });
+        .orElseThrow(() -> ApiProblemException.notFound("dependent.not_found"));
   }
 
   private SchoolModel requireSchool(Long schoolId) {
     return schools
         .findById(schoolId)
-        .orElseThrow(
-            () -> new ResponseStatusException(HttpStatus.NOT_FOUND, message("school.not_found")));
+        .orElseThrow(() -> ApiProblemException.notFound("school.not_found"));
   }
 
   private Consumer<AddressModel> catalogAddressWriter(DependentAddressRequestDTO request) {
@@ -250,7 +230,7 @@ public class AddressService {
 
   private void applyToNewAddress(AddressModel address, AddressRequestDTO request) {
     if (!hasText(request.placeId())) {
-      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, message("address.place_required"));
+      throw ApiProblemException.badRequest("address.place_required");
     }
     resolvePlaceInto(address, request);
   }

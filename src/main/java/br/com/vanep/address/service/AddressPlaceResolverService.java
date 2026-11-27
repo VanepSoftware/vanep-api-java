@@ -6,24 +6,18 @@ import br.com.vanep.location.StreetAddressExtractor;
 import br.com.vanep.location.service.LocationResolverService;
 import br.com.vanep.places.client.PlacesClient;
 import br.com.vanep.places.dto.PlaceDetailsResponseDTO;
+import br.com.vanep.shared.error.ApiProblemException;
 import java.util.Optional;
-import org.springframework.context.MessageSource;
-import org.springframework.context.i18n.LocaleContextHolder;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class AddressPlaceResolverService {
   private final PlacesClient places;
   private final LocationResolverService resolver;
-  private final MessageSource messages;
 
-  public AddressPlaceResolverService(
-      PlacesClient places, LocationResolverService resolver, MessageSource messages) {
+  public AddressPlaceResolverService(PlacesClient places, LocationResolverService resolver) {
     this.places = places;
     this.resolver = resolver;
-    this.messages = messages;
   }
 
   public void applyPlace(
@@ -32,10 +26,7 @@ public class AddressPlaceResolverService {
 
     String street =
         StreetAddressExtractor.findStreet(details)
-            .orElseThrow(
-                () ->
-                    new ResponseStatusException(
-                        HttpStatus.BAD_REQUEST, message("location.address.street_required")));
+            .orElseThrow(() -> ApiProblemException.badRequest("location.address.street_required"));
 
     writePlace(
         address, details, resolver.resolveAndPersist(details).city(), street, number, complement);
@@ -74,9 +65,5 @@ public class AddressPlaceResolverService {
         .filter(value -> !value.isBlank())
         .or(() -> StreetAddressExtractor.findNumber(details))
         .orElse(null);
-  }
-
-  private String message(String key) {
-    return messages.getMessage(key, null, LocaleContextHolder.getLocale());
   }
 }

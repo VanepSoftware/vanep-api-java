@@ -540,7 +540,8 @@ class DependentControllerTest {
 
     mockMvc
         .perform(get("/api/dependent/" + own.getToken()).with(otherJwt()))
-        .andExpect(status().isForbidden());
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value("dependent.forbidden"));
   }
 
   @Test
@@ -576,10 +577,12 @@ class DependentControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"name\":\"" + "a".repeat(256) + "\"}"))
         .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("validation.failed"))
         .andExpect(
             jsonPath("$.detail").value(message("dependent.name.too_long").replace("{max}", "255")))
         .andExpect(jsonPath("$.field").value("name"))
         .andExpect(jsonPath("$.errors[0].field").value("name"))
+        .andExpect(jsonPath("$.errors[0].code").value("dependent.name.too_long"))
         .andExpect(
             jsonPath("$.errors[0].message")
                 .value(message("dependent.name.too_long").replace("{max}", "255")));
@@ -600,9 +603,11 @@ class DependentControllerTest {
                         + cityToken
                         + "\",\"street\":\"Rua Teste\",\"zipCode\":\"123\"}}"))
         .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("validation.failed"))
         .andExpect(jsonPath("$.detail").value(message("dependent_address.zip_code.invalid")))
         .andExpect(jsonPath("$.field").value("address.zipCode"))
         .andExpect(jsonPath("$.errors[0].field").value("address.zipCode"))
+        .andExpect(jsonPath("$.errors[0].code").value("dependent_address.zip_code.invalid"))
         .andExpect(
             jsonPath("$.errors[0].message").value(message("dependent_address.zip_code.invalid")));
   }
@@ -1310,6 +1315,7 @@ class DependentControllerTest {
             putSchoolDays(own, schoolDaysBody(day("MONDAY", "MORNING"), day("MONDAY", "FULLTIME")))
                 .with(ownerJwt()))
         .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("dependent.school_days.weekday_duplicate"))
         .andExpect(jsonPath("$.detail").value(message("dependent.school_days.weekday_duplicate")));
 
     expectStoredGrid(own, "FRIDAY", "NIGHT");

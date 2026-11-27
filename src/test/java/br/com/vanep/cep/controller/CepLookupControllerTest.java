@@ -148,6 +148,7 @@ class CepLookupControllerTest {
     mockMvc
         .perform(get("/api/cep/70040-010").with(authenticatedClientJwt()))
         .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("cep.invalid"))
         .andExpect(jsonPath("$.detail").value(message("cep.invalid")));
 
     verify(viaCepClient, never()).findByCep(anyString());
@@ -236,6 +237,7 @@ class CepLookupControllerTest {
     mockMvc
         .perform(get("/api/cep/" + BRASILIA_CEP).with(authenticatedClientJwt()))
         .andExpect(status().isTooManyRequests())
+        .andExpect(jsonPath("$.code").value("cep.rate_limited"))
         .andExpect(jsonPath("$.detail").value(message("cep.rate_limited")));
 
     verify(viaCepClient, never()).findByCep(anyString());

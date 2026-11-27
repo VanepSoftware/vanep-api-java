@@ -6,8 +6,11 @@ import java.math.BigDecimal;
 import org.openapitools.jackson.nullable.JsonNullable;
 
 public record ClientUpdateRequestDTO(
-    JsonNullable<@Size(max = 255) String> name,
-    JsonNullable<@Email @Size(max = 255) String> email,
+    JsonNullable<@Size(max = 255, message = "{client.name.too_long}") String> name,
+    JsonNullable<
+            @Email(message = "{user.profile.email.invalid}")
+            @Size(max = 255, message = "{user.profile.email.too_long}") String>
+        email,
     JsonNullable<BigDecimal> rating,
     JsonNullable<Boolean> active) {
 

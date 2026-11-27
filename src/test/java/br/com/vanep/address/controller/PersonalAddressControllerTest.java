@@ -172,7 +172,9 @@ class PersonalAddressControllerTest {
                 .with(caller())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(json(body)))
-        .andExpect(status().isBadRequest());
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("validation.failed"))
+        .andExpect(jsonPath("$.errors[0].code").value("personal_address.zip_code.required"));
 
     assertThat(addresses.count()).isZero();
   }
@@ -188,7 +190,9 @@ class PersonalAddressControllerTest {
                 .with(caller())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(json(body)))
-        .andExpect(status().isBadRequest());
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("validation.failed"))
+        .andExpect(jsonPath("$.errors[0].code").value("personal_address.zip_code.invalid"));
 
     assertThat(addresses.count()).isZero();
   }
@@ -204,7 +208,9 @@ class PersonalAddressControllerTest {
                 .with(caller())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(json(body)))
-        .andExpect(status().isBadRequest());
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("validation.failed"))
+        .andExpect(jsonPath("$.errors[0].code").value("personal_address.street.required"));
 
     assertThat(addresses.count()).isZero();
   }
@@ -221,6 +227,7 @@ class PersonalAddressControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(json(body)))
         .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.code").value("city.not_found"))
         .andExpect(jsonPath("$.detail").value(message("city.not_found")));
 
     assertThat(addresses.count()).isZero();

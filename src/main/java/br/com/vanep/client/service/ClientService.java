@@ -7,19 +7,16 @@ import br.com.vanep.client.dto.ClientUpdateRequestDTO;
 import br.com.vanep.client.mapper.ClientMapper;
 import br.com.vanep.client.model.ClientModel;
 import br.com.vanep.client.repository.ClientRepository;
+import br.com.vanep.shared.error.ApiProblemException;
 import br.com.vanep.user.enums.UserType;
 import br.com.vanep.user.model.UserModel;
 import br.com.vanep.user.repository.UserRepository;
 import br.com.vanep.user.service.UserService;
 import java.util.Objects;
-import org.springframework.context.MessageSource;
-import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class ClientService {
@@ -28,25 +25,18 @@ public class ClientService {
   private final ClientMapper mapper;
   private final UserService userService;
   private final AddressService addressService;
-  private final MessageSource messages;
 
   public ClientService(
       ClientRepository clients,
       UserRepository users,
       ClientMapper mapper,
       UserService userService,
-      AddressService addressService,
-      MessageSource messages) {
+      AddressService addressService) {
     this.clients = clients;
     this.users = users;
     this.mapper = mapper;
     this.userService = userService;
     this.addressService = addressService;
-    this.messages = messages;
-  }
-
-  private String message(String key) {
-    return messages.getMessage(key, null, LocaleContextHolder.getLocale());
   }
 
   public Page<ClientResponseDTO> findAll(Pageable pageable) {
@@ -95,7 +85,7 @@ public class ClientService {
     if (request.active().isPresent()) {
       Boolean active = request.active().get();
       if (active == null) {
-        throw badRequest("client.active.required");
+        throw ApiProblemException.badRequest("client.active.required");
       }
       client.setActive(active);
     }
@@ -108,20 +98,16 @@ public class ClientService {
 
   void applyEmail(UserModel user, String email) {
     if (!email.equalsIgnoreCase(user.getEmail()) && users.existsByEmail(email)) {
-      throw new ResponseStatusException(HttpStatus.CONFLICT, message("client.email.duplicate"));
+      throw ApiProblemException.conflict("client.email.duplicate");
     }
     user.setEmail(email);
   }
 
   String requireText(String value, String messageKey) {
     if (value == null || value.isBlank()) {
-      throw badRequest(messageKey);
+      throw ApiProblemException.badRequest(messageKey);
     }
     return value;
-  }
-
-  ResponseStatusException badRequest(String messageKey) {
-    return new ResponseStatusException(HttpStatus.BAD_REQUEST, message(messageKey));
   }
 
   @Transactional
@@ -138,18 +124,12 @@ public class ClientService {
   private ClientModel requireByUserId(Long userId) {
     return clients
         .findByUserId(userId)
-        .orElseThrow(
-            () ->
-                new ResponseStatusException(
-                    HttpStatus.NOT_FOUND, message("client.profile.not_found")));
+        .orElseThrow(() -> ApiProblemException.notFound("client.profile.not_found"));
   }
 
   private ClientModel requireByToken(String token) {
     return clients
         .findByToken(token)
-        .orElseThrow(
-            () ->
-                new ResponseStatusException(
-                    HttpStatus.NOT_FOUND, message("client.profile.not_found")));
+        .orElseThrow(() -> ApiProblemException.notFound("client.profile.not_found"));
   }
 }

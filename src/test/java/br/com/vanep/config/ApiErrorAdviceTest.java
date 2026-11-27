@@ -7,6 +7,15 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import br.com.vanep.cep.exception.ViaCepLookupException;
+import br.com.vanep.cep.exception.ViaCepNotFoundException;
+import br.com.vanep.location.exception.PlaceNotResolvableException;
+import br.com.vanep.location.exception.UnknownAddressComponentException;
+import br.com.vanep.location.exception.UnmatchedCityException;
+import br.com.vanep.location.exception.UnsupportedCountryException;
+import br.com.vanep.location.exception.UnsupportedStateException;
+import br.com.vanep.places.exception.PlaceLookupException;
+import br.com.vanep.places.exception.PlaceNotFoundException;
 import br.com.vanep.shared.error.ApiProblemException;
 import jakarta.validation.Constraint;
 import jakarta.validation.ConstraintValidator;
@@ -216,6 +225,46 @@ class ApiErrorAdviceTest {
         .andExpect(jsonPath("$.detail", not(containsString("IllegalStateException"))));
   }
 
+  @Test
+  void mapsCepAndLocationDomainExceptionsWithExpectedStatusAndCode() throws Exception {
+    mockMvc
+        .perform(get("/__test/validation/cep-not-found"))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.code").value("cep.not_found"));
+    mockMvc
+        .perform(get("/__test/validation/cep-unavailable"))
+        .andExpect(status().isServiceUnavailable())
+        .andExpect(jsonPath("$.code").value("cep.lookup_failed"));
+    mockMvc
+        .perform(get("/__test/validation/place-not-found"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("location.place.not_found"));
+    mockMvc
+        .perform(get("/__test/validation/place-not-resolvable"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("location.place.not_resolvable"));
+    mockMvc
+        .perform(get("/__test/validation/unsupported-country"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("location.country.unsupported"));
+    mockMvc
+        .perform(get("/__test/validation/unsupported-state"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("location.state.unsupported"));
+    mockMvc
+        .perform(get("/__test/validation/unmatched-city"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("location.city.unmatched"));
+    mockMvc
+        .perform(get("/__test/validation/unknown-component"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("location.component.unknown_type"));
+    mockMvc
+        .perform(get("/__test/validation/place-unavailable"))
+        .andExpect(status().isServiceUnavailable())
+        .andExpect(jsonPath("$.code").value("location.place.lookup_failed"));
+  }
+
   @RestController
   @RequestMapping("/__test/validation")
   static class ValidationFixtureController {
@@ -254,6 +303,51 @@ class ApiErrorAdviceTest {
     @GetMapping("/boom")
     void boom() {
       throw new IllegalStateException("SELECT * FROM users WHERE secret='123'");
+    }
+
+    @GetMapping("/cep-not-found")
+    void cepNotFound() {
+      throw new ViaCepNotFoundException("70040010");
+    }
+
+    @GetMapping("/cep-unavailable")
+    void cepUnavailable() {
+      throw new ViaCepLookupException("timeout");
+    }
+
+    @GetMapping("/place-not-found")
+    void placeNotFound() {
+      throw new PlaceNotFoundException("place-1");
+    }
+
+    @GetMapping("/place-not-resolvable")
+    void placeNotResolvable() {
+      throw new PlaceNotResolvableException("place-1");
+    }
+
+    @GetMapping("/unsupported-country")
+    void unsupportedCountry() {
+      throw new UnsupportedCountryException("US");
+    }
+
+    @GetMapping("/unsupported-state")
+    void unsupportedState() {
+      throw new UnsupportedStateException("XX");
+    }
+
+    @GetMapping("/unmatched-city")
+    void unmatchedCity() {
+      throw new UnmatchedCityException("SP", "Nowhere", "place-1");
+    }
+
+    @GetMapping("/unknown-component")
+    void unknownComponent() {
+      throw new UnknownAddressComponentException("Foo", java.util.List.of("weird"));
+    }
+
+    @GetMapping("/place-unavailable")
+    void placeUnavailable() {
+      throw new PlaceLookupException("timeout");
     }
   }
 
