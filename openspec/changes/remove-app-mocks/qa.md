@@ -1,6 +1,6 @@
 # QA — remove-app-mocks (VAN-95, constitution rule 55)
 
-Latest run: API built from `fix/remove-mocks`, merged with `main`. Run date: 2026-11-26. Result: **55/55 passed**.
+Latest run: API built from `fix/remove-mocks`, merged with `main`. Run date: 2026-11-27. Result: **57/57 passed**.
 
 ## How to run
 
@@ -105,6 +105,8 @@ All new reads are `GET`. Covered: happy path per actor, no token, invalid token,
 | id | scenario | expected | result |
 |---|---|---|---|
 | N1 | no van today, next five days returned | 200 | PASS |
+| N3 | contract starting soon: no van today, covered child not listed as without van | 200 | PASS |
+| N4 | contract starting beyond the window: child still without van | 200 | PASS |
 | N2 | no ACTIVE contract: nothing today, both children without van | 200 | PASS |
 
 ### A6 paused and former links

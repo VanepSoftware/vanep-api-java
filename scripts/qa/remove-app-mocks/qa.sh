@@ -188,6 +188,16 @@ expect N1 "no van today, next five days returned" 200 \
 echo "response N1: $RESP_BODY"
 sql "insert into schedule_slot overriding system value select * from qa_slot_backup;
      drop table qa_slot_backup" >/dev/null
+STARTS_ON=$(sql "select starts_on from contract limit 1")
+sql "update contract set starts_on = (now() at time zone 'America/Sao_Paulo')::date + 3" >/dev/null
+request GET "$DAY" "$ANA"
+expect N3 "contract starting soon: no van today, covered child not listed as without van" 200 \
+  '.vans == [] and all(.childrenWithoutVan[]; .name != "Lucas Souza") and any(.childrenWithoutVan[]; .name == "Marina Souza")'
+sql "update contract set starts_on = (now() at time zone 'America/Sao_Paulo')::date + 30" >/dev/null
+request GET "$DAY" "$ANA"
+expect N4 "contract starting beyond the window: child still without van" 200 \
+  'any(.childrenWithoutVan[]; .name == "Lucas Souza")'
+sql "update contract set starts_on = '$STARTS_ON'" >/dev/null
 sql "update contract set status = 'CANCELLED'" >/dev/null
 request GET "$DAY" "$ANA"
 expect N2 "no ACTIVE contract: nothing today, both children without van" 200 \

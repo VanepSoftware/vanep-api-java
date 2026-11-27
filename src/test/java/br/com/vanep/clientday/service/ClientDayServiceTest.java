@@ -253,7 +253,7 @@ class ClientDayServiceTest {
   }
 
   @Test
-  void listsTheChildrenNoContractCoversToday() {
+  void listsOnlyTheChildrenWithoutAContractNowOrStartingSoon() {
     DependentModel pedro = dependent("dep-pedro", "Pedro");
     pedro.setId(1L);
     DependentModel davi = dependent("dep-davi", "Davi");
@@ -276,7 +276,7 @@ class ClientDayServiceTest {
 
     assertThat(service.findMyDay(CALLER).childrenWithoutVan())
         .extracting(ClientDayChildDTO::name)
-        .containsExactly("Bia", "Davi");
+        .containsExactly("Davi");
   }
 
   @Test

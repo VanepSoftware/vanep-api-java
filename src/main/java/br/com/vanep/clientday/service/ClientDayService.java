@@ -120,11 +120,7 @@ public class ClientDayService {
             .toList();
     List<ClientDayUpcomingDTO> upcoming = vans.isEmpty() ? upcomingDays(items, today) : List.of();
     return new ClientDayResponseDTO(
-        today,
-        vans,
-        upcoming,
-        childrenWithoutVan(client, items, today),
-        expiredInspections(items, today));
+        today, vans, upcoming, childrenWithoutVan(client, items), expiredInspections(items, today));
   }
 
   /**
@@ -175,16 +171,15 @@ public class ClientDayService {
   }
 
   /**
-   * Dependents of the client that no contract in force today covers. The client registered as their
-   * own passenger is left out: they are not a child waiting for a van.
+   * Dependents of the client that no ACTIVE contract covers, in force today or starting within
+   * {@value #DAYS_TO_LOOK_AHEAD} days: a child whose contract is about to start already has a van.
+   * The client registered as their own passenger is left out: they are not a child waiting for a
+   * van.
    */
   private List<ClientDayChildDTO> childrenWithoutVan(
-      ClientModel client, List<ContractItemModel> items, LocalDate today) {
+      ClientModel client, List<ContractItemModel> items) {
     Set<Long> covered =
-        items.stream()
-            .filter(item -> isInForce(item.getContract(), today))
-            .map(item -> item.getDependent().getId())
-            .collect(Collectors.toSet());
+        items.stream().map(item -> item.getDependent().getId()).collect(Collectors.toSet());
     return dependentRepository.findByClientId(client.getId()).stream()
         .filter(dependent -> !dependent.isSelf() && !covered.contains(dependent.getId()))
         .sorted(Comparator.comparing(DependentModel::getName))
